@@ -1,28 +1,44 @@
-# Dependencies
-node_modules/
+# deps
+/node_modules
+/.pnp
+.pnp.*
 
-# Next.js
-.next/
-out/
+# testing
+/coverage
 
-# Environment
-.env*
-.env.local
+# next.js
+/.next/
+/out/
 
-# OS
+# production
+/build
+/dist
+
+# misc
 .DS_Store
 Thumbs.db
-
-# Secrets
-*.key
 *.pem
+*.key
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# env files
+.env
+.env*.local
+.env.cron
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
 
 # IDE
 .vscode/
 .idea/
-
-# Build
-dist/
-
-# Logs
-*.log

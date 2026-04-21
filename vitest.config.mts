@@ -1,0 +1,28 @@
+import { defineConfig } from "vitest/config";
+import path from "node:path";
+
+// Nota: environment 'node' para evitar timeouts de worker en OneDrive.
+export default defineConfig({
+  test: {
+    environment: "node",
+    globals: true,
+    include: ["__tests__/**/*.test.{ts,tsx,mts,mjs}"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      thresholds: {
+        statements: 70,
+        branches: 70,
+        functions: 70,
+        lines: 70,
+      },
+      include: ["lib/**/*.ts"],
+      exclude: ["lib/**/*.test.ts", "lib/supabase/**"],
+    },
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "."),
+    },
+  },
+});

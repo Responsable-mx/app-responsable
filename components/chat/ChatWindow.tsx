@@ -22,9 +22,10 @@ const ROLES: Array<{
   color: string;
   emoji: string;
 }> = [
+  // Orden lógico de la cadena de calidad: Autor → Revisor → Elevador → Validador.
   { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-teal-700", emoji: "✍️" },
-  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-indigo-700", emoji: "⭐" },
   { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-amber-600", emoji: "🔍" },
+  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-indigo-700", emoji: "⭐" },
   { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-rose-700", emoji: "✅" },
 ];
 

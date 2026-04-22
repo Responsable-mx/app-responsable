@@ -9,21 +9,22 @@ export type PromptKey =
   | "role.elena"
   | "role.valeria";
 
+// Orden alfabético por label mostrado (es-MX).
 export const PROMPT_KEYS: PromptKey[] = [
+  "role.aurora",
+  "role.elena",
   "system.app_navigation",
   "system.base_rules",
-  "role.aurora",
   "role.rebeca",
-  "role.elena",
   "role.valeria",
 ];
 
 export const PROMPT_LABELS: Record<PromptKey, string> = {
+  "role.aurora": "Aurora · Autor",
+  "role.elena": "Elena · Elevador",
   "system.app_navigation": "Navegación de la app (común)",
   "system.base_rules": "Reglas base (común a los 4 roles)",
-  "role.aurora": "Aurora · Autor",
   "role.rebeca": "Rebeca · Revisor",
-  "role.elena": "Elena · Elevador",
   "role.valeria": "Valeria · Validador",
 };
 

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Orden alfabético por label (es-MX).
 const TABS = [
   { href: "/configuracion/catalogos", label: "Catálogos", icon: "📚" },
-  { href: "/configuracion/usuarios", label: "Usuarios", icon: "👥" },
-  { href: "/configuracion/prompts", label: "Prompts IA", icon: "🧠" },
   { href: "/configuracion/preferencias", label: "Preferencias", icon: "🎛️" },
+  { href: "/configuracion/prompts", label: "Prompts IA", icon: "🧠" },
+  { href: "/configuracion/usuarios", label: "Usuarios", icon: "👥" },
 ];
 
 export function ConfigTabs() {

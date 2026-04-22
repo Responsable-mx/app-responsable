@@ -18,6 +18,7 @@ export type CatalogCategory =
   | "countries"
   | "revenue_models";
 
+// Orden alfabético por label (es-MX).
 export const CATALOG_CATEGORIES: Array<{
   key: CatalogCategory;
   label: string;
@@ -25,16 +26,16 @@ export const CATALOG_CATEGORIES: Array<{
   hasSearch: boolean;   // si el dropdown muestra buscador (catálogos ≥10)
   hasGroups: boolean;   // si se agrupa por group_name en el dropdown
 }> = [
-  { key: "sectors",                 label: "Sectores",              description: "Taxonomía de industrias que los clientes pueden elegir.", hasSearch: true,  hasGroups: true },
-  { key: "countries",               label: "Países",                description: "Países donde operan los clientes.",                     hasSearch: true,  hasGroups: true },
-  { key: "business_segments",       label: "Segmentos de negocio",  description: "B2B, B2C, gobierno, etc.",                              hasSearch: false, hasGroups: false },
-  { key: "frameworks",              label: "Marcos ESG",            description: "GRI, SASB, ISSB, CSRD y similares.",                    hasSearch: true,  hasGroups: true },
-  { key: "applicable_regulations",  label: "Regulaciones aplicables", description: "Regulaciones ESG por jurisdicción.",                  hasSearch: true,  hasGroups: true },
-  { key: "policies",                label: "Políticas corporativas", description: "Políticas internas que el cliente puede tener formalizadas.", hasSearch: false, hasGroups: false },
-  { key: "certifications",          label: "Certificaciones",       description: "Certificaciones ISO, B Corp, EcoVadis, etc.",           hasSearch: true,  hasGroups: true },
-  { key: "material_topics",         label: "Temas materiales",      description: "Temas ESG priorizables en materialidad (basado en GRI).", hasSearch: true,  hasGroups: true },
-  { key: "maturity_levels",         label: "Niveles de madurez",    description: "Escala de madurez ESG del cliente.",                    hasSearch: false, hasGroups: false },
-  { key: "revenue_models",          label: "Modelos de ingresos",   description: "Cómo el cliente genera ingresos (B2B contratos, suscripción, etc.).", hasSearch: false, hasGroups: false },
+  { key: "certifications",          label: "Certificaciones",         description: "Certificaciones ISO, B Corp, EcoVadis, etc.",           hasSearch: true,  hasGroups: true },
+  { key: "frameworks",              label: "Marcos ESG",              description: "GRI, SASB, ISSB, CSRD y similares.",                    hasSearch: true,  hasGroups: true },
+  { key: "revenue_models",          label: "Modelos de ingresos",     description: "Cómo el cliente genera ingresos (B2B contratos, suscripción, etc.).", hasSearch: false, hasGroups: false },
+  { key: "maturity_levels",         label: "Niveles de madurez",      description: "Escala de madurez ESG del cliente.",                    hasSearch: false, hasGroups: false },
+  { key: "countries",               label: "Países",                  description: "Países donde operan los clientes.",                     hasSearch: true,  hasGroups: true },
+  { key: "policies",                label: "Políticas corporativas",  description: "Políticas internas que el cliente puede tener formalizadas.", hasSearch: false, hasGroups: false },
+  { key: "applicable_regulations",  label: "Regulaciones aplicables", description: "Regulaciones ESG por jurisdicción.",                    hasSearch: true,  hasGroups: true },
+  { key: "sectors",                 label: "Sectores",                description: "Taxonomía de industrias que los clientes pueden elegir.", hasSearch: true,  hasGroups: true },
+  { key: "business_segments",       label: "Segmentos de negocio",    description: "B2B, B2C, gobierno, etc.",                              hasSearch: false, hasGroups: false },
+  { key: "material_topics",         label: "Temas materiales",        description: "Temas ESG priorizables en materialidad (basado en GRI).", hasSearch: true,  hasGroups: true },
 ];
 
 export type CatalogSeedItem = {
@@ -147,24 +148,24 @@ export const CATALOG_SEEDS: CatalogSeedItem[] = [
   { category: "sectors", value: "inmobiliario",    label: "Inmobiliario",            group_name: "Servicios",  sort_order: 210 },
   { category: "sectors", value: "agropecuario",    label: "Agropecuario",            group_name: "Primario",   sort_order: 220 },
 
-  // countries
+  // countries — México primero, resto alfabético (es-MX)
   { category: "countries", value: "mx", label: "México",              group_name: "LATAM",        sort_order: 10 },
-  { category: "countries", value: "gt", label: "Guatemala",           group_name: "LATAM",        sort_order: 20 },
-  { category: "countries", value: "cr", label: "Costa Rica",          group_name: "LATAM",        sort_order: 30 },
-  { category: "countries", value: "pa", label: "Panamá",              group_name: "LATAM",        sort_order: 40 },
-  { category: "countries", value: "co", label: "Colombia",            group_name: "LATAM",        sort_order: 50 },
-  { category: "countries", value: "pe", label: "Perú",                group_name: "LATAM",        sort_order: 60 },
-  { category: "countries", value: "cl", label: "Chile",               group_name: "LATAM",        sort_order: 70 },
-  { category: "countries", value: "ar", label: "Argentina",           group_name: "LATAM",        sort_order: 80 },
-  { category: "countries", value: "br", label: "Brasil",              group_name: "LATAM",        sort_order: 90 },
-  { category: "countries", value: "do", label: "República Dominicana",group_name: "LATAM",        sort_order: 100 },
-  { category: "countries", value: "us", label: "Estados Unidos",      group_name: "Norteamérica", sort_order: 110 },
-  { category: "countries", value: "ca", label: "Canadá",              group_name: "Norteamérica", sort_order: 120 },
-  { category: "countries", value: "es", label: "España",              group_name: "Europa",       sort_order: 130 },
-  { category: "countries", value: "de", label: "Alemania",            group_name: "Europa",       sort_order: 140 },
-  { category: "countries", value: "fr", label: "Francia",             group_name: "Europa",       sort_order: 150 },
+  { category: "countries", value: "de", label: "Alemania",            group_name: "Europa",       sort_order: 20 },
+  { category: "countries", value: "ar", label: "Argentina",           group_name: "LATAM",        sort_order: 30 },
+  { category: "countries", value: "br", label: "Brasil",              group_name: "LATAM",        sort_order: 40 },
+  { category: "countries", value: "ca", label: "Canadá",              group_name: "Norteamérica", sort_order: 50 },
+  { category: "countries", value: "cl", label: "Chile",               group_name: "LATAM",        sort_order: 60 },
+  { category: "countries", value: "co", label: "Colombia",            group_name: "LATAM",        sort_order: 70 },
+  { category: "countries", value: "cr", label: "Costa Rica",          group_name: "LATAM",        sort_order: 80 },
+  { category: "countries", value: "es", label: "España",              group_name: "Europa",       sort_order: 90 },
+  { category: "countries", value: "us", label: "Estados Unidos",      group_name: "Norteamérica", sort_order: 100 },
+  { category: "countries", value: "fr", label: "Francia",             group_name: "Europa",       sort_order: 110 },
+  { category: "countries", value: "gt", label: "Guatemala",           group_name: "LATAM",        sort_order: 120 },
+  { category: "countries", value: "nl", label: "Países Bajos",        group_name: "Europa",       sort_order: 130 },
+  { category: "countries", value: "pa", label: "Panamá",              group_name: "LATAM",        sort_order: 140 },
+  { category: "countries", value: "pe", label: "Perú",                group_name: "LATAM",        sort_order: 150 },
   { category: "countries", value: "uk", label: "Reino Unido",         group_name: "Europa",       sort_order: 160 },
-  { category: "countries", value: "nl", label: "Países Bajos",        group_name: "Europa",       sort_order: 170 },
+  { category: "countries", value: "do", label: "República Dominicana",group_name: "LATAM",        sort_order: 170 },
 
   // revenue_models
   { category: "revenue_models", value: "venta_directa",      label: "Venta directa",           sort_order: 10 },

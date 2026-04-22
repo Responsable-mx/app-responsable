@@ -5,17 +5,25 @@ import { useRouter } from "next/navigation";
 import type { Client } from "@/lib/clients";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
+import { StructuredBlockEditor } from "@/components/StructuredBlockEditor";
+import { BoolTriField } from "@/components/fields/BoolTriField";
+import {
+  NARRATIVE_SCHEMAS,
+  type NarrativeBlockKey,
+} from "@/lib/clients/narrative-schemas";
 
 type Props =
   | { mode: "create"; initial?: undefined }
   | { mode: "edit"; initial: Client };
 
+type BlockValue = Record<string, unknown>;
+
 type FormState = {
   // Identificación
   name: string;
-  sector: string;       // single-select value
+  sector: string;
   subsector: string;
-  countries: string[];  // multi
+  countries: string[];
   size: string;
 
   // Atributos estructurados
@@ -25,18 +33,13 @@ type FormState = {
   policies_in_place: string[];
   certifications: string[];
   material_topics: string[];
-  maturity_level: string; // single
+  maturity_level: string;
   has_double_materiality: boolean | null;
   has_sustainability_report: boolean | null;
   has_sustainability_strategy: boolean | null;
 
-  // Narrativa
-  info_general: string;
-  business_model: string;
-  impacts: string;
-  regulatory_context: string;
-  sustainability_strategy: string;
-  stakeholders: string;
+  // Narrativa JSONB (6 bloques)
+  blocks: Record<NarrativeBlockKey, BlockValue>;
 };
 
 const SIZE_OPTIONS = [
@@ -48,53 +51,23 @@ const SIZE_OPTIONS = [
   { value: "corporativo", label: "Corporativo" },
 ];
 
-const BLOCKS: Array<{
-  key: keyof Pick<
-    FormState,
-    | "info_general"
-    | "business_model"
-    | "impacts"
-    | "regulatory_context"
-    | "sustainability_strategy"
-    | "stakeholders"
-  >;
-  label: string;
-  hint: string;
-}> = [
-  {
-    key: "info_general",
-    label: "1. Operaciones y productos",
-    hint: "Unidades de negocio, % ingresos por línea, productos/servicios principales, volúmenes relevantes. (Nombre/sector/países/tamaño ya están arriba.)",
-  },
-  {
-    key: "business_model",
-    label: "2. Modelo de negocio",
-    hint: "Cómo genera ingresos, propuesta de valor, costos operativos, CAPEX, dependencias críticas. (Segmentos ya están en chips.)",
-  },
-  {
-    key: "impacts",
-    label: "3. Impactos ESG actuales",
-    hint: "Emisiones 1/2/3 con valores medidos, agua, residuos, biodiversidad, condiciones laborales, comunidades, incidentes/multas.",
-  },
-  {
-    key: "regulatory_context",
-    label: "4. Contexto sectorial",
-    hint: "Requerimientos de cadena global, presión de inversionistas, top 3 tendencias del sector, benchmark competidores. (Regulaciones ya están en chips.)",
-  },
-  {
-    key: "sustainability_strategy",
-    label: "5. Estrategia y materialidad",
-    hint: "Pilares/objetivos, KPIs con targets y base year, modelo de sostenibilidad, resultados del estudio de materialidad. (Políticas/certificaciones/temas ya están en chips.)",
-  },
-  {
-    key: "stakeholders",
-    label: "6. Stakeholders",
-    hint: "Grupos clave, nivel de dependencia, canales de relación, expectativas y conflictos.",
-  },
-];
-
 function toBool(v: boolean | null | undefined): boolean | null {
   return v === undefined ? null : v;
+}
+
+function initialBlocks(
+  initial?: Client
+): Record<NarrativeBlockKey, BlockValue> {
+  return {
+    info_general: (initial?.info_general_json as BlockValue) ?? {},
+    business_model: (initial?.business_model_json as BlockValue) ?? {},
+    impacts: (initial?.impacts_json as BlockValue) ?? {},
+    regulatory_context:
+      (initial?.regulatory_context_json as BlockValue) ?? {},
+    sustainability_strategy:
+      (initial?.sustainability_strategy_json as BlockValue) ?? {},
+    stakeholders: (initial?.stakeholders_json as BlockValue) ?? {},
+  };
 }
 
 export function ClientForm(props: Props) {
@@ -123,16 +96,18 @@ export function ClientForm(props: Props) {
     has_sustainability_strategy: toBool(
       props.initial?.has_sustainability_strategy
     ),
-    info_general: props.initial?.info_general ?? "",
-    business_model: props.initial?.business_model ?? "",
-    impacts: props.initial?.impacts ?? "",
-    regulatory_context: props.initial?.regulatory_context ?? "",
-    sustainability_strategy: props.initial?.sustainability_strategy ?? "",
-    stakeholders: props.initial?.stakeholders ?? "",
+    blocks: initialBlocks(props.initial),
   });
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateBlock(block: NarrativeBlockKey, next: BlockValue) {
+    setForm((prev) => ({
+      ...prev,
+      blocks: { ...prev.blocks, [block]: next },
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -156,12 +131,12 @@ export function ClientForm(props: Props) {
         has_double_materiality: form.has_double_materiality,
         has_sustainability_report: form.has_sustainability_report,
         has_sustainability_strategy: form.has_sustainability_strategy,
-        info_general: form.info_general || null,
-        business_model: form.business_model || null,
-        impacts: form.impacts || null,
-        regulatory_context: form.regulatory_context || null,
-        sustainability_strategy: form.sustainability_strategy || null,
-        stakeholders: form.stakeholders || null,
+        info_general_json: form.blocks.info_general,
+        business_model_json: form.blocks.business_model,
+        impacts_json: form.blocks.impacts,
+        regulatory_context_json: form.blocks.regulatory_context,
+        sustainability_strategy_json: form.blocks.sustainability_strategy,
+        stakeholders_json: form.blocks.stakeholders,
       };
 
       const url =
@@ -206,7 +181,7 @@ export function ClientForm(props: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* ═══ Nivel 1 — Identificación ═══════════════════════ */}
+      {/* ═══ Identificación ══════════════════════════════════ */}
       <Section title="Identificación">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Nombre *">
@@ -263,7 +238,7 @@ export function ClientForm(props: Props) {
         />
       </Section>
 
-      {/* ═══ Nivel 2 — Atributos estructurados ═══════════════ */}
+      {/* ═══ Atributos estructurados ═════════════════════════ */}
       <Section title="Atributos ESG">
         <div className="grid grid-cols-2 gap-4">
           <MultiSelectCombobox
@@ -295,7 +270,6 @@ export function ClientForm(props: Props) {
         <MultiSelectCombobox
           category="applicable_regulations"
           label="Regulaciones aplicables"
-          hint="Regulaciones ESG que le aplican por jurisdicción."
           value={form.applicable_regulations}
           onChange={(v) =>
             update("applicable_regulations", (v as string[]) ?? [])
@@ -307,7 +281,9 @@ export function ClientForm(props: Props) {
           category="policies"
           label="Políticas formalizadas"
           value={form.policies_in_place}
-          onChange={(v) => update("policies_in_place", (v as string[]) ?? [])}
+          onChange={(v) =>
+            update("policies_in_place", (v as string[]) ?? [])
+          }
         />
 
         <MultiSelectCombobox
@@ -328,17 +304,17 @@ export function ClientForm(props: Props) {
         />
 
         <div className="grid grid-cols-3 gap-4 pt-1">
-          <BoolField
+          <BoolFieldInline
             label="Tiene estrategia de sostenibilidad"
             value={form.has_sustainability_strategy}
             onChange={(v) => update("has_sustainability_strategy", v)}
           />
-          <BoolField
+          <BoolFieldInline
             label="Publica reporte de sostenibilidad"
             value={form.has_sustainability_report}
             onChange={(v) => update("has_sustainability_report", v)}
           />
-          <BoolField
+          <BoolFieldInline
             label="Tiene estudio de doble materialidad"
             value={form.has_double_materiality}
             onChange={(v) => update("has_double_materiality", v)}
@@ -346,25 +322,26 @@ export function ClientForm(props: Props) {
         </div>
       </Section>
 
-      {/* ═══ Nivel 3 — Narrativa (6 bloques delgados) ═══════ */}
-      {BLOCKS.map((block) => (
-        <div
-          key={block.key}
-          className="bg-white border border-stone-200 rounded-xl p-6"
-        >
-          <label className="block text-sm font-semibold text-slate-900 mb-1">
-            {block.label}
-          </label>
-          <p className="text-xs text-slate-500 mb-3">{block.hint}</p>
-          <textarea
-            value={form[block.key]}
-            onChange={(e) => update(block.key, e.target.value)}
-            rows={5}
-            className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent resize-y"
-            placeholder="Escribe lo que tengas. Puedes dejarlo vacío y completarlo después."
-          />
+      {/* ═══ Narrativa (6 bloques con sub-campos) ═══════════ */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
+            Narrativa detallada
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            6 bloques con preguntas específicas. Cada respuesta se guarda
+            por separado para que los roles IA la usen directamente.
+          </p>
         </div>
-      ))}
+        {NARRATIVE_SCHEMAS.map((schema) => (
+          <StructuredBlockEditor
+            key={schema.block}
+            schema={schema}
+            value={form.blocks[schema.block]}
+            onChange={(v) => updateBlock(schema.block, v)}
+          />
+        ))}
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3">
@@ -451,7 +428,7 @@ function Field({
   );
 }
 
-function BoolField({
+function BoolFieldInline({
   label,
   value,
   onChange,
@@ -465,37 +442,7 @@ function BoolField({
       <div className="block text-xs font-medium text-slate-700 mb-1">
         {label}
       </div>
-      <div className="flex gap-1 bg-stone-100 rounded-lg p-0.5 text-xs">
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className={`flex-1 py-1 rounded ${
-            value === null ? "bg-white shadow-sm" : "text-slate-500"
-          }`}
-        >
-          —
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(false)}
-          className={`flex-1 py-1 rounded ${
-            value === false ? "bg-white text-red-700 shadow-sm" : "text-slate-500"
-          }`}
-        >
-          No
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(true)}
-          className={`flex-1 py-1 rounded ${
-            value === true
-              ? "bg-white text-green-800 shadow-sm"
-              : "text-slate-500"
-          }`}
-        >
-          Sí
-        </button>
-      </div>
+      <BoolTriField value={value} onChange={onChange} />
     </div>
   );
 }

@@ -1,6 +1,12 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ClientInput } from "@/lib/validation";
+import {
+  NARRATIVE_SCHEMAS,
+  countAllSubfields,
+  countFilledInBlock,
+  type NarrativeBlockKey,
+} from "@/lib/clients/narrative-schemas";
 
 export function isDevMode(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -49,7 +55,7 @@ export type Client = {
   has_sustainability_report: boolean | null;
   has_sustainability_strategy: boolean | null;
 
-  // Narrativa
+  // Narrativa legacy (text, se conserva)
   info_general: string | null;
   business_model: string | null;
   impacts: string | null;
@@ -57,20 +63,28 @@ export type Client = {
   sustainability_strategy: string | null;
   stakeholders: string | null;
 
+  // Narrativa estructurada (JSONB)
+  info_general_json: Record<string, unknown> | null;
+  business_model_json: Record<string, unknown> | null;
+  impacts_json: Record<string, unknown> | null;
+  regulatory_context_json: Record<string, unknown> | null;
+  sustainability_strategy_json: Record<string, unknown> | null;
+  stakeholders_json: Record<string, unknown> | null;
+
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
 
-const NARRATIVE_BLOCKS = [
+const NARRATIVE_BLOCKS: NarrativeBlockKey[] = [
   "info_general",
   "business_model",
   "impacts",
   "regulatory_context",
   "sustainability_strategy",
   "stakeholders",
-] as const;
+];
 
 const STRUCTURED_ARRAYS = [
   "business_segments",
@@ -81,12 +95,23 @@ const STRUCTURED_ARRAYS = [
   "material_topics",
 ] as const;
 
+const JSON_BLOCKS = [
+  "info_general_json",
+  "business_model_json",
+  "impacts_json",
+  "regulatory_context_json",
+  "sustainability_strategy_json",
+  "stakeholders_json",
+] as const;
+
 const ALL_COLUMNS = [
   "id,name,sector,subsector,countries,size",
   "business_segments,frameworks,applicable_regulations,policies_in_place",
   "certifications,material_topics,maturity_level",
   "has_double_materiality,has_sustainability_report,has_sustainability_strategy",
   "info_general,business_model,impacts,regulatory_context,sustainability_strategy,stakeholders",
+  "info_general_json,business_model_json,impacts_json",
+  "regulatory_context_json,sustainability_strategy_json,stakeholders_json",
   "created_by,updated_by,created_at,updated_at",
 ].join(",");
 
@@ -125,7 +150,7 @@ export function getClient(id: string): Promise<Client | null> {
   });
 }
 
-/** Extrae solo las keys válidas del input para insert/update. */
+/** Filtra y extrae las keys válidas del input. */
 function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const KEYS = [
@@ -140,6 +165,7 @@ function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
     "has_sustainability_report",
     "has_sustainability_strategy",
     ...NARRATIVE_BLOCKS,
+    ...JSON_BLOCKS,
   ] as const;
   for (const k of KEYS) {
     const v = input[k as keyof ClientInput];
@@ -208,12 +234,13 @@ export function deleteClientRow(id: string): Promise<void> {
   });
 }
 
-// ── Completitud v2 (14 puntos: 8 atributos + 6 bloques) ──────
+// ── Completitud v3 ───────────────────────────────────────────
 /**
- * Mide qué tan lleno está el contexto del cliente.
- * - 8 atributos estructurados (cada grupo con ≥1 valor cuenta como 1)
- * - 6 bloques narrativos (cada uno con ≥20 chars cuenta como 1)
- * Total: 14.
+ * Mide qué tan lleno está el contexto. Cuenta:
+ * - 8 atributos estructurados (grupo llenado = 1).
+ * - 1 punto por cada sub-campo de narrativa JSONB que tenga valor.
+ *
+ * Total: 8 atributos + countAllSubfields() sub-campos narrativos.
  */
 export function clientContextCompleteness(
   client: Pick<
@@ -226,14 +253,15 @@ export function clientContextCompleteness(
     | "material_topics"
     | "maturity_level"
     | "has_double_materiality"
-    | "info_general"
-    | "business_model"
-    | "impacts"
-    | "regulatory_context"
-    | "sustainability_strategy"
-    | "stakeholders"
+    | "info_general_json"
+    | "business_model_json"
+    | "impacts_json"
+    | "regulatory_context_json"
+    | "sustainability_strategy_json"
+    | "stakeholders_json"
   >
-): { filled: number; total: 14 } {
+): { filled: number; total: number } {
+  // 8 atributos
   const arrGroups: Array<string[] | null | undefined> = [
     client.business_segments,
     client.frameworks,
@@ -249,11 +277,19 @@ export function clientContextCompleteness(
     client.has_double_materiality !== undefined
       ? 1
       : 0);
-  const narrativeFilled = NARRATIVE_BLOCKS.filter(
-    (k) => ((client[k] as string | null)?.trim().length ?? 0) >= 20
-  ).length;
+
+  // Sub-campos JSONB
+  const narrativeFilled = NARRATIVE_SCHEMAS.reduce((sum, schema) => {
+    const jsonCol = schema.jsonColumn;
+    const json = (client as unknown as Record<string, unknown>)[jsonCol] as
+      | Record<string, unknown>
+      | null;
+    return sum + countFilledInBlock(schema, json ?? null);
+  }, 0);
+
+  const total = 8 + countAllSubfields();
   return {
     filled: arrFilled + singleFilled + narrativeFilled,
-    total: 14,
+    total,
   };
 }

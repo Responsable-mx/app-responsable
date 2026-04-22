@@ -15,7 +15,8 @@ export type CatalogCategory =
   | "material_topics"
   | "maturity_levels"
   | "sectors"
-  | "countries";
+  | "countries"
+  | "revenue_models";
 
 export const CATALOG_CATEGORIES: Array<{
   key: CatalogCategory;
@@ -33,6 +34,7 @@ export const CATALOG_CATEGORIES: Array<{
   { key: "certifications",          label: "Certificaciones",       description: "Certificaciones ISO, B Corp, EcoVadis, etc.",           hasSearch: true,  hasGroups: true },
   { key: "material_topics",         label: "Temas materiales",      description: "Temas ESG priorizables en materialidad (basado en GRI).", hasSearch: true,  hasGroups: true },
   { key: "maturity_levels",         label: "Niveles de madurez",    description: "Escala de madurez ESG del cliente.",                    hasSearch: false, hasGroups: false },
+  { key: "revenue_models",          label: "Modelos de ingresos",   description: "Cómo el cliente genera ingresos (B2B contratos, suscripción, etc.).", hasSearch: false, hasGroups: false },
 ];
 
 export type CatalogSeedItem = {
@@ -163,4 +165,16 @@ export const CATALOG_SEEDS: CatalogSeedItem[] = [
   { category: "countries", value: "fr", label: "Francia",             group_name: "Europa",       sort_order: 150 },
   { category: "countries", value: "uk", label: "Reino Unido",         group_name: "Europa",       sort_order: 160 },
   { category: "countries", value: "nl", label: "Países Bajos",        group_name: "Europa",       sort_order: 170 },
+
+  // revenue_models
+  { category: "revenue_models", value: "venta_directa",      label: "Venta directa",           sort_order: 10 },
+  { category: "revenue_models", value: "venta_mayorista",    label: "Venta mayorista",         sort_order: 20 },
+  { category: "revenue_models", value: "suscripcion",        label: "Suscripción",             sort_order: 30 },
+  { category: "revenue_models", value: "contratos",          label: "Contratos recurrentes",   sort_order: 40 },
+  { category: "revenue_models", value: "licenciamiento",     label: "Licenciamiento",          sort_order: 50 },
+  { category: "revenue_models", value: "franquicia",         label: "Franquicia",              sort_order: 60 },
+  { category: "revenue_models", value: "marketplace",        label: "Marketplace / comisión",  sort_order: 70 },
+  { category: "revenue_models", value: "publicidad",         label: "Publicidad",              sort_order: 80 },
+  { category: "revenue_models", value: "servicios_proyecto", label: "Servicios por proyecto",  sort_order: 90 },
+  { category: "revenue_models", value: "servicios_hora",     label: "Servicios por hora",      sort_order: 100 },
 ];

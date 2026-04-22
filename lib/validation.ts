@@ -11,6 +11,7 @@ export const CatalogCategorySchema = z.enum([
   "maturity_levels",
   "sectors",
   "countries",
+  "revenue_models",
 ]);
 export type CatalogCategoryId = z.infer<typeof CatalogCategorySchema>;
 
@@ -96,13 +97,22 @@ export const ClientInputSchema = z.object({
   has_sustainability_report: z.boolean().optional().nullable(),
   has_sustainability_strategy: z.boolean().optional().nullable(),
 
-  // Narrativa (6 bloques, más delgados ahora)
+  // Narrativa legacy — text libre (se conserva durante transición)
   info_general: z.string().max(20000).optional().nullable(),
   business_model: z.string().max(20000).optional().nullable(),
   impacts: z.string().max(20000).optional().nullable(),
   regulatory_context: z.string().max(20000).optional().nullable(),
   sustainability_strategy: z.string().max(20000).optional().nullable(),
   stakeholders: z.string().max(20000).optional().nullable(),
+
+  // Narrativa estructurada — 6 JSONB con schema propio.
+  // Aceptamos cualquier objeto; el form garantiza la forma antes de enviar.
+  info_general_json: z.record(z.string(), z.unknown()).optional().nullable(),
+  business_model_json: z.record(z.string(), z.unknown()).optional().nullable(),
+  impacts_json: z.record(z.string(), z.unknown()).optional().nullable(),
+  regulatory_context_json: z.record(z.string(), z.unknown()).optional().nullable(),
+  sustainability_strategy_json: z.record(z.string(), z.unknown()).optional().nullable(),
+  stakeholders_json: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 export type ClientInput = z.infer<typeof ClientInputSchema>;

@@ -2,6 +2,7 @@ import "server-only";
 import type { Client } from "@/lib/clients";
 import type { RoleId } from "@/lib/ai/models";
 import { buildRoleSystemText } from "@/lib/ai/prompts";
+import { NARRATIVE_SCHEMAS } from "@/lib/clients/narrative-schemas";
 
 export { DEFAULT_PROMPTS, PROMPT_KEYS } from "@/lib/ai/prompts";
 
@@ -51,33 +52,18 @@ de arriba o que cree el cliente en /clientes.
     .filter(Boolean)
     .join("\n");
 
+  const narrativeBlocks = NARRATIVE_SCHEMAS.map((schema) => {
+    const json = (client as unknown as Record<string, unknown>)[
+      schema.jsonColumn
+    ] as Record<string, unknown> | null | undefined;
+    return serializeBlock(schema.block, json);
+  }).join("\n\n");
+
   return `<context>
 <client>
 ${attrs}
 
-<info_general>
-${client.info_general || "(pendiente de llenar)"}
-</info_general>
-
-<business_model>
-${client.business_model || "(pendiente)"}
-</business_model>
-
-<impacts>
-${client.impacts || "(pendiente)"}
-</impacts>
-
-<regulatory_context>
-${client.regulatory_context || "(pendiente)"}
-</regulatory_context>
-
-<sustainability_strategy>
-${client.sustainability_strategy || "(pendiente)"}
-</sustainability_strategy>
-
-<stakeholders>
-${client.stakeholders || "(pendiente)"}
-</stakeholders>
+${narrativeBlocks}
 </client>
 
 Instrucción sobre este contexto:
@@ -85,10 +71,58 @@ Instrucción sobre este contexto:
 - Los atributos estructurados (frameworks_reported, certifications,
   material_topics, etc.) son hechos declarados por el cliente — trátalos
   como dato confiable.
-- Si un bloque narrativo dice "(pendiente)", señálalo cuando sea relevante
-  y sugiere que el usuario lo llene en /clientes/${client.id} antes de
-  profundizar en ese tema.
+- Los bloques narrativos tienen sub-campos específicos (pilares, kpis,
+  objetivos, etc.). Cuando respondas, cita el sub-campo exacto si lo
+  mencionas (ej: "el KPI de alcance 1+2 indica…").
+- Si un sub-campo está vacío pero es relevante para la pregunta, señálalo
+  y sugiere que se llene en /clientes/${client.id}.
 </context>`;
+}
+
+/**
+ * Convierte un bloque JSONB en XML legible para el modelo. Omite claves
+ * vacías para no inflar el prompt.
+ */
+function serializeBlock(
+  blockName: string,
+  json: Record<string, unknown> | null | undefined
+): string {
+  if (!json || Object.keys(json).length === 0) {
+    return `<${blockName}>(pendiente)</${blockName}>`;
+  }
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(json)) {
+    if (value === null || value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+      if (value.every((v) => typeof v === "string")) {
+        parts.push(`  <${key}>${(value as string[]).join(", ")}</${key}>`);
+      } else {
+        const items = (value as Array<Record<string, unknown>>)
+          .map((obj, i) => {
+            const attrs = Object.entries(obj)
+              .filter(([, v]) => v !== null && v !== undefined && v !== "")
+              .map(([k, v]) => `${k}="${escapeAttr(String(v))}"`)
+              .join(" ");
+            return `    <item ${attrs} index="${i + 1}"/>`;
+          })
+          .join("\n");
+        parts.push(`  <${key}>\n${items}\n  </${key}>`);
+      }
+    } else if (typeof value === "boolean") {
+      parts.push(`  <${key}>${value ? "sí" : "no"}</${key}>`);
+    } else if (typeof value === "number" || typeof value === "string") {
+      parts.push(`  <${key}>${value}</${key}>`);
+    }
+  }
+  if (parts.length === 0) {
+    return `<${blockName}>(pendiente)</${blockName}>`;
+  }
+  return `<${blockName}>\n${parts.join("\n")}\n</${blockName}>`;
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**

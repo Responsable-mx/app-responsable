@@ -25,6 +25,31 @@ const FULL_CLIENT = {
   regulatory_context: "NIS + ISSB aplicables 2026",
   sustainability_strategy: "Brew a Better World 2030",
   stakeholders: "Comunidades Tecate, SLP; proveedores agrícolas",
+  info_general_json: {
+    unidades_negocio: ["Cervezas MX", "Refrescos"],
+    volumen_anual: "42 Mhl/año",
+  },
+  business_model_json: { tipo_ingresos: ["venta_mayorista"] },
+  impacts_json: {
+    emisiones_alcance_1_2: [
+      { medido: true, valor: 45000, base_year: 2023 },
+    ],
+  },
+  regulatory_context_json: {},
+  sustainability_strategy_json: {
+    pilares: ["Clima", "Agua", "Gente"],
+    kpis: [
+      {
+        metrica: "Emisiones alcance 1+2",
+        valor_actual: "45000",
+        unidad: "tCO2e",
+        target: "-30% vs 2023",
+        base_year: 2023,
+      },
+    ],
+    materialidad_ano: 2024,
+  },
+  stakeholders_json: {},
   created_by: "g@r.net",
   updated_by: "g@r.net",
   created_at: "2026-04-01T00:00:00Z",
@@ -48,11 +73,28 @@ describe("buildClientContext", () => {
     expect(out).toContain("<regulatory_context>");
     expect(out).toContain("<sustainability_strategy>");
     expect(out).toContain("<stakeholders>");
-    expect(out).toContain("Brew a Better World 2030");
   });
 
-  it("marca bloques vacíos como (pendiente) y apunta a /clientes/:id", () => {
-    const partial = { ...FULL_CLIENT, impacts: null, stakeholders: "" };
+  it("serializa sub-campos de JSONB como XML estructurado", () => {
+    const out = buildClientContext(FULL_CLIENT);
+    // pilares (lista de strings)
+    expect(out).toContain("<pilares>Clima, Agua, Gente</pilares>");
+    // kpis (lista de objetos)
+    expect(out).toContain("<kpis>");
+    expect(out).toContain('metrica="Emisiones alcance 1+2"');
+    expect(out).toContain('target="-30% vs 2023"');
+    // year simple
+    expect(out).toContain("<materialidad_ano>2024</materialidad_ano>");
+    // bool dentro de item
+    expect(out).toContain('medido="true"');
+  });
+
+  it("marca bloque con JSONB vacío como (pendiente) y apunta a /clientes/:id", () => {
+    const partial = {
+      ...FULL_CLIENT,
+      regulatory_context_json: {},
+      stakeholders_json: null,
+    };
     const out = buildClientContext(partial);
     expect(out).toContain("(pendiente)");
     expect(out).toContain(`/clientes/${partial.id}`);

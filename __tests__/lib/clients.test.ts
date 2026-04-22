@@ -19,20 +19,19 @@ const EMPTY_BASE = {
   material_topics: null,
   maturity_level: null,
   has_double_materiality: null,
-  info_general: null,
-  business_model: null,
-  impacts: null,
-  regulatory_context: null,
-  sustainability_strategy: null,
-  stakeholders: null,
+  info_general_json: null,
+  business_model_json: null,
+  impacts_json: null,
+  regulatory_context_json: null,
+  sustainability_strategy_json: null,
+  stakeholders_json: null,
 };
 
-describe("clientContextCompleteness v2 (14 puntos)", () => {
-  it("devuelve 0/14 cuando todo es null/vacío", () => {
-    expect(clientContextCompleteness(EMPTY_BASE)).toEqual({
-      filled: 0,
-      total: 14,
-    });
+describe("clientContextCompleteness v3 (atributos + sub-campos JSONB)", () => {
+  it("devuelve 0 cuando todo es null/vacío", () => {
+    const r = clientContextCompleteness(EMPTY_BASE);
+    expect(r.filled).toBe(0);
+    expect(r.total).toBeGreaterThan(30);
   });
 
   it("cuenta chips: 1 punto por grupo con ≥1 valor", () => {
@@ -54,41 +53,50 @@ describe("clientContextCompleteness v2 (14 puntos)", () => {
   });
 
   it("has_double_materiality=false también cuenta (es respuesta válida)", () => {
+    const c = { ...EMPTY_BASE, has_double_materiality: false };
+    expect(clientContextCompleteness(c).filled).toBe(1);
+  });
+
+  it("cuenta sub-campos JSONB: string y number llenos", () => {
     const c = {
       ...EMPTY_BASE,
-      has_double_materiality: false,
+      sustainability_strategy_json: {
+        materialidad_metodologia: "Encuestas + entrevistas",
+        materialidad_ano: 2024,
+      },
+    };
+    expect(clientContextCompleteness(c).filled).toBe(2);
+  });
+
+  it("cuenta sub-campos tipo lista: ≥1 item = 1 punto", () => {
+    const c = {
+      ...EMPTY_BASE,
+      sustainability_strategy_json: {
+        pilares: ["Clima", "Agua"],
+        objetivos: [{ pilar: "Clima", meta: "Net zero", deadline: 2040 }],
+      },
+    };
+    expect(clientContextCompleteness(c).filled).toBe(2);
+  });
+
+  it("ignora strings vacíos y listas vacías", () => {
+    const c = {
+      ...EMPTY_BASE,
+      info_general_json: {
+        unidades_negocio: [],
+        productos_principales: "",
+        volumen_anual: "42 Mhl/año",
+      },
     };
     expect(clientContextCompleteness(c).filled).toBe(1);
   });
 
-  it("narrativa: solo bloques con ≥20 chars cuentan", () => {
-    const c = {
-      ...EMPTY_BASE,
-      info_general: "corto",
-      business_model: "a".repeat(25),
-      impacts: "",
-    };
-    expect(clientContextCompleteness(c).filled).toBe(1);
-  });
-
-  it("14/14 con todo lleno", () => {
-    const c = {
-      business_segments: ["b2b"],
-      frameworks: ["gri"],
-      applicable_regulations: ["issb_global"],
-      policies_in_place: ["etica"],
-      certifications: ["iso_14001"],
-      material_topics: ["cambio_climatico"],
-      maturity_level: "avanzado",
-      has_double_materiality: true,
-      info_general: "a".repeat(30),
-      business_model: "a".repeat(30),
-      impacts: "a".repeat(30),
-      regulatory_context: "a".repeat(30),
-      sustainability_strategy: "a".repeat(30),
-      stakeholders: "a".repeat(30),
-    };
-    expect(clientContextCompleteness(c)).toEqual({ filled: 14, total: 14 });
+  it("total incluye atributos + sub-campos narrativos", () => {
+    const { total } = clientContextCompleteness(EMPTY_BASE);
+    // 8 atributos (6 chips + maturity + has_double_materiality)
+    // + ~33 sub-campos narrativos (según schemas)
+    expect(total).toBeGreaterThanOrEqual(30);
+    expect(total).toBeLessThanOrEqual(80);
   });
 });
 

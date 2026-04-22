@@ -1,40 +1,32 @@
 # Últimos hallazgos — App ResponSable
 
 Fecha: 2026-04-21
-Tipo: `/audit` completa + limpieza masiva
-Resultado: ✅ 0 críticos · 0 importantes inmediatos · 1 importante pendiente de OK (B1)
+Tipo: `/audit` completa post-deploy prod + limpieza total
+Resultado: ✅ 0 críticos · 0 importantes · 1 menor · 1 cross-repo · 1 operativo
 
 ## Contexto
 
-Auditoría disparada post-bootstrap. Detecté 10 hallazgos nuevos (2 críticos, 3
-importantes, 5 menores) y procedí a limpiar **toda** la deuda en el mismo
-barrido. Los 8 ítems que venían de DEUDA anterior (D001-D008) quedaron
-completamente resueltos o absorbidos.
+Auditoría disparada tras poner `app.responsable.net` en producción. Detecté
+10 hallazgos nuevos y procedí a cerrar todos excepto los de acción operativa
+(rotación de keys = OP1) y cross-repo (D008).
 
-## Hallazgos críticos cerrados
+## Cerrados en esta sesión
 
-- **A1 · Brute-force al OTP** — tabla `otp_attempts` + rate limit de intentos
-  fallidos (5 / 5 min por email). Incluye IP para forense futura.
-- **E1 · Prompt cache inactivo** — los 4 system prompts pasaron de ~500 a
-  >3000 chars cada uno. Breakpoint único al final del prefix (`[contexto] →
-  [rol + cache_control]`): cache hit completo en turnos subsecuentes de la
-  misma conversación.
+### Importantes (4)
+- **H2** — +16 smoke tests UI (`ClientsList`, `ConfirmDialog`, `StringListField`)
+- **H3** — Función `isDevMode()` centralizada en `lib/env.ts` (eliminados 6 duplicados)
+- **H9** — Página `/configuracion/uso-ia` con métricas, top consultores, top clientes, tabla diaria
+- **H10** — Rate limit 30 msgs/5min en `/api/chat` + tabla `chat_requests`
 
-## Observabilidad habilitada (G1 + G2)
+### Menores (4)
+- **H5** — DEUDA.md sincronizado; B1 movido a histórico (cerrado por migración 0006)
+- **H8** — Cron `audit-health` ahora envía email HTML a admins via Resend
+- **H11** — `/clientes` con buscador (nombre/sector/país/marcos/certs) + filtro por sector
+- **B1** — RLS whitelist ya aplicada (migración 0006 en prod)
 
-- Tabla `ai_calls` logueando cada llamada: tokens (input/output/cache
-  creation/cache read), modelo, latencia, stop_reason, error, usuario, rol,
-  cliente.
-- Vistas `ai_calls_daily_by_role` y `ai_calls_daily_by_client` para métricas.
-- Cron `audit-health` quincenal reporta costo estimado USD + stats.
+## Migraciones nuevas aplicadas a producción
 
-## Pendiente
-
-- **B1** (único pendiente) — migración `0004_clients_rls_whitelist.sql` está
-  lista para aplicar. Destructiva (DROP POLICY), requiere OK textual del
-  usuario + `--confirm-destructive` por modo paranoico.
-- **D008** (cross-repo) — migrar `middleware.ts → proxy.ts` en `leads/` y
-  `s-peak-dashboard/`. No toca App ResponSable.
+- `0015_chat_rate_limit.sql` — tabla `chat_requests` (aditiva)
 
 ## Verificación
 
@@ -42,12 +34,21 @@ completamente resueltos o absorbidos.
 |-------|-----------|
 | `tsc --noEmit` | ✅ 0 errores |
 | `eslint .` | ✅ 0 warnings |
-| `vitest run` | ✅ 70/70 tests (+27 vs bootstrap) |
-| `next build` | ✅ 15 rutas (+2 crons) |
+| `vitest run` | ✅ **133/133** tests (+16 UI) |
+| `next build` | ✅ compilado sin errores |
 
-## Siguientes pasos
+## Pendientes
 
-1. OK explícito para aplicar `0004_clients_rls_whitelist.sql` (B1).
-2. Decidir si procede D008 en los otros dos repos.
-3. Configurar credenciales reales (Supabase + Resend + Anthropic) y correr
-   end-to-end.
+- **R1** (menor) — Extraer subcomponentes de `CatalogsManager`/`PromptsManager`.
+  Diferido hasta próximo cambio funcional.
+- **D008** (cross-repo) — `middleware.ts → proxy.ts` en `leads/` y
+  `s-peak-dashboard/`.
+- **OP1** (operativo) — Rotar API keys Anthropic + Resend. Acción del admin.
+
+## Siguientes pasos sugeridos
+
+1. **OP1**: rotación de keys (5 min tuyos).
+2. Cuando lleguen consultores reales, verificar `/configuracion/uso-ia` dos
+   semanas después para validar costos estimados vs factura real.
+3. Considerar upgrade Vercel Pro si `leads` + `app-responsable` consumen
+   cuota Hobby.

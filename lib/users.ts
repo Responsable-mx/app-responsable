@@ -109,6 +109,8 @@ export async function getUser(email: string): Promise<AuthorizedUser | null> {
 
 export async function isAuthorized(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
+  // Dev mode: dev@localhost pasa como admin autorizado para UI local.
+  if (isDevMode() && normalized === "dev@localhost") return true;
   const user = await getUser(normalized);
   if (user) return user.active;
   // Fallback a env var solo si la DB no devolvió nada (seguridad en rollout).
@@ -117,6 +119,8 @@ export async function isAuthorized(email: string): Promise<boolean> {
 
 export async function isAdmin(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
+  // Dev mode: dev@localhost se trata como admin para ver Configuración local.
+  if (isDevMode() && normalized === "dev@localhost") return true;
   const user = await getUser(normalized);
   if (user) return user.active && user.role === "admin";
   // Fallback: cualquier email en env var se trata como admin.

@@ -27,8 +27,8 @@ ALTER TABLE public.authorized_users ENABLE ROW LEVEL SECURITY;
 
 -- Permite a cada usuario leer su propia fila (útil para saber su rol desde
 -- el cliente sin pasar por /api/users que solo admins pueden llamar).
-CREATE POLICY IF NOT EXISTS "authorized_users_select_self"
-  ON public.authorized_users FOR SELECT
+DROP POLICY IF EXISTS "authorized_users_select_self" ON public.authorized_users;
+CREATE POLICY "authorized_users_select_self" ON public.authorized_users FOR SELECT
   TO authenticated
   USING (lower(email) = lower(auth.email()));
 
@@ -52,8 +52,8 @@ DROP POLICY IF EXISTS "clients_insert_authenticated" ON public.clients;
 DROP POLICY IF EXISTS "clients_update_authenticated" ON public.clients;
 DROP POLICY IF EXISTS "clients_delete_authenticated" ON public.clients;
 
-CREATE POLICY IF NOT EXISTS "clients_select_whitelist"
-  ON public.clients FOR SELECT
+DROP POLICY IF EXISTS "clients_select_whitelist" ON public.clients;
+CREATE POLICY "clients_select_whitelist" ON public.clients FOR SELECT
   TO authenticated
   USING (EXISTS (
     SELECT 1 FROM public.authorized_users au
@@ -61,8 +61,8 @@ CREATE POLICY IF NOT EXISTS "clients_select_whitelist"
       AND au.active = true
   ));
 
-CREATE POLICY IF NOT EXISTS "clients_insert_whitelist"
-  ON public.clients FOR INSERT
+DROP POLICY IF EXISTS "clients_insert_whitelist" ON public.clients;
+CREATE POLICY "clients_insert_whitelist" ON public.clients FOR INSERT
   TO authenticated
   WITH CHECK (EXISTS (
     SELECT 1 FROM public.authorized_users au
@@ -70,8 +70,8 @@ CREATE POLICY IF NOT EXISTS "clients_insert_whitelist"
       AND au.active = true
   ));
 
-CREATE POLICY IF NOT EXISTS "clients_update_whitelist"
-  ON public.clients FOR UPDATE
+DROP POLICY IF EXISTS "clients_update_whitelist" ON public.clients;
+CREATE POLICY "clients_update_whitelist" ON public.clients FOR UPDATE
   TO authenticated
   USING (EXISTS (
     SELECT 1 FROM public.authorized_users au
@@ -84,8 +84,8 @@ CREATE POLICY IF NOT EXISTS "clients_update_whitelist"
       AND au.active = true
   ));
 
-CREATE POLICY IF NOT EXISTS "clients_delete_whitelist"
-  ON public.clients FOR DELETE
+DROP POLICY IF EXISTS "clients_delete_whitelist" ON public.clients;
+CREATE POLICY "clients_delete_whitelist" ON public.clients FOR DELETE
   TO authenticated
   USING (EXISTS (
     SELECT 1 FROM public.authorized_users au

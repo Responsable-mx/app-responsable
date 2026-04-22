@@ -35,24 +35,24 @@ CREATE INDEX IF NOT EXISTS idx_clients_updated_at ON public.clients (updated_at 
 -- (Decisión de negocio: los 8 consultores comparten todos los clientes).
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "clients_select_authenticated"
-  ON public.clients FOR SELECT
+DROP POLICY IF EXISTS "clients_select_authenticated" ON public.clients;
+CREATE POLICY "clients_select_authenticated" ON public.clients FOR SELECT
   TO authenticated
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "clients_insert_authenticated"
-  ON public.clients FOR INSERT
+DROP POLICY IF EXISTS "clients_insert_authenticated" ON public.clients;
+CREATE POLICY "clients_insert_authenticated" ON public.clients FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "clients_update_authenticated"
-  ON public.clients FOR UPDATE
+DROP POLICY IF EXISTS "clients_update_authenticated" ON public.clients;
+CREATE POLICY "clients_update_authenticated" ON public.clients FOR UPDATE
   TO authenticated
   USING (true)
   WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "clients_delete_authenticated"
-  ON public.clients FOR DELETE
+DROP POLICY IF EXISTS "clients_delete_authenticated" ON public.clients;
+CREATE POLICY "clients_delete_authenticated" ON public.clients FOR DELETE
   TO authenticated
   USING (true);
 

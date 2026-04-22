@@ -25,8 +25,8 @@ ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Lectura abierta a cualquier autenticado (para que el cliente pueda
 -- comparar su tour_version con el remoto).
-CREATE POLICY IF NOT EXISTS "app_settings_select_authenticated"
-  ON public.app_settings FOR SELECT
+DROP POLICY IF EXISTS "app_settings_select_authenticated" ON public.app_settings;
+CREATE POLICY "app_settings_select_authenticated" ON public.app_settings FOR SELECT
   TO authenticated
   USING (true);
 

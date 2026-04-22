@@ -263,14 +263,6 @@ export function ClientForm(props: Props) {
         </div>
 
         <MultiSelectCombobox
-          category="services"
-          label="Servicios ResponSable contratados"
-          hint="Qué servicio(s) le estamos prestando a este cliente."
-          value={form.services}
-          onChange={(v) => update("services", (v as string[]) ?? [])}
-        />
-
-        <MultiSelectCombobox
           category="frameworks"
           label="Marcos de sostenibilidad reportados"
           hint="Marcos que el cliente ya usa para reportar (GRI, ISSB, CSRD…)."

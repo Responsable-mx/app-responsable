@@ -3,6 +3,7 @@ import Link from "next/link";
 const NAV = [
   { href: "/configuracion/catalogos", label: "Catálogos", icon: "📚" },
   { href: "/configuracion/usuarios", label: "Usuarios", icon: "👥" },
+  { href: "/configuracion/prompts", label: "Prompts IA", icon: "🧠" },
 ];
 
 export default function ConfigLayout({

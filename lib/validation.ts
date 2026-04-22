@@ -47,6 +47,24 @@ export const UserInputSchema = z.object({
 
 export const UserPatchSchema = UserInputSchema.partial().omit({ email: true });
 
+// ── Prompts ──────────────────────────────────────────────────
+export const PromptKeySchema = z.enum([
+  "system.app_navigation",
+  "system.base_rules",
+  "role.aurora",
+  "role.rebeca",
+  "role.elena",
+  "role.valeria",
+]);
+
+export const PromptUpdateSchema = z.object({
+  content: z.string().trim().min(10).max(50000),
+});
+
+export const PromptVersionLabelSchema = z.object({
+  label: z.string().trim().max(80).nullable(),
+});
+
 
 export const ClientSizeSchema = z.enum([
   "micro",

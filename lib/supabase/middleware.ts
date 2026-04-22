@@ -81,7 +81,8 @@ export async function updateSession(request: NextRequest) {
   const role = (user?.user_metadata?.role as string | undefined) ?? "consultor";
   const isAdminRoute =
     pathname.startsWith("/configuracion") ||
-    pathname.startsWith("/api/users");
+    pathname.startsWith("/api/users") ||
+    pathname.startsWith("/api/prompts");
   if (user && isAdminRoute && role !== "admin") {
     // API → JSON 403; UI → redirect /chat
     if (pathname.startsWith("/api/")) {

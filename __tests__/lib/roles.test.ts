@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildClientContext,
-  buildSystemBlocks,
-  ROLE_PROMPTS,
-} from "@/lib/ai/roles";
+import { buildClientContext, buildSystemBlocks } from "@/lib/ai/roles";
+import { DEFAULT_PROMPTS, PROMPT_KEYS } from "@/lib/ai/prompts";
 
 const FULL_CLIENT = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -76,7 +73,9 @@ describe("buildClientContext", () => {
 
   it("incluye atributos estructurados como tags compactos", () => {
     const out = buildClientContext(FULL_CLIENT);
-    expect(out).toContain("<frameworks_reported>gri, sbti</frameworks_reported>");
+    expect(out).toContain(
+      "<frameworks_reported>gri, sbti</frameworks_reported>"
+    );
     expect(out).toContain("<certifications>esr_cemefi</certifications>");
     expect(out).toContain(
       "<material_topics>cambio_climatico, agua</material_topics>"
@@ -98,46 +97,62 @@ describe("buildClientContext", () => {
   });
 });
 
-describe("buildSystemBlocks", () => {
-  it("devuelve 2 bloques de texto con cache_control solo en el último", () => {
-    const blocks = buildSystemBlocks("aurora", null);
+describe("buildSystemBlocks (async)", () => {
+  it("devuelve 2 bloques de texto con cache_control solo en el último", async () => {
+    const blocks = await buildSystemBlocks("aurora", null);
     expect(blocks).toHaveLength(2);
     expect(blocks[0].type).toBe("text");
     expect(blocks[1].type).toBe("text");
-    // Solo el último tiene cache_control
     expect("cache_control" in blocks[0]).toBe(false);
     expect((blocks[1] as { cache_control?: unknown }).cache_control).toEqual({
       type: "ephemeral",
     });
   });
 
-  it("el segundo bloque contiene el prompt del rol pedido", () => {
-    const aurora = buildSystemBlocks("aurora", null);
-    const rebeca = buildSystemBlocks("rebeca", null);
+  it("el segundo bloque contiene el prompt del rol pedido", async () => {
+    const aurora = await buildSystemBlocks("aurora", null);
+    const rebeca = await buildSystemBlocks("rebeca", null);
     expect(aurora[1].text).toContain("Aurora");
     expect(rebeca[1].text).toContain("Rebeca");
   });
 
-  it("cada rol genera un prompt largo (proxy para >1024 tokens de cache)", () => {
-    // Anthropic requiere ≥1,024 tokens para activar cache ephemeral.
-    // Para español, el BPE usa ~2.5-3 chars/token. Pedimos al menos
-    // 3,000 chars en el prompt del ROL (sin cliente) para estar seguros de
-    // que con el contexto agregado superamos el umbral incluso cuando no
-    // hay cliente seleccionado.
-    for (const role of ["aurora", "rebeca", "elena", "valeria"] as const) {
-      expect(ROLE_PROMPTS[role].length).toBeGreaterThan(3000);
-    }
+  it("el prefix combinado incluye navegación y reglas base", async () => {
+    const blocks = await buildSystemBlocks("aurora", null);
+    expect(blocks[1].text).toContain("<app_navigation>");
+    expect(blocks[1].text).toContain("<rules>");
   });
 });
 
-describe("ROLE_PROMPTS", () => {
-  it("los 4 roles tienen prompt no vacío con reglas y XML tags", () => {
+describe("DEFAULT_PROMPTS", () => {
+  it("los 6 keys tienen contenido", () => {
+    for (const key of PROMPT_KEYS) {
+      expect(DEFAULT_PROMPTS[key].length).toBeGreaterThan(100);
+    }
+  });
+
+  it("cada rol tiene instrucciones y ejemplos", () => {
     for (const role of ["aurora", "rebeca", "elena", "valeria"] as const) {
-      const p = ROLE_PROMPTS[role];
+      const p = DEFAULT_PROMPTS[`role.${role}` as const];
       expect(p).toContain("<role>");
-      expect(p).toContain("<rules>");
       expect(p).toContain("<instructions>");
-      expect(p).toContain("<app_navigation>");
+      expect(p).toContain("<examples>");
+    }
+  });
+
+  it("reglas base incluye idioma y marcos de referencia", () => {
+    const rules = DEFAULT_PROMPTS["system.base_rules"];
+    expect(rules).toContain("español de México");
+    expect(rules).toContain("GRI");
+    expect(rules).toContain("ISSB");
+  });
+
+  it("cada rol + reglas base + navegación combinados superan umbral de cache (~1K tokens)", () => {
+    for (const role of ["aurora", "rebeca", "elena", "valeria"] as const) {
+      const total =
+        DEFAULT_PROMPTS[`role.${role}` as const].length +
+        DEFAULT_PROMPTS["system.app_navigation"].length +
+        DEFAULT_PROMPTS["system.base_rules"].length;
+      expect(total).toBeGreaterThan(3500);
     }
   });
 });

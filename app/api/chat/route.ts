@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const client = clientId ? await getClient(clientId).catch(() => null) : null;
   const config = getModelConfig(role);
-  const systemBlocks = buildSystemBlocks(role, client);
+  const systemBlocks = await buildSystemBlocks(role, client);
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const encoder = new TextEncoder();

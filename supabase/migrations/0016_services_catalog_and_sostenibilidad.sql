@@ -10,7 +10,7 @@
 -- ── Seed catálogo services ──────────────────────────────────
 INSERT INTO public.catalog_items (category, value, label, sort_order, is_system) VALUES
   ('services', 'doble_materialidad',    'Doble materialidad',       10, true),
-  ('services', 'esr_cemefi',             'ESR (CEMEFI)',             20, true),
+  ('services', 'esr',                    'ESR',                      20, true),
   ('services', 'informe_sostenibilidad', 'Informe de sostenibilidad',30, true)
   ON CONFLICT (category, value) DO NOTHING;
 

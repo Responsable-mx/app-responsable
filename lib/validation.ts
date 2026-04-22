@@ -1,5 +1,53 @@
 import { z } from "zod";
 
+// ── Catálogos ────────────────────────────────────────────────
+export const CatalogCategorySchema = z.enum([
+  "business_segments",
+  "frameworks",
+  "applicable_regulations",
+  "policies",
+  "certifications",
+  "material_topics",
+  "maturity_levels",
+  "sectors",
+  "countries",
+]);
+export type CatalogCategoryId = z.infer<typeof CatalogCategorySchema>;
+
+export const CatalogItemInputSchema = z.object({
+  category: CatalogCategorySchema,
+  value: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9_]+$/, "Solo minúsculas, números y guiones bajos")
+    .optional(),
+  label: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).optional().nullable(),
+  group_name: z.string().trim().max(60).optional().nullable(),
+  sort_order: z.number().int().min(0).max(10000).optional(),
+  is_active: z.boolean().optional(),
+});
+
+export const ReorderCatalogSchema = z.object({
+  category: CatalogCategorySchema,
+  ordered_ids: z.array(z.string()).min(1).max(500),
+});
+
+// ── Usuarios ─────────────────────────────────────────────────
+export const UserRoleSchema = z.enum(["admin", "consultor"]);
+
+export const UserInputSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(200),
+  role: UserRoleSchema,
+  full_name: z.string().trim().max(120).optional().nullable(),
+  active: z.boolean().optional(),
+});
+
+export const UserPatchSchema = UserInputSchema.partial().omit({ email: true });
+
+
 export const ClientSizeSchema = z.enum([
   "micro",
   "pyme",

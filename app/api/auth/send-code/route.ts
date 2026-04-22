@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Formato de email inválido" }, { status: 400 });
   }
 
-  if (!isAuthorizedEmail(normalizedEmail)) {
+  if (!(await isAuthorizedEmail(normalizedEmail))) {
     return NextResponse.json(
       { error: "Este correo no tiene acceso." },
       { status: 403 }

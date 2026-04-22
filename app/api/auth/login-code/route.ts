@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeEmail } from "@/lib/auth";
+import { getUser, recordLogin } from "@/lib/users";
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MINUTES = 5;
@@ -99,11 +100,36 @@ export async function POST(req: NextRequest) {
 
   await admin.from("access_codes").update({ used: true }).eq("id", codeRow.id);
 
+  // Sincroniza rol desde authorized_users → user_metadata del JWT.
+  // Así el middleware lee user.user_metadata.role sin query extra por request.
+  const dbUser = await getUser(normalizedEmail);
+  const role = dbUser?.role ?? "consultor";
+
   await admin.auth.admin
-    .createUser({ email: normalizedEmail, email_confirm: true })
-    .catch(() => {
-      /* ya existe */
+    .createUser({
+      email: normalizedEmail,
+      email_confirm: true,
+      user_metadata: { role },
+    })
+    .catch(async () => {
+      // Usuario ya existe → actualizamos su metadata con el rol actual.
+      const { data: list } = await admin.auth.admin.listUsers({
+        page: 1,
+        perPage: 200,
+      });
+      const existing = list?.users.find(
+        (u) => u.email?.toLowerCase() === normalizedEmail
+      );
+      if (existing) {
+        await admin.auth.admin
+          .updateUserById(existing.id, { user_metadata: { role } })
+          .catch(() => {
+            /* best-effort */
+          });
+      }
     });
+
+  await recordLogin(normalizedEmail);
 
   const { data: linkData, error: linkError } =
     await admin.auth.admin.generateLink({

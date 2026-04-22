@@ -76,5 +76,24 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Gate /configuracion y /api/catalogs|users mutaciones → solo admin.
+  // Lectura a /api/catalogs sigue abierta a todo consultor autenticado.
+  const role = (user?.user_metadata?.role as string | undefined) ?? "consultor";
+  const isAdminRoute =
+    pathname.startsWith("/configuracion") ||
+    pathname.startsWith("/api/users");
+  if (user && isAdminRoute && role !== "admin") {
+    // API → JSON 403; UI → redirect /chat
+    if (pathname.startsWith("/api/")) {
+      return new NextResponse(
+        JSON.stringify({ error: "Requiere permisos de administrador." }),
+        { status: 403, headers: { "content-type": "application/json" } }
+      );
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/chat";
+    return NextResponse.redirect(url);
+  }
+
   return supabaseResponse;
 }

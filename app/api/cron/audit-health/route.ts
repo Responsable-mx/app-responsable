@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCron } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { Resend } from "resend";
 
 export const maxDuration = 120;
 
 /**
  * Cron audit-health — corre quincenal (ver vercel.json).
  * Revisa salud del proyecto: uso de IA, costos estimados, errores, deuda.
- * Reporta siempre (no solo fallos), con métricas clave.
+ * Reporta a Vercel logs + email a admins si Resend está configurado.
  */
 export async function GET(req: NextRequest) {
   if (!verifyCron(req)) {
@@ -46,8 +47,6 @@ export async function GET(req: NextRequest) {
       : 0,
   };
 
-  // Estimación grosera de costo (Sonnet $3/$15 por 1M, Haiku $1/$5 por 1M).
-  // Usamos rate Sonnet como peor caso porque los 4 roles lo usan mayoritariamente.
   const costEstimate = {
     input_usd: (stats.ai_input_tokens * 3) / 1_000_000,
     output_usd: (stats.ai_output_tokens * 15) / 1_000_000,
@@ -58,20 +57,101 @@ export async function GET(req: NextRequest) {
     costEstimate.output_usd +
     costEstimate.cache_read_usd;
 
-  // ── Conteo de clientes
+  // ── Conteos
   const { count: clientsCount } = await admin
     .from("clients")
     .select("id", { head: true, count: "exact" });
+  const { count: usersCount } = await admin
+    .from("authorized_users")
+    .select("email", { head: true, count: "exact" })
+    .eq("active", true);
 
   const report = {
     window_days: 14,
     ai: stats,
     cost_usd_estimate_max: Number(totalUsd.toFixed(3)),
     clients_total: clientsCount ?? 0,
+    users_active: usersCount ?? 0,
     ai_query_error: aiErr?.message ?? null,
     generated_at: new Date().toISOString(),
   };
 
   console.log("[cron/audit-health]", JSON.stringify(report));
-  return NextResponse.json(report);
+
+  // ── Email a admins (si Resend + hay admins activos)
+  const emailResult = await sendReportEmail(admin, report, totalUsd, stats);
+
+  return NextResponse.json({ ...report, email: emailResult });
+}
+
+async function sendReportEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  report: Record<string, unknown>,
+  totalUsd: number,
+  stats: {
+    ai_calls_total: number;
+    ai_calls_errors: number;
+    ai_avg_latency_ms: number;
+  }
+): Promise<{ sent: boolean; reason?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { sent: false, reason: "RESEND_API_KEY missing" };
+
+  const { data: admins } = await admin
+    .from("authorized_users")
+    .select("email,full_name")
+    .eq("role", "admin")
+    .eq("active", true);
+  const recipients = (admins ?? []).map((a) => a.email);
+  if (recipients.length === 0)
+    return { sent: false, reason: "no active admins" };
+
+  const from = process.env.RESEND_FROM || "App ResponSable <noreply@responsable.net>";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.responsable.net";
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a;">
+      <div style="border-bottom:2px solid #0d9488;padding-bottom:12px;margin-bottom:20px;">
+        <h2 style="margin:0;font-size:20px;color:#134e4a;">App ResponSable · Auditoría quincenal</h2>
+        <p style="margin:4px 0 0;font-size:12px;color:#64748b;">Ventana: últimos 14 días</p>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr><td style="padding:6px 0;color:#64748b;">Llamadas IA</td><td style="padding:6px 0;text-align:right;font-weight:600;">${stats.ai_calls_total}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Errores IA</td><td style="padding:6px 0;text-align:right;font-weight:600;color:${stats.ai_calls_errors > 0 ? "#dc2626" : "#0f172a"};">${stats.ai_calls_errors}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Latencia promedio</td><td style="padding:6px 0;text-align:right;font-weight:600;">${stats.ai_avg_latency_ms} ms</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Costo máximo estimado (USD)</td><td style="padding:6px 0;text-align:right;font-weight:600;">$${totalUsd.toFixed(3)}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Clientes registrados</td><td style="padding:6px 0;text-align:right;font-weight:600;">${report.clients_total}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Usuarios activos</td><td style="padding:6px 0;text-align:right;font-weight:600;">${report.users_active}</td></tr>
+      </table>
+
+      <p style="margin-top:24px;text-align:center;">
+        <a href="${appUrl}/configuracion/uso-ia" style="display:inline-block;padding:10px 20px;background:#0d9488;color:#fff;border-radius:8px;text-decoration:none;font-weight:500;font-size:14px;">
+          Ver panel completo →
+        </a>
+      </p>
+
+      <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:12px;">
+        Este correo se envía automáticamente a los admins el 1 y 15 de cada mes.
+      </p>
+    </div>
+  `;
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from,
+      to: recipients,
+      subject: `App ResponSable — Auditoría quincenal · ${stats.ai_calls_total} llamadas, $${totalUsd.toFixed(2)} USD`,
+      html,
+    });
+    if (error) {
+      console.error("[cron/audit-health] Resend error:", error);
+      return { sent: false, reason: error.message };
+    }
+    return { sent: true };
+  } catch (e) {
+    console.error("[cron/audit-health] Resend exception:", e);
+    return { sent: false, reason: String(e) };
+  }
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ClientInput } from "@/lib/validation";
 import {
@@ -7,11 +8,6 @@ import {
   countFilledInBlock,
   type NarrativeBlockKey,
 } from "@/lib/clients/narrative-schemas";
-
-export function isDevMode(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return !url || url === "https://xxx.supabase.co";
-}
 
 type ReadOp<T> = { kind: "read"; fallback: T; run: () => Promise<T> };
 type WriteOp<T> = {

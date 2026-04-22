@@ -1,7 +1,8 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 
-// Nota: environment 'node' para evitar timeouts de worker en OneDrive.
+// Nota: environment 'node' por default (workers OneDrive).
+// Los archivos *.ui.test.tsx overridean a jsdom via /** @vitest-environment jsdom */
 export default defineConfig({
   test: {
     environment: "node",

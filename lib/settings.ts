@@ -1,10 +1,6 @@
 import "server-only";
+import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-function isDevMode(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return !url || url === "https://xxx.supabase.co";
-}
 
 const DEFAULT_SETTINGS: Record<string, unknown> = {
   tour_version: 1,

@@ -5,14 +5,50 @@ import { getClient } from "@/lib/clients";
 import { getModelConfig } from "@/lib/ai/models";
 import { buildSystemBlocks } from "@/lib/ai/roles";
 import { logAiCall } from "@/lib/ai/logging";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isDevMode } from "@/lib/env";
 import { ChatRequestSchema } from "@/lib/validation";
 
 export const maxDuration = 60;
 
-// AbortSignal 45s (margen ~30% vs maxDuration 60s). Si la llamada excede,
-// cancelamos antes de que Vercel mate la función abruptamente.
+// AbortSignal 45s (margen ~30% vs maxDuration 60s).
 const STREAM_TIMEOUT_MS = 45_000;
 const OVERLOADED_RETRY_DELAY_MS = 2_000;
+
+// Rate limit: 30 mensajes / 5 min por email. Evita que un loop accidental
+// queme crédito Anthropic.
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MIN = 5;
+
+async function checkAndRecordRateLimit(
+  email: string,
+  role: string,
+  clientId: string | null
+): Promise<{ limited: boolean; count: number }> {
+  if (isDevMode()) return { limited: false, count: 0 };
+  try {
+    const admin = createAdminClient();
+    const since = new Date(
+      Date.now() - RATE_LIMIT_WINDOW_MIN * 60 * 1000
+    ).toISOString();
+    const { count } = await admin
+      .from("chat_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("user_email", email)
+      .gte("created_at", since);
+    const used = count ?? 0;
+    if (used >= RATE_LIMIT_MAX) {
+      return { limited: true, count: used };
+    }
+    await admin
+      .from("chat_requests")
+      .insert({ user_email: email, role, client_id: clientId });
+    return { limited: false, count: used + 1 };
+  } catch (e) {
+    console.error("[chat rate limit]", e);
+    return { limited: false, count: 0 }; // falla abierto
+  }
+}
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -49,6 +85,22 @@ export async function POST(req: NextRequest) {
     return new Response(
       JSON.stringify({ error: "ANTHROPIC_API_KEY no configurada" }),
       { status: 500, headers: { "content-type": "application/json" } }
+    );
+  }
+
+  const rl = await checkAndRecordRateLimit(user, role, clientId ?? null);
+  if (rl.limited) {
+    return new Response(
+      JSON.stringify({
+        error: `Has enviado ${rl.count} mensajes en los últimos ${RATE_LIMIT_WINDOW_MIN} minutos. Espera un momento y vuelve a intentar.`,
+      }),
+      {
+        status: 429,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": String(RATE_LIMIT_WINDOW_MIN * 60),
+        },
+      }
     );
   }
 

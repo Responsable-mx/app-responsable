@@ -1,4 +1,5 @@
 import "server-only";
+import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type UserRole = "admin" | "consultor";
@@ -20,11 +21,6 @@ export type UserInput = {
   full_name?: string | null;
   active?: boolean;
 };
-
-function isDevMode(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return !url || url === "https://xxx.supabase.co";
-}
 
 /**
  * Admins fallback de emergencia — leen de env var si la DB no está lista.

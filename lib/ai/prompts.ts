@@ -1,4 +1,5 @@
 import "server-only";
+import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PromptKey =
@@ -264,11 +265,6 @@ export type PromptVersion = {
   created_by: string | null;
   created_at: string;
 };
-
-function isDevMode(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return !url || url === "https://xxx.supabase.co";
-}
 
 // ── Cache in-memory (60s TTL) para evitar N queries por request ────
 type CacheEntry = { content: string; fetchedAt: number };

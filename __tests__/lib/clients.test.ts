@@ -2,13 +2,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 import {
   clientContextCompleteness,
-  isDevMode,
   listClients,
   getClient,
   createClientRow,
   updateClientRow,
   deleteClientRow,
 } from "@/lib/clients";
+import { isDevMode } from "@/lib/env";
 
 const EMPTY_BASE = {
   business_segments: null,

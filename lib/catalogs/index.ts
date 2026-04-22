@@ -1,4 +1,5 @@
 import "server-only";
+import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   CATALOG_SEEDS,
@@ -35,11 +36,6 @@ export type CatalogItemInput = {
   sort_order?: number;
   is_active?: boolean;
 };
-
-function isDevMode(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return !url || url === "https://xxx.supabase.co";
-}
 
 /** Seeds como CatalogItem completos, para dev mode y fallback. */
 function seedsAsItems(category?: CatalogCategory): CatalogItem[] {

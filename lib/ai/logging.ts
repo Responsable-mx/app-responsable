@@ -1,4 +1,5 @@
 import "server-only";
+import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { RoleId } from "@/lib/ai/models";
 
@@ -15,11 +16,6 @@ export type AiCallLog = {
   latencyMs: number;
   error?: string | null;
 };
-
-function isDevMode(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return !url || url === "https://xxx.supabase.co";
-}
 
 /**
  * Inserta una fila en ai_calls. No lanza — si falla, solo logea.

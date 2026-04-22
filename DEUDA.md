@@ -8,7 +8,8 @@
 |-----------|----------|
 | Crítico   | 0        |
 | Importante| 4        |
-| Menor     | 2        |
+| Menor     | 3        |
+| Cross-repo| 1        |
 
 ## Ítems
 
@@ -39,3 +40,13 @@
 
 - **D006** — Falta `__tests__/lib/clients.test.ts` — solo hay test de
   validación. Agregar mock de Supabase admin y cubrir list/get/create/update.
+
+- **D007** — `lib/clients.ts` tiene 5 guards de dev mode duplicados (uno por
+  función). Extraer a un decorador o wrapper único. Funcional, pero code smell.
+
+### Cross-repo
+
+- **D008** — **Next.js 16 deprecó el nombre de archivo `middleware.ts` en
+  favor de `proxy.ts`**. App ResponSable ya migró. Pendiente migrar también
+  en `leads/` y `s-peak-dashboard/` antes de subir a Next 17 (donde podría
+  ser breaking). Update también de `STACK_BASE.md` cuando se migren todos.

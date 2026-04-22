@@ -22,6 +22,12 @@ App web interna para el equipo de consultoría de ResponSable. Cuatro asistentes
 
 Flujo: secuencial sugerido (Aurora -> Rebeca -> Elena -> Valeria), no obligatorio.
 
+
+## Contexto de auditoría
+- Deuda técnica acumulada → ver DEUDA.md
+- Últimos hallazgos críticos → ver AUDIT_LAST.md
+- Si DEUDA.md no existe → crearlo al completar la primera auditoría
+
 ## Stack
 
 - Stack base: ver `~/.claude/STACK_BASE.md`
@@ -31,6 +37,9 @@ Flujo: secuencial sugerido (Aurora -> Rebeca -> Elena -> Valeria), no obligatori
 
 - Entregable: Estudio de Doble Materialidad
 - Usuarios piloto: equipo de consultoria (8 personas)
+
+## AI / Prompts
+- Convenciones de prompt engineering y model selection: ver `~/.claude/STACK_BASE.md` (seccion AI / Prompt Engineering)
 
 ## MVP
 

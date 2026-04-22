@@ -2,6 +2,13 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ClientInput } from "@/lib/validation";
 
+/** Dev mode: sin Supabase configurado, devolvemos respuestas vacías en vez de
+ * tirar 500. Facilita desarrollo local antes de tener credenciales reales. */
+function isDevMode(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return !url || url === "https://xxx.supabase.co";
+}
+
 export type Client = {
   id: string;
   name: string;
@@ -25,6 +32,7 @@ const ALL_COLUMNS =
 
 /** Lista todos los clientes. Todos los consultores ven todos. */
 export async function listClients(): Promise<Client[]> {
+  if (isDevMode()) return [];
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("clients")
@@ -36,6 +44,7 @@ export async function listClients(): Promise<Client[]> {
 }
 
 export async function getClient(id: string): Promise<Client | null> {
+  if (isDevMode()) return null;
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("clients")
@@ -51,6 +60,11 @@ export async function createClientRow(
   input: ClientInput,
   createdBy: string
 ): Promise<Client> {
+  if (isDevMode()) {
+    throw new Error(
+      "Supabase no configurado (dev mode). Llena .env.local para crear clientes."
+    );
+  }
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("clients")
@@ -79,6 +93,11 @@ export async function updateClientRow(
   input: Partial<ClientInput>,
   updatedBy: string
 ): Promise<Client> {
+  if (isDevMode()) {
+    throw new Error(
+      "Supabase no configurado (dev mode). Llena .env.local para editar clientes."
+    );
+  }
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("clients")
@@ -114,6 +133,11 @@ export async function updateClientRow(
 }
 
 export async function deleteClientRow(id: string): Promise<void> {
+  if (isDevMode()) {
+    throw new Error(
+      "Supabase no configurado (dev mode). Llena .env.local para eliminar clientes."
+    );
+  }
   const admin = createAdminClient();
   const { error } = await admin.from("clients").delete().eq("id", id);
   if (error) throw new Error(`deleteClient: ${error.message}`);

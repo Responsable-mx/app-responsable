@@ -77,10 +77,13 @@ export function GuidedTour() {
             },
           },
           {
+            element: '[data-tour="nav-clientes"]',
             popover: {
               title: "Gestionar clientes",
               description:
-                "Desde el menú lateral (🏢 Clientes) puedes agregar clientes nuevos o editar su contexto. Entre más completo el contexto, mejor responden los 4 roles.",
+                "Desde aquí agregas clientes nuevos o editas su contexto. Entre más completo el contexto, mejor responden los 4 roles.",
+              side: "right",
+              align: "start",
             },
           },
           {

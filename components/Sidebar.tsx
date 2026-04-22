@@ -5,12 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { HelpMenu } from "@/components/HelpMenu";
 
 const NAV_BASE = [
-  { href: "/chat", label: "Chat IA", icon: "💬" },
-  { href: "/clientes", label: "Clientes", icon: "🏢" },
+  { href: "/chat", label: "Chat IA", icon: "💬", tour: "nav-chat" },
+  { href: "/clientes", label: "Clientes", icon: "🏢", tour: "nav-clientes" },
 ];
 
 const NAV_ADMIN = [
-  { href: "/configuracion", label: "Configuración", icon: "⚙️" },
+  { href: "/configuracion", label: "Configuración", icon: "⚙️", tour: "nav-config" },
 ];
 
 export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
@@ -49,6 +49,7 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
             <Link
               key={item.href}
               href={item.href}
+              data-tour={item.tour}
               className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                 active
                   ? "bg-teal-50 text-teal-800 font-medium"

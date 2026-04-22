@@ -9,7 +9,16 @@ export async function GET() {
 
   try {
     const data = await listClients();
-    return NextResponse.json({ data });
+    return NextResponse.json(
+      { data },
+      {
+        headers: {
+          // Lista cambia ocasionalmente; 60s con SWR de 5 min es suficiente
+          // para que el dropdown del chat no re-fetchee en cada turno.
+          "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (e) {
     console.error("[GET /api/clients]", e);
     return NextResponse.json({ error: "Error al listar clientes" }, { status: 500 });

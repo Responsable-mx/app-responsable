@@ -6,6 +6,10 @@ import { normalizeEmail } from "@/lib/auth";
 const MAX_ATTEMPTS = 5;
 const WINDOW_MINUTES = 5;
 
+/**
+ * Cuenta TODOS los intentos (éxito + fallo) de este email en la ventana.
+ * Bloquea brute-force al OTP de 6 dígitos.
+ */
 async function isRateLimited(
   admin: ReturnType<typeof createAdminClient>,
   email: string
@@ -15,10 +19,9 @@ async function isRateLimited(
   ).toISOString();
 
   const { count, error } = await admin
-    .from("access_codes")
+    .from("otp_attempts")
     .select("*", { count: "exact", head: true })
     .eq("email", email)
-    .eq("used", true)
     .gte("created_at", windowStart);
 
   if (error) {
@@ -26,6 +29,15 @@ async function isRateLimited(
     return false;
   }
   return (count ?? 0) >= MAX_ATTEMPTS;
+}
+
+async function recordAttempt(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string,
+  success: boolean,
+  ip: string | null
+): Promise<void> {
+  await admin.from("otp_attempts").insert({ email, success, ip });
 }
 
 export async function POST(req: NextRequest) {
@@ -47,6 +59,10 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedCode = code.trim();
   const admin = createAdminClient();
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    req.headers.get("x-real-ip") ??
+    null;
 
   if (await isRateLimited(admin, normalizedEmail)) {
     await admin
@@ -72,11 +88,14 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (codeError || !codeRow) {
+    await recordAttempt(admin, normalizedEmail, false, ip);
     return NextResponse.json(
       { error: "Código incorrecto o expirado." },
       { status: 403 }
     );
   }
+
+  await recordAttempt(admin, normalizedEmail, true, ip);
 
   await admin.from("access_codes").update({ used: true }).eq("id", codeRow.id);
 

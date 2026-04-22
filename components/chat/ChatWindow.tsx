@@ -3,8 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
-type ClientOption = { id: string; name: string; sector: string | null };
+type ClientOption = {
+  id: string;
+  name: string;
+  sector: string | null;
+  completeness: { filled: number; total: 6 };
+};
 type RoleId = "aurora" | "rebeca" | "elena" | "valeria";
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -55,6 +61,9 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
+  const [pendingRoleChange, setPendingRoleChange] = useState<RoleId | null>(
+    null
+  );
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +75,26 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
   }, [messages, streaming]);
 
   const currentRole = ROLES.find((r) => r.id === role)!;
+  const selectedClient = clients.find((c) => c.id === clientId) ?? null;
+
+  function handleRoleClick(next: RoleId) {
+    if (next === role) return;
+    if (messages.length === 0) {
+      setRole(next);
+      return;
+    }
+    // F2: confirm antes de descartar la conversación
+    setPendingRoleChange(next);
+  }
+
+  function confirmRoleChange() {
+    if (pendingRoleChange) {
+      setRole(pendingRoleChange);
+      setMessages([]);
+      setError("");
+    }
+    setPendingRoleChange(null);
+  }
 
   async function send(prompt: string) {
     if (!prompt.trim() || streaming) return;
@@ -79,7 +108,6 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Placeholder para streaming
     setMessages((m) => [...m, { role: "assistant", content: "" }]);
 
     try {
@@ -154,18 +182,22 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
     setError("");
   }
 
+  function completenessBadge(c: ClientOption): string {
+    const { filled, total } = c.completeness;
+    return ` · ${filled}/${total}`;
+  }
+
   return (
     <div className="flex flex-col h-full bg-stone-50">
-      {/* Header con selectores */}
       <header className="bg-white border-b border-stone-200 px-6 py-3 flex items-center gap-4">
-        <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-1">
+        <div
+          className="flex items-center gap-1 bg-stone-100 rounded-lg p-1"
+          data-tour="role-selector"
+        >
           {ROLES.map((r) => (
             <button
               key={r.id}
-              onClick={() => {
-                setRole(r.id);
-                resetChat();
-              }}
+              onClick={() => handleRoleClick(r.id)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                 role === r.id
                   ? "bg-white text-slate-900 shadow-sm"
@@ -180,7 +212,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
 
         <div className="flex-1" />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-tour="client-picker">
           <label className="text-xs text-slate-500">Cliente:</label>
           <select
             value={clientId}
@@ -195,17 +227,37 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               <option key={c.id} value={c.id}>
                 {c.name}
                 {c.sector ? ` · ${c.sector}` : ""}
+                {completenessBadge(c)}
               </option>
             ))}
           </select>
         </div>
       </header>
 
-      {/* Mensajes */}
+      {selectedClient && selectedClient.completeness.filled < 6 && (
+        <div
+          role="status"
+          className="bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-6 py-2 flex items-center gap-2"
+        >
+          <span>⚠️</span>
+          <span>
+            El contexto de <strong>{selectedClient.name}</strong> tiene{" "}
+            {selectedClient.completeness.filled}/6 bloques llenos. Los roles
+            responden mejor cuando está completo.{" "}
+            <a
+              href={`/clientes/${selectedClient.id}`}
+              className="underline hover:text-amber-700"
+            >
+              Completar ahora →
+            </a>
+          </span>
+        </div>
+      )}
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 && (
-            <div className="text-center py-12">
+            <div className="text-center py-12" data-tour="empty-state">
               <div
                 className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl ${currentRole.color} text-white text-2xl mb-3`}
               >
@@ -275,7 +327,6 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
         </div>
       </div>
 
-      {/* Input */}
       <footer className="bg-white border-t border-stone-200 px-6 py-3">
         <div className="max-w-3xl mx-auto">
           <form
@@ -323,6 +374,18 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
           </p>
         </div>
       </footer>
+
+      <ConfirmDialog
+        open={pendingRoleChange !== null}
+        title="Cambiar de rol borra el chat actual"
+        description={
+          "Esta conversación se va a perder si cambias a otro rol. Cada rol mantiene su propio contexto para no mezclar metodologías."
+        }
+        confirmLabel="Cambiar de rol"
+        cancelLabel="Quedarme aquí"
+        onConfirm={confirmRoleChange}
+        onCancel={() => setPendingRoleChange(null)}
+      />
     </div>
   );
 }

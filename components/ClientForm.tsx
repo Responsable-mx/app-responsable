@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Client } from "@/lib/clients";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Props =
   | { mode: "create"; initial?: undefined }
@@ -80,6 +81,7 @@ export function ClientForm(props: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     name: props.initial?.name ?? "",
@@ -144,9 +146,9 @@ export function ClientForm(props: Props) {
     }
   }
 
-  async function handleDelete() {
+  async function performDelete() {
     if (props.mode !== "edit") return;
-    if (!confirm(`¿Eliminar el cliente ${props.initial.name}? No se puede deshacer.`)) return;
+    setConfirmDelete(false);
     const res = await fetch(`/api/clients/${props.initial.id}`, {
       method: "DELETE",
     });
@@ -246,13 +248,28 @@ export function ClientForm(props: Props) {
         {props.mode === "edit" && (
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => setConfirmDelete(true)}
             className="px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded-lg"
           >
             Eliminar
           </button>
         )}
       </div>
+
+      {props.mode === "edit" && (
+        <ConfirmDialog
+          open={confirmDelete}
+          title={`Eliminar ${props.initial.name}`}
+          description={
+            "Esta acción no se puede deshacer. El cliente y su contexto quedarán borrados para todo el equipo."
+          }
+          confirmLabel="Eliminar"
+          cancelLabel="Cancelar"
+          variant="destructive"
+          onConfirm={performDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </form>
   );
 }

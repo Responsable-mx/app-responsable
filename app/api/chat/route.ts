@@ -4,9 +4,15 @@ import { requireUser } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getModelConfig } from "@/lib/ai/models";
 import { buildSystemBlocks } from "@/lib/ai/roles";
+import { logAiCall } from "@/lib/ai/logging";
 import { ChatRequestSchema } from "@/lib/validation";
 
 export const maxDuration = 60;
+
+// AbortSignal 45s (margen ~30% vs maxDuration 60s). Si la llamada excede,
+// cancelamos antes de que Vercel mate la función abruptamente.
+const STREAM_TIMEOUT_MS = 45_000;
+const OVERLOADED_RETRY_DELAY_MS = 2_000;
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -51,7 +57,6 @@ export async function POST(req: NextRequest) {
   const systemBlocks = buildSystemBlocks(role, client);
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
   const encoder = new TextEncoder();
   const startedAt = Date.now();
 
@@ -61,13 +66,44 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       };
 
-      try {
-        const response = await anthropic.messages.stream({
+      const logUsage = (
+        usage: {
+          input_tokens?: number | null;
+          output_tokens?: number | null;
+          cache_creation_input_tokens?: number | null;
+          cache_read_input_tokens?: number | null;
+        } | null,
+        stopReason: string | null,
+        error: string | null = null
+      ) => {
+        logAiCall({
+          userEmail: user,
+          role,
+          clientId: clientId ?? null,
           model: config.model,
-          max_tokens: config.maxTokens,
-          system: systemBlocks,
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          inputTokens: usage?.input_tokens ?? undefined,
+          outputTokens: usage?.output_tokens ?? undefined,
+          cacheCreationTokens: usage?.cache_creation_input_tokens ?? undefined,
+          cacheReadTokens: usage?.cache_read_input_tokens ?? undefined,
+          stopReason,
+          latencyMs: Date.now() - startedAt,
+          error,
         });
+      };
+
+      const runOnce = async () => {
+        const response = await anthropic.messages.stream(
+          {
+            model: config.model,
+            max_tokens: config.maxTokens,
+            system: systemBlocks,
+            messages: messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+          },
+          { signal: AbortSignal.timeout(STREAM_TIMEOUT_MS) }
+        );
 
         for await (const event of response) {
           if (
@@ -83,9 +119,50 @@ export async function POST(req: NextRequest) {
           type: "done",
           usage: finalMessage.usage,
           stop_reason: finalMessage.stop_reason,
+          // ayuda al cliente a confirmar que hay cache hit en turnos subsecuentes
+          cache_read_tokens: finalMessage.usage.cache_read_input_tokens ?? 0,
         });
+        logUsage(finalMessage.usage, finalMessage.stop_reason);
+      };
+
+      try {
+        await runOnce();
       } catch (err) {
-        const e = err as { name?: string; message?: string; status?: number };
+        const e = err as {
+          name?: string;
+          message?: string;
+          status?: number;
+        };
+
+        // Retry ÚNICO ante 529 (overloaded) de Anthropic
+        if (e.status === 529) {
+          await new Promise((r) =>
+            setTimeout(r, OVERLOADED_RETRY_DELAY_MS)
+          );
+          try {
+            await runOnce();
+            return;
+          } catch (err2) {
+            const e2 = err2 as {
+              name?: string;
+              message?: string;
+              status?: number;
+            };
+            const msg2 =
+              "La IA está saturada. Espera un momento e intenta de nuevo.";
+            console.error(
+              "[/api/chat retry]",
+              e2.name,
+              e2.status,
+              e2.message,
+              Date.now() - startedAt
+            );
+            send({ type: "error", error: msg2 });
+            logUsage(null, null, `529-retry-failed: ${e2.message}`);
+            return;
+          }
+        }
+
         console.error(
           "[/api/chat]",
           e.name,
@@ -93,11 +170,13 @@ export async function POST(req: NextRequest) {
           e.message,
           Date.now() - startedAt
         );
+
         const msg =
           e.name === "AbortError" || e.name === "TimeoutError"
             ? "La IA tardó más de lo esperado. Intenta de nuevo."
             : `Error: ${e.message ?? "desconocido"}`;
         send({ type: "error", error: msg });
+        logUsage(null, null, msg);
       } finally {
         controller.close();
       }

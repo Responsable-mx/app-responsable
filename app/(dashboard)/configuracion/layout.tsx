@@ -4,6 +4,7 @@ const NAV = [
   { href: "/configuracion/catalogos", label: "Catálogos", icon: "📚" },
   { href: "/configuracion/usuarios", label: "Usuarios", icon: "👥" },
   { href: "/configuracion/prompts", label: "Prompts IA", icon: "🧠" },
+  { href: "/configuracion/preferencias", label: "Preferencias", icon: "🎛️" },
 ];
 
 export default function ConfigLayout({

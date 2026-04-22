@@ -1,0 +1,84 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { resetGuidedTourLocal } from "@/components/GuidedTour";
+
+/**
+ * Botón flotante "?" en sidebar. Abre un menú con:
+ * - Ver tour del chat (limpia localStorage + navega a /chat)
+ * - Reportar un problema (mailto)
+ * Patrón tomado de S-Peak App (help widget).
+ */
+export function HelpMenu() {
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  function runChatTour() {
+    resetGuidedTourLocal();
+    setOpen(false);
+    if (pathname === "/chat") {
+      window.location.reload();
+    } else {
+      router.push("/chat");
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative" data-tour="help-button">
+      <button
+        onClick={() => setOpen((s) => !s)}
+        aria-label="Ayuda"
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-stone-50 rounded-lg"
+      >
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-xs font-bold">
+          ?
+        </span>
+        <span>Ayuda</span>
+      </button>
+
+      {open && (
+        <div className="absolute left-full bottom-0 ml-2 w-64 bg-white rounded-xl shadow-lg border border-stone-200 py-2 z-50 animate-fade-in">
+          <button
+            onClick={runChatTour}
+            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <span>🎯</span>
+            <div>
+              <div className="font-medium">Ver tour del chat</div>
+              <div className="text-[10px] text-slate-500">
+                Repite la guía de los 4 roles
+              </div>
+            </div>
+          </button>
+          <a
+            href="mailto:soporte@responsable.net?subject=App ResponSable — Problema"
+            onClick={() => setOpen(false)}
+            className="block px-3 py-2 text-sm text-slate-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <span>✉️</span>
+            <div>
+              <div className="font-medium">Reportar un problema</div>
+              <div className="text-[10px] text-slate-500">
+                Enviamos un correo a soporte
+              </div>
+            </div>
+          </a>
+          <div className="px-3 pt-2 pb-1 text-[10px] text-slate-400 border-t border-stone-100 mt-1">
+            App ResponSable · consultoría ESG con IA
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { HelpMenu } from "@/components/HelpMenu";
 
 const NAV_BASE = [
   { href: "/chat", label: "Chat IA", icon: "💬" },
@@ -61,7 +62,8 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
         })}
       </nav>
 
-      <div className="p-2 border-t border-stone-200">
+      <div className="p-2 border-t border-stone-200 space-y-1">
+        <HelpMenu />
         <button
           onClick={handleLogout}
           className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-stone-50"

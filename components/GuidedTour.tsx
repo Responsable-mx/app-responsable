@@ -2,21 +2,39 @@
 
 import { useEffect } from "react";
 
-const TOUR_STORAGE_KEY = "app-responsable:tour-completed:v1";
+const LS_KEY_PREFIX = "app-responsable:tour-completed:v";
 
 /**
- * Guided tour de primer uso. Arranca la primera vez que el consultor entra
- * al chat. Explica los 4 roles, el selector de cliente y el link a /clientes.
- * Usa driver.js (F23 de S-Peak App).
+ * Lee el tour_version remoto. Si local < remoto (o no hay local),
+ * ejecuta el tour y actualiza localStorage.
+ * Así un admin puede forzar re-tour a todos bumping la versión.
  */
 export function GuidedTour() {
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.localStorage.getItem(TOUR_STORAGE_KEY) === "1") return;
 
     let cancelled = false;
 
     (async () => {
+      // 1. Consulta versión remota
+      let remoteVersion = 1;
+      try {
+        const res = await fetch("/api/settings/tour-version");
+        if (res.ok) {
+          const j = await res.json();
+          remoteVersion = Number(j?.data?.version ?? 1);
+        }
+      } catch {
+        // sin red → no ejecutamos tour. Mejor silencio que tour espurio.
+        return;
+      }
+      if (cancelled) return;
+
+      // 2. Si este cliente ya vio esta versión, no hacer nada
+      const lsKey = LS_KEY_PREFIX + remoteVersion;
+      if (window.localStorage.getItem(lsKey) === "1") return;
+
+      // 3. Carga driver.js dinámicamente y ejecuta
       const { driver } = await import("driver.js");
       await import("driver.js/dist/driver.css");
       if (cancelled) return;
@@ -43,7 +61,7 @@ export function GuidedTour() {
             popover: {
               title: "Elige un cliente para personalizar",
               description:
-                "Cuando seleccionas un cliente, sus 6 bloques de contexto (sector, impactos, estrategia, etc.) van al prompt del rol. Sin cliente, los roles responden con metodología general.",
+                "Cuando seleccionas un cliente, sus atributos ESG (marcos, regulaciones, certificaciones, temas materiales) + 6 bloques narrativos van al prompt del rol. Sin cliente, los roles responden con metodología general.",
               side: "bottom",
               align: "end",
             },
@@ -65,14 +83,23 @@ export function GuidedTour() {
                 "Desde el menú lateral (🏢 Clientes) puedes agregar clientes nuevos o editar su contexto. Entre más completo el contexto, mejor responden los 4 roles.",
             },
           },
+          {
+            element: '[data-tour="help-button"]',
+            popover: {
+              title: "¿Necesitas volver a ver este tour?",
+              description:
+                "Haz clic en el botón ? abajo a la izquierda para ver este tour de nuevo cuando quieras.",
+              side: "right",
+              align: "end",
+            },
+          },
         ],
         onDestroyStarted: () => {
-          window.localStorage.setItem(TOUR_STORAGE_KEY, "1");
+          window.localStorage.setItem(lsKey, "1");
           d.destroy();
         },
       });
 
-      // Espera un tick para que el DOM quede pintado.
       setTimeout(() => {
         if (!cancelled) d.drive();
       }, 300);
@@ -86,8 +113,14 @@ export function GuidedTour() {
   return null;
 }
 
-/** Reinicia el tour. Útil si lo pedimos desde un menú "Ver tutorial". */
-export function resetGuidedTour() {
+/** Reinicia el tour localmente para este usuario/dispositivo. */
+export function resetGuidedTourLocal() {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(TOUR_STORAGE_KEY);
+  // Borra todos los flags tour-completed:vX (cualquier versión)
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (key?.startsWith(LS_KEY_PREFIX)) {
+      window.localStorage.removeItem(key);
+    }
+  }
 }

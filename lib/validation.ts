@@ -13,6 +13,7 @@ export const CatalogCategorySchema = z.enum([
   "countries",
   "revenue_models",
   "client_sizes",
+  "services",
 ]);
 export type CatalogCategoryId = z.infer<typeof CatalogCategorySchema>;
 

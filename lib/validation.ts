@@ -56,11 +56,29 @@ export const ClientSizeSchema = z.enum([
   "corporativo",
 ]);
 
+const catalogArray = z.array(z.string().trim().min(1).max(80)).max(50);
+
 export const ClientInputSchema = z.object({
+  // Identificación
   name: z.string().trim().min(2, "Nombre muy corto").max(200),
   sector: z.string().trim().max(120).optional().nullable(),
+  subsector: z.string().trim().max(120).optional().nullable(),
   countries: z.array(z.string().trim().min(2).max(80)).max(30).optional(),
   size: ClientSizeSchema.optional().nullable(),
+
+  // Atributos estructurados (nuevos)
+  business_segments: catalogArray.optional(),
+  frameworks: catalogArray.optional(),
+  applicable_regulations: catalogArray.optional(),
+  policies_in_place: catalogArray.optional(),
+  certifications: catalogArray.optional(),
+  material_topics: catalogArray.optional(),
+  maturity_level: z.string().trim().max(60).optional().nullable(),
+  has_double_materiality: z.boolean().optional().nullable(),
+  has_sustainability_report: z.boolean().optional().nullable(),
+  has_sustainability_strategy: z.boolean().optional().nullable(),
+
+  // Narrativa (6 bloques, más delgados ahora)
   info_general: z.string().max(20000).optional().nullable(),
   business_model: z.string().max(20000).optional().nullable(),
   impacts: z.string().max(20000).optional().nullable(),

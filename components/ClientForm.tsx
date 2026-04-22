@@ -4,16 +4,33 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Client } from "@/lib/clients";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 
 type Props =
   | { mode: "create"; initial?: undefined }
   | { mode: "edit"; initial: Client };
 
 type FormState = {
+  // Identificación
   name: string;
-  sector: string;
-  countries: string; // comma-separated en UI
+  sector: string;       // single-select value
+  subsector: string;
+  countries: string[];  // multi
   size: string;
+
+  // Atributos estructurados
+  business_segments: string[];
+  frameworks: string[];
+  applicable_regulations: string[];
+  policies_in_place: string[];
+  certifications: string[];
+  material_topics: string[];
+  maturity_level: string; // single
+  has_double_materiality: boolean | null;
+  has_sustainability_report: boolean | null;
+  has_sustainability_strategy: boolean | null;
+
+  // Narrativa
   info_general: string;
   business_model: string;
   impacts: string;
@@ -31,7 +48,6 @@ const SIZE_OPTIONS = [
   { value: "corporativo", label: "Corporativo" },
 ];
 
-// Los 6 bloques con su guía (los sub-puntos del Word como recordatorio)
 const BLOCKS: Array<{
   key: keyof Pick<
     FormState,
@@ -47,35 +63,39 @@ const BLOCKS: Array<{
 }> = [
   {
     key: "info_general",
-    label: "1. Información general",
-    hint: "Nombre, sector/subsector, países, unidades de negocio, % ingresos por línea, tamaño (empleados/ingresos), productos/servicios.",
+    label: "1. Operaciones y productos",
+    hint: "Unidades de negocio, % ingresos por línea, productos/servicios principales, volúmenes relevantes. (Nombre/sector/países/tamaño ya están arriba.)",
   },
   {
     key: "business_model",
     label: "2. Modelo de negocio",
-    hint: "Cómo genera ingresos, segmentos (B2B/B2C/gobierno), propuesta de valor, costos operativos, CAPEX, dependencias críticas.",
+    hint: "Cómo genera ingresos, propuesta de valor, costos operativos, CAPEX, dependencias críticas. (Segmentos ya están en chips.)",
   },
   {
     key: "impacts",
-    label: "3. Impactos sociales y ambientales actuales",
-    hint: "Emisiones (alcance 1/2/3), agua, residuos, biodiversidad, condiciones laborales, D&I, comunidades, incidentes/multas.",
+    label: "3. Impactos ESG actuales",
+    hint: "Emisiones 1/2/3 con valores medidos, agua, residuos, biodiversidad, condiciones laborales, comunidades, incidentes/multas.",
   },
   {
     key: "regulatory_context",
-    label: "4. Contexto regulatorio y sectorial",
-    hint: "Regulaciones por país, requerimientos de clientes/cadenas globales, presión de inversionistas, top 3 tendencias, benchmark de competidores.",
+    label: "4. Contexto sectorial",
+    hint: "Requerimientos de cadena global, presión de inversionistas, top 3 tendencias del sector, benchmark competidores. (Regulaciones ya están en chips.)",
   },
   {
     key: "sustainability_strategy",
-    label: "5. Estrategia y madurez en sostenibilidad",
-    hint: "Estrategia formal, políticas (ética/DDHH/ambiental/proveedores), KPIs, certificaciones (ISO/GRI/ESR/GPTW), reportes, modelo (pilares/temas), materialidad, temas materiales.",
+    label: "5. Estrategia y materialidad",
+    hint: "Pilares/objetivos, KPIs con targets y base year, modelo de sostenibilidad, resultados del estudio de materialidad. (Políticas/certificaciones/temas ya están en chips.)",
   },
   {
     key: "stakeholders",
     label: "6. Stakeholders",
-    hint: "Grupos clave, nivel de dependencia, canales de relación actual, expectativas y conflictos principales.",
+    hint: "Grupos clave, nivel de dependencia, canales de relación, expectativas y conflictos.",
   },
 ];
+
+function toBool(v: boolean | null | undefined): boolean | null {
+  return v === undefined ? null : v;
+}
 
 export function ClientForm(props: Props) {
   const router = useRouter();
@@ -86,8 +106,23 @@ export function ClientForm(props: Props) {
   const [form, setForm] = useState<FormState>({
     name: props.initial?.name ?? "",
     sector: props.initial?.sector ?? "",
-    countries: props.initial?.countries?.join(", ") ?? "",
+    subsector: props.initial?.subsector ?? "",
+    countries: props.initial?.countries ?? [],
     size: props.initial?.size ?? "",
+    business_segments: props.initial?.business_segments ?? [],
+    frameworks: props.initial?.frameworks ?? [],
+    applicable_regulations: props.initial?.applicable_regulations ?? [],
+    policies_in_place: props.initial?.policies_in_place ?? [],
+    certifications: props.initial?.certifications ?? [],
+    material_topics: props.initial?.material_topics ?? [],
+    maturity_level: props.initial?.maturity_level ?? "",
+    has_double_materiality: toBool(props.initial?.has_double_materiality),
+    has_sustainability_report: toBool(
+      props.initial?.has_sustainability_report
+    ),
+    has_sustainability_strategy: toBool(
+      props.initial?.has_sustainability_strategy
+    ),
     info_general: props.initial?.info_general ?? "",
     business_model: props.initial?.business_model ?? "",
     impacts: props.initial?.impacts ?? "",
@@ -107,12 +142,20 @@ export function ClientForm(props: Props) {
     try {
       const payload = {
         name: form.name.trim(),
-        sector: form.sector.trim() || null,
-        countries: form.countries
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        sector: form.sector || null,
+        subsector: form.subsector.trim() || null,
+        countries: form.countries,
         size: form.size || null,
+        business_segments: form.business_segments,
+        frameworks: form.frameworks,
+        applicable_regulations: form.applicable_regulations,
+        policies_in_place: form.policies_in_place,
+        certifications: form.certifications,
+        material_topics: form.material_topics,
+        maturity_level: form.maturity_level || null,
+        has_double_materiality: form.has_double_materiality,
+        has_sustainability_report: form.has_sustainability_report,
+        has_sustainability_strategy: form.has_sustainability_strategy,
         info_general: form.info_general || null,
         business_model: form.business_model || null,
         impacts: form.impacts || null,
@@ -163,11 +206,8 @@ export function ClientForm(props: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Campos estructurados */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
-          Identificación
-        </h2>
+      {/* ═══ Nivel 1 — Identificación ═══════════════════════ */}
+      <Section title="Identificación">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Nombre *">
             <input
@@ -176,22 +216,6 @@ export function ClientForm(props: Props) {
               onChange={(e) => update("name", e.target.value)}
               className={inputCls}
               placeholder="Ej: Heineken México"
-            />
-          </Field>
-          <Field label="Sector">
-            <input
-              value={form.sector}
-              onChange={(e) => update("sector", e.target.value)}
-              className={inputCls}
-              placeholder="Ej: Bebidas / Retail / Farmacéutico"
-            />
-          </Field>
-          <Field label="Países (separados por coma)">
-            <input
-              value={form.countries}
-              onChange={(e) => update("countries", e.target.value)}
-              className={inputCls}
-              placeholder="México, Costa Rica, Colombia"
             />
           </Field>
           <Field label="Tamaño">
@@ -208,9 +232,121 @@ export function ClientForm(props: Props) {
             </select>
           </Field>
         </div>
-      </div>
 
-      {/* 6 bloques de contexto */}
+        <div className="grid grid-cols-2 gap-4">
+          <MultiSelectCombobox
+            category="sectors"
+            label="Sector"
+            mode="single"
+            value={form.sector}
+            onChange={(v) => update("sector", (v as string) ?? "")}
+            hasGroups
+            placeholder="Elige o busca un sector…"
+          />
+          <Field label="Subsector">
+            <input
+              value={form.subsector}
+              onChange={(e) => update("subsector", e.target.value)}
+              className={inputCls}
+              placeholder="Ej: Cervezas, Retail deportivo, etc."
+            />
+          </Field>
+        </div>
+
+        <MultiSelectCombobox
+          category="countries"
+          label="Países donde opera"
+          value={form.countries}
+          onChange={(v) => update("countries", (v as string[]) ?? [])}
+          hasGroups
+          placeholder="México, Colombia, España…"
+        />
+      </Section>
+
+      {/* ═══ Nivel 2 — Atributos estructurados ═══════════════ */}
+      <Section title="Atributos ESG">
+        <div className="grid grid-cols-2 gap-4">
+          <MultiSelectCombobox
+            category="business_segments"
+            label="Segmentos de negocio"
+            value={form.business_segments}
+            onChange={(v) =>
+              update("business_segments", (v as string[]) ?? [])
+            }
+          />
+          <MultiSelectCombobox
+            category="maturity_levels"
+            label="Madurez ESG"
+            mode="single"
+            value={form.maturity_level}
+            onChange={(v) => update("maturity_level", (v as string) ?? "")}
+          />
+        </div>
+
+        <MultiSelectCombobox
+          category="frameworks"
+          label="Marcos ESG reportados"
+          hint="Marcos que el cliente ya usa para reportar (GRI, ISSB, CSRD…)."
+          value={form.frameworks}
+          onChange={(v) => update("frameworks", (v as string[]) ?? [])}
+          hasGroups
+        />
+
+        <MultiSelectCombobox
+          category="applicable_regulations"
+          label="Regulaciones aplicables"
+          hint="Regulaciones ESG que le aplican por jurisdicción."
+          value={form.applicable_regulations}
+          onChange={(v) =>
+            update("applicable_regulations", (v as string[]) ?? [])
+          }
+          hasGroups
+        />
+
+        <MultiSelectCombobox
+          category="policies"
+          label="Políticas formalizadas"
+          value={form.policies_in_place}
+          onChange={(v) => update("policies_in_place", (v as string[]) ?? [])}
+        />
+
+        <MultiSelectCombobox
+          category="certifications"
+          label="Certificaciones vigentes"
+          value={form.certifications}
+          onChange={(v) => update("certifications", (v as string[]) ?? [])}
+          hasGroups
+        />
+
+        <MultiSelectCombobox
+          category="material_topics"
+          label="Temas materiales priorizados"
+          hint="Si ya hay estudio de materialidad, marca los temas resultantes."
+          value={form.material_topics}
+          onChange={(v) => update("material_topics", (v as string[]) ?? [])}
+          hasGroups
+        />
+
+        <div className="grid grid-cols-3 gap-4 pt-1">
+          <BoolField
+            label="Tiene estrategia de sostenibilidad"
+            value={form.has_sustainability_strategy}
+            onChange={(v) => update("has_sustainability_strategy", v)}
+          />
+          <BoolField
+            label="Publica reporte de sostenibilidad"
+            value={form.has_sustainability_report}
+            onChange={(v) => update("has_sustainability_report", v)}
+          />
+          <BoolField
+            label="Tiene estudio de doble materialidad"
+            value={form.has_double_materiality}
+            onChange={(v) => update("has_double_materiality", v)}
+          />
+        </div>
+      </Section>
+
+      {/* ═══ Nivel 3 — Narrativa (6 bloques delgados) ═══════ */}
       {BLOCKS.map((block) => (
         <div
           key={block.key}
@@ -223,7 +359,7 @@ export function ClientForm(props: Props) {
           <textarea
             value={form[block.key]}
             onChange={(e) => update(block.key, e.target.value)}
-            rows={6}
+            rows={5}
             className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent resize-y"
             placeholder="Escribe lo que tengas. Puedes dejarlo vacío y completarlo después."
           />
@@ -242,7 +378,11 @@ export function ClientForm(props: Props) {
           disabled={saving || !form.name.trim()}
           className="px-5 py-2.5 bg-teal-700 text-white rounded-lg text-sm font-medium hover:bg-teal-800 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
         >
-          {saving ? "Guardando..." : props.mode === "create" ? "Crear cliente" : "Guardar cambios"}
+          {saving
+            ? "Guardando..."
+            : props.mode === "create"
+            ? "Crear cliente"
+            : "Guardar cambios"}
         </button>
 
         {props.mode === "edit" && (
@@ -277,6 +417,23 @@ export function ClientForm(props: Props) {
 const inputCls =
   "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent";
 
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-6 space-y-4">
+      <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
 function Field({
   label,
   children,
@@ -290,6 +447,55 @@ function Field({
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+function BoolField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean | null;
+  onChange: (v: boolean | null) => void;
+}) {
+  return (
+    <div>
+      <div className="block text-xs font-medium text-slate-700 mb-1">
+        {label}
+      </div>
+      <div className="flex gap-1 bg-stone-100 rounded-lg p-0.5 text-xs">
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className={`flex-1 py-1 rounded ${
+            value === null ? "bg-white shadow-sm" : "text-slate-500"
+          }`}
+        >
+          —
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={`flex-1 py-1 rounded ${
+            value === false ? "bg-white text-red-700 shadow-sm" : "text-slate-500"
+          }`}
+        >
+          No
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={`flex-1 py-1 rounded ${
+            value === true
+              ? "bg-white text-green-800 shadow-sm"
+              : "text-slate-500"
+          }`}
+        >
+          Sí
+        </button>
+      </div>
     </div>
   );
 }

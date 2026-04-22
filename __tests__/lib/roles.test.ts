@@ -8,9 +8,20 @@ import {
 const FULL_CLIENT = {
   id: "11111111-1111-1111-1111-111111111111",
   name: "Heineken México",
-  sector: "Bebidas",
-  countries: ["México"],
+  sector: "bebidas",
+  subsector: "Cervezas",
+  countries: ["mx"],
   size: "corporativo",
+  business_segments: ["b2b", "b2b2c"],
+  frameworks: ["gri", "sbti"],
+  applicable_regulations: ["nis_mx"],
+  policies_in_place: ["etica", "proveedores"],
+  certifications: ["esr_cemefi"],
+  material_topics: ["cambio_climatico", "agua"],
+  maturity_level: "avanzado",
+  has_double_materiality: true,
+  has_sustainability_report: true,
+  has_sustainability_strategy: true,
   info_general: "3 plantas en MX, ingresos 2025 ~80B MXN",
   business_model: "Retail + HORECA, B2B2C",
   impacts: "Alcance 1+2 medidos, alcance 3 en progreso",
@@ -58,10 +69,32 @@ describe("buildClientContext", () => {
       size: null,
     };
     const out = buildClientContext(minimal);
-    // no debe contener tags vacíos
     expect(out).not.toContain("<sector></sector>");
     expect(out).not.toContain("<countries></countries>");
     expect(out).not.toContain("<size></size>");
+  });
+
+  it("incluye atributos estructurados como tags compactos", () => {
+    const out = buildClientContext(FULL_CLIENT);
+    expect(out).toContain("<frameworks_reported>gri, sbti</frameworks_reported>");
+    expect(out).toContain("<certifications>esr_cemefi</certifications>");
+    expect(out).toContain(
+      "<material_topics>cambio_climatico, agua</material_topics>"
+    );
+    expect(out).toContain("<maturity_level>avanzado</maturity_level>");
+    expect(out).toContain("<has_double_materiality>sí</has_double_materiality>");
+  });
+
+  it("bool=false se serializa como 'no'", () => {
+    const c = { ...FULL_CLIENT, has_double_materiality: false };
+    const out = buildClientContext(c);
+    expect(out).toContain("<has_double_materiality>no</has_double_materiality>");
+  });
+
+  it("bool=null no aparece en el output", () => {
+    const c = { ...FULL_CLIENT, has_double_materiality: null };
+    const out = buildClientContext(c);
+    expect(out).not.toContain("<has_double_materiality>");
   });
 });
 

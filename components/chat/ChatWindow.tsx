@@ -9,7 +9,7 @@ type ClientOption = {
   id: string;
   name: string;
   sector: string | null;
-  completeness: { filled: number; total: 6 };
+  completeness: { filled: number; total: number };
 };
 type RoleId = "aurora" | "rebeca" | "elena" | "valeria";
 type ChatMessage = { role: "user" | "assistant"; content: string };

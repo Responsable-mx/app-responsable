@@ -2,18 +2,11 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ClientInput } from "@/lib/validation";
 
-/** Dev mode: sin Supabase configurado, evitamos tirar 500. */
 export function isDevMode(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   return !url || url === "https://xxx.supabase.co";
 }
 
-/**
- * Wrapper uniforme para operaciones que tocan Supabase:
- *  - En dev mode devuelve el fallback (lectura) o lanza error descriptivo (mutación).
- *  - En producción ejecuta la operación normal.
- * Kind determina el mensaje de error de las mutaciones.
- */
 type ReadOp<T> = { kind: "read"; fallback: T; run: () => Promise<T> };
 type WriteOp<T> = {
   kind: "write";
@@ -37,23 +30,65 @@ async function withDevModeFallback<T>(
 export type Client = {
   id: string;
   name: string;
+
+  // Identificación
   sector: string | null;
+  subsector: string | null;
   countries: string[] | null;
   size: string | null;
+
+  // Atributos estructurados
+  business_segments: string[] | null;
+  frameworks: string[] | null;
+  applicable_regulations: string[] | null;
+  policies_in_place: string[] | null;
+  certifications: string[] | null;
+  material_topics: string[] | null;
+  maturity_level: string | null;
+  has_double_materiality: boolean | null;
+  has_sustainability_report: boolean | null;
+  has_sustainability_strategy: boolean | null;
+
+  // Narrativa
   info_general: string | null;
   business_model: string | null;
   impacts: string | null;
   regulatory_context: string | null;
   sustainability_strategy: string | null;
   stakeholders: string | null;
+
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
 
-const ALL_COLUMNS =
-  "id,name,sector,countries,size,info_general,business_model,impacts,regulatory_context,sustainability_strategy,stakeholders,created_by,updated_by,created_at,updated_at";
+const NARRATIVE_BLOCKS = [
+  "info_general",
+  "business_model",
+  "impacts",
+  "regulatory_context",
+  "sustainability_strategy",
+  "stakeholders",
+] as const;
+
+const STRUCTURED_ARRAYS = [
+  "business_segments",
+  "frameworks",
+  "applicable_regulations",
+  "policies_in_place",
+  "certifications",
+  "material_topics",
+] as const;
+
+const ALL_COLUMNS = [
+  "id,name,sector,subsector,countries,size",
+  "business_segments,frameworks,applicable_regulations,policies_in_place",
+  "certifications,material_topics,maturity_level",
+  "has_double_materiality,has_sustainability_report,has_sustainability_strategy",
+  "info_general,business_model,impacts,regulatory_context,sustainability_strategy,stakeholders",
+  "created_by,updated_by,created_at,updated_at",
+].join(",");
 
 export function listClients(): Promise<Client[]> {
   return withDevModeFallback<Client[]>({
@@ -67,7 +102,7 @@ export function listClients(): Promise<Client[]> {
         .order("updated_at", { ascending: false })
         .limit(500);
       if (error) throw new Error(`listClients: ${error.message}`);
-      return (data ?? []) as Client[];
+      return (data ?? []) as unknown as Client[];
     },
   });
 }
@@ -85,9 +120,32 @@ export function getClient(id: string): Promise<Client | null> {
         .limit(1)
         .maybeSingle();
       if (error) throw new Error(`getClient: ${error.message}`);
-      return (data as Client) ?? null;
+      return (data as unknown as Client) ?? null;
     },
   });
+}
+
+/** Extrae solo las keys válidas del input para insert/update. */
+function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const KEYS = [
+    "name",
+    "sector",
+    "subsector",
+    "countries",
+    "size",
+    ...STRUCTURED_ARRAYS,
+    "maturity_level",
+    "has_double_materiality",
+    "has_sustainability_report",
+    "has_sustainability_strategy",
+    ...NARRATIVE_BLOCKS,
+  ] as const;
+  for (const k of KEYS) {
+    const v = input[k as keyof ClientInput];
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
 }
 
 export function createClientRow(
@@ -99,26 +157,16 @@ export function createClientRow(
     action: "crear",
     async run() {
       const admin = createAdminClient();
+      const patch = coerceInput(input);
+      patch.created_by = createdBy;
+      patch.updated_by = createdBy;
       const { data, error } = await admin
         .from("clients")
-        .insert({
-          name: input.name,
-          sector: input.sector ?? null,
-          countries: input.countries ?? null,
-          size: input.size ?? null,
-          info_general: input.info_general ?? null,
-          business_model: input.business_model ?? null,
-          impacts: input.impacts ?? null,
-          regulatory_context: input.regulatory_context ?? null,
-          sustainability_strategy: input.sustainability_strategy ?? null,
-          stakeholders: input.stakeholders ?? null,
-          created_by: createdBy,
-          updated_by: createdBy,
-        })
+        .insert(patch)
         .select(ALL_COLUMNS)
         .single();
       if (error) throw new Error(`createClient: ${error.message}`);
-      return data as Client;
+      return data as unknown as Client;
     },
   });
 }
@@ -133,26 +181,9 @@ export function updateClientRow(
     action: "editar",
     async run() {
       const admin = createAdminClient();
-      const patch: Record<string, unknown> = {
-        updated_by: updatedBy,
-        updated_at: new Date().toISOString(),
-      };
-      const KEYS: Array<keyof ClientInput> = [
-        "name",
-        "sector",
-        "countries",
-        "size",
-        "info_general",
-        "business_model",
-        "impacts",
-        "regulatory_context",
-        "sustainability_strategy",
-        "stakeholders",
-      ];
-      for (const k of KEYS) {
-        if (input[k] !== undefined) patch[k] = input[k];
-      }
-
+      const patch = coerceInput(input);
+      patch.updated_by = updatedBy;
+      patch.updated_at = new Date().toISOString();
       const { data, error } = await admin
         .from("clients")
         .update(patch)
@@ -160,7 +191,7 @@ export function updateClientRow(
         .select(ALL_COLUMNS)
         .single();
       if (error) throw new Error(`updateClient: ${error.message}`);
-      return data as Client;
+      return data as unknown as Client;
     },
   });
 }
@@ -177,15 +208,24 @@ export function deleteClientRow(id: string): Promise<void> {
   });
 }
 
-// ── Completitud (F1) ─────────────────────────────────────────
+// ── Completitud v2 (14 puntos: 8 atributos + 6 bloques) ──────
 /**
- * Cuántos de los 6 bloques están llenos (≥20 chars de contenido útil).
- * Se usa en el selector de cliente para mostrar "3/6 bloques" y avisar al
- * consultor cuando el contexto está incompleto.
+ * Mide qué tan lleno está el contexto del cliente.
+ * - 8 atributos estructurados (cada grupo con ≥1 valor cuenta como 1)
+ * - 6 bloques narrativos (cada uno con ≥20 chars cuenta como 1)
+ * Total: 14.
  */
 export function clientContextCompleteness(
   client: Pick<
     Client,
+    | "business_segments"
+    | "frameworks"
+    | "applicable_regulations"
+    | "policies_in_place"
+    | "certifications"
+    | "material_topics"
+    | "maturity_level"
+    | "has_double_materiality"
     | "info_general"
     | "business_model"
     | "impacts"
@@ -193,15 +233,27 @@ export function clientContextCompleteness(
     | "sustainability_strategy"
     | "stakeholders"
   >
-): { filled: number; total: 6 } {
-  const blocks = [
-    client.info_general,
-    client.business_model,
-    client.impacts,
-    client.regulatory_context,
-    client.sustainability_strategy,
-    client.stakeholders,
+): { filled: number; total: 14 } {
+  const arrGroups: Array<string[] | null | undefined> = [
+    client.business_segments,
+    client.frameworks,
+    client.applicable_regulations,
+    client.policies_in_place,
+    client.certifications,
+    client.material_topics,
   ];
-  const filled = blocks.filter((b) => (b?.trim().length ?? 0) >= 20).length;
-  return { filled, total: 6 };
+  const arrFilled = arrGroups.filter((a) => (a?.length ?? 0) > 0).length;
+  const singleFilled =
+    (client.maturity_level ? 1 : 0) +
+    (client.has_double_materiality !== null &&
+    client.has_double_materiality !== undefined
+      ? 1
+      : 0);
+  const narrativeFilled = NARRATIVE_BLOCKS.filter(
+    (k) => ((client[k] as string | null)?.trim().length ?? 0) >= 20
+  ).length;
+  return {
+    filled: arrFilled + singleFilled + narrativeFilled,
+    total: 14,
+  };
 }

@@ -216,8 +216,12 @@ export const ROLE_PROMPTS: Record<RoleId, string> = {
 };
 
 /**
- * Construye el preámbulo de contexto del cliente. Los 6 bloques entran
- * como texto — el modelo los usa pero no los cita literal.
+ * Construye el preámbulo de contexto del cliente.
+ *
+ * Estructura: atributos estructurados primero (chips), luego narrativa
+ * (6 bloques markdown libre). Los atributos son de alto valor semántico y
+ * bajo costo en tokens; el modelo puede razonar sobre ellos sin extraer
+ * del texto.
  */
 export function buildClientContext(client: Client | null): string {
   if (!client) {
@@ -230,12 +234,38 @@ de arriba o que cree el cliente en /clientes.
 </context>`;
   }
 
+  const line = (tag: string, v: string | null | undefined) =>
+    v && v.trim() ? `<${tag}>${v}</${tag}>` : "";
+  const arr = (tag: string, v: string[] | null | undefined) =>
+    v && v.length ? `<${tag}>${v.join(", ")}</${tag}>` : "";
+  const bool = (tag: string, v: boolean | null | undefined) =>
+    v === null || v === undefined
+      ? ""
+      : `<${tag}>${v ? "sí" : "no"}</${tag}>`;
+
+  const attrs = [
+    line("name", client.name),
+    line("sector", client.sector),
+    line("subsector", client.subsector),
+    line("size", client.size),
+    arr("countries", client.countries),
+    arr("business_segments", client.business_segments),
+    arr("frameworks_reported", client.frameworks),
+    arr("applicable_regulations", client.applicable_regulations),
+    arr("policies_in_place", client.policies_in_place),
+    arr("certifications", client.certifications),
+    arr("material_topics", client.material_topics),
+    line("maturity_level", client.maturity_level),
+    bool("has_double_materiality", client.has_double_materiality),
+    bool("has_sustainability_report", client.has_sustainability_report),
+    bool("has_sustainability_strategy", client.has_sustainability_strategy),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   return `<context>
 <client>
-<name>${client.name}</name>
-${client.sector ? `<sector>${client.sector}</sector>` : ""}
-${client.countries?.length ? `<countries>${client.countries.join(", ")}</countries>` : ""}
-${client.size ? `<size>${client.size}</size>` : ""}
+${attrs}
 
 <info_general>
 ${client.info_general || "(pendiente de llenar)"}
@@ -264,9 +294,12 @@ ${client.stakeholders || "(pendiente)"}
 
 Instrucción sobre este contexto:
 - Úsalo para personalizar. No lo repitas literal en tu respuesta.
-- Si un bloque dice "(pendiente)", señálalo cuando sea relevante y sugiere
-  que el usuario lo llene en /clientes/${client.id} antes de profundizar
-  en ese tema.
+- Los atributos estructurados (frameworks_reported, certifications,
+  material_topics, etc.) son hechos declarados por el cliente — trátalos
+  como dato confiable.
+- Si un bloque narrativo dice "(pendiente)", señálalo cuando sea relevante
+  y sugiere que el usuario lo llene en /clientes/${client.id} antes de
+  profundizar en ese tema.
 </context>`;
 }
 

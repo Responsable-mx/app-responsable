@@ -16,7 +16,8 @@ export type CatalogCategory =
   | "maturity_levels"
   | "sectors"
   | "countries"
-  | "revenue_models";
+  | "revenue_models"
+  | "client_sizes";
 
 // Orden alfabético por label (es-MX).
 export const CATALOG_CATEGORIES: Array<{
@@ -30,6 +31,7 @@ export const CATALOG_CATEGORIES: Array<{
   { key: "frameworks",              label: "Marcos ESG",              description: "GRI, SASB, ISSB, CSRD y similares.",                    hasSearch: true,  hasGroups: true },
   { key: "revenue_models",          label: "Modelos de ingresos",     description: "Cómo el cliente genera ingresos (B2B contratos, suscripción, etc.).", hasSearch: false, hasGroups: false },
   { key: "maturity_levels",         label: "Niveles de madurez",      description: "Escala de madurez ESG del cliente.",                    hasSearch: false, hasGroups: false },
+  { key: "client_sizes",            label: "Tamaños de cliente",      description: "Escala de tamaño (micro, PyME, mediana, grande, corporativo).", hasSearch: false, hasGroups: false },
   { key: "countries",               label: "Países",                  description: "Países donde operan los clientes.",                     hasSearch: true,  hasGroups: true },
   { key: "policies",                label: "Políticas corporativas",  description: "Políticas internas que el cliente puede tener formalizadas.", hasSearch: false, hasGroups: false },
   { key: "applicable_regulations",  label: "Regulaciones aplicables", description: "Regulaciones ESG por jurisdicción.",                    hasSearch: true,  hasGroups: true },
@@ -180,4 +182,11 @@ export const CATALOG_SEEDS: CatalogSeedItem[] = [
   { category: "revenue_models", value: "suscripcion",        label: "Suscripción",             sort_order: 80 },
   { category: "revenue_models", value: "venta_directa",      label: "Venta directa",           sort_order: 90 },
   { category: "revenue_models", value: "venta_mayorista",    label: "Venta mayorista",         sort_order: 100 },
+
+  // client_sizes — escala lógica (NO alfabético, intencionalmente)
+  { category: "client_sizes", value: "micro",       label: "Micro",        sort_order: 10 },
+  { category: "client_sizes", value: "pyme",        label: "PyME",         sort_order: 20 },
+  { category: "client_sizes", value: "mediana",     label: "Mediana",      sort_order: 30 },
+  { category: "client_sizes", value: "grande",      label: "Grande",       sort_order: 40 },
+  { category: "client_sizes", value: "corporativo", label: "Corporativo",  sort_order: 50 },
 ];

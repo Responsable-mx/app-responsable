@@ -47,15 +47,6 @@ type FormState = {
   blocks: Record<NarrativeBlockKey, BlockValue>;
 };
 
-const SIZE_OPTIONS = [
-  { value: "", label: "—" },
-  { value: "micro", label: "Micro" },
-  { value: "pyme", label: "PyME" },
-  { value: "mediana", label: "Mediana" },
-  { value: "grande", label: "Grande" },
-  { value: "corporativo", label: "Corporativo" },
-];
-
 function toBool(v: boolean | null | undefined): boolean | null {
   return v === undefined ? null : v;
 }
@@ -208,19 +199,14 @@ export function ClientForm(props: Props) {
               placeholder="Ej: Heineken México"
             />
           </Field>
-          <Field label="Tamaño">
-            <select
-              value={form.size}
-              onChange={(e) => update("size", e.target.value)}
-              className={inputCls}
-            >
-              {SIZE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <MultiSelectCombobox
+            category="client_sizes"
+            label="Tamaño"
+            mode="single"
+            value={form.size}
+            onChange={(v) => update("size", (v as string) ?? "")}
+            placeholder="Elige tamaño…"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-4">

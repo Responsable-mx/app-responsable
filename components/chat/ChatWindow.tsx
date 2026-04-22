@@ -14,6 +14,7 @@ type ClientOption = {
 type RoleId = "aurora" | "rebeca" | "elena" | "valeria";
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+// Orden alfabético por nombre (es-MX).
 const ROLES: Array<{
   id: RoleId;
   name: string;
@@ -22,8 +23,8 @@ const ROLES: Array<{
   emoji: string;
 }> = [
   { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-teal-700", emoji: "✍️" },
-  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-amber-600", emoji: "🔍" },
   { id: "elena", name: "Elena", fn: "Elevador", color: "bg-indigo-700", emoji: "⭐" },
+  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-amber-600", emoji: "🔍" },
   { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-rose-700", emoji: "✅" },
 ];
 

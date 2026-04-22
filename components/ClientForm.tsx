@@ -38,6 +38,11 @@ type FormState = {
   has_sustainability_report: boolean | null;
   has_sustainability_strategy: boolean | null;
 
+  // URLs de documentos
+  sustainability_strategy_url: string;
+  sustainability_report_url: string;
+  double_materiality_url: string;
+
   // Narrativa JSONB (6 bloques)
   blocks: Record<NarrativeBlockKey, BlockValue>;
 };
@@ -96,6 +101,11 @@ export function ClientForm(props: Props) {
     has_sustainability_strategy: toBool(
       props.initial?.has_sustainability_strategy
     ),
+    sustainability_strategy_url:
+      props.initial?.sustainability_strategy_url ?? "",
+    sustainability_report_url:
+      props.initial?.sustainability_report_url ?? "",
+    double_materiality_url: props.initial?.double_materiality_url ?? "",
     blocks: initialBlocks(props.initial),
   });
 
@@ -131,6 +141,11 @@ export function ClientForm(props: Props) {
         has_double_materiality: form.has_double_materiality,
         has_sustainability_report: form.has_sustainability_report,
         has_sustainability_strategy: form.has_sustainability_strategy,
+        sustainability_strategy_url:
+          form.sustainability_strategy_url.trim() || null,
+        sustainability_report_url:
+          form.sustainability_report_url.trim() || null,
+        double_materiality_url: form.double_materiality_url.trim() || null,
         info_general_json: form.blocks.info_general,
         business_model_json: form.blocks.business_model,
         impacts_json: form.blocks.impacts,
@@ -308,16 +323,25 @@ export function ClientForm(props: Props) {
             label="Tiene estrategia de sostenibilidad"
             value={form.has_sustainability_strategy}
             onChange={(v) => update("has_sustainability_strategy", v)}
+            urlLabel="URL de la estrategia"
+            urlValue={form.sustainability_strategy_url}
+            onUrlChange={(v) => update("sustainability_strategy_url", v)}
           />
           <BoolFieldInline
             label="Publica reporte de sostenibilidad"
             value={form.has_sustainability_report}
             onChange={(v) => update("has_sustainability_report", v)}
+            urlLabel="URL del último reporte"
+            urlValue={form.sustainability_report_url}
+            onUrlChange={(v) => update("sustainability_report_url", v)}
           />
           <BoolFieldInline
             label="Tiene estudio de doble materialidad"
             value={form.has_double_materiality}
             onChange={(v) => update("has_double_materiality", v)}
+            urlLabel="URL del estudio"
+            urlValue={form.double_materiality_url}
+            onUrlChange={(v) => update("double_materiality_url", v)}
           />
         </div>
       </Section>
@@ -432,10 +456,16 @@ function BoolFieldInline({
   label,
   value,
   onChange,
+  urlLabel,
+  urlValue,
+  onUrlChange,
 }: {
   label: string;
   value: boolean | null;
   onChange: (v: boolean | null) => void;
+  urlLabel?: string;
+  urlValue?: string;
+  onUrlChange?: (v: string) => void;
 }) {
   return (
     <div>
@@ -443,6 +473,20 @@ function BoolFieldInline({
         {label}
       </div>
       <BoolTriField value={value} onChange={onChange} />
+      {value === true && urlLabel && onUrlChange && (
+        <div className="mt-2">
+          <label className="block text-[10px] font-medium text-slate-600 mb-0.5">
+            {urlLabel}
+          </label>
+          <input
+            type="url"
+            value={urlValue ?? ""}
+            onChange={(e) => onUrlChange(e.target.value)}
+            placeholder="https:// …  o liga al PDF"
+            className="w-full px-2 py-1.5 border border-stone-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-teal-600"
+          />
+        </div>
+      )}
     </div>
   );
 }

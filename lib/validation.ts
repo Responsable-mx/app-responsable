@@ -97,6 +97,26 @@ export const ClientInputSchema = z.object({
   has_sustainability_report: z.boolean().optional().nullable(),
   has_sustainability_strategy: z.boolean().optional().nullable(),
 
+  // URLs públicas de documentos (PDF, web, Drive). Opcionales.
+  sustainability_strategy_url: z
+    .string()
+    .trim()
+    .max(600)
+    .optional()
+    .nullable(),
+  sustainability_report_url: z
+    .string()
+    .trim()
+    .max(600)
+    .optional()
+    .nullable(),
+  double_materiality_url: z
+    .string()
+    .trim()
+    .max(600)
+    .optional()
+    .nullable(),
+
   // Narrativa legacy — text libre (se conserva durante transición)
   info_general: z.string().max(20000).optional().nullable(),
   business_model: z.string().max(20000).optional().nullable(),

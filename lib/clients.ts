@@ -55,6 +55,11 @@ export type Client = {
   has_sustainability_report: boolean | null;
   has_sustainability_strategy: boolean | null;
 
+  // URLs de documentos clave (opcionales)
+  sustainability_strategy_url: string | null;
+  sustainability_report_url: string | null;
+  double_materiality_url: string | null;
+
   // Narrativa legacy (text, se conserva)
   info_general: string | null;
   business_model: string | null;
@@ -109,6 +114,7 @@ const ALL_COLUMNS = [
   "business_segments,frameworks,applicable_regulations,policies_in_place",
   "certifications,material_topics,maturity_level",
   "has_double_materiality,has_sustainability_report,has_sustainability_strategy",
+  "sustainability_strategy_url,sustainability_report_url,double_materiality_url",
   "info_general,business_model,impacts,regulatory_context,sustainability_strategy,stakeholders",
   "info_general_json,business_model_json,impacts_json",
   "regulatory_context_json,sustainability_strategy_json,stakeholders_json",
@@ -164,6 +170,9 @@ function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
     "has_double_materiality",
     "has_sustainability_report",
     "has_sustainability_strategy",
+    "sustainability_strategy_url",
+    "sustainability_report_url",
+    "double_materiality_url",
     ...NARRATIVE_BLOCKS,
     ...JSON_BLOCKS,
   ] as const;

@@ -48,6 +48,9 @@ de arriba o que cree el cliente en /clientes.
     bool("has_double_materiality", client.has_double_materiality),
     bool("has_sustainability_report", client.has_sustainability_report),
     bool("has_sustainability_strategy", client.has_sustainability_strategy),
+    line("sustainability_strategy_url", client.sustainability_strategy_url),
+    line("sustainability_report_url", client.sustainability_report_url),
+    line("double_materiality_url", client.double_materiality_url),
   ]
     .filter(Boolean)
     .join("\n");

@@ -45,9 +45,9 @@ export function PromptsManager() {
   const meta = useSWR<{ data: PromptMeta[] }>("/api/prompts", fetcher);
 
   return (
-    <div className="flex gap-4">
-      {/* Tabs laterales */}
-      <div className="w-60 flex flex-col gap-1">
+    <div>
+      {/* Tabs horizontales de prompts */}
+      <div className="flex flex-wrap gap-1 bg-stone-100 p-1 rounded-lg mb-4">
         {PROMPT_KEYS.map((k) => {
           const m = meta.data?.data.find((x) => x.key === k);
           const isActive = active === k;
@@ -58,36 +58,32 @@ export function PromptsManager() {
                 setActive(k);
                 setShowHistory(false);
               }}
-              className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                 isActive
-                  ? "bg-teal-50 text-teal-800 font-medium"
-                  : "text-slate-700 hover:bg-stone-50"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span>{PROMPT_LABELS[k]}</span>
-                {m?.has_override && (
-                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
-                    Custom
-                  </span>
-                )}
-              </div>
+              <span>{PROMPT_LABELS[k]}</span>
+              {m?.has_override && (
+                <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
+                  Custom
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      <div className="flex-1">
-        <PromptEditor
-          key={active}
-          promptKey={active}
-          showHistory={showHistory}
-          onToggleHistory={() => setShowHistory((s) => !s)}
-          onSaved={() => {
-            meta.mutate();
-          }}
-        />
-      </div>
+      <PromptEditor
+        key={active}
+        promptKey={active}
+        showHistory={showHistory}
+        onToggleHistory={() => setShowHistory((s) => !s)}
+        onSaved={() => {
+          meta.mutate();
+        }}
+      />
     </div>
   );
 }
@@ -219,7 +215,7 @@ function PromptEditor({
           setDraft(e.target.value);
           setDirty(e.target.value !== detail.content);
         }}
-        className="w-full h-[440px] px-3 py-2 border border-stone-300 rounded-lg font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-teal-600"
+        className="w-full h-[520px] px-4 py-3 border border-stone-300 rounded-lg font-mono text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-teal-600"
         spellCheck={false}
       />
       <div className="mt-1 text-[10px] text-slate-500">

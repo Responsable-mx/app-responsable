@@ -9,7 +9,7 @@ const LS_KEY_PREFIX = "app-responsable:tour-completed:v";
  * ejecuta el tour y actualiza localStorage.
  * Así un admin puede forzar re-tour a todos bumping la versión.
  */
-export function GuidedTour() {
+export function GuidedTour({ isAdmin = false }: { isAdmin?: boolean }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -86,6 +86,20 @@ export function GuidedTour() {
               align: "start",
             },
           },
+          ...(isAdmin
+            ? [
+                {
+                  element: '[data-tour="nav-config"]',
+                  popover: {
+                    title: "Configuración (solo admins)",
+                    description:
+                      "Aquí gestionas catálogos (sectores, marcos, certificaciones…), invitas usuarios, editas los prompts de los 4 roles y ajustas preferencias del equipo.",
+                    side: "right" as const,
+                    align: "start" as const,
+                  },
+                },
+              ]
+            : []),
           {
             element: '[data-tour="help-button"]',
             popover: {
@@ -111,7 +125,7 @@ export function GuidedTour() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAdmin]);
 
   return null;
 }

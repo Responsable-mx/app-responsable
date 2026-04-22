@@ -41,6 +41,7 @@ export type Client = {
 
   // Atributos estructurados
   business_segments: string[] | null;
+  services: string[] | null;
   frameworks: string[] | null;
   applicable_regulations: string[] | null;
   policies_in_place: string[] | null;

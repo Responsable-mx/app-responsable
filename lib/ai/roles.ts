@@ -16,7 +16,7 @@ export function buildClientContext(client: Client | null): string {
   if (!client) {
     return `<context>
 No hay cliente seleccionado en este chat. El usuario te está preguntando
-sobre metodología general de consultoría ESG de ResponSable, sin
+sobre metodología general de consultoría en sostenibilidad de ResponSable, sin
 personalizar a una empresa específica. Si necesitas contexto de cliente
 para responder bien, pídele al usuario que lo seleccione en el dropdown
 de arriba o que cree el cliente en /clientes.
@@ -39,6 +39,7 @@ de arriba o que cree el cliente en /clientes.
     line("size", client.size),
     arr("countries", client.countries),
     arr("business_segments", client.business_segments),
+    arr("services_contracted", client.services),
     arr("frameworks_reported", client.frameworks),
     arr("applicable_regulations", client.applicable_regulations),
     arr("policies_in_place", client.policies_in_place),

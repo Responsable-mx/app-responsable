@@ -61,7 +61,7 @@ export function GuidedTour({ isAdmin = false }: { isAdmin?: boolean }) {
             popover: {
               title: "Elige un cliente para personalizar",
               description:
-                "Cuando seleccionas un cliente, sus atributos ESG (marcos, regulaciones, certificaciones, temas materiales) + 6 bloques narrativos van al prompt del rol. Sin cliente, los roles responden con metodología general.",
+                "Cuando seleccionas un cliente, sus atributos de sostenibilidad (marcos, regulaciones, certificaciones, temas materiales) + 6 bloques narrativos van al prompt del rol. Sin cliente, los roles responden con metodología general.",
               side: "bottom",
               align: "end",
             },

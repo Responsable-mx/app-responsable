@@ -73,7 +73,7 @@ export function HelpMenu() {
             </div>
           </a>
           <div className="px-3 pt-2 pb-1 text-[10px] text-slate-400 border-t border-stone-100 mt-1">
-            App ResponSable · Consultoría ESG con IA
+            App ResponSable · Consultoría en sostenibilidad con IA
           </div>
         </div>
       )}

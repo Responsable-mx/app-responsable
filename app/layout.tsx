@@ -12,7 +12,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "App ResponSable",
   description:
-    "Sistema conversacional con IA y cadena de calidad por roles para consultoría ESG.",
+    "Sistema conversacional con IA y cadena de calidad por roles para consultoría en sostenibilidad.",
 };
 
 export default function RootLayout({

@@ -17,7 +17,8 @@ export type CatalogCategory =
   | "sectors"
   | "countries"
   | "revenue_models"
-  | "client_sizes";
+  | "client_sizes"
+  | "services";
 
 // Orden alfabético por label (es-MX).
 export const CATALOG_CATEGORIES: Array<{
@@ -28,16 +29,17 @@ export const CATALOG_CATEGORIES: Array<{
   hasGroups: boolean;   // si se agrupa por group_name en el dropdown
 }> = [
   { key: "certifications",          label: "Certificaciones",         description: "Certificaciones ISO, B Corp, EcoVadis, etc.",           hasSearch: true,  hasGroups: true },
-  { key: "frameworks",              label: "Marcos ESG",              description: "GRI, SASB, ISSB, CSRD y similares.",                    hasSearch: true,  hasGroups: true },
+  { key: "frameworks",              label: "Marcos de sostenibilidad",              description: "GRI, SASB, ISSB, CSRD y similares.",                    hasSearch: true,  hasGroups: true },
   { key: "revenue_models",          label: "Modelos de ingresos",     description: "Cómo el cliente genera ingresos (B2B contratos, suscripción, etc.).", hasSearch: false, hasGroups: false },
-  { key: "maturity_levels",         label: "Niveles de madurez",      description: "Escala de madurez ESG del cliente.",                    hasSearch: false, hasGroups: false },
+  { key: "maturity_levels",         label: "Niveles de madurez",      description: "Escala de madurez en sostenibilidad del cliente.",                    hasSearch: false, hasGroups: false },
   { key: "client_sizes",            label: "Tamaños de cliente",      description: "Escala de tamaño (micro, PyME, mediana, grande, corporativo).", hasSearch: false, hasGroups: false },
   { key: "countries",               label: "Países",                  description: "Países donde operan los clientes.",                     hasSearch: true,  hasGroups: true },
   { key: "policies",                label: "Políticas corporativas",  description: "Políticas internas que el cliente puede tener formalizadas.", hasSearch: false, hasGroups: false },
-  { key: "applicable_regulations",  label: "Regulaciones aplicables", description: "Regulaciones ESG por jurisdicción.",                    hasSearch: true,  hasGroups: true },
+  { key: "applicable_regulations",  label: "Regulaciones aplicables", description: "Regulaciones de sostenibilidad por jurisdicción.",                    hasSearch: true,  hasGroups: true },
   { key: "sectors",                 label: "Sectores",                description: "Taxonomía de industrias que los clientes pueden elegir.", hasSearch: true,  hasGroups: true },
   { key: "business_segments",       label: "Segmentos de negocio",    description: "B2B, B2C, gobierno, etc.",                              hasSearch: false, hasGroups: false },
-  { key: "material_topics",         label: "Temas materiales",        description: "Temas ESG priorizables en materialidad (basado en GRI).", hasSearch: true,  hasGroups: true },
+  { key: "material_topics",         label: "Temas materiales",        description: "Temas priorizables en materialidad (basado en GRI).", hasSearch: true,  hasGroups: true },
+  { key: "services",                label: "Servicios",               description: "Portafolio de servicios ResponSable (ESR, doble materialidad, informe de sostenibilidad).", hasSearch: false, hasGroups: false },
 ];
 
 export type CatalogSeedItem = {
@@ -61,23 +63,23 @@ export const CATALOG_SEEDS: CatalogSeedItem[] = [
   { category: "business_segments", value: "franchise", label: "Franquicia",     sort_order: 60 },
   { category: "business_segments", value: "wholesale", label: "Mayorista",      sort_order: 70 },
 
-  // frameworks — grupos alfabéticos (Clima, ESG, Social), items alfabéticos dentro
+  // frameworks — grupos alfabéticos (Clima, Social, Sostenibilidad), items alfabéticos dentro
   { category: "frameworks", value: "cdp",               label: "CDP",               group_name: "Clima",  sort_order: 10 },
   { category: "frameworks", value: "sbti",              label: "SBTi",              group_name: "Clima",  sort_order: 20 },
   { category: "frameworks", value: "tcfd",              label: "TCFD",              group_name: "Clima",  sort_order: 30 },
-  { category: "frameworks", value: "csrd",              label: "CSRD (UE)",         group_name: "ESG",    sort_order: 40 },
-  { category: "frameworks", value: "gri",               label: "GRI Standards",     group_name: "ESG",    sort_order: 50 },
-  { category: "frameworks", value: "issb",              label: "ISSB",              group_name: "ESG",    sort_order: 60 },
-  { category: "frameworks", value: "sasb",              label: "SASB",              group_name: "ESG",    sort_order: 70 },
+  { category: "frameworks", value: "csrd",              label: "CSRD (UE)",         group_name: "Sostenibilidad",    sort_order: 40 },
+  { category: "frameworks", value: "gri",               label: "GRI Standards",     group_name: "Sostenibilidad",    sort_order: 50 },
+  { category: "frameworks", value: "issb",              label: "ISSB",              group_name: "Sostenibilidad",    sort_order: 60 },
+  { category: "frameworks", value: "sasb",              label: "SASB",              group_name: "Sostenibilidad",    sort_order: 70 },
   { category: "frameworks", value: "esr_cemefi",        label: "ESR CEMEFI",        group_name: "Social", sort_order: 80 },
   { category: "frameworks", value: "ilo",               label: "ILO",               group_name: "Social", sort_order: 90 },
   { category: "frameworks", value: "oecd",              label: "OECD Guidelines",   group_name: "Social", sort_order: 100 },
   { category: "frameworks", value: "un_global_compact", label: "UN Global Compact", group_name: "Social", sort_order: 110 },
 
-  // applicable_regulations — grupos alfabéticos (ESG, México), items alfabéticos dentro
-  { category: "applicable_regulations", value: "csrd_ue",                 label: "CSRD (Unión Europea)",        group_name: "ESG",    sort_order: 10 },
-  { category: "applicable_regulations", value: "issb_global",             label: "ISSB (global)",               group_name: "ESG",    sort_order: 20 },
-  { category: "applicable_regulations", value: "sec_climate_us",          label: "SEC Climate Disclosure (US)", group_name: "ESG",    sort_order: 30 },
+  // applicable_regulations — grupos alfabéticos (México, Sostenibilidad), items alfabéticos dentro
+  { category: "applicable_regulations", value: "csrd_ue",                 label: "CSRD (Unión Europea)",        group_name: "Sostenibilidad",    sort_order: 10 },
+  { category: "applicable_regulations", value: "issb_global",             label: "ISSB (global)",               group_name: "Sostenibilidad",    sort_order: 20 },
+  { category: "applicable_regulations", value: "sec_climate_us",          label: "SEC Climate Disclosure (US)", group_name: "Sostenibilidad",    sort_order: 30 },
   { category: "applicable_regulations", value: "cnbv_sustentabilidad_mx", label: "CNBV Sustentabilidad (MX)",   group_name: "México", sort_order: 40 },
   { category: "applicable_regulations", value: "ley_cambio_climatico_mx", label: "Ley Cambio Climático (MX)",   group_name: "México", sort_order: 50 },
   { category: "applicable_regulations", value: "ley_olimpia_mx",          label: "Ley Olimpia (MX)",            group_name: "México", sort_order: 60 },
@@ -189,4 +191,9 @@ export const CATALOG_SEEDS: CatalogSeedItem[] = [
   { category: "client_sizes", value: "mediana",     label: "Mediana",      sort_order: 30 },
   { category: "client_sizes", value: "grande",      label: "Grande",       sort_order: 40 },
   { category: "client_sizes", value: "corporativo", label: "Corporativo",  sort_order: 50 },
+
+  // services — portafolio ResponSable (orden sugerido por uso, no alfabético)
+  { category: "services", value: "doble_materialidad",    label: "Doble materialidad",       sort_order: 10 },
+  { category: "services", value: "esr_cemefi",            label: "ESR (CEMEFI)",             sort_order: 20 },
+  { category: "services", value: "informe_sostenibilidad",label: "Informe de sostenibilidad",sort_order: 30 },
 ];

@@ -434,7 +434,7 @@ function ItemEditor({
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               className={inputCls}
-              placeholder="Ej: ESG, Clima, Social"
+              placeholder="Ej: Sostenibilidad, Clima, Social"
             />
           </Field>
           <Field label="Descripción (opcional, tooltip)">

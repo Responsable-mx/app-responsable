@@ -162,7 +162,7 @@ const BUSINESS_MODEL: BlockSchema = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// 3. Impactos ESG actuales
+// 3. Impactos de sostenibilidad actuales
 // ─────────────────────────────────────────────────────────────
 const emisionesSchema: FieldDef[] = [
   { key: "medido", label: "¿Medido?", type: { kind: "bool_tri" } },
@@ -182,7 +182,7 @@ const emisionesSchema: FieldDef[] = [
 const IMPACTS: BlockSchema = {
   block: "impacts",
   jsonColumn: "impacts_json",
-  title: "3. Impactos ESG actuales",
+  title: "3. Impactos de sostenibilidad actuales",
   description:
     "Datos duros sobre huella del cliente. Si algo no está medido, marca 'No' y déjalo vacío; es información útil por sí misma.",
   fields: [
@@ -310,12 +310,12 @@ const REGULATORY_CONTEXT: BlockSchema = {
     {
       key: "presion_inversionistas",
       label: "Presión de inversionistas",
-      hint: "Fondos activistas, score ESG exigido, ratings aplicables.",
+      hint: "Fondos activistas, score de sostenibilidad exigido, ratings aplicables.",
       type: { kind: "text", multiline: true },
     },
     {
       key: "tendencias_sector",
-      label: "Top 3 tendencias ESG del sector",
+      label: "Top 3 tendencias de sostenibilidad del sector",
       type: { kind: "string_list", maxItems: 3 },
     },
     {
@@ -329,7 +329,7 @@ const REGULATORY_CONTEXT: BlockSchema = {
           { key: "nombre", label: "Competidor", type: { kind: "text" } },
           {
             key: "notas",
-            label: "Qué reporta / diferenciador ESG",
+            label: "Qué reporta / diferenciador de sostenibilidad",
             type: { kind: "text", multiline: true },
           },
         ],
@@ -351,7 +351,7 @@ const SUSTAINABILITY_STRATEGY: BlockSchema = {
   jsonColumn: "sustainability_strategy_json",
   title: "5. Estrategia y materialidad",
   description:
-    "Los pilares, metas y KPIs de la estrategia ESG del cliente. Booleanos de 'existe estrategia/reporte/doble materialidad' ya están en Atributos; aquí va el detalle.",
+    "Los pilares, metas y KPIs de la estrategia de sostenibilidad del cliente. Booleanos de 'existe estrategia/reporte/doble materialidad' ya están en Atributos; aquí va el detalle.",
   fields: [
     {
       key: "pilares",

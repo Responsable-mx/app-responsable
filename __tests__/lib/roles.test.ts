@@ -10,6 +10,7 @@ const FULL_CLIENT = {
   countries: ["mx"],
   size: "corporativo",
   business_segments: ["b2b", "b2b2c"],
+  services: ["doble_materialidad"],
   frameworks: ["gri", "sbti"],
   applicable_regulations: ["nis_mx"],
   policies_in_place: ["etica", "proveedores"],

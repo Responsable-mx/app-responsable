@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────
--- 0012 — URLs de documentos ESG clave del cliente.
+-- 0012 — URLs de documentos de sostenibilidad clave del cliente.
 -- Aditiva. Los URLs son opcionales y aplican solo si el booleano
 -- correspondiente es true.
 -- ─────────────────────────────────────────────────────────────

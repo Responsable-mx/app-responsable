@@ -28,6 +28,7 @@ type FormState = {
 
   // Atributos estructurados
   business_segments: string[];
+  services: string[];
   frameworks: string[];
   applicable_regulations: string[];
   policies_in_place: string[];
@@ -79,6 +80,7 @@ export function ClientForm(props: Props) {
     countries: props.initial?.countries ?? [],
     size: props.initial?.size ?? "",
     business_segments: props.initial?.business_segments ?? [],
+    services: props.initial?.services ?? [],
     frameworks: props.initial?.frameworks ?? [],
     applicable_regulations: props.initial?.applicable_regulations ?? [],
     policies_in_place: props.initial?.policies_in_place ?? [],
@@ -123,6 +125,7 @@ export function ClientForm(props: Props) {
         countries: form.countries,
         size: form.size || null,
         business_segments: form.business_segments,
+        services: form.services,
         frameworks: form.frameworks,
         applicable_regulations: form.applicable_regulations,
         policies_in_place: form.policies_in_place,
@@ -240,7 +243,7 @@ export function ClientForm(props: Props) {
       </Section>
 
       {/* ═══ Atributos estructurados ═════════════════════════ */}
-      <Section title="Atributos ESG">
+      <Section title="Atributos de sostenibilidad">
         <div className="grid grid-cols-2 gap-4">
           <MultiSelectCombobox
             category="business_segments"
@@ -252,7 +255,7 @@ export function ClientForm(props: Props) {
           />
           <MultiSelectCombobox
             category="maturity_levels"
-            label="Madurez ESG"
+            label="Madurez en sostenibilidad"
             mode="single"
             value={form.maturity_level}
             onChange={(v) => update("maturity_level", (v as string) ?? "")}
@@ -260,8 +263,16 @@ export function ClientForm(props: Props) {
         </div>
 
         <MultiSelectCombobox
+          category="services"
+          label="Servicios ResponSable contratados"
+          hint="Qué servicio(s) le estamos prestando a este cliente."
+          value={form.services}
+          onChange={(v) => update("services", (v as string[]) ?? [])}
+        />
+
+        <MultiSelectCombobox
           category="frameworks"
-          label="Marcos ESG reportados"
+          label="Marcos de sostenibilidad reportados"
           hint="Marcos que el cliente ya usa para reportar (GRI, ISSB, CSRD…)."
           value={form.frameworks}
           onChange={(v) => update("frameworks", (v as string[]) ?? [])}

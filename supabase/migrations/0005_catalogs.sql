@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.catalog_items (
   value         text NOT NULL,   -- canónico, va a clients.<col>[]
   label         text NOT NULL,   -- lo que ve el usuario
   description   text,            -- tooltip
-  group_name    text,            -- agrupa en dropdown (ESG/Clima/Social)
+  group_name    text,            -- agrupa en dropdown (Sostenibilidad/Clima/Social)
   sort_order    integer NOT NULL DEFAULT 100,
   is_active     boolean NOT NULL DEFAULT true,
   is_system     boolean NOT NULL DEFAULT false,
@@ -59,10 +59,10 @@ INSERT INTO public.catalog_items (category, value, label, sort_order, is_system)
 
 -- ── frameworks (marcos de reporte ESG) ──────────────────────
 INSERT INTO public.catalog_items (category, value, label, group_name, sort_order, is_system) VALUES
-  ('frameworks', 'gri',           'GRI Standards',     'ESG',     10, true),
-  ('frameworks', 'sasb',          'SASB',              'ESG',     20, true),
-  ('frameworks', 'issb',          'ISSB',              'ESG',     30, true),
-  ('frameworks', 'csrd',          'CSRD (UE)',         'ESG',     40, true),
+  ('frameworks', 'gri',           'GRI Standards',     'Sostenibilidad',     10, true),
+  ('frameworks', 'sasb',          'SASB',              'Sostenibilidad',     20, true),
+  ('frameworks', 'issb',          'ISSB',              'Sostenibilidad',     30, true),
+  ('frameworks', 'csrd',          'CSRD (UE)',         'Sostenibilidad',     40, true),
   ('frameworks', 'tcfd',          'TCFD',              'Clima',   50, true),
   ('frameworks', 'cdp',           'CDP',               'Clima',   60, true),
   ('frameworks', 'sbti',          'SBTi',              'Clima',   70, true),
@@ -74,9 +74,9 @@ INSERT INTO public.catalog_items (category, value, label, group_name, sort_order
 
 -- ── applicable_regulations ──────────────────────────────────
 INSERT INTO public.catalog_items (category, value, label, group_name, sort_order, is_system) VALUES
-  ('applicable_regulations', 'csrd_ue',           'CSRD (Unión Europea)',        'ESG',       10, true),
-  ('applicable_regulations', 'issb_global',       'ISSB (global)',               'ESG',       20, true),
-  ('applicable_regulations', 'sec_climate_us',    'SEC Climate Disclosure (US)', 'ESG',       30, true),
+  ('applicable_regulations', 'csrd_ue',           'CSRD (Unión Europea)',        'Sostenibilidad',       10, true),
+  ('applicable_regulations', 'issb_global',       'ISSB (global)',               'Sostenibilidad',       20, true),
+  ('applicable_regulations', 'sec_climate_us',    'SEC Climate Disclosure (US)', 'Sostenibilidad',       30, true),
   ('applicable_regulations', 'nis_mx',            'NIS (México)',                'México',    40, true),
   ('applicable_regulations', 'ley_cambio_climatico_mx', 'Ley Cambio Climático (MX)', 'México', 50, true),
   ('applicable_regulations', 'cnbv_sustentabilidad_mx', 'CNBV Sustentabilidad (MX)', 'México', 60, true),

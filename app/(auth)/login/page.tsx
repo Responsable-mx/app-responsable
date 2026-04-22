@@ -67,7 +67,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-xl font-bold text-slate-900">App ResponSable</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Consultoría ESG con cadena de calidad IA
+            Consultoría en sostenibilidad con cadena de calidad IA
           </p>
         </div>
 

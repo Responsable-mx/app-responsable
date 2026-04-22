@@ -58,7 +58,7 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
               App ResponSable
             </div>
             <div className="text-[10px] text-slate-500 leading-tight mt-0.5">
-              Consultoría ESG · IA
+              Consultoría en sostenibilidad · IA
             </div>
           </div>
         </div>

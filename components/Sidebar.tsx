@@ -3,14 +3,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-const NAV = [
+const NAV_BASE = [
   { href: "/chat", label: "Chat IA", icon: "💬" },
   { href: "/clientes", label: "Clientes", icon: "🏢" },
 ];
 
-export function Sidebar() {
+const NAV_ADMIN = [
+  { href: "/configuracion", label: "Configuración", icon: "⚙️" },
+];
+
+export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
+  const items = isAdmin ? [...NAV_BASE, ...NAV_ADMIN] : NAV_BASE;
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -36,7 +41,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 p-2 space-y-1">
-        {NAV.map((item) => {
+        {items.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
           return (

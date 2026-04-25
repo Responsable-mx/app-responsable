@@ -1,54 +1,50 @@
-# Últimos hallazgos — App ResponSable
+# AUDIT_LAST.md — App ResponSable
 
-Fecha: 2026-04-21
-Tipo: `/audit` completa post-deploy prod + limpieza total
-Resultado: ✅ 0 críticos · 0 importantes · 1 menor · 1 cross-repo · 1 operativo
+**Fecha:** 2026-04-24
+**Modo:** /calibrar (recalibración vs starters globales actualizados)
+**Calificación:** 8.0/10 (MVP en prod sin bloqueos, gaps a11y/IA antes de piloto activo)
 
-## Contexto
+## Estado del proyecto
 
-Auditoría disparada tras poner `app.responsable.net` en producción. Detecté
-10 hallazgos nuevos y procedí a cerrar todos excepto los de acción operativa
-(rotación de keys = OP1) y cross-repo (D008).
+MVP funcional desplegado en `app.responsable.net`. 4 roles IA, RLS, rate limit, página `/configuracion/uso-ia`, 133 tests, 0 deuda crítica previa. Piloto inminente con 8 consultores.
 
-## Cerrados en esta sesión
+## Top hallazgos (5 importantes pre-piloto)
 
-### Importantes (4)
-- **H2** — +16 smoke tests UI (`ClientsList`, `ConfirmDialog`, `StringListField`)
-- **H3** — Función `isDevMode()` centralizada en `lib/env.ts` (eliminados 6 duplicados)
-- **H9** — Página `/configuracion/uso-ia` con métricas, top consultores, top clientes, tabla diaria
-- **H10** — Rate limit 30 msgs/5min en `/api/chat` + tabla `chat_requests`
+1. **DRSP-1** — Primitives canonicos faltantes (`components/ui/` solo tiene Icons). Sin Button/Input/Modal/Toast/SkipLink/Skeleton. ~1 día.
+2. **DRSP-2** — `globals.css` con hex hardcoded, sin tokens, sin `prefers-reduced-motion`. 1-2h.
+3. **DRSP-3** — Codes crudos `services_contracted`/`maturity_level` filtrados al LLM en respuesta al consultor. Riesgo reputacional. 1-2h.
+4. **DRSP-6** — Solo 1 cache breakpoint cuando STACK declara 2. Costo Anthropic ~2x al cambiar de rol. 15min (XS).
+5. **DRSP-8** — Sin CI workflow, sin Playwright, coverage threshold bajo. Moderado.
 
-### Menores (4)
-- **H5** — DEUDA.md sincronizado; B1 movido a histórico (cerrado por migración 0006)
-- **H8** — Cron `audit-health` ahora envía email HTML a admins via Resend
-- **H11** — `/clientes` con buscador (nombre/sector/país/marcos/certs) + filtro por sector
-- **B1** — RLS whitelist ya aplicada (migración 0006 en prod)
+## Menores (cleanup gradual)
 
-## Migraciones nuevas aplicadas a producción
+- DRSP-4: 69 usos slate-400/500 (contraste).
+- DRSP-5: Sin SkipLink, sin app/dev/* previews.
+- DRSP-7: Sin audit_log para mutaciones admin.
+- R1: CatalogsManager/PromptsManager monolíticos.
 
-- `0015_chat_rate_limit.sql` — tabla `chat_requests` (aditiva)
+## Recomendación concreta
 
-## Verificación
+**Antes de que arranquen los 8 consultores en piloto activo:** invertir 1-2 días en DRSP-1 (primitives) + DRSP-2 (tokens) + DRSP-3 (codes LLM-only) + DRSP-6 (2do cache breakpoint). ROI alto: paleta consistente, sin leak de jerga al cliente, ahorro inmediato en tokens.
 
-| Check | Resultado |
-|-------|-----------|
-| `tsc --noEmit` | ✅ 0 errores |
-| `eslint .` | ✅ 0 warnings |
-| `vitest run` | ✅ **133/133** tests (+16 UI) |
-| `next build` | ✅ compilado sin errores |
+DRSP-7 (audit_log) y DRSP-8 (CI) pueden esperar a los siguientes 20+ usuarios.
 
-## Pendientes
+## Riesgo de escalado (8 → 50 consultores)
 
-- **R1** (menor) — Extraer subcomponentes de `CatalogsManager`/`PromptsManager`.
-  Diferido hasta próximo cambio funcional.
-- **D008** (cross-repo) — `middleware.ts → proxy.ts` en `leads/` y
-  `s-peak-dashboard/`.
-- **OP1** (operativo) — Rotar API keys Anthropic + Resend. Acción del admin.
+Bottleneck será UX/mantenibilidad, no infra. Concreto:
+1. **Primitives ausentes** → drift visual + regresiones a11y por feature (DRSP-1).
+2. **Codes crudos en respuesta IA** → leak a clientes corporativos premium (DRSP-3).
+3. **Sin Playwright ni CI** → cambios al chat rompen en prod sin alerta (DRSP-8).
+4. **1 solo cache breakpoint** → costo Anthropic se dispara con volumen (DRSP-6).
+5. **Pregunta abierta:** ¿RLS lax intencional con datos ESG empresariales sensibles? Revisar antes de prospecto corporativo.
 
-## Siguientes pasos sugeridos
+## Próximo /predev debe verificar
 
-1. **OP1**: rotación de keys (5 min tuyos).
-2. Cuando lleguen consultores reales, verificar `/configuracion/uso-ia` dos
-   semanas después para validar costos estimados vs factura real.
-3. Considerar upgrade Vercel Pro si `leads` + `app-responsable` consumen
-   cuota Hobby.
+- Antes de feature nueva con UI → ¿el primitive existe? Si no, crearlo primero (Button, Input, Modal, etc.)
+- Antes de tocar prompt IA → ¿hay codes que el LLM pueda repetir literal? Mapear a nombre humano o instruir "no citar literal".
+- Antes de agregar tabla → aplicar STARTER_UX §7 (8 principios) desde día 1 + §7.1 banner jerárquico si consolida datos.
+
+## Cambios aplicados en este audit
+
+- DEUDA.md: agregados DRSP-1 a DRSP-8 (5 importantes + 4 menores). R1 conservado.
+- CLAUDE.md: bloque "Reglas de UX/a11y" + decisión explícita §7.3 sobre codes internos + lista de primitives a crear con orden estricto.

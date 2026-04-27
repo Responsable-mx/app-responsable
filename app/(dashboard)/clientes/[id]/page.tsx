@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getClient } from "@/lib/clients";
-import { ClientForm } from "@/components/ClientForm";
+import { ClientTabs } from "@/components/ClientTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +14,12 @@ export default async function EditarClientePage({ params }: Props) {
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">{client.name}</h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Editar contexto del cliente. Los cambios aplican a las próximas
-        conversaciones con los 4 roles.
+      <p className="text-sm text-slate-600 mb-4">
+        {client.sector ?? "—"}
+        {client.subsector && ` · ${client.subsector}`}
+        {client.size && ` · ${client.size}`}
       </p>
-      <ClientForm mode="edit" initial={client} />
+      <ClientTabs client={client} />
     </div>
   );
 }

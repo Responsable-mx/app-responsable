@@ -164,7 +164,7 @@ export function MultiSelectCombobox({
       <label className="block text-xs font-medium text-slate-700 mb-1">
         {label}
       </label>
-      {hint && <p className="text-[10px] text-slate-500 mb-1">{hint}</p>}
+      {hint && <p className="text-[10px] text-slate-600 mb-1">{hint}</p>}
       <div
         className="flex flex-wrap gap-1 px-2 py-1.5 border border-stone-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-teal-600"
         onClick={() => {
@@ -214,7 +214,7 @@ export function MultiSelectCombobox({
       {open && (
         <div className="absolute z-20 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
           {filtered.length === 0 ? (
-            <div className="px-3 py-4 text-xs text-slate-500 text-center">
+            <div className="px-3 py-4 text-xs text-slate-600 text-center">
               {items.length === 0
                 ? "Cargando…"
                 : query
@@ -224,7 +224,7 @@ export function MultiSelectCombobox({
           ) : grouped ? (
             Array.from(grouped.entries()).map(([group, list]) => (
               <div key={group}>
-                <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-slate-500 bg-stone-50 sticky top-0">
+                <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-slate-600 bg-stone-50 sticky top-0">
                   {group}
                 </div>
                 {list.map((it) => (

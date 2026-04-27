@@ -207,7 +207,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               }`}
             >
               {r.emoji} {r.name}
-              <span className="ml-1 text-slate-400 font-normal">· {r.fn}</span>
+              <span className="ml-1 text-slate-600 font-normal">· {r.fn}</span>
             </button>
           ))}
         </div>
@@ -215,7 +215,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-2" data-tour="client-picker">
-          <label className="text-xs text-slate-500">Cliente:</label>
+          <label className="text-xs text-slate-600">Cliente:</label>
           <select
             value={clientId}
             onChange={(e) => {
@@ -268,7 +268,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               <h2 className="text-lg font-bold text-slate-900">
                 {currentRole.name} · {currentRole.fn}
               </h2>
-              <p className="text-sm text-slate-500 mt-1 mb-6">
+              <p className="text-sm text-slate-600 mt-1 mb-6">
                 {clientId
                   ? `Contexto de cliente activo. Pregunta lo que necesites.`
                   : "Sin cliente seleccionado. Respondo sobre metodología general."}
@@ -370,7 +370,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               </button>
             )}
           </form>
-          <p className="text-[10px] text-slate-400 text-center mt-2">
+          <p className="text-[10px] text-slate-600 text-center mt-2">
             Los modelos IA pueden cometer errores. Verifica la información
             importante antes de entregar al cliente.
           </p>

@@ -13,7 +13,9 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-stone-50 flex">
       <Sidebar isAdmin={admin} />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <main id="main-content" className="flex-1 overflow-hidden">
+        {children}
+      </main>
     </div>
   );
 }

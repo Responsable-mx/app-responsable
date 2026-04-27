@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 import { StructuredBlockEditor } from "@/components/StructuredBlockEditor";
 import { BoolTriField } from "@/components/fields/BoolTriField";
+import { ExtractSectorModal } from "@/components/extract/ExtractSectorModal";
 import {
   NARRATIVE_SCHEMAS,
   type NarrativeBlockKey,
@@ -72,6 +73,7 @@ export function ClientForm(props: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sectorAiOpen, setSectorAiOpen] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     name: props.initial?.name ?? "",
@@ -213,15 +215,30 @@ export function ClientForm(props: Props) {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <MultiSelectCombobox
-            category="sectors"
-            label="Sector"
-            mode="single"
-            value={form.sector}
-            onChange={(v) => update("sector", (v as string) ?? "")}
-            hasGroups
-            placeholder="Elige o busca un sector…"
-          />
+          <div>
+            <div className="flex items-end justify-between gap-2 mb-1">
+              <label className="block text-xs font-medium text-slate-700">
+                Sector
+              </label>
+              <button
+                type="button"
+                onClick={() => setSectorAiOpen(true)}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100"
+                title="POC: rellenar con IA desde URL o transcripción"
+              >
+                🤖 Rellenar con IA
+              </button>
+            </div>
+            <MultiSelectCombobox
+              category="sectors"
+              label=""
+              mode="single"
+              value={form.sector}
+              onChange={(v) => update("sector", (v as string) ?? "")}
+              hasGroups
+              placeholder="Elige o busca un sector…"
+            />
+          </div>
           <Field label="Subsector">
             <input
               value={form.subsector}
@@ -341,7 +358,7 @@ export function ClientForm(props: Props) {
           <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
             Narrativa detallada
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-600 mt-0.5">
             6 bloques con preguntas específicas. Cada respuesta se guarda
             por separado para que los roles IA la usen directamente.
           </p>
@@ -385,6 +402,12 @@ export function ClientForm(props: Props) {
           </button>
         )}
       </div>
+
+      <ExtractSectorModal
+        open={sectorAiOpen}
+        onClose={() => setSectorAiOpen(false)}
+        onApply={(v) => update("sector", v)}
+      />
 
       {props.mode === "edit" && (
         <ConfirmDialog

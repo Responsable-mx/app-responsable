@@ -78,12 +78,12 @@ export function UsersManager() {
         </div>
       )}
 
-      {isLoading && <div className="text-sm text-slate-500">Cargando…</div>}
+      {isLoading && <div className="text-sm text-slate-600">Cargando…</div>}
 
       {!isLoading && users.length > 0 && (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[10px] uppercase tracking-wide text-slate-500">
+            <tr className="text-left text-[10px] uppercase tracking-wide text-slate-600">
               <th className="pb-2">Email</th>
               <th className="pb-2">Nombre</th>
               <th className="pb-2">Rol</th>
@@ -113,13 +113,13 @@ export function UsersManager() {
                     className={`text-[10px] px-2 py-0.5 rounded-full ${
                       u.active
                         ? "bg-green-50 text-green-800"
-                        : "bg-stone-100 text-slate-500"
+                        : "bg-stone-100 text-slate-600"
                     }`}
                   >
                     {u.active ? "Activo" : "Inactivo"}
                   </span>
                 </td>
-                <td className="py-2 text-xs text-slate-500">
+                <td className="py-2 text-xs text-slate-600">
                   {u.last_login
                     ? new Date(u.last_login).toLocaleDateString("es-MX")
                     : "Nunca"}

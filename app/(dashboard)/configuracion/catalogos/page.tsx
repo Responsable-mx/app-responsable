@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default function CatalogosPage() {
   return (
     <div className="px-8 py-6 max-w-6xl mx-auto">
-      <p className="text-sm text-slate-500 mb-4">
+      <p className="text-sm text-slate-600 mb-4">
         Los valores que los consultores pueden elegir al llenar el contexto de
         un cliente. Los ítems marcados con 🔒 son del sistema: se pueden
         desactivar o renombrar, pero no eliminar.

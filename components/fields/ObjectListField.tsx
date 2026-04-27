@@ -51,7 +51,7 @@ export function ObjectListField({
           className="bg-stone-50 border border-stone-200 rounded-lg p-3 relative"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-wide text-slate-500">
+            <span className="text-[10px] uppercase tracking-wide text-slate-600">
               {itemLabel} {idx + 1}
             </span>
             <button
@@ -145,7 +145,7 @@ function SubFieldRenderer({
             className={inputCls + " flex-1"}
           />
           {type.unit && (
-            <span className="text-xs text-slate-500">{type.unit}</span>
+            <span className="text-xs text-slate-600">{type.unit}</span>
           )}
         </div>
       );

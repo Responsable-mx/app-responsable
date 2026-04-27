@@ -7,6 +7,7 @@ import {
   type PromptKey,
 } from "@/lib/ai/prompts";
 import { PromptKeySchema, PromptUpdateSchema } from "@/lib/validation";
+import { logChange } from "@/lib/audit-log";
 
 type Ctx = { params: Promise<{ key: string }> };
 
@@ -59,8 +60,19 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     );
   }
   try {
+    const before = await getPromptDetail(keyParsed.data as PromptKey).catch(
+      () => null
+    );
     await upsertPrompt(keyParsed.data as PromptKey, parsed.data.content, admin);
     const data = await getPromptDetail(keyParsed.data as PromptKey);
+    await logChange({
+      actorEmail: admin,
+      entityType: "prompts",
+      entityId: keyParsed.data,
+      action: "update",
+      before: before ? { content: before.content } : null,
+      after: { content: parsed.data.content },
+    });
     return NextResponse.json({ data });
   } catch (e) {
     console.error("[PATCH /api/prompts/:key]", e);
@@ -83,7 +95,17 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "key inválida" }, { status: 400 });
   }
   try {
+    const before = await getPromptDetail(parsed.data as PromptKey).catch(
+      () => null
+    );
     await deletePromptOverride(parsed.data as PromptKey);
+    await logChange({
+      actorEmail: admin,
+      entityType: "prompts",
+      entityId: parsed.data,
+      action: "delete",
+      before: before ? { content: before.content } : null,
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[DELETE /api/prompts/:key]", e);

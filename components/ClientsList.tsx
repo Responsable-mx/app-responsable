@@ -59,7 +59,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
             strokeWidth={1.75}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
           >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -79,7 +79,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
             ))}
           </select>
         )}
-        <div className="text-xs text-slate-500 whitespace-nowrap">
+        <div className="text-xs text-slate-600 whitespace-nowrap">
           {filtered.length} de {clients.length}
         </div>
       </div>
@@ -135,7 +135,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
                     {c.countries?.join(", ") ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{c.size ?? "—"}</td>
-                  <td className="px-4 py-3 text-right text-slate-500 text-xs">
+                  <td className="px-4 py-3 text-right text-slate-600 text-xs">
                     {new Date(c.updated_at).toLocaleDateString("es-MX")}
                   </td>
                 </tr>

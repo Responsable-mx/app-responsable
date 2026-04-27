@@ -50,11 +50,11 @@ export function PreferencesPanel({
         </p>
         <div className="mt-4 bg-stone-50 border border-stone-200 rounded-lg p-4 flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs text-slate-500">Versión actual del tour</div>
+            <div className="text-xs text-slate-600">Versión actual del tour</div>
             <div className="text-2xl font-bold text-slate-900 mt-0.5">
               v{tourVersion}
             </div>
-            <p className="text-xs text-slate-500 mt-1 max-w-lg">
+            <p className="text-xs text-slate-600 mt-1 max-w-lg">
               Incrementa esta versión cuando cambies el flujo o quieras que
               todo el equipo vuelva a verlo. Cada usuario verá el tour la
               próxima vez que entre al chat.
@@ -69,7 +69,7 @@ export function PreferencesPanel({
           </button>
         </div>
 
-        <div className="mt-4 text-xs text-slate-500 border-t border-stone-100 pt-3">
+        <div className="mt-4 text-xs text-slate-600 border-t border-stone-100 pt-3">
           <strong className="text-slate-700">Para ti solo:</strong> Si quieres
           ver el tour de nuevo únicamente en tu dispositivo, usa el botón ?
           en la barra lateral → &ldquo;Ver tour del chat&rdquo;.

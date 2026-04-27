@@ -118,10 +118,166 @@ const ALL_COLUMNS = [
   "created_by,updated_by,created_at,updated_at",
 ].join(",");
 
+// Dev-mode seed: 2 clientes fake para poder navegar el mockup sin DB real.
+const DEV_SEED_CLIENTS: Client[] = [
+  {
+    id: "dev-heineken",
+    name: "Heineken México",
+    sector: "bebidas",
+    subsector: "Cervezas",
+    countries: ["mx"],
+    size: "corporativo",
+    business_segments: ["b2b", "b2b2c"],
+    services: null,
+    frameworks: ["gri", "sbti", "cdp"],
+    applicable_regulations: ["nis_mx", "issb_global"],
+    policies_in_place: ["etica", "proveedores", "ddhh", "ambiental"],
+    certifications: ["esr_cemefi", "iso_14001", "gptw"],
+    material_topics: ["cambio_climatico", "agua", "ddhh", "cadena_suministro"],
+    maturity_level: "avanzado",
+    has_double_materiality: true,
+    has_sustainability_report: true,
+    has_sustainability_strategy: true,
+    sustainability_strategy_url: "https://www.heinekenmexico.com/brew-a-better-world",
+    sustainability_report_url: "https://www.heinekenmexico.com/reporte-2023.pdf",
+    double_materiality_url: null,
+    info_general: null,
+    business_model: null,
+    impacts: null,
+    regulatory_context: null,
+    sustainability_strategy: null,
+    stakeholders: null,
+    info_general_json: {
+      unidades_negocio: ["Cervezas MX", "Refrescos MX"],
+      productos_principales:
+        "Tecate, Heineken 0.0, Dos Equis, Amstel Ultra, Sol, Indio",
+      volumen_anual: "42 Mhl/año 2025",
+      notas: "3 plantas en MX (Tecate, Monterrey, Orizaba)",
+    },
+    business_model_json: {
+      tipo_ingresos: ["venta_mayorista", "venta_directa"],
+      propuesta_valor:
+        "Portafolio de cervezas premium y masivas con fuerte presencia en on-trade y modernización del off-trade.",
+      dependencias_criticas: [
+        "Agua del acuífero Tecate",
+        "Aluminio Novelis",
+        "Cebada malteada importada",
+      ],
+    },
+    impacts_json: {
+      emisiones_alcance_1_2: [
+        { medido: true, valor: 45000, base_year: 2023, target: "-30% vs 2023 al 2030" },
+      ],
+      emisiones_alcance_3: [{ medido: false }],
+      agua_m3: [{ medido: true, valor: 18000000, estres_hidrico: true }],
+      rotacion_personal_pct: 12,
+      diversidad_mujeres_liderazgo_pct: 38,
+    },
+    regulatory_context_json: {},
+    sustainability_strategy_json: {
+      pilares: ["Cambio climático", "Cadena circular", "Gente y comunidades"],
+      objetivos: [
+        { pilar: "Cambio climático", meta: "Net zero alcance 1+2 al 2040", deadline: 2040 },
+      ],
+      kpis: [
+        {
+          metrica: "Emisiones alcance 1+2",
+          valor_actual: "45000",
+          unidad: "tCO2e",
+          target: "-30% vs 2023",
+          base_year: 2023,
+        },
+        {
+          metrica: "Agua consumida",
+          valor_actual: "18",
+          unidad: "Mm³",
+          target: "-20% al 2030",
+          base_year: 2023,
+        },
+      ],
+      reportes_publicados: [
+        { ano: 2023, marco: "gri" },
+        { ano: 2022, marco: "gri" },
+      ],
+      materialidad_metodologia: "Encuestas + entrevistas + análisis de prensa",
+      materialidad_ano: 2024,
+      materialidad_proximo_refresh: 2027,
+    },
+    stakeholders_json: {
+      grupos_clave: [
+        {
+          grupo: "Comunidades Tecate",
+          dependencia: "alta",
+          canal: "Mesa trimestral",
+          expectativas: "Agua, empleo local, impacto en tráfico",
+        },
+        {
+          grupo: "Proveedores agrícolas MX",
+          dependencia: "media",
+          canal: "Programa SmartAgri",
+          expectativas: "Precio justo, asistencia técnica",
+        },
+      ],
+    },
+    created_by: "gwenaelle@responsable.net",
+    updated_by: "gwenaelle@responsable.net",
+    created_at: "2026-03-01T00:00:00Z",
+    updated_at: "2026-04-15T00:00:00Z",
+  },
+  {
+    id: "dev-ikea",
+    name: "IKEA México",
+    sector: "retail",
+    subsector: "Mobiliario hogar",
+    countries: ["mx"],
+    size: "grande",
+    business_segments: ["b2c", "b2b2c"],
+    services: null,
+    frameworks: ["gri"],
+    applicable_regulations: ["nom_035_mx"],
+    policies_in_place: ["etica", "diversidad", "ambiental"],
+    certifications: ["gptw"],
+    material_topics: ["cambio_climatico", "economia_circular", "diversidad"],
+    maturity_level: "gestionado",
+    has_double_materiality: false,
+    has_sustainability_report: false,
+    has_sustainability_strategy: true,
+    sustainability_strategy_url: null,
+    sustainability_report_url: null,
+    double_materiality_url: null,
+    info_general: null,
+    business_model: null,
+    impacts: null,
+    regulatory_context: null,
+    sustainability_strategy: null,
+    stakeholders: null,
+    info_general_json: {
+      productos_principales: "Muebles, decoración, cocina, textil",
+      volumen_anual: "3 tiendas físicas + e-commerce MX",
+    },
+    business_model_json: {
+      tipo_ingresos: ["venta_directa"],
+      propuesta_valor:
+        "Diseño escandinavo democrático, precios accesibles, autoarmado.",
+    },
+    impacts_json: {},
+    regulatory_context_json: {},
+    sustainability_strategy_json: {
+      pilares: ["Circularidad", "Personas", "Clima positivo"],
+      reportes_publicados: [],
+    },
+    stakeholders_json: {},
+    created_by: "elian@responsable.net",
+    updated_by: "elian@responsable.net",
+    created_at: "2026-02-15T00:00:00Z",
+    updated_at: "2026-03-20T00:00:00Z",
+  },
+];
+
 export function listClients(): Promise<Client[]> {
   return withDevModeFallback<Client[]>({
     kind: "read",
-    fallback: [],
+    fallback: DEV_SEED_CLIENTS,
     async run() {
       const admin = createAdminClient();
       const { data, error } = await admin
@@ -138,7 +294,7 @@ export function listClients(): Promise<Client[]> {
 export function getClient(id: string): Promise<Client | null> {
   return withDevModeFallback<Client | null>({
     kind: "read",
-    fallback: null,
+    fallback: DEV_SEED_CLIENTS.find((c) => c.id === id) ?? null,
     async run() {
       const admin = createAdminClient();
       const { data, error } = await admin

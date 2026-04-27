@@ -3,14 +3,41 @@ import type { Client } from "@/lib/clients";
 import type { RoleId } from "@/lib/ai/models";
 import { buildRoleSystemText } from "@/lib/ai/prompts";
 import { NARRATIVE_SCHEMAS } from "@/lib/clients/narrative-schemas";
+import { CATALOG_SEEDS, type CatalogCategory } from "@/lib/catalogs/seeds";
 
 export { DEFAULT_PROMPTS, PROMPT_KEYS } from "@/lib/ai/prompts";
+
+// ── Mapeo code → label humano (es-MX) ──────────────────────────
+// Los códigos del catálogo (`doble_materialidad`, `gestionado`, `gri`...)
+// son referencias internas. El LLM razona mejor si recibe el nombre humano
+// junto al código — y nunca debe repetir el código literal en respuesta al
+// consultor. STARTER_UX §7.3 + §8.
+const CATALOG_LABELS: Record<CatalogCategory, Record<string, string>> = (() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const item of CATALOG_SEEDS) {
+    if (!out[item.category]) out[item.category] = {};
+    out[item.category][item.value] = item.label;
+  }
+  return out as Record<CatalogCategory, Record<string, string>>;
+})();
+
+function humanize(category: CatalogCategory, value: string): string {
+  return CATALOG_LABELS[category]?.[value] ?? value;
+}
+function humanizeList(category: CatalogCategory, values: string[]): string[] {
+  return values.map((v) => humanize(category, v));
+}
 
 /**
  * Construye el preámbulo de contexto del cliente.
  *
  * Atributos estructurados primero (alto valor semántico / bajo costo en tokens),
  * luego narrativa. Los roles IA pueden razonar sobre los chips sin extraer de la prosa.
+ *
+ * Códigos internos (catalog values) se traducen a labels humanos antes de
+ * inyectarse al prompt. El LLM ve "Doble materialidad, ESR" en lugar de
+ * "doble_materialidad, esr" — evita que el consultor lea jerga interna en la
+ * respuesta. STARTER_UX §7.3.
  */
 export function buildClientContext(client: Client | null): string {
   if (!client) {
@@ -32,20 +59,54 @@ de arriba o que cree el cliente en /clientes.
       ? ""
       : `<${tag}>${v ? "sí" : "no"}</${tag}>`;
 
+  const sectorHuman = client.sector
+    ? humanize("sectors", client.sector)
+    : null;
+  const sizeHuman = client.size
+    ? humanize("client_sizes", client.size)
+    : null;
+  const countriesHuman = client.countries?.length
+    ? humanizeList("countries", client.countries)
+    : null;
+  const segmentsHuman = client.business_segments?.length
+    ? humanizeList("business_segments", client.business_segments)
+    : null;
+  const servicesHuman = client.services?.length
+    ? humanizeList("services", client.services)
+    : null;
+  const frameworksHuman = client.frameworks?.length
+    ? humanizeList("frameworks", client.frameworks)
+    : null;
+  const regulationsHuman = client.applicable_regulations?.length
+    ? humanizeList("applicable_regulations", client.applicable_regulations)
+    : null;
+  const policiesHuman = client.policies_in_place?.length
+    ? humanizeList("policies", client.policies_in_place)
+    : null;
+  const certsHuman = client.certifications?.length
+    ? humanizeList("certifications", client.certifications)
+    : null;
+  const topicsHuman = client.material_topics?.length
+    ? humanizeList("material_topics", client.material_topics)
+    : null;
+  const maturityHuman = client.maturity_level
+    ? humanize("maturity_levels", client.maturity_level)
+    : null;
+
   const attrs = [
     line("name", client.name),
-    line("sector", client.sector),
+    line("sector", sectorHuman),
     line("subsector", client.subsector),
-    line("size", client.size),
-    arr("countries", client.countries),
-    arr("business_segments", client.business_segments),
-    arr("services_contracted", client.services),
-    arr("frameworks_reported", client.frameworks),
-    arr("applicable_regulations", client.applicable_regulations),
-    arr("policies_in_place", client.policies_in_place),
-    arr("certifications", client.certifications),
-    arr("material_topics", client.material_topics),
-    line("maturity_level", client.maturity_level),
+    line("size", sizeHuman),
+    arr("countries", countriesHuman),
+    arr("business_segments", segmentsHuman),
+    arr("services_contracted", servicesHuman),
+    arr("frameworks_reported", frameworksHuman),
+    arr("applicable_regulations", regulationsHuman),
+    arr("policies_in_place", policiesHuman),
+    arr("certifications", certsHuman),
+    arr("material_topics", topicsHuman),
+    line("maturity_level", maturityHuman),
     bool("has_double_materiality", client.has_double_materiality),
     bool("has_sustainability_report", client.has_sustainability_report),
     bool("has_sustainability_strategy", client.has_sustainability_strategy),
@@ -75,6 +136,10 @@ Instrucción sobre este contexto:
 - Los atributos estructurados (frameworks_reported, certifications,
   material_topics, etc.) son hechos declarados por el cliente — trátalos
   como dato confiable.
+- Los nombres ya vienen humanizados (ej. "Doble materialidad", "Gestionado",
+  "GRI Standards"). NUNCA uses códigos internos del catálogo
+  (doble_materialidad, gestionado, gri) en tu respuesta al consultor —
+  son referencias técnicas internas, no se exponen al usuario.
 - Los bloques narrativos tienen sub-campos específicos (pilares, kpis,
   objetivos, etc.). Cuando respondas, cita el sub-campo exacto si lo
   mencionas (ej: "el KPI de alcance 1+2 indica…").
@@ -133,17 +198,28 @@ function escapeAttr(s: string): string {
  * System blocks para el SDK de Anthropic.
  *
  * Estructura: [contexto del cliente] [rol + navegación + reglas base].
- * Cache_control al final del prefix → todo el prefix cacheable. Subsecuentes
- * turnos de la misma conversación (mismo cliente + mismo rol) hacen cache hit.
  *
- * Ahora es async porque lee prompts desde DB (con fallback a código).
+ * 2 cache breakpoints (max permitido = 4):
+ *  - 1 al final del contextBlock → al cambiar de rol con mismo cliente, el
+ *    preámbulo del cliente (potencialmente >1KB con 6 bloques narrativos
+ *    JSONB) hace cache hit y no se re-tokeniza.
+ *  - 1 al final del roleBlock → turnos subsecuentes con mismo cliente +
+ *    mismo rol hacen cache hit completo del prefix.
+ *
+ * Resultado: ~50% ahorro en input tokens vs cache de 1 solo breakpoint
+ * cuando el consultor cambia entre Aurora/Rebeca/Elena/Valeria sobre el
+ * mismo cliente. STARTER_IA §2 + STACK.md "2 breakpoints ephemerales".
  */
 export async function buildSystemBlocks(role: RoleId, client: Client | null) {
   const contextBlock = buildClientContext(client);
   const roleBlock = await buildRoleSystemText(role);
 
   return [
-    { type: "text" as const, text: contextBlock },
+    {
+      type: "text" as const,
+      text: contextBlock,
+      cache_control: { type: "ephemeral" as const },
+    },
     {
       type: "text" as const,
       text: roleBlock,

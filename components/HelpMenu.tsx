@@ -41,7 +41,7 @@ export function HelpMenu() {
         aria-label="Ayuda"
         className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-stone-50 hover:text-slate-900 transition-colors"
       >
-        <IconHelp className="w-[18px] h-[18px] text-slate-400 group-hover:text-slate-600" />
+        <IconHelp className="w-[18px] h-[18px] text-slate-600 group-hover:text-slate-600" />
         <span>Ayuda</span>
       </button>
 
@@ -54,7 +54,7 @@ export function HelpMenu() {
             <IconTarget className="w-4 h-4 mt-0.5 shrink-0 text-teal-700" />
             <div>
               <div className="font-medium">Ver tour del chat</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="text-[11px] text-slate-600 mt-0.5">
                 Repite la guía de los 4 roles
               </div>
             </div>
@@ -67,12 +67,12 @@ export function HelpMenu() {
             <IconMail className="w-4 h-4 mt-0.5 shrink-0 text-indigo-700" />
             <div>
               <div className="font-medium">Reportar un problema</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="text-[11px] text-slate-600 mt-0.5">
                 Enviamos un correo a soporte
               </div>
             </div>
           </a>
-          <div className="px-3 pt-2 pb-1 text-[10px] text-slate-400 border-t border-stone-100 mt-1">
+          <div className="px-3 pt-2 pb-1 text-[10px] text-slate-600 border-t border-stone-100 mt-1">
             App ResponSable · Consultoría en sostenibilidad con IA
           </div>
         </div>

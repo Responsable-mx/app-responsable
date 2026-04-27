@@ -117,17 +117,41 @@ describe("buildClientContext", () => {
     expect(out).not.toContain("<size></size>");
   });
 
-  it("incluye atributos estructurados como tags compactos", () => {
+  it("humaniza códigos de catálogo a labels es-MX (DRSP-3)", () => {
     const out = buildClientContext(FULL_CLIENT);
+    // codes → labels humanos antes de inyectarse al prompt
     expect(out).toContain(
-      "<frameworks_reported>gri, sbti</frameworks_reported>"
+      "<frameworks_reported>GRI Standards, SBTi</frameworks_reported>"
     );
-    expect(out).toContain("<certifications>esr_cemefi</certifications>");
+    expect(out).toContain("<certifications>ESR CEMEFI</certifications>");
     expect(out).toContain(
-      "<material_topics>cambio_climatico, agua</material_topics>"
+      "<material_topics>Cambio climático, Agua</material_topics>"
     );
-    expect(out).toContain("<maturity_level>avanzado</maturity_level>");
+    expect(out).toContain("<maturity_level>Avanzado</maturity_level>");
+    expect(out).toContain("<sector>Bebidas</sector>");
+    expect(out).toContain("<size>Corporativo</size>");
+    expect(out).toContain("<countries>México</countries>");
+    expect(out).toContain(
+      "<services_contracted>Doble materialidad</services_contracted>"
+    );
+    // codes crudos NO deben aparecer en el prompt
+    expect(out).not.toContain(">gri, sbti<");
+    expect(out).not.toContain(">esr_cemefi<");
+    expect(out).not.toContain(">cambio_climatico");
+    expect(out).not.toContain(">avanzado<");
+    expect(out).not.toContain(">doble_materialidad<");
     expect(out).toContain("<has_double_materiality>sí</has_double_materiality>");
+  });
+
+  it("incluye instrucción de no exponer códigos internos al usuario", () => {
+    const out = buildClientContext(FULL_CLIENT);
+    expect(out).toMatch(/NUNCA.+códigos internos/);
+  });
+
+  it("códigos sin label en catálogo se preservan literal (fallback)", () => {
+    const c = { ...FULL_CLIENT, maturity_level: "valor_inexistente" };
+    const out = buildClientContext(c);
+    expect(out).toContain("<maturity_level>valor_inexistente</maturity_level>");
   });
 
   it("bool=false se serializa como 'no'", () => {
@@ -144,12 +168,16 @@ describe("buildClientContext", () => {
 });
 
 describe("buildSystemBlocks (async)", () => {
-  it("devuelve 2 bloques de texto con cache_control solo en el último", async () => {
+  it("devuelve 2 bloques con cache_control en AMBOS (DRSP-6)", async () => {
     const blocks = await buildSystemBlocks("aurora", null);
     expect(blocks).toHaveLength(2);
     expect(blocks[0].type).toBe("text");
     expect(blocks[1].type).toBe("text");
-    expect("cache_control" in blocks[0]).toBe(false);
+    // contextBlock cacheado → al cambiar de rol con mismo cliente, hit
+    expect((blocks[0] as { cache_control?: unknown }).cache_control).toEqual({
+      type: "ephemeral",
+    });
+    // roleBlock cacheado → turnos subsecuentes con mismo (cliente, rol), hit
     expect((blocks[1] as { cache_control?: unknown }).cache_control).toEqual({
       type: "ephemeral",
     });

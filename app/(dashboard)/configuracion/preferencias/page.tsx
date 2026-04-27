@@ -7,7 +7,7 @@ export default async function PreferenciasPage() {
   const tourVersion = (await getSetting<number>("tour_version")) ?? 1;
   return (
     <div className="px-8 py-6 max-w-4xl mx-auto">
-      <p className="text-sm text-slate-500 mb-4">
+      <p className="text-sm text-slate-600 mb-4">
         Ajustes globales de la app que afectan a todo el equipo.
       </p>
       <PreferencesPanel currentTourVersion={tourVersion} />

@@ -77,7 +77,7 @@ export function StringListField({
         />
       </div>
       {maxItems && (
-        <div className="text-[10px] text-slate-400 mt-0.5">
+        <div className="text-[10px] text-slate-600 mt-0.5">
           {list.length}/{maxItems}
         </div>
       )}

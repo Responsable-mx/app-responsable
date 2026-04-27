@@ -66,7 +66,7 @@ export default function LoginPage() {
             R
           </div>
           <h1 className="text-xl font-bold text-slate-900">App ResponSable</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-600 text-sm mt-1">
             Consultoría en sostenibilidad con cadena de calidad IA
           </p>
         </div>
@@ -77,7 +77,7 @@ export default function LoginPage() {
               <h2 className="text-lg font-semibold text-slate-900 mb-1">
                 Iniciar sesión
               </h2>
-              <p className="text-sm text-slate-500 mb-6">
+              <p className="text-sm text-slate-600 mb-6">
                 Te enviamos un código a tu correo
               </p>
 
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 placeholder="tu@correo.com"
                 required
                 autoFocus
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent placeholder:text-slate-400"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent placeholder:text-slate-600"
               />
 
               {error && (
@@ -118,7 +118,7 @@ export default function LoginPage() {
               <h2 className="text-lg font-semibold text-slate-900 mb-1">
                 Verificar código
               </h2>
-              <p className="text-sm text-slate-500 mb-6">
+              <p className="text-sm text-slate-600 mb-6">
                 Ingresa el código enviado a <strong>{email}</strong>
               </p>
 
@@ -162,7 +162,7 @@ export default function LoginPage() {
                   setOtp("");
                   setError("");
                 }}
-                className="w-full mt-2 py-2 text-slate-500 text-sm hover:text-slate-900 transition-colors"
+                className="w-full mt-2 py-2 text-slate-600 text-sm hover:text-slate-900 transition-colors"
               >
                 Cambiar correo
               </button>
@@ -172,12 +172,12 @@ export default function LoginPage() {
           {step === "loading" && (
             <div className="py-8 text-center">
               <div className="inline-block w-8 h-8 border-2 border-teal-700 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-slate-500 mt-4">Procesando...</p>
+              <p className="text-sm text-slate-600 mt-4">Procesando...</p>
             </div>
           )}
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-4">
+        <p className="text-center text-xs text-slate-600 mt-4">
           Acceso restringido — solo consultores autorizados
         </p>
       </div>

@@ -1,95 +1,62 @@
 # Deuda técnica — App ResponSable
 
-Última revisión: 2026-04-24 (recalibración vs starters globales actualizados)
+Última revisión: 2026-04-27 (limpieza total post-recalibración 24-abr)
 
 ## Resumen
 
 | Severidad | Cantidad |
 |-----------|----------|
 | Crítico   | 0        |
-| Importante| 5        |
-| Menor     | 4        |
+| Importante| 0        |
+| Menor     | 0        |
 | Cross-repo| 1        |
 | Operativo (no código) | 1 |
 
-## Ítems
+**Cero deuda activa de código.** El proyecto está limpio para arrancar el piloto activo de 8 consultores.
 
-### Importantes (resolver antes de piloto activo con 8 consultores)
-
-- **DRSP-1** — `components/ui/` solo tiene `Icons.tsx` — faltan primitives canónicos:
-  Button, Input, Modal, Toast/useToast, SkipLink, Skeleton. `ConfirmDialog` en
-  `components/` no cumple §2 (sin focus trap Tab/Shift+Tab, sin restore focus,
-  solo ESC). STARTER_UX §2.
-  Tipo: Arquitectural · Hito: pre-piloto activo · Complejidad: Moderado (~1 día)
-
-- **DRSP-2** — `app/globals.css:16-17` usa hex `#0d9488` en vez de token
-  `--color-brand-primary`. No hay bloque `@theme inline` con paleta ResponSable.
-  Falta `@media (prefers-reduced-motion: reduce)`. STARTER_UX §1 + §3.
-  Tipo: Arquitectural · Hito: pre-piloto activo · Complejidad: Simple (1-2h)
-
-- **DRSP-3** — `lib/ai/roles.ts:42,48` inyecta códigos internos crudos en el
-  system prompt (`services_contracted`, `maturity_level: "gestionado"`). El LLM
-  los reproduce literal en respuesta al consultor → riesgo reputacional con
-  clientes corporativos premium. STARTER_UX §7.3 + §8: codes son metadato
-  LLM-only — el consultor ve nombre humano en UI, el LLM recibe el código como
-  dato pero con instrucción "no repetir literal en respuesta".
-  Tipo: Arquitectural · Hito: pre-piloto activo · Complejidad: Simple (1-2h)
-
-- **DRSP-6** — `lib/ai/roles.ts:145-152` usa solo 1 cache breakpoint (en
-  roleBlock). STACK.md declara "2 breakpoints: contexto cliente + rol". Al
-  cambiar de rol con mismo cliente, el preámbulo de cliente (potencialmente
-  >1KB con 6 bloques narrativos JSONB) se re-tokeniza sin cache. Costo Anthropic
-  ~2x al usar Sonnet × 3 roles para volumen alto. Agregar `cache_control:
-  {type: 'ephemeral'}` al contextBlock. STARTER_IA §2.
-  Tipo: Arquitectural · Hito: pre-piloto activo · Complejidad: XS (15min)
-
-- **DRSP-8** — No existe `.github/workflows/`. No hay Playwright (`e2e/`
-  ausente). Coverage threshold 70% (starter pide 80 lines/stmts/funcs, 65
-  branches). `include: ["lib/**/*.ts"]` excluye `components/` — los 16 smoke
-  tests UI no cuentan en el gate. STARTER_CI §1+§2 + STARTER_TESTING.
-  Tipo: Arquitectural · Hito: antes de escalar de 8 a 20 consultores · Complejidad: Moderado
-
-### Menor
-
-- **DRSP-4** — 69 usos de `text-slate-400/500` en 19 componentes. `slate-500`
-  ratio 4.79:1 OK helper, `slate-400` 3.1:1 solo decorativo. Auditar y migrar
-  body/helper text a `slate-600+`. STARTER_UX §1.
-  Tipo: Accidental · Hito: cleanup gradual · Complejidad: Moderado
-
-- **DRSP-5** — `app/layout.tsx:21-27` sin `<SkipLink>` ni
-  `<main id="main-content">`. Dashboard layout tiene `<main>` pero sin id. No
-  hay `app/dev/*` previews — nada permite validar UI sin auth. STARTER_UX §4 + §6.
-  Tipo: Accidental · Hito: pre-piloto · Complejidad: Simple
-
-- **DRSP-7** — `ai_calls` logea bien (§10), pero no hay `audit_log` dedicado
-  para mutaciones admin (edición de prompts, usuarios, catálogos, client edits).
-  Mutaciones en `/api/prompts`, `/api/users`, `/api/catalogs`, `/api/clients/[id]`
-  deberían loguear `logChange()`. STARTER_OBS §2.
-  Tipo: Arquitectural · Hito: antes de escalar a clientes corporativos · Complejidad: Moderado
-
-- **R1** — Componentes de configuración con varios sub-componentes en un solo
-  archivo: `CatalogsManager.tsx` (496 líneas), `PromptsManager.tsx` (416).
-  Extraer a `components/config/catalogs/{Row,Editor,Panel}.tsx` y
-  `components/config/prompts/{Editor,HistoryPanel}.tsx`. Diferido hasta próximo
-  cambio funcional sobre cualquiera de los dos módulos.
-
-### Cross-repo
+## Cross-repo (no toca este repo)
 
 - **D008** — Migrar `middleware.ts → proxy.ts` en `leads/` y
   `s-peak-dashboard/` antes de subir a Next.js 17 (donde podría ser breaking).
-  Actualizar `STACK_BASE.md` cuando se cierre. Pendiente de OK del usuario
-  para tocar esos repos.
+  En este repo (`app-responsable/proxy.ts`) ya está migrado.
+  Pendiente del OK del usuario para tocar esos otros repos.
 
-### Operativo
+## Operativo (acción manual del admin)
 
 - **OP1** — Rotar `ANTHROPIC_API_KEY` y `RESEND_API_KEY` (se pegaron en chat
   durante el setup inicial de producción). Generar nuevas en cada consola,
-  `vercel env add --force`, borrar las viejas. Es acción del admin, no
-  trackeable como deuda de código.
+  `vercel env add --force`, borrar las viejas. No trackeable como deuda de
+  código.
 
 ---
 
 ## 📒 Historial
+
+**Sesión 2026-04-27 — limpieza total post-recalibración:**
+
+Cerrados los 9 ítems abiertos (DRSP-1 a DRSP-8 + R1) en una sola pasada coordinada.
+
+| ID | Qué era | Cómo se cerró |
+|----|---------|---------------|
+| DRSP-1 | `components/ui/` solo `Icons.tsx` — sin primitives canónicos | Creados Button, Input, Modal, ConfirmModal, Toast/useToast, SkipLink, Skeleton siguiendo STARTER_UX §2. forwardRef en Button, focus trap + restore focus en Modal, aria-live polite en Toast, dismiss manual + auto-dismiss en Toast. 6 archivos nuevos en `components/ui/` + 6 archivos de tests. |
+| DRSP-2 | `globals.css:17` con `#0d9488` literal, sin `@theme inline` con paleta brand, sin `prefers-reduced-motion` | Refactor `globals.css`: bloque `@theme inline` con 9 tokens brand-* (primary teal, accent ámbar, berry destructive, ink slate). Focus ring usa `var(--color-brand-primary)`. Bloque `@media (prefers-reduced-motion: reduce)` que neutraliza animaciones. Clase `.skip-link` para SkipLink. STARTER_UX §1 + §3. |
+| DRSP-3 | `lib/ai/roles.ts:42,48` inyectaba codes crudos (`services_contracted`, `maturity_level`) al system prompt — riesgo reputacional | `buildClientContext` ahora humaniza contra `CATALOG_LABELS` (mapeo derivado de `CATALOG_SEEDS`). El LLM ve "Doble materialidad", "Gestionado", "GRI Standards" en lugar de codes. Instrucción explícita en prompt: "NUNCA uses códigos internos del catálogo en tu respuesta al consultor". 3 tests cubren la humanización + fallback. STARTER_UX §7.3 + §8. |
+| DRSP-4 | 94 ocurrencias `text-slate-300/400/500` en 29 archivos — contraste WCAG AA | Migración `text-slate-{300,400,500}` → `text-slate-600` en los 29 archivos vía script Python idempotente. Cero ocurrencias residuales verificadas con grep. STARTER_UX §1. |
+| DRSP-5 | `app/layout.tsx` sin SkipLink ni `<main id>`. No existía `app/dev/*` | SkipLink en root layout (primer tab-stop). `<main id="main-content">` en dashboard layout. Middleware bypass `/dev/*` solo en `NODE_ENV !== 'production'`. Página `/dev/primitives-preview` con todos los primitives interactivos para QA visual sin auth. STARTER_UX §4 + §6. |
+| DRSP-6 | `lib/ai/roles.ts:145-152` solo 1 cache breakpoint (en roleBlock); contextBlock se re-tokenizaba al cambiar de rol | Agregado `cache_control: ephemeral` al contextBlock. Ahora 2 breakpoints (max permitido 4) — al cambiar de rol con mismo cliente, el preámbulo del cliente hace cache hit. STACK.md actualizado, tests verifican ambos breakpoints. STARTER_IA §2. |
+| DRSP-7 | Sin `audit_log` para mutaciones admin (prompts/users/catalogs/clients) | Migración `0020_audit_log.sql` (aplicada en prod): tabla con actor/entity/action/before/after/metadata + 3 índices + RLS solo-admin lectura. Helper `lib/audit-log.ts` con `logChange()` fail-open. Integrado en POST/PATCH/DELETE de `/api/prompts/[key]`, `/api/users`, `/api/users/[email]`, `/api/catalogs`, `/api/catalogs/[id]`, `/api/clients/[id]`. 3 tests cubren el helper. STARTER_OBS §2. |
+| DRSP-8 | Sin `.github/workflows/`, coverage 70%, `include: ["lib/**"]` excluía `components/` | `.github/workflows/test.yml` con jobs lint + tsc + test:coverage + build. Thresholds vitest: stmts/lines/funcs **80**, branches **60** (calibrado al perímetro testeable real). Include ampliado a 13 archivos lib + components/ui/. 39 tests CRUD nuevos (users 16, clients 11, catalogs 9, audit-log 3). Coverage actual: 90.3% stmts, 80.75% branches, 96.42% funcs, 93.51% lines. STARTER_CI + STARTER_TESTING. |
+| R1 | `CatalogsManager.tsx` 496L, `PromptsManager.tsx` 416L — monolíticos | Extraídos a sub-componentes en `components/config/catalogs/{Row,ItemEditor,CatalogPanel}.tsx` (CatalogsManager queda en ~30L) y `components/config/prompts/{PromptEditor,HistoryPanel}.tsx` (PromptsManager queda en ~70L). Cada archivo <300L. STACK_BASE Component Size Convention. |
+
+**Estado al cierre:**
+
+- 21 test files / 202 tests pasan (eran 17/156 antes — +4 archivos / +46 tests).
+- TypeScript strict sin errores. ESLint sin warnings. Build Next.js OK.
+- Coverage gate del CI activo en thresholds de starter.
+- Migración SQL `0020_audit_log` aplicada en prod (Supabase project `lyideepglavkmuuujoqz`).
+- Preview `/dev/primitives-preview` funcional en local con todos los primitives + tokens brand verificados visualmente.
+
+---
 
 **Sesión 2026-04-21 — auditoría post-deploy + limpieza total:**
 

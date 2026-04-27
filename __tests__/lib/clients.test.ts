@@ -109,12 +109,16 @@ describe("dev mode guards (sin Supabase)", () => {
     expect(isDevMode()).toBe(true);
   });
 
-  it("listClients devuelve []", async () => {
-    await expect(listClients()).resolves.toEqual([]);
+  it("listClients devuelve seeds de dev (Heineken + IKEA para mockup)", async () => {
+    const list = await listClients();
+    expect(list.length).toBe(2);
+    const names = list.map((c) => c.name).sort();
+    expect(names).toEqual(["Heineken México", "IKEA México"]);
   });
 
-  it("getClient devuelve null", async () => {
-    await expect(getClient("id")).resolves.toBeNull();
+  it("getClient devuelve un seed si matchea, null si no", async () => {
+    await expect(getClient("dev-heineken")).resolves.not.toBeNull();
+    await expect(getClient("id-que-no-existe")).resolves.toBeNull();
   });
 
   it("createClientRow lanza error en dev mode", async () => {

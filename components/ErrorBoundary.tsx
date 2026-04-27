@@ -28,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
               Ocurrió un error inesperado. Recarga la página. Si el problema
               persiste, avísanos.
             </p>
-            <details className="text-xs text-slate-500">
+            <details className="text-xs text-slate-600">
               <summary className="cursor-pointer">Detalle técnico</summary>
               <pre className="mt-2 whitespace-pre-wrap break-all">
                 {this.state.message}

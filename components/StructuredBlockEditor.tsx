@@ -49,15 +49,15 @@ export function StructuredBlockEditor({
       >
         <div className="text-left">
           <div className="font-semibold text-slate-900">{schema.title}</div>
-          <div className="text-xs text-slate-500 mt-0.5">
+          <div className="text-xs text-slate-600 mt-0.5">
             {schema.description}
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-3 text-xs text-slate-600">
           <span
             className={`px-2 py-0.5 rounded-full ${
               filled === 0
-                ? "bg-stone-100 text-slate-500"
+                ? "bg-stone-100 text-slate-600"
                 : filled === total
                 ? "bg-green-50 text-green-800"
                 : "bg-amber-50 text-amber-800"
@@ -65,7 +65,7 @@ export function StructuredBlockEditor({
           >
             {filled}/{total}
           </span>
-          <span className="text-slate-400">{open ? "▲" : "▼"}</span>
+          <span className="text-slate-600">{open ? "▲" : "▼"}</span>
         </div>
       </button>
 
@@ -104,7 +104,7 @@ function FieldRow({
         </span>
       </label>
       {field.hint && (
-        <p className="text-[10px] text-slate-500 mb-1">{field.hint}</p>
+        <p className="text-[10px] text-slate-600 mb-1">{field.hint}</p>
       )}
       <FieldRenderer type={field.type} value={value} onChange={onChange} />
     </div>
@@ -156,7 +156,7 @@ function FieldRenderer({
             className={inputCls + " flex-1 max-w-xs"}
           />
           {type.unit && (
-            <span className="text-xs text-slate-500">{type.unit}</span>
+            <span className="text-xs text-slate-600">{type.unit}</span>
           )}
         </div>
       );

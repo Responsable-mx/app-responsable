@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { updateUser, deleteUser, getUser } from "@/lib/users";
 import { UserPatchSchema } from "@/lib/validation";
+import { logChange } from "@/lib/audit-log";
 
 type Ctx = { params: Promise<{ email: string }> };
 
@@ -69,7 +70,22 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   try {
+    const before = await getUser(decoded).catch(() => null);
     const data = await updateUser(decoded, parsed.data);
+    await logChange({
+      actorEmail: admin,
+      entityType: "users",
+      entityId: decoded,
+      action: "update",
+      before: before
+        ? {
+            role: before.role,
+            full_name: before.full_name,
+            active: before.active,
+          }
+        : null,
+      after: { ...parsed.data },
+    });
     return NextResponse.json({ data });
   } catch (e) {
     console.error("[PATCH /api/users/:email]", e);
@@ -95,7 +111,17 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
     );
   }
   try {
+    const before = await getUser(decoded).catch(() => null);
     await deleteUser(decoded);
+    await logChange({
+      actorEmail: admin,
+      entityType: "users",
+      entityId: decoded,
+      action: "delete",
+      before: before
+        ? { role: before.role, full_name: before.full_name }
+        : null,
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[DELETE /api/users/:email]", e);

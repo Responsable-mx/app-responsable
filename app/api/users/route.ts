@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { listUsers, createUser } from "@/lib/users";
 import { UserInputSchema } from "@/lib/validation";
+import { logChange } from "@/lib/audit-log";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -45,6 +46,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const data = await createUser(parsed.data, admin);
+    await logChange({
+      actorEmail: admin,
+      entityType: "users",
+      entityId: parsed.data.email,
+      action: "create",
+      after: { ...parsed.data },
+    });
     return NextResponse.json({ data }, { status: 201 });
   } catch (e) {
     console.error("[POST /api/users]", e);

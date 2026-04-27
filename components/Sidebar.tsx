@@ -57,7 +57,7 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
             <div className="text-sm font-bold text-slate-900 leading-tight">
               App ResponSable
             </div>
-            <div className="text-[10px] text-slate-500 leading-tight mt-0.5">
+            <div className="text-[10px] text-slate-600 leading-tight mt-0.5">
               Consultoría en sostenibilidad · IA
             </div>
           </div>
@@ -84,7 +84,7 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
                 className={`w-[18px] h-[18px] shrink-0 ${
                   active
                     ? "text-teal-700"
-                    : "text-slate-400 group-hover:text-slate-600"
+                    : "text-slate-600 group-hover:text-slate-600"
                 }`}
               />
               <span>{item.label}</span>
@@ -102,7 +102,7 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           onClick={handleLogout}
           className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-stone-50 hover:text-slate-900 transition-colors"
         >
-          <IconLogout className="w-[18px] h-[18px] text-slate-400 group-hover:text-slate-600" />
+          <IconLogout className="w-[18px] h-[18px] text-slate-600 group-hover:text-slate-600" />
           <span>Cerrar sesión</span>
         </button>
       </div>

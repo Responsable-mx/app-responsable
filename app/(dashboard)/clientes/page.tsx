@@ -12,7 +12,7 @@ export default async function ClientesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-600 mt-1">
             {clients.length} {clients.length === 1 ? "cliente" : "clientes"} ·
             Todos los consultores pueden ver y editar.
           </p>

@@ -14,7 +14,7 @@ export default async function UsoIaPage() {
 
   return (
     <div className="px-8 py-6 max-w-6xl mx-auto">
-      <p className="text-sm text-slate-500 mb-4">
+      <p className="text-sm text-slate-600 mb-4">
         Uso de los 4 roles IA en los últimos 30 días. Costo estimado es un
         techo — asume Sonnet para todo (Valeria en realidad corre Haiku que es
         5× más barato). Cache hits reducen ~90% el costo de input.
@@ -87,7 +87,7 @@ export default async function UsoIaPage() {
                     >
                       <span className="text-slate-700">
                         {c.client_name ?? (
-                          <span className="font-mono text-xs text-slate-500">
+                          <span className="font-mono text-xs text-slate-600">
                             {c.client_id.slice(0, 8)}…
                           </span>
                         )}
@@ -108,7 +108,7 @@ export default async function UsoIaPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="text-slate-500 text-left uppercase tracking-wide text-[10px]">
+                  <thead className="text-slate-600 text-left uppercase tracking-wide text-[10px]">
                     <tr>
                       <th className="py-2 pr-3">Día</th>
                       <th className="py-2 pr-3">Rol</th>
@@ -123,7 +123,7 @@ export default async function UsoIaPage() {
                   <tbody className="divide-y divide-stone-100">
                     {s.by_day_role.map((r, i) => (
                       <tr key={i}>
-                        <td className="py-1.5 pr-3 text-slate-500">
+                        <td className="py-1.5 pr-3 text-slate-600">
                           {new Date(r.day).toLocaleDateString("es-MX", {
                             month: "short",
                             day: "numeric",
@@ -144,12 +144,12 @@ export default async function UsoIaPage() {
                         <td className="py-1.5 pr-3 text-right text-teal-700">
                           {numFmt.format(r.total_cache_hits)}
                         </td>
-                        <td className="py-1.5 pr-3 text-right text-slate-500">
+                        <td className="py-1.5 pr-3 text-right text-slate-600">
                           {r.avg_latency_ms}ms
                         </td>
                         <td
                           className={`py-1.5 pr-3 text-right ${
-                            r.errors > 0 ? "text-red-700" : "text-slate-500"
+                            r.errors > 0 ? "text-red-700" : "text-slate-600"
                           }`}
                         >
                           {r.errors}
@@ -186,11 +186,11 @@ function Metric({
       : "text-slate-900";
   return (
     <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500">
+      <div className="text-[10px] uppercase tracking-wide text-slate-600">
         {label}
       </div>
       <div className={`text-xl font-bold mt-1 ${valueClass}`}>{value}</div>
-      {hint && <div className="text-[10px] text-slate-500 mt-0.5">{hint}</div>}
+      {hint && <div className="text-[10px] text-slate-600 mt-0.5">{hint}</div>}
     </div>
   );
 }
@@ -204,7 +204,7 @@ function Panel({
 }) {
   return (
     <div className="bg-white border border-stone-200 rounded-xl p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500 mb-3">
+      <div className="text-xs uppercase tracking-wide text-slate-600 mb-3">
         {title}
       </div>
       {children}
@@ -214,7 +214,7 @@ function Panel({
 
 function Empty({ text }: { text?: string } = {}) {
   return (
-    <div className="text-sm text-slate-500 text-center py-6">
+    <div className="text-sm text-slate-600 text-center py-6">
       {text ?? "Sin datos en el período."}
     </div>
   );

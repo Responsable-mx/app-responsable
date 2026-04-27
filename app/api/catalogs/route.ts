@@ -9,6 +9,7 @@ import {
   CatalogCategorySchema,
   CatalogItemInputSchema,
 } from "@/lib/validation";
+import { logChange } from "@/lib/audit-log";
 
 /**
  * GET /api/catalogs?category=X&all=true
@@ -86,6 +87,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const data = await createCatalogItem(parsed.data, admin);
+    await logChange({
+      actorEmail: admin,
+      entityType: "catalogs",
+      entityId: data.id,
+      action: "create",
+      after: {
+        category: data.category,
+        value: data.value,
+        label: data.label,
+        group_name: data.group_name,
+      },
+    });
     return NextResponse.json({ data }, { status: 201 });
   } catch (e) {
     console.error("[POST /api/catalogs]", e);

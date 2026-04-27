@@ -9,7 +9,7 @@ export default function ConfigLayout({
     <div className="flex flex-col h-screen bg-stone-50">
       <header className="bg-white border-b border-stone-200 px-8 pt-6 pb-0">
         <div className="max-w-6xl mx-auto">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wide">
+          <div className="text-[10px] text-slate-600 uppercase tracking-wide">
             Admin
           </div>
           <h1 className="text-lg font-bold text-slate-900 mt-0.5 mb-3">

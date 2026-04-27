@@ -51,14 +51,20 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref,
 ) {
-  const isDisabled = disabled || loading;
+  // Click-disabled cuando loading O disabled. Pero opacity-50 SOLO cuando
+  // disabled-y-no-loading. Sin esta separación, loading se ve idéntico a
+  // disabled (ambos pintan opacity-50 sobre el mismo bg). El spinner debe
+  // mantener contraste pleno; la opacidad es señal de "no clickeable".
+  const isInteractionBlocked = disabled || loading;
+  const showFadedOut = disabled && !loading;
   return (
     <button
       ref={ref}
       type={type}
-      disabled={isDisabled}
+      disabled={isInteractionBlocked}
       aria-busy={loading || undefined}
-      className={`inline-flex items-center justify-center rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      data-loading={loading || undefined}
+      className={`inline-flex items-center justify-center rounded-lg font-semibold transition-colors ${isInteractionBlocked ? "cursor-not-allowed" : ""} ${showFadedOut ? "opacity-50" : ""} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}
     >
       {loading ? (

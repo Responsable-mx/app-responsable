@@ -38,17 +38,17 @@ export function StringListField({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border border-stone-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-teal-600">
+      <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border border-stone-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-brand-primary">
         {list.map((s, i) => (
           <span
             key={`${s}-${i}`}
-            className="inline-flex items-center gap-1 bg-teal-50 text-teal-800 text-xs px-2 py-0.5 rounded-full"
+            className="inline-flex items-center gap-1 bg-brand-primary-light text-brand-primary-dark text-xs px-2 py-0.5 rounded-full"
           >
             {s}
             <button
               type="button"
               onClick={() => removeAt(i)}
-              className="hover:text-teal-900"
+              className="hover:text-brand-primary-dark"
               aria-label={`Quitar ${s}`}
             >
               ×

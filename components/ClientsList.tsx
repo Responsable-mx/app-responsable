@@ -50,7 +50,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por nombre, sector, país, marco, certificación…"
-            className="w-full pl-10 pr-3 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-600"
+            className="w-full pl-10 pr-3 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
           />
           <svg
             viewBox="0 0 24 24"
@@ -69,7 +69,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
           <select
             value={sectorFilter}
             onChange={(e) => setSectorFilter(e.target.value)}
-            className="px-3 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-600"
+            className="px-3 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
           >
             <option value="">Todos los sectores</option>
             {sectors.map((s) => (
@@ -94,7 +94,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
           {clients.length === 0 && (
             <Link
               href="/clientes/nuevo"
-              className="inline-block mt-3 px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800"
+              className="inline-block mt-3 px-4 py-2 bg-brand-primary-hover text-white text-sm font-medium rounded-lg hover:bg-brand-primary-dark"
             >
               Agregar el primero
             </Link>
@@ -123,7 +123,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
                   <td className="px-4 py-3">
                     <Link
                       href={`/clientes/${c.id}`}
-                      className="font-medium text-slate-900 hover:text-teal-700"
+                      className="font-medium text-slate-900 hover:text-brand-primary-hover"
                     >
                       {c.name}
                     </Link>

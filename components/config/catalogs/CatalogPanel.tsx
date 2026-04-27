@@ -17,7 +17,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import type { CATALOG_CATEGORIES as CAT_TYPE } from "@/lib/catalogs/seeds";
 import { Row, type CatalogRowItem } from "./Row";
 import { ItemEditor } from "./ItemEditor";
@@ -205,13 +205,13 @@ export function CatalogPanel({ category }: { category: Category }) {
         />
       )}
 
-      <ConfirmDialog
+      <ConfirmModal
         open={deleteTarget !== null}
         title={`Eliminar ${deleteTarget?.label ?? ""}`}
         description="Se eliminará del catálogo. Si algún cliente tenía este valor asignado, el string queda en su ficha pero ya no se podrá elegir en dropdowns nuevos. No se puede deshacer."
         confirmLabel="Eliminar"
         cancelLabel="Cancelar"
-        variant="destructive"
+        tone="destructive"
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />

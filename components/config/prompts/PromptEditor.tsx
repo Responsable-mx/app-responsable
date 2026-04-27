@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { PROMPT_LABELS } from "@/lib/ai/prompts-public";
 import type { PromptKey } from "@/lib/ai/prompts-public";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { HistoryPanel } from "./HistoryPanel";
 
 type PromptDetail = {
@@ -188,13 +188,13 @@ export function PromptEditor({
         )}
       </div>
 
-      <ConfirmDialog
+      <ConfirmModal
         open={confirmReset}
         title="Restaurar default"
         description="Se elimina el override y el prompt vuelve al contenido hardcoded en el código. El historial de versiones editadas se conserva (puedes restaurar cualquier versión pasada)."
         confirmLabel="Restaurar default"
         cancelLabel="Cancelar"
-        variant="destructive"
+        tone="destructive"
         onConfirm={resetToDefault}
         onCancel={() => setConfirmReset(false)}
       />

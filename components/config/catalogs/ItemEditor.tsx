@@ -2,27 +2,10 @@
 
 import { useState } from "react";
 import type { CatalogCategory } from "@/lib/catalogs/seeds";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import type { CatalogRowItem } from "./Row";
-
-const inputCls =
-  "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-slate-700 mb-1">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
 
 export function ItemEditor({
   item,
@@ -42,8 +25,8 @@ export function ItemEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     setError("");
     setSaving(true);
     try {
@@ -75,87 +58,87 @@ export function ItemEditor({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-fade-in"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-xl shadow-lg border border-stone-200 max-w-lg w-full p-6"
-      >
-        <h2 className="text-lg font-bold text-slate-900 mb-4">
-          {item ? "Editar ítem" : "Agregar ítem"}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <Field label="Label (lo que ve el usuario) *">
-            <input
-              required
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              className={inputCls}
-              placeholder="Ej: GRI Standards"
-              autoFocus
-            />
-          </Field>
-          <Field
-            label={
-              item?.is_system
-                ? "Valor canónico (sistema, no editable)"
-                : "Valor canónico (auto)"
-            }
+    <Modal
+      open
+      onClose={saving ? () => {} : onClose}
+      title={item ? "Editar ítem" : "Agregar ítem"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => handleSubmit()}
+            loading={saving}
+            disabled={!label.trim()}
           >
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              disabled={item?.is_system === true}
-              className={`${inputCls} font-mono text-xs disabled:bg-stone-50`}
-              placeholder="Se autogenera desde el label"
-            />
-          </Field>
-          <Field label="Grupo (opcional, agrupa en dropdowns)">
-            <input
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              className={inputCls}
-              placeholder="Ej: Sostenibilidad, Clima, Social"
-            />
-          </Field>
-          <Field label="Descripción (opcional, tooltip)">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className={inputCls}
-              placeholder="Ayuda al consultor a entender cuándo elegir este valor."
-            />
-          </Field>
+            {item ? "Guardar" : "Crear"}
+          </Button>
+        </>
+      }
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-3"
+        noValidate
+      >
+        <Input
+          label="Label (lo que ve el usuario) *"
+          required
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Ej: GRI Standards"
+          autoFocus
+        />
+        <Input
+          label={
+            item?.is_system
+              ? "Valor canónico (sistema, no editable)"
+              : "Valor canónico (auto)"
+          }
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={item?.is_system === true}
+          className="font-mono text-xs disabled:bg-stone-50"
+          placeholder="Se autogenera desde el label"
+        />
+        <Input
+          label="Grupo (opcional, agrupa en dropdowns)"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          placeholder="Ej: Sostenibilidad, Clima, Social"
+        />
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="catalog-item-description"
+            className="text-sm font-medium text-slate-700"
+          >
+            Descripción (opcional, tooltip)
+          </label>
+          <textarea
+            id="catalog-item-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            className="rounded-lg border border-stone-300 px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            placeholder="Ayuda al consultor a entender cuándo elegir este valor."
+          />
+        </div>
 
-          {error && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 text-sm text-slate-700 hover:bg-stone-50 rounded"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !label.trim()}
-              className="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-medium rounded-lg disabled:bg-stone-300 disabled:cursor-not-allowed"
-            >
-              {saving ? "Guardando…" : item ? "Guardar" : "Crear"}
-            </button>
+        {error && (
+          <div
+            role="alert"
+            className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded-lg p-2"
+          >
+            {error}
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        {/* Submit oculto para que Enter dentro del form funcione */}
+        <button type="submit" className="sr-only" tabIndex={-1} aria-hidden="true">
+          Submit
+        </button>
+      </form>
+    </Modal>
   );
 }

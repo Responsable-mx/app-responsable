@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
-import { SkipLink } from "@/components/ui/SkipLink";
 import {
   SkeletonCard,
   SkeletonList,
@@ -149,11 +148,26 @@ function PreviewInner() {
 
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-slate-700">SkipLink</h2>
-        <p className="text-slate-700">
-          Tab desde la barra de URL: el link &quot;Saltar al contenido
-          principal&quot; aparece arriba a la izquierda.
-        </p>
-        <SkipLink />
+        <div className="bg-stone-100 rounded-lg p-4 text-sm text-slate-700 space-y-2">
+          <p>
+            <strong>Patrón:</strong> oculto fuera de viewport hasta recibir
+            foco con Tab. Al primer Tab desde la barra de URL aparece arriba
+            a la izquierda con fondo brand-primary.
+          </p>
+          <p>
+            <strong>Cómo probarlo:</strong> click en la barra de URL,
+            presiona <kbd className="px-1.5 py-0.5 bg-white rounded border border-stone-300 font-mono text-xs">Tab</kbd>{" "}
+            una vez. El link &quot;Saltar al contenido principal&quot; debe
+            aparecer en la esquina superior izquierda. Otro Tab y desaparece.
+          </p>
+          <p>
+            <strong>Dónde vive:</strong> instanciado en{" "}
+            <code className="font-mono text-xs">app/layout.tsx</code> como
+            primer hijo del <code className="font-mono text-xs">&lt;body&gt;</code>{" "}
+            — un solo SkipLink por página, target ={" "}
+            <code className="font-mono text-xs">#main-content</code>.
+          </p>
+        </div>
       </section>
     </main>
   );

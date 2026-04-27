@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Client } from "@/lib/clients";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 import { StructuredBlockEditor } from "@/components/StructuredBlockEditor";
 import { BoolTriField } from "@/components/fields/BoolTriField";
@@ -223,7 +223,7 @@ export function ClientForm(props: Props) {
               <button
                 type="button"
                 onClick={() => setSectorAiOpen(true)}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100"
+                className="text-[10px] px-2 py-0.5 rounded-full bg-brand-primary-light text-brand-primary-dark border border-brand-primary-light hover:bg-brand-primary-light"
                 title="POC: rellenar con IA desde URL o transcripción"
               >
                 🤖 Rellenar con IA
@@ -383,7 +383,7 @@ export function ClientForm(props: Props) {
         <button
           type="submit"
           disabled={saving || !form.name.trim()}
-          className="px-5 py-2.5 bg-teal-700 text-white rounded-lg text-sm font-medium hover:bg-teal-800 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
+          className="px-5 py-2.5 bg-brand-primary-hover text-white rounded-lg text-sm font-medium hover:bg-brand-primary-dark disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
         >
           {saving
             ? "Guardando..."
@@ -410,7 +410,7 @@ export function ClientForm(props: Props) {
       />
 
       {props.mode === "edit" && (
-        <ConfirmDialog
+        <ConfirmModal
           open={confirmDelete}
           title={`Eliminar ${props.initial.name}`}
           description={
@@ -418,7 +418,7 @@ export function ClientForm(props: Props) {
           }
           confirmLabel="Eliminar"
           cancelLabel="Cancelar"
-          variant="destructive"
+          tone="destructive"
           onConfirm={performDelete}
           onCancel={() => setConfirmDelete(false)}
         />
@@ -428,7 +428,7 @@ export function ClientForm(props: Props) {
 }
 
 const inputCls =
-  "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent";
+  "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
 
 function Section({
   title,
@@ -495,7 +495,7 @@ function BoolFieldInline({
             value={urlValue ?? ""}
             onChange={(e) => onUrlChange(e.target.value)}
             placeholder="https:// …  o liga al PDF"
-            className="w-full px-2 py-1.5 border border-stone-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-teal-600"
+            className="w-full px-2 py-1.5 border border-stone-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary"
           />
         </div>
       )}

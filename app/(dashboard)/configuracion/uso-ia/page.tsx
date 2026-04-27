@@ -141,7 +141,7 @@ export default async function UsoIaPage() {
                         <td className="py-1.5 pr-3 text-right text-slate-600">
                           {numFmt.format(r.total_output_tokens)}
                         </td>
-                        <td className="py-1.5 pr-3 text-right text-teal-700">
+                        <td className="py-1.5 pr-3 text-right text-brand-primary-hover">
                           {numFmt.format(r.total_cache_hits)}
                         </td>
                         <td className="py-1.5 pr-3 text-right text-slate-600">

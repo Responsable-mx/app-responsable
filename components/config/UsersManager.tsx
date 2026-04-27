@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 type User = {
   email: string;
@@ -54,7 +57,7 @@ export function UsersManager() {
         </div>
         <button
           onClick={() => setInviting(true)}
-          className="px-3 py-1.5 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800"
+          className="px-3 py-1.5 bg-brand-primary-hover text-white text-sm font-medium rounded-lg hover:bg-brand-primary-dark"
         >
           + Invitar usuario
         </button>
@@ -159,13 +162,13 @@ export function UsersManager() {
         />
       )}
 
-      <ConfirmDialog
+      <ConfirmModal
         open={deleteTarget !== null}
         title={`Eliminar ${deleteTarget?.email ?? ""}`}
         description="Se quita del whitelist. El usuario no podrá iniciar sesión. Sus acciones pasadas (clientes que creó, logs IA) se conservan."
         confirmLabel="Eliminar"
         cancelLabel="Cancelar"
-        variant="destructive"
+        tone="destructive"
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />
@@ -222,98 +225,90 @@ function UserEditor({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-fade-in"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={saving ? () => {} : onClose}
+      title={user ? "Editar usuario" : "Invitar usuario"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+            loading={saving}
+            disabled={!email.trim()}
+          >
+            {user ? "Guardar" : "Invitar"}
+          </Button>
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-xl shadow-lg border border-stone-200 max-w-md w-full p-6"
-      >
-        <h2 className="text-lg font-bold text-slate-900 mb-4">
-          {user ? "Editar usuario" : "Invitar usuario"}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Correo *
-            </label>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={user !== null}
-              className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm disabled:bg-stone-50 font-mono"
-              placeholder="alguien@responsable.net"
-              autoFocus={user === null}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Nombre completo
-            </label>
-            <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm"
-              placeholder="María López"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Rol
-            </label>
-            <select
-              value={role}
-              onChange={(e) =>
-                setRole(e.target.value as "admin" | "consultor")
-              }
-              className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm bg-white"
-            >
-              <option value="consultor">
-                Consultor · solo chat y clientes
-              </option>
-              <option value="admin">
-                Admin · además gestiona configuración
-              </option>
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(e) => setActive(e.target.checked)}
-            />
-            Activo (puede iniciar sesión)
+      <form onSubmit={handleSubmit} className="space-y-3" noValidate>
+        <Input
+          label="Correo *"
+          required
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={user !== null}
+          className="font-mono"
+          placeholder="alguien@responsable.net"
+          autoFocus={user === null}
+        />
+        <Input
+          label="Nombre completo"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          placeholder="María López"
+        />
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="user-role-select"
+            className="text-sm font-medium text-slate-700"
+          >
+            Rol
           </label>
+          <select
+            id="user-role-select"
+            value={role}
+            onChange={(e) =>
+              setRole(e.target.value as "admin" | "consultor")
+            }
+            className="rounded-lg border border-stone-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          >
+            <option value="consultor">
+              Consultor · solo chat y clientes
+            </option>
+            <option value="admin">
+              Admin · además gestiona configuración
+            </option>
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+            className="accent-brand-primary"
+          />
+          Activo (puede iniciar sesión)
+        </label>
 
-          {error && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 text-sm text-slate-700 hover:bg-stone-50 rounded"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !email.trim()}
-              className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:bg-stone-300"
-            >
-              {saving ? "Guardando…" : user ? "Guardar" : "Invitar"}
-            </button>
+        {error && (
+          <div
+            role="alert"
+            className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded-lg p-2"
+          >
+            {error}
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        {/* Submit oculto para que Enter dentro del form lance handleSubmit */}
+        <button type="submit" className="sr-only" tabIndex={-1} aria-hidden="true">
+          Submit
+        </button>
+      </form>
+    </Modal>
   );
 }

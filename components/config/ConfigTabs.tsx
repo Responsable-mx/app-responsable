@@ -42,7 +42,7 @@ export function ConfigTabs() {
             href={t.href}
             className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 transition-colors ${
               active
-                ? "border-teal-700 text-teal-800 font-medium"
+                ? "border-brand-primary-hover text-brand-primary-dark font-medium"
                 : "border-transparent text-slate-600 hover:text-slate-900"
             }`}
           >

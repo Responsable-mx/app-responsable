@@ -166,7 +166,7 @@ export function MultiSelectCombobox({
       </label>
       {hint && <p className="text-[10px] text-slate-600 mb-1">{hint}</p>}
       <div
-        className="flex flex-wrap gap-1 px-2 py-1.5 border border-stone-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-teal-600"
+        className="flex flex-wrap gap-1 px-2 py-1.5 border border-stone-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-brand-primary"
         onClick={() => {
           setOpen(true);
           inputRef.current?.focus();
@@ -175,7 +175,7 @@ export function MultiSelectCombobox({
         {selectedValues.map((v) => (
           <span
             key={v}
-            className="inline-flex items-center gap-1 bg-teal-50 text-teal-800 text-xs px-2 py-0.5 rounded-full"
+            className="inline-flex items-center gap-1 bg-brand-primary-light text-brand-primary-dark text-xs px-2 py-0.5 rounded-full"
           >
             {labelOf(v)}
             <button
@@ -185,7 +185,7 @@ export function MultiSelectCombobox({
                 removeChip(v);
               }}
               aria-label={`Quitar ${labelOf(v)}`}
-              className="hover:text-teal-900"
+              className="hover:text-brand-primary-dark"
             >
               ×
             </button>
@@ -238,7 +238,7 @@ export function MultiSelectCombobox({
                     }}
                     className={`block w-full text-left px-3 py-1.5 text-sm ${
                       filtered.indexOf(it) === safeHighlight
-                        ? "bg-teal-50 text-teal-900"
+                        ? "bg-brand-primary-light text-brand-primary-dark"
                         : "hover:bg-stone-50"
                     }`}
                   >
@@ -259,7 +259,7 @@ export function MultiSelectCombobox({
                 }}
                 className={`block w-full text-left px-3 py-1.5 text-sm ${
                   idx === safeHighlight
-                    ? "bg-teal-50 text-teal-900"
+                    ? "bg-brand-primary-light text-brand-primary-dark"
                     : "hover:bg-stone-50"
                 }`}
               >

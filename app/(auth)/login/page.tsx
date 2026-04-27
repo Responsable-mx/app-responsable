@@ -2,20 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
-type Step = "email" | "otp" | "loading";
+type Step = "email" | "otp";
 
 export default function LoginPage() {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setStep("loading");
+    setSubmitting(true);
     try {
       const res = await fetch("/api/auth/send-code", {
         method: "POST",
@@ -25,20 +28,20 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error);
-        setStep("email");
         return;
       }
       setStep("otp");
     } catch {
       setError("Error de conexión. Intenta de nuevo.");
-      setStep("email");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setStep("loading");
+    setSubmitting(true);
     try {
       const res = await fetch("/api/auth/login-code", {
         method: "POST",
@@ -48,13 +51,13 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error);
-        setStep("otp");
         return;
       }
       router.push(data.redirect || "/chat");
     } catch {
       setError("Error de conexión. Intenta de nuevo.");
-      setStep("otp");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -62,7 +65,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-stone-50">
       <div className="w-full max-w-sm mx-4">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-teal-700 text-white font-bold text-2xl mb-3">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-primary-hover text-white font-bold text-2xl mb-3">
             R
           </div>
           <h1 className="text-xl font-bold text-slate-900">App ResponSable</h1>
@@ -81,35 +84,26 @@ export default function LoginPage() {
                 Te enviamos un código a tu correo
               </p>
 
-              <label
-                htmlFor="email-input"
-                className="block text-sm font-medium text-slate-900 mb-1"
-              >
-                Correo electrónico
-              </label>
-              <input
+              <Input
                 id="email-input"
+                label="Correo electrónico"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@correo.com"
                 required
                 autoFocus
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent placeholder:text-slate-600"
+                error={error || undefined}
               />
 
-              {error && (
-                <p role="alert" className="text-sm text-red-600 mt-2">
-                  {error}
-                </p>
-              )}
-
-              <button
+              <Button
                 type="submit"
-                className="w-full mt-4 py-2.5 bg-teal-700 text-white rounded-lg font-medium text-sm hover:bg-teal-800 transition-colors"
+                size="lg"
+                loading={submitting}
+                className="w-full mt-4"
               >
                 Enviar código
-              </button>
+              </Button>
             </form>
           )}
 
@@ -124,13 +118,14 @@ export default function LoginPage() {
 
               <label
                 htmlFor="otp-input"
-                className="block text-sm font-medium text-slate-900 mb-1"
+                className="block text-sm font-medium text-slate-700 mb-1"
               >
                 Código de verificación
               </label>
               <input
                 id="otp-input"
                 type="text"
+                inputMode="numeric"
                 value={otp}
                 onChange={(e) =>
                   setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
@@ -139,41 +134,44 @@ export default function LoginPage() {
                 required
                 autoFocus
                 maxLength={6}
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent"
+                aria-invalid={error ? "true" : undefined}
+                aria-describedby={error ? "otp-error" : undefined}
+                className={`w-full px-3 py-2 border rounded-lg text-sm text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent ${error ? "border-brand-berry" : "border-stone-300"}`}
               />
 
               {error && (
-                <p role="alert" className="text-sm text-red-600 mt-2">
+                <p
+                  id="otp-error"
+                  role="alert"
+                  className="text-xs text-brand-berry font-medium mt-1"
+                >
                   {error}
                 </p>
               )}
 
-              <button
+              <Button
                 type="submit"
-                className="w-full mt-4 py-2.5 bg-teal-700 text-white rounded-lg font-medium text-sm hover:bg-teal-800 transition-colors"
+                size="lg"
+                loading={submitting}
+                className="w-full mt-4"
               >
                 Verificar
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => {
                   setStep("email");
                   setOtp("");
                   setError("");
                 }}
-                className="w-full mt-2 py-2 text-slate-600 text-sm hover:text-slate-900 transition-colors"
+                disabled={submitting}
+                className="w-full mt-2"
               >
                 Cambiar correo
-              </button>
+              </Button>
             </form>
-          )}
-
-          {step === "loading" && (
-            <div className="py-8 text-center">
-              <div className="inline-block w-8 h-8 border-2 border-teal-700 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-slate-600 mt-4">Procesando...</p>
-            </div>
           )}
         </div>
 

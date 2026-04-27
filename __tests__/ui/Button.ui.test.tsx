@@ -12,7 +12,7 @@ describe("Button primitive", () => {
     expect(handle).toHaveBeenCalledOnce();
   });
 
-  it("loading=true muestra spinner, deshabilita y bloquea click", async () => {
+  it("loading=true muestra spinner, deshabilita y bloquea click — SIN opacity reducida", async () => {
     const handle = vi.fn();
     render(
       <Button loading onClick={handle}>
@@ -22,11 +22,16 @@ describe("Button primitive", () => {
     const btn = screen.getByRole("button", { name: /enviando/i });
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute("aria-busy", "true");
+    expect(btn).toHaveAttribute("data-loading", "true");
+    // Crítico: loading NO debe verse idéntico a disabled. Sin opacity-50,
+    // el spinner mantiene contraste pleno.
+    expect(btn.className).not.toContain("opacity-50");
+    expect(btn.className).toContain("cursor-not-allowed");
     await userEvent.click(btn);
     expect(handle).not.toHaveBeenCalled();
   });
 
-  it("disabled=true bloquea click sin spinner", async () => {
+  it("disabled=true bloquea click + opacity-50 + sin spinner", async () => {
     const handle = vi.fn();
     render(
       <Button disabled onClick={handle}>
@@ -36,8 +41,21 @@ describe("Button primitive", () => {
     const btn = screen.getByRole("button", { name: /acción/i });
     expect(btn).toBeDisabled();
     expect(btn).not.toHaveAttribute("aria-busy");
+    expect(btn).not.toHaveAttribute("data-loading");
+    expect(btn.className).toContain("opacity-50");
     await userEvent.click(btn);
     expect(handle).not.toHaveBeenCalled();
+  });
+
+  it("loading + disabled juntos: loading prevalece (spinner sin opacity)", () => {
+    render(
+      <Button loading disabled>
+        X
+      </Button>,
+    );
+    const btn = screen.getByRole("button", { name: /x/i });
+    expect(btn.className).not.toContain("opacity-50");
+    expect(btn).toHaveAttribute("data-loading", "true");
   });
 
   it("variant destructive aplica clases brand-berry", () => {

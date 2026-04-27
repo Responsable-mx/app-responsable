@@ -121,7 +121,7 @@ function FieldRenderer({
   onChange: (v: unknown) => void;
 }) {
   const inputCls =
-    "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white";
+    "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
 
   switch (type.kind) {
     case "text":

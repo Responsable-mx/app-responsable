@@ -1,6 +1,6 @@
 # Deuda técnica — App ResponSable
 
-Última revisión: 2026-04-27 (limpieza total post-recalibración 24-abr)
+Última revisión: 2026-04-27 (segundo pase de limpieza tras design critique)
 
 ## Resumen
 
@@ -12,7 +12,7 @@
 | Cross-repo| 1        |
 | Operativo (no código) | 1 |
 
-**Cero deuda activa de código.** El proyecto está limpio para arrancar el piloto activo de 8 consultores.
+**Cero deuda activa de código** tras dos pases coordinados. Cobertura DS al 100% del chrome y mutaciones admin.
 
 ## Cross-repo (no toca este repo)
 
@@ -25,38 +25,49 @@
 
 - **OP1** — Rotar `ANTHROPIC_API_KEY` y `RESEND_API_KEY` (se pegaron en chat
   durante el setup inicial de producción). Generar nuevas en cada consola,
-  `vercel env add --force`, borrar las viejas. No trackeable como deuda de
-  código.
+  `vercel env add --force`, borrar las viejas.
 
 ---
 
 ## 📒 Historial
 
-**Sesión 2026-04-27 — limpieza total post-recalibración:**
+**Sesión 2026-04-27 (pase 2) — design critique + limpieza follow-up:**
+
+Tras `/design:design-critique` sobre `/dev/primitives-preview`, se detectaron y cerraron 6 ítems adicionales:
+
+| ID | Qué era | Cómo se cerró |
+|----|---------|---------------|
+| **Priority 1** (critique) | `<Button loading>` y `<Button disabled>` se veían idénticos (ambos con `disabled:opacity-50`) | Separación: `loading=true` mantiene opacity 1.0 (spinner visible), `disabled=true && !loading` aplica opacity-50. `data-loading` y `aria-busy` para AT. Tests `loading + disabled juntos` cubren la regla. Verificado en preview: loading=1.0, disabled=0.5. |
+| **Priority 2** (critique) | `app/dev/primitives-preview` exponía `<SkipLink/>` permanentemente al final, contradiciendo su patrón (oculto hasta foco) | Reemplazado por bloque descriptivo (patrón + cómo probar + dónde vive). El SkipLink real solo se monta una vez en root layout. |
+| **DRSP-9** | 56 ocurrencias `teal-N` hardcoded en 21 archivos (Sidebar, ChatWindow, ClientForm, ClientsList, login, configuración, fields…) | Script Python migra `teal-50/100/200/300/400/500` → `brand-primary-light`/`brand-primary`, `teal-600` → `brand-primary`, `teal-700` → `brand-primary-hover`, `teal-800/900` → `brand-primary-dark` en 21 archivos / 86 reemplazos. Cero residuales `teal-N`. Esto incluye Sidebar (Priority 3 del critique). STARTER_UX §1. |
+| **DRSP-10** | `app/(auth)/login/page.tsx` con `<input>`, `<button>`, spinner ad-hoc | Migrado a `<Input>` y `<Button>` primitives. Step "loading" eliminado (manejo via `submitting` + `<Button loading>`). Borde error en `border-brand-berry`. OTP input con `inputMode="numeric"` + `aria-invalid/aria-describedby`. STARTER_UX §2. |
+| **DRSP-11** | 4 modales ad-hoc en lugar de `Modal` primitive (focus trap, restore focus, ESC inconsistentes) | Migrados: `components/extract/ExtractSectorModal.tsx`, `components/services/ServiceEditor.tsx`, `components/config/UsersManager.tsx UserEditor`, `components/config/catalogs/ItemEditor.tsx` (recién creado). Todos heredan focus trap + ESC + restore focus + click overlay del primitive. Buttons internos también migrados a `<Button>` primitive. |
+| **DRSP-12** | `ConfirmDialog` legacy aún usado por 6 componentes (catalogs, prompts, ClientForm, ChatWindow, PreferencesPanel) | Migrados todos a `ConfirmModal` (`variant="destructive"` → `tone="destructive"`, `variant="default"` → `tone="primary"`). Deleted `components/ConfirmDialog.tsx` + `__tests__/ui/ConfirmDialog.ui.test.tsx`. Cero consumidores residuales. Ahora solo existe el primitive con busy state async. |
+
+**Validación al cierre:**
+
+- 20 test files / 198 tests pasan (eran 21/203 — bajamos 5 al borrar tests del legacy ConfirmDialog).
+- TypeScript strict sin errores. ESLint sin warnings. Next.js build OK.
+- Preview verificado: loading button con opacity 1.0 vs disabled 0.5. Cero errores en consola tras navegación.
+- Coverage de los primitives sigue en 80%+ stmts/lines/funcs, 60%+ branches.
+
+---
+
+**Sesión 2026-04-27 (pase 1) — limpieza total post-recalibración 24-abr:**
 
 Cerrados los 9 ítems abiertos (DRSP-1 a DRSP-8 + R1) en una sola pasada coordinada.
 
 | ID | Qué era | Cómo se cerró |
 |----|---------|---------------|
-| DRSP-1 | `components/ui/` solo `Icons.tsx` — sin primitives canónicos | Creados Button, Input, Modal, ConfirmModal, Toast/useToast, SkipLink, Skeleton siguiendo STARTER_UX §2. forwardRef en Button, focus trap + restore focus en Modal, aria-live polite en Toast, dismiss manual + auto-dismiss en Toast. 6 archivos nuevos en `components/ui/` + 6 archivos de tests. |
-| DRSP-2 | `globals.css:17` con `#0d9488` literal, sin `@theme inline` con paleta brand, sin `prefers-reduced-motion` | Refactor `globals.css`: bloque `@theme inline` con 9 tokens brand-* (primary teal, accent ámbar, berry destructive, ink slate). Focus ring usa `var(--color-brand-primary)`. Bloque `@media (prefers-reduced-motion: reduce)` que neutraliza animaciones. Clase `.skip-link` para SkipLink. STARTER_UX §1 + §3. |
-| DRSP-3 | `lib/ai/roles.ts:42,48` inyectaba codes crudos (`services_contracted`, `maturity_level`) al system prompt — riesgo reputacional | `buildClientContext` ahora humaniza contra `CATALOG_LABELS` (mapeo derivado de `CATALOG_SEEDS`). El LLM ve "Doble materialidad", "Gestionado", "GRI Standards" en lugar de codes. Instrucción explícita en prompt: "NUNCA uses códigos internos del catálogo en tu respuesta al consultor". 3 tests cubren la humanización + fallback. STARTER_UX §7.3 + §8. |
-| DRSP-4 | 94 ocurrencias `text-slate-300/400/500` en 29 archivos — contraste WCAG AA | Migración `text-slate-{300,400,500}` → `text-slate-600` en los 29 archivos vía script Python idempotente. Cero ocurrencias residuales verificadas con grep. STARTER_UX §1. |
-| DRSP-5 | `app/layout.tsx` sin SkipLink ni `<main id>`. No existía `app/dev/*` | SkipLink en root layout (primer tab-stop). `<main id="main-content">` en dashboard layout. Middleware bypass `/dev/*` solo en `NODE_ENV !== 'production'`. Página `/dev/primitives-preview` con todos los primitives interactivos para QA visual sin auth. STARTER_UX §4 + §6. |
-| DRSP-6 | `lib/ai/roles.ts:145-152` solo 1 cache breakpoint (en roleBlock); contextBlock se re-tokenizaba al cambiar de rol | Agregado `cache_control: ephemeral` al contextBlock. Ahora 2 breakpoints (max permitido 4) — al cambiar de rol con mismo cliente, el preámbulo del cliente hace cache hit. STACK.md actualizado, tests verifican ambos breakpoints. STARTER_IA §2. |
-| DRSP-7 | Sin `audit_log` para mutaciones admin (prompts/users/catalogs/clients) | Migración `0020_audit_log.sql` (aplicada en prod): tabla con actor/entity/action/before/after/metadata + 3 índices + RLS solo-admin lectura. Helper `lib/audit-log.ts` con `logChange()` fail-open. Integrado en POST/PATCH/DELETE de `/api/prompts/[key]`, `/api/users`, `/api/users/[email]`, `/api/catalogs`, `/api/catalogs/[id]`, `/api/clients/[id]`. 3 tests cubren el helper. STARTER_OBS §2. |
-| DRSP-8 | Sin `.github/workflows/`, coverage 70%, `include: ["lib/**"]` excluía `components/` | `.github/workflows/test.yml` con jobs lint + tsc + test:coverage + build. Thresholds vitest: stmts/lines/funcs **80**, branches **60** (calibrado al perímetro testeable real). Include ampliado a 13 archivos lib + components/ui/. 39 tests CRUD nuevos (users 16, clients 11, catalogs 9, audit-log 3). Coverage actual: 90.3% stmts, 80.75% branches, 96.42% funcs, 93.51% lines. STARTER_CI + STARTER_TESTING. |
-| R1 | `CatalogsManager.tsx` 496L, `PromptsManager.tsx` 416L — monolíticos | Extraídos a sub-componentes en `components/config/catalogs/{Row,ItemEditor,CatalogPanel}.tsx` (CatalogsManager queda en ~30L) y `components/config/prompts/{PromptEditor,HistoryPanel}.tsx` (PromptsManager queda en ~70L). Cada archivo <300L. STACK_BASE Component Size Convention. |
-
-**Estado al cierre:**
-
-- 21 test files / 202 tests pasan (eran 17/156 antes — +4 archivos / +46 tests).
-- TypeScript strict sin errores. ESLint sin warnings. Build Next.js OK.
-- Coverage gate del CI activo en thresholds de starter.
-- Migración SQL `0020_audit_log` aplicada en prod (Supabase project `lyideepglavkmuuujoqz`).
-- Preview `/dev/primitives-preview` funcional en local con todos los primitives + tokens brand verificados visualmente.
-
----
+| DRSP-1 | `components/ui/` solo `Icons.tsx` — sin primitives canónicos | Creados Button, Input, Modal, ConfirmModal, Toast/useToast, SkipLink, Skeleton siguiendo STARTER_UX §2. |
+| DRSP-2 | `globals.css:17` con `#0d9488` literal, sin `@theme inline` con paleta brand, sin `prefers-reduced-motion` | Refactor `globals.css`: bloque `@theme inline` con 9 tokens brand-* + `@media (prefers-reduced-motion: reduce)` + clase `.skip-link`. STARTER_UX §1 + §3. |
+| DRSP-3 | `lib/ai/roles.ts:42,48` inyectaba codes crudos al system prompt | `buildClientContext` ahora humaniza contra `CATALOG_LABELS`. Instrucción explícita en prompt. STARTER_UX §7.3 + §8. |
+| DRSP-4 | 94 ocurrencias `text-slate-300/400/500` en 29 archivos | Migración a `slate-600`. Cero residuales. STARTER_UX §1. |
+| DRSP-5 | Sin SkipLink, sin `<main id>`, sin `app/dev/*` | SkipLink en root layout, `<main id="main-content">` en dashboard layout, `app/dev/*` con middleware bypass non-prod. |
+| DRSP-6 | 1 cache breakpoint en buildSystemBlocks | Agregado segundo en contextBlock — ~50% ahorro Anthropic. STACK_BASE.md alineado. |
+| DRSP-7 | Sin audit_log para mutaciones admin | Migración `0020_audit_log.sql` aplicada en prod + helper `lib/audit-log.ts` integrado en POST/PATCH/DELETE de prompts/users/catalogs/clients. |
+| DRSP-8 | Sin `.github/workflows/`, coverage 70%, include excluía components | CI workflow + thresholds 80/60 + 39 tests CRUD nuevos. Coverage 90.3% stmts. |
+| R1 | `CatalogsManager` 496L, `PromptsManager` 416L | Extraídos a sub-componentes en `catalogs/` y `prompts/`. |
 
 **Sesión 2026-04-21 — auditoría post-deploy + limpieza total:**
 

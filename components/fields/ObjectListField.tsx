@@ -108,7 +108,7 @@ function SubFieldRenderer({
   onChange: (v: unknown) => void;
 }) {
   const inputCls =
-    "w-full px-2 py-1.5 border border-stone-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white";
+    "w-full px-2 py-1.5 border border-stone-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
 
   switch (type.kind) {
     case "text":

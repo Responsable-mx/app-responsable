@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 export function PreferencesPanel({
   currentTourVersion,
@@ -63,7 +63,7 @@ export function PreferencesPanel({
           <button
             onClick={() => setConfirm(true)}
             disabled={busy}
-            className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:bg-stone-300 whitespace-nowrap"
+            className="px-4 py-2 bg-brand-primary-hover text-white text-sm font-medium rounded-lg hover:bg-brand-primary-dark disabled:bg-stone-300 whitespace-nowrap"
           >
             Reiniciar tour para todo el equipo
           </button>
@@ -87,7 +87,7 @@ export function PreferencesPanel({
         )}
       </section>
 
-      <ConfirmDialog
+      <ConfirmModal
         open={confirm}
         title="Reiniciar tour para todo el equipo"
         description={`Se incrementará la versión del tour (a v${

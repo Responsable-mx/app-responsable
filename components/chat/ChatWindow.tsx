@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type ClientOption = {
   id: string;
@@ -23,7 +23,7 @@ const ROLES: Array<{
   emoji: string;
 }> = [
   // Orden lógico de la cadena de calidad: Autor → Revisor → Elevador → Validador.
-  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-teal-700", emoji: "✍️" },
+  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-brand-primary-hover", emoji: "✍️" },
   { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-amber-600", emoji: "🔍" },
   { id: "elena", name: "Elena", fn: "Elevador", color: "bg-indigo-700", emoji: "⭐" },
   { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-rose-700", emoji: "✅" },
@@ -222,7 +222,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               setClientId(e.target.value);
               resetChat();
             }}
-            className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-600"
+            className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
           >
             <option value="">Sin cliente (metodología general)</option>
             {clients.map((c) => (
@@ -278,7 +278,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="text-left text-xs px-3 py-2 bg-white border border-stone-200 rounded-lg hover:border-teal-600 hover:bg-teal-50 transition-colors"
+                    className="text-left text-xs px-3 py-2 bg-white border border-stone-200 rounded-lg hover:border-brand-primary hover:bg-brand-primary-light transition-colors"
                   >
                     {s}
                   </button>
@@ -297,7 +297,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               <div
                 className={`max-w-2xl ${
                   m.role === "user"
-                    ? "bg-teal-700 text-white rounded-2xl rounded-br-md px-4 py-2.5"
+                    ? "bg-brand-primary-hover text-white rounded-2xl rounded-br-md px-4 py-2.5"
                     : "bg-white border border-stone-200 rounded-2xl rounded-bl-md px-4 py-3"
                 }`}
               >
@@ -349,7 +349,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               }}
               placeholder={`Escribe a ${currentRole.name}...`}
               rows={1}
-              className="flex-1 px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 resize-none max-h-40"
+              className="flex-1 px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none max-h-40"
               disabled={streaming}
             />
             {streaming ? (
@@ -364,7 +364,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
               <button
                 type="submit"
                 disabled={!input.trim()}
-                className="px-4 py-2 bg-teal-700 text-white rounded-lg text-sm font-medium hover:bg-teal-800 disabled:bg-stone-300 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-brand-primary-hover text-white rounded-lg text-sm font-medium hover:bg-brand-primary-dark disabled:bg-stone-300 disabled:cursor-not-allowed"
               >
                 Enviar
               </button>
@@ -377,7 +377,7 @@ export function ChatWindow({ clients }: { clients: ClientOption[] }) {
         </div>
       </footer>
 
-      <ConfirmDialog
+      <ConfirmModal
         open={pendingRoleChange !== null}
         title="Cambiar de rol borra el chat actual"
         description={

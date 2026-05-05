@@ -59,6 +59,22 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   if (!step) return NextResponse.json({ error: "Paso no encontrado" }, { status: 404 });
   if (!step.ai_can_fill) return NextResponse.json({ error: "Paso no soporta AI fill" }, { status: 400 });
 
+  // Guard only_double_materialidad: si el paso solo aplica a clientes con flag,
+  // verificar antes de gastar tokens IA en datos que no se podrán guardar
+  // (PATCH del cuestionario los rechaza con 422).
+  if (step.only_double_materialidad) {
+    const clientForFlag = await getClient(id).catch(() => null);
+    if (clientForFlag && clientForFlag.has_double_materiality !== true) {
+      return NextResponse.json(
+        {
+          error:
+            "Este paso solo aplica a clientes con Doble Materialidad. Activa el flag en el cliente o elige otro paso.",
+        },
+        { status: 422 }
+      );
+    }
+  }
+
   // Construir prompt con contexto del cliente + campos a llenar.
   const fieldsList = step.fields
     .map((f) => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ""}`)

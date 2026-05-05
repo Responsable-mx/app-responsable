@@ -93,6 +93,22 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           );
           continue;
         }
+        // Sources required: si source_type es "public" o "interpretation",
+        // sources[] no puede estar vacío. Las 8 reglas operativas exigen URL
+        // verificable; sin sources, la categoría es inválida y debería ser
+        // "consultor_only" (con value=null) o tener fuente.
+        for (const field of step.fields) {
+          const raw = stepResp[field.key];
+          if (!isFieldResponse(raw)) continue;
+          const requiresSources =
+            raw.source_type === "public" || raw.source_type === "interpretation";
+          const hasValue = isFieldFilled(raw.value);
+          if (requiresSources && hasValue && (!raw.sources || raw.sources.length === 0)) {
+            validationErrors.push(
+              `Paso "${step.title}", campo "${field.label}": tiene valor con source_type "${raw.source_type}" pero sin fuentes. Agrega URL o cambia a "solo consultor".`
+            );
+          }
+        }
         // Required: solo se valida cuando el consultor marca el paso como completo.
         // Mientras edita libremente, autosave no debe bloquear progreso parcial.
         if (completedSections.includes(step.key)) {

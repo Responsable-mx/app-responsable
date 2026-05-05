@@ -163,7 +163,7 @@ function WizardEditor({
     saveTimer.current = setTimeout(() => void save(), AUTOSAVE_DELAY_MS);
   }
 
-  async function save() {
+  async function save(overrideResponses?: QuestionnaireResponseData) {
     if (!dirty.current) return;
     // Cancelar retry pendiente — esta save reemplaza al pendiente.
     if (retryTimer.current) {
@@ -173,8 +173,12 @@ function WizardEditor({
     dirty.current = false;
     setSaveState("saving");
     setErrorMsg(null);
+    // FIX bug AI fill: usar override si viene (responses fresco del setState batch).
+    // Sin esto, save() captura el closure viejo y guarda data sin los campos IA.
+    const responsesToSave = overrideResponses ?? responses;
+    const computedProgress = computeProgress(schema, responsesToSave);
     const completedSections = steps
-      .filter((s) => (progress.sectionProgress[s.key]?.pct === 100 && s.fields.length > 0))
+      .filter((s) => (computedProgress.sectionProgress[s.key]?.pct === 100 && s.fields.length > 0))
       .map((s) => s.key);
     try {
       const res = await fetch(`/api/clients/${clientId}/questionnaire`, {
@@ -182,7 +186,7 @@ function WizardEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           service: template.service_key,
-          responses,
+          responses: responsesToSave,
           completedSections,
           // Optimistic lock: server rechaza con 409 si alguien más escribió primero.
           expectedUpdatedAt: lastServerUpdatedAt.current,
@@ -246,9 +250,12 @@ function WizardEditor({
         throw new Error(json.error ?? `HTTP ${res.status}`);
       }
       const json = (await res.json()) as { data: Record<string, FieldResponse> };
-      setResponses((prev) => ({ ...prev, [stepKey]: json.data }));
+      // Computar el merged ANTES de setState para pasarlo a save() y evitar
+      // closure stale: si save() lee `responses` del closure, está vacío.
+      const merged: QuestionnaireResponseData = { ...responses, [stepKey]: json.data };
+      setResponses(merged);
       dirty.current = true;
-      void save();
+      await save(merged);
       toast.push("success", "IA llenó campos del paso");
       mutate();
     } catch (e) {
@@ -266,6 +273,11 @@ function WizardEditor({
     const failures: { step: string; error: string }[] = [];
     setAiBulkProgress({ current: 0, total: aiSteps.length, stepTitle: "Iniciando…" });
 
+    // Acumulador de respuestas IA durante todo el bulk. Se persiste al final con
+    // un solo PATCH al server (atomic). Evita race conditions de saves
+    // concurrentes con state stale del closure.
+    const accum: Record<string, Record<string, FieldResponse>> = {};
+
     async function fillOne(s: WizardStep) {
       try {
         const controller = new AbortController();
@@ -280,9 +292,8 @@ function WizardEditor({
           throw new Error(json.error ?? `HTTP ${res.status}`);
         }
         const json = (await res.json()) as { data: Record<string, FieldResponse> };
+        accum[s.key] = json.data;
         setResponses((prev) => ({ ...prev, [s.key]: json.data }));
-        dirty.current = true;
-        void save();
         success++;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Error desconocido";
@@ -303,6 +314,14 @@ function WizardEditor({
     for (let i = 0; i < aiSteps.length; i += BATCH_SIZE) {
       const batch = aiSteps.slice(i, i + BATCH_SIZE);
       await Promise.all(batch.map(fillOne));
+    }
+
+    // Save único con todos los pasos llenos por IA + responses previos.
+    if (Object.keys(accum).length > 0) {
+      const merged: QuestionnaireResponseData = { ...responses, ...accum };
+      setResponses(merged);
+      dirty.current = true;
+      await save(merged);
     }
 
     setAiBulkProgress(null);

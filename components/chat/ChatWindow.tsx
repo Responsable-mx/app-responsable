@@ -27,10 +27,22 @@ const MODEL_PER_ROLE: Record<RoleId, string> = {
   valeria: "Haiku",
 };
 
-const MODEL_COST: Record<string, number> = {
+// Precios por 1M tokens. Input mucho más barato que output. Cache read 90% off del input.
+// Estos valores reflejan la lógica server (lib/ai/usage.ts cost estimator).
+const PRICE_INPUT_PER_TOKEN: Record<string, number> = {
+  Sonnet: 3 / 1_000_000,
+  Opus: 15 / 1_000_000,
+  Haiku: 1 / 1_000_000,
+};
+const PRICE_OUTPUT_PER_TOKEN: Record<string, number> = {
   Sonnet: 15 / 1_000_000,
   Opus: 75 / 1_000_000,
-  Haiku: 1.25 / 1_000_000,
+  Haiku: 5 / 1_000_000,
+};
+const PRICE_CACHE_READ_PER_TOKEN: Record<string, number> = {
+  Sonnet: 0.3 / 1_000_000,
+  Opus: 1.5 / 1_000_000,
+  Haiku: 0.1 / 1_000_000,
 };
 
 // Orden lógico cadena calidad: Autor → Revisor → Elevador → Validador.
@@ -114,13 +126,19 @@ export function ChatWindow({
     null
   );
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  // Acumulado real de tokens y costo desde eventos `done` del SSE.
+  // Antes: estimación length/4 — siempre subestimaba input (system prompt no contado).
+  const [usageAcc, setUsageAcc] = useState({
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    costUsd: 0,
+  });
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const totalTokens = Math.round(
-    messages.filter((m) => m.role === "assistant").reduce((s, m) => s + m.content.length, 0) / 4
-  );
-  const totalCost = (totalTokens * (MODEL_COST[MODEL_PER_ROLE[role]] ?? MODEL_COST.Sonnet));
+  const totalTokens = usageAcc.inputTokens + usageAcc.outputTokens + usageAcc.cacheReadTokens;
+  const totalCost = usageAcc.costUsd;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -147,6 +165,7 @@ export function ChatWindow({
       setRole(pendingRoleChange);
       setMessages([]);
       setError("");
+      setUsageAcc({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 });
     }
     setPendingRoleChange(null);
   }
@@ -213,6 +232,23 @@ export function ChatWindow({
                   { ...last, content: last.content + raw.text },
                 ];
               });
+            } else if (raw.type === "done") {
+              // Acumular tokens reales del turno + calcular costo según modelo del rol.
+              const modelKey = MODEL_PER_ROLE[role];
+              const inputTokens = raw.usage.input_tokens ?? 0;
+              const outputTokens = raw.usage.output_tokens ?? 0;
+              const cacheReadTokens = raw.usage.cache_read_input_tokens ?? 0;
+              const turnCost =
+                inputTokens * (PRICE_INPUT_PER_TOKEN[modelKey] ?? PRICE_INPUT_PER_TOKEN.Sonnet) +
+                outputTokens * (PRICE_OUTPUT_PER_TOKEN[modelKey] ?? PRICE_OUTPUT_PER_TOKEN.Sonnet) +
+                cacheReadTokens *
+                  (PRICE_CACHE_READ_PER_TOKEN[modelKey] ?? PRICE_CACHE_READ_PER_TOKEN.Sonnet);
+              setUsageAcc((prev) => ({
+                inputTokens: prev.inputTokens + inputTokens,
+                outputTokens: prev.outputTokens + outputTokens,
+                cacheReadTokens: prev.cacheReadTokens + cacheReadTokens,
+                costUsd: prev.costUsd + turnCost,
+              }));
             } else if (raw.type === "error") {
               setError(raw.error);
             }
@@ -240,6 +276,7 @@ export function ChatWindow({
   function resetChat() {
     setMessages([]);
     setError("");
+    setUsageAcc({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 });
   }
 
   function rateMessage(idx: number, rating: "up" | "down") {

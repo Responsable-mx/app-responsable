@@ -94,10 +94,10 @@ export function Sidebar({
           {!collapsed && (
             <div className="min-w-0">
               <div className="text-sm font-bold text-slate-900 leading-tight truncate">
-                App ResponSable
+                ResponSable
               </div>
-              <div className="text-[10px] text-slate-600 leading-tight mt-0.5 truncate">
-                Consultoría sostenibilidad · IA
+              <div className="text-[10px] text-slate-500 leading-tight mt-0.5 truncate uppercase tracking-widest font-semibold">
+                app interna · MVP
               </div>
             </div>
           )}

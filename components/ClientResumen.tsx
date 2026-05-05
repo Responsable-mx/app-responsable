@@ -1,8 +1,20 @@
 "use client";
 
-import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
+import {
+  getFieldValue,
+  isWizardSchema,
+  type QuestionnaireBundle,
+  type WizardStep,
+} from "@/lib/questionnaires/types";
 
-const SECTION_META: Record<
+const STEP_META_DEFAULTS = {
+  icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  iconBg: "bg-slate-100",
+  iconColor: "text-slate-700",
+  accentBorder: "border-l-slate-400",
+};
+
+const STEP_META: Record<
   string,
   { icon: string; iconBg: string; iconColor: string; accentBorder: string }
 > = {
@@ -61,24 +73,32 @@ export function ClientResumen({
   const { template, response, progress } = questionnaire;
   const responses = response?.responses ?? {};
 
+  const items: Array<{ key: string; label: string; description?: string; fields: Array<{ key: string; label: string }> }> =
+    isWizardSchema(template.schema)
+      ? template.schema.steps.map((s: WizardStep) => ({
+          key: s.key,
+          label: s.title,
+          description: s.subtitle,
+          fields: s.fields,
+        }))
+      : template.schema.sections.map((s) => ({
+          key: s.key,
+          label: s.label,
+          description: s.description,
+          fields: s.fields,
+        }));
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-      {template.schema.sections.map((section) => {
-        const sectionResp = responses[section.key] ?? {};
-        const meta = SECTION_META[section.key] ?? {
-          icon: "M12 8v4l3 3",
-          iconBg: "bg-slate-100",
-          iconColor: "text-slate-700",
-          accentBorder: "border-l-slate-400",
-        };
+      {items.map((section) => {
+        const sectionResp = (responses[section.key] as Record<string, unknown>) ?? {};
+        const meta = STEP_META[section.key] ?? STEP_META_DEFAULTS;
         const sectionProgress = progress.sectionProgress[section.key] ?? {
           filled: 0,
           total: section.fields.length,
           pct: 0,
         };
         const isComplete = sectionProgress.pct === 100 && section.fields.length > 0;
-
-        // Mostrar máx 4 campos en preview con sus valores
         const fieldsToShow = section.fields.slice(0, 4);
 
         return (
@@ -88,7 +108,6 @@ export function ClientResumen({
             onClick={onJumpToCuestionario}
             className={`group bg-white border border-slate-200 ${meta.accentBorder} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:border-brand-primary/40 transition-all`}
           >
-            {/* Header */}
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
               <div className={`w-10 h-10 rounded ${meta.iconBg} flex items-center justify-center shrink-0`}>
                 <svg className={`w-5 h-5 ${meta.iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -112,12 +131,10 @@ export function ClientResumen({
               )}
             </div>
 
-            {/* Fields preview */}
             <div className="px-4 py-3">
               <dl className="space-y-1.5">
                 {fieldsToShow.map((field) => {
-                  const value = sectionResp[field.key];
-                  const display = formatValue(value);
+                  const display = formatValue(getFieldValue(sectionResp[field.key]));
                   return (
                     <div key={field.key} className="flex items-start gap-3 text-xs">
                       <dt className="text-slate-500 shrink-0 w-28 truncate">{field.label}</dt>
@@ -135,7 +152,6 @@ export function ClientResumen({
               )}
             </div>
 
-            {/* Footer progress bar */}
             <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between gap-3">
               <span className="text-[11px] text-slate-600 tabular-nums">
                 {sectionProgress.filled}/{sectionProgress.total} campos
@@ -146,9 +162,7 @@ export function ClientResumen({
                   style={{ width: `${sectionProgress.pct}%` }}
                 />
               </div>
-              <span
-                className={`text-[11px] font-bold tabular-nums ${isComplete ? "text-emerald-700" : "text-slate-700"}`}
-              >
+              <span className={`text-[11px] font-bold tabular-nums ${isComplete ? "text-emerald-700" : "text-slate-700"}`}>
                 {sectionProgress.pct}%
               </span>
             </div>

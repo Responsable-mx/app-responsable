@@ -41,7 +41,12 @@ export function ClientTabs({ client, completeness }: Props) {
   );
 
   const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
-  const totalSections = questionnaireResp?.data.template.schema.sections.length ?? 0;
+  const schema = questionnaireResp?.data.template.schema;
+  const totalSections = schema
+    ? "steps" in schema
+      ? schema.steps.length
+      : schema.sections.length
+    : 0;
   const completedSections = questionnaireResp?.data.response?.completed_sections.length ?? 0;
   const materialityCount = materialityResp?.data?.length ?? null;
   const materialityValidated = materialityCount; // placeholder: en futuro será # validados

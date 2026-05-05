@@ -1,11 +1,16 @@
 "use client";
 
-// /equipo con 3 vistas: Por consultor · Por proyecto · Timeline global.
+// /equipo con 3 vistas (consultor / proyecto / timeline) + filtros compartidos.
+// FilterBar al top: status, consultor, proyecto. Aplican a las 3 vistas.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import type { ProjectOverview } from "@/app/api/projects/overview/route";
+import type { TeamMember } from "@/app/api/team/occupancy/route";
 import { TeamOccupancy } from "./TeamOccupancy";
 import { ProjectsOverview } from "./ProjectsOverview";
 import { GlobalTimeline } from "./GlobalTimeline";
+import { FiltersBar, emptyFilters, type EquipoFilters } from "./EquipoFilters";
 
 type View = "consultor" | "proyecto" | "timeline";
 
@@ -14,11 +19,40 @@ const INTRO: Record<View, string> = {
     "Carga del equipo derivada de actividades activas. Click en un consultor para ver el detalle.",
   proyecto: "Tus proyectos con etapas, actividades y fechas. Click en un proyecto para expandir.",
   timeline:
-    "Timeline cross-project: 1 fila por consultor, todas sus actividades en una línea. Detecta solapamientos al instante.",
+    "Timeline cross-project: 1 fila por consultor, todas sus actividades en una línea.",
 };
+
+const fetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  });
 
 export function EquipoView() {
   const [view, setView] = useState<View>("consultor");
+  const [filters, setFilters] = useState<EquipoFilters>(() => emptyFilters());
+
+  // Para popular dropdowns de filtros: lista de consultores + lista de proyectos.
+  // Reutiliza los mismos endpoints que las vistas (SWR comparte cache).
+  const { data: teamData } = useSWR<{ data: TeamMember[] }>("/api/team/occupancy", fetcher);
+  const { data: projData } = useSWR<{ data: ProjectOverview[] }>(
+    "/api/projects/overview",
+    fetcher
+  );
+
+  const consultors = useMemo(
+    () =>
+      (teamData?.data ?? []).map((m) => ({
+        email: m.email,
+        name: m.full_name,
+      })),
+    [teamData]
+  );
+  const projects = useMemo(
+    () =>
+      (projData?.data ?? []).map((p) => ({ id: p.client_id, name: p.client_name })),
+    [projData]
+  );
 
   return (
     <div className="space-y-4">
@@ -73,9 +107,16 @@ export function EquipoView() {
         </div>
       </div>
 
-      {view === "consultor" && <TeamOccupancy />}
-      {view === "proyecto" && <ProjectsOverview />}
-      {view === "timeline" && <GlobalTimeline />}
+      <FiltersBar
+        value={filters}
+        onChange={setFilters}
+        consultors={consultors}
+        projects={projects}
+      />
+
+      {view === "consultor" && <TeamOccupancy filters={filters} />}
+      {view === "proyecto" && <ProjectsOverview filters={filters} />}
+      {view === "timeline" && <GlobalTimeline filters={filters} />}
     </div>
   );
 }

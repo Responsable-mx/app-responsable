@@ -8,6 +8,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
 import type { ActivityStatus } from "@/lib/stages";
+import type { EquipoFilters } from "./EquipoFilters";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
 const fetcher = (url: string) =>
@@ -65,16 +66,19 @@ function fmt(d: string | null) {
   });
 }
 
-export function GlobalTimeline() {
+export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
   const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
 
-  // Aplanar todas las actividades
+  // Aplanar todas las actividades + aplicar filtros
   const activities = useMemo<FlatActivity[]>(() => {
     const out: FlatActivity[] = [];
     for (const p of data?.data ?? []) {
+      if (filters?.clientId && p.client_id !== filters.clientId) continue;
       for (const sv of p.services) {
         for (const st of sv.stages) {
           for (const a of st.activities) {
+            if (filters?.statuses && filters.statuses.size > 0 && !filters.statuses.has(a.status)) continue;
+            if (filters?.consultorEmail && a.assignee_email !== filters.consultorEmail) continue;
             out.push({
               id: a.id,
               name: a.name,
@@ -94,7 +98,7 @@ export function GlobalTimeline() {
       }
     }
     return out;
-  }, [data]);
+  }, [data, filters]);
 
   // Agrupar por consultor
   const byConsultor = useMemo(() => {

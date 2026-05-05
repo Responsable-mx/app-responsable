@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // Si cambia algo más allá de actual_start/actual_end, requiere admin
+  // D-44: una sola llamada a requireAdmin() — evita 2 round-trips Supabase
   const adminOnlyFields = [
     "name",
     "description",
@@ -50,22 +50,20 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     "assignee_email",
   ] as const;
   const touchesAdminField = adminOnlyFields.some((k) => parsed.data[k] !== undefined);
+  const adminEmail = await requireAdmin();
 
-  if (touchesAdminField) {
-    const admin = await requireAdmin();
-    if (!admin) {
-      return NextResponse.json(
-        {
-          error:
-            "Solo admin puede editar nombre/fechas plan/asignado. Consultor solo edita fechas reales.",
-        },
-        { status: 403 }
-      );
-    }
+  if (touchesAdminField && !adminEmail) {
+    return NextResponse.json(
+      {
+        error:
+          "Solo admin puede editar nombre/fechas plan/asignado. Consultor solo edita fechas reales.",
+      },
+      { status: 403 }
+    );
   }
 
   // Si el actor no es admin, debe estar en el equipo del cliente o ser el assignee
-  const isAdminEmail = (await requireAdmin()) !== null;
+  const isAdminEmail = adminEmail !== null;
   if (!isAdminEmail) {
     const adminDb = createAdminClient();
     const { data: act } = await adminDb

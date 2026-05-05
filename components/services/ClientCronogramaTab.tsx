@@ -45,7 +45,7 @@ export function ClientCronogramaTab({
     activity?: StageActivity;
   } | null>(null);
 
-  const { data: servicesData, isLoading: loadingServices } = useSWR<{ data: ServiceRow[] }>(
+  const { data: servicesData, isLoading: loadingServices, error: servicesError } = useSWR<{ data: ServiceRow[] }>(
     `/api/clients/${clientId}/services`,
     fetcher
   );
@@ -78,6 +78,15 @@ export function ClientCronogramaTab({
         {[1, 2].map((i) => (
           <div key={i} className="bg-white border border-slate-200 rounded h-24 animate-pulse" />
         ))}
+      </div>
+    );
+  }
+
+  // D-45: error visible al usuario, no fallo silencioso
+  if (servicesError) {
+    return (
+      <div className="bg-white border border-rose-200 rounded p-6 text-center">
+        <p className="text-sm text-rose-700">Error al cargar servicios. Recarga la página.</p>
       </div>
     );
   }

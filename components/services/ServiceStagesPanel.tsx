@@ -45,7 +45,7 @@ export function ServiceStagesPanel({
   isAdmin: boolean;
   consultorEmails: string[];
 }) {
-  const { data, mutate, isLoading } = useSWR(
+  const { data, mutate, isLoading, error } = useSWR(
     `/api/clients/${clientId}/stages`,
     fetcher
   );
@@ -110,7 +110,21 @@ export function ServiceStagesPanel({
   }
 
   if (isLoading) {
-    return <div className="text-xs text-slate-500 italic px-2 py-3">Cargando etapas…</div>;
+    return (
+      <div className="border-t border-slate-100 mt-3 pt-3 space-y-1.5">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-10 bg-slate-100 rounded animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="border-t border-slate-100 mt-3 pt-3">
+        <p className="text-xs text-rose-700">Error al cargar etapas. Reintenta más tarde.</p>
+      </div>
+    );
   }
 
   return (
@@ -124,14 +138,11 @@ export function ServiceStagesPanel({
         )}
       </div>
 
-      {stages.length === 0 && !isAdmin && null}
-
       {stages.map((s) => (
         <StageRow
           key={s.id}
           stage={s}
           isAdmin={isAdmin}
-          consultorEmails={consultorEmails}
           onAddActivity={() => setEditingActivity({ stageId: s.id })}
           onEditActivity={(act) => setEditingActivity({ stageId: s.id, activity: act })}
           onDeleteStage={() => setDeleteStageId(s.id)}
@@ -210,7 +221,6 @@ function StageRow({
 }: {
   stage: ServiceStage;
   isAdmin: boolean;
-  consultorEmails: string[];
   onAddActivity: () => void;
   onEditActivity: (a: StageActivity) => void;
   onDeleteStage: () => void;

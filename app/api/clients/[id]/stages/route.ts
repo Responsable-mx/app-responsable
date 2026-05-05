@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireUser, requireAdmin } from "@/lib/auth";
 import {
   listStagesByClient,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/stages";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logChange } from "@/lib/audit-log";
+import { isDevMode } from "@/lib/env";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -42,8 +44,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
+  // En dev mode, client_service_id puede ser "dev-svc-N" (no UUID) — omitir validación UUID.
+  const clientServiceIdSchema = isDevMode()
+    ? z.string().min(1)
+    : z.string().uuid();
   const ext = StageInputSchema.extend({
-    client_service_id: (await import("zod")).z.string().uuid(),
+    client_service_id: clientServiceIdSchema,
   }).safeParse(body);
   if (!ext.success) {
     return NextResponse.json(
@@ -52,18 +58,20 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // Verificar ownership del client_service
-  const adminDb = createAdminClient();
-  const { data: cs } = await adminDb
-    .from("client_services")
-    .select("client_id")
-    .eq("id", ext.data.client_service_id)
-    .single();
-  if (!cs || cs.client_id !== clientId) {
-    return NextResponse.json(
-      { error: "Servicio no pertenece a este cliente" },
-      { status: 403 }
-    );
+  // Verificar ownership del client_service (omitir en dev mode — no hay DB real)
+  if (!isDevMode()) {
+    const adminDb = createAdminClient();
+    const { data: cs } = await adminDb
+      .from("client_services")
+      .select("client_id")
+      .eq("id", ext.data.client_service_id)
+      .single();
+    if (!cs || cs.client_id !== clientId) {
+      return NextResponse.json(
+        { error: "Servicio no pertenece a este cliente" },
+        { status: 403 }
+      );
+    }
   }
 
   try {

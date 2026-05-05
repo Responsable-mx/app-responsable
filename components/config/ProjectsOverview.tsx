@@ -7,6 +7,7 @@ import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
+import type { EquipoFilters } from "./EquipoFilters";
 import { ServiceGantt } from "@/components/services/ServiceGantt";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
@@ -40,7 +41,7 @@ function fmt(d: string | null) {
   });
 }
 
-export function ProjectsOverview() {
+export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) {
   const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
   const { data: serviceCat = [] } = useSWR<{ value: string; label: string }[]>(
     "/api/catalogs?category=services",
@@ -62,7 +63,51 @@ export function ProjectsOverview() {
       </div>
     );
 
-  const projects = data?.data ?? [];
+  const rawProjects = data?.data ?? [];
+  const projects = rawProjects
+    .filter((p) => !filters?.clientId || p.client_id === filters.clientId)
+    .map((p) => {
+      const services = p.services.map((sv) => ({
+        ...sv,
+        stages: sv.stages
+          .map((st) => ({
+            ...st,
+            activities: st.activities.filter((a) => {
+              if (filters?.statuses && filters.statuses.size > 0 && !filters.statuses.has(a.status)) return false;
+              if (filters?.consultorEmail && a.assignee_email !== filters.consultorEmail) return false;
+              return true;
+            }),
+          }))
+          .filter((st) => {
+            const noFilter = !filters?.statuses?.size && !filters?.consultorEmail;
+            return st.activities.length > 0 || noFilter;
+          }),
+      })).filter((sv) => {
+        const noFilter = !filters?.statuses?.size && !filters?.consultorEmail;
+        return sv.stages.length > 0 || noFilter;
+      });
+      let total = 0, active = 0, delayed = 0, upcoming = 0;
+      const today = Date.now();
+      const horizon = today + 30 * 86_400_000;
+      for (const sv of services) {
+        for (const st of sv.stages) {
+          for (const a of st.activities) {
+            total++;
+            if (a.status === "in_progress" || a.status === "delayed") active++;
+            if (a.status === "delayed") delayed++;
+            if (a.status === "pending" && a.planned_start) {
+              const ts = new Date(a.planned_start + "T00:00:00").getTime();
+              if (ts >= today && ts <= horizon) upcoming++;
+            }
+          }
+        }
+      }
+      return { ...p, services, total_activities: total, active_count: active, delayed_count: delayed, upcoming_count: upcoming };
+    })
+    .filter((p) => {
+      const hasFilter = (filters?.statuses?.size ?? 0) > 0 || filters?.consultorEmail;
+      return !hasFilter || p.total_activities > 0;
+    });
 
   if (projects.length === 0) {
     return (

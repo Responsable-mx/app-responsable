@@ -1,6 +1,27 @@
 import "server-only";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isDevMode } from "@/lib/env";
+
+// ─── Dev-mode in-memory store ─────────────────────────────
+let _seq = 0;
+const _devStages: (ServiceStage & { _clientServiceId: string })[] = [];
+const _devActs: StageActivity[] = [];
+function devId(p: string) { return `${p}-${String(++_seq)}`; }
+function _hydrateStages(stages: typeof _devStages): ServiceStage[] {
+  return stages.map((s) => ({
+    id: s.id,
+    client_service_id: s.client_service_id,
+    name: s.name,
+    order_index: s.order_index,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+    activities: _devActs
+      .filter((a) => a.stage_id === s.id)
+      .sort((a, b) => a.order_index - b.order_index)
+      .map((a) => ({ ...a, status: computeStatus(a) })),
+  }));
+}
 
 export type ActivityStatus = "pending" | "in_progress" | "completed" | "delayed";
 
@@ -71,6 +92,12 @@ export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 // === Queries ===
 
 export async function listStagesByClient(clientId: string): Promise<ServiceStage[]> {
+  if (isDevMode()) {
+    const { listClientServices } = await import("@/lib/client-services");
+    const svcs = await listClientServices(clientId);
+    const svcIds = new Set(svcs.map((s) => s.id));
+    return _hydrateStages(_devStages.filter((s) => svcIds.has(s.client_service_id)));
+  }
   const admin = createAdminClient();
   // Etapas via JOIN: client_services.client_id == clientId
   const { data: services, error: e1 } = await admin
@@ -131,6 +158,22 @@ export async function createStage(
   clientServiceId: string,
   input: StageInput
 ): Promise<ServiceStage> {
+  if (isDevMode()) {
+    const order = input.order_index ??
+      _devStages.filter((s) => s.client_service_id === clientServiceId).length;
+    const stage = {
+      id: devId("dev-stg"),
+      client_service_id: clientServiceId,
+      _clientServiceId: clientServiceId,
+      name: input.name,
+      order_index: order,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      activities: [],
+    };
+    _devStages.push(stage);
+    return stage;
+  }
   const admin = createAdminClient();
   // Auto order_index: max + 1
   let order = input.order_index;
@@ -165,6 +208,13 @@ export async function updateStage(
 }
 
 export async function deleteStage(stageId: string): Promise<void> {
+  if (isDevMode()) {
+    const idx = _devStages.findIndex((s) => s.id === stageId);
+    if (idx >= 0) _devStages.splice(idx, 1);
+    let i = _devActs.length;
+    while (i--) { if (_devActs[i].stage_id === stageId) _devActs.splice(i, 1); }
+    return;
+  }
   const admin = createAdminClient();
   const { error } = await admin.from("service_stages").delete().eq("id", stageId);
   if (error) throw error;
@@ -174,6 +224,26 @@ export async function createActivity(
   stageId: string,
   input: ActivityInput
 ): Promise<StageActivity> {
+  if (isDevMode()) {
+    const order = input.order_index ?? _devActs.filter((a) => a.stage_id === stageId).length;
+    const act: StageActivity = {
+      id: devId("dev-act"),
+      stage_id: stageId,
+      name: input.name,
+      description: input.description ?? null,
+      order_index: order,
+      planned_start: input.planned_start ?? null,
+      planned_end: input.planned_end ?? null,
+      actual_start: input.actual_start ?? null,
+      actual_end: input.actual_end ?? null,
+      assignee_email: input.assignee_email ?? null,
+      status: computeStatus(input as Parameters<typeof computeStatus>[0]),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    _devActs.push(act);
+    return act;
+  }
   const admin = createAdminClient();
   let order = input.order_index;
   if (order === undefined) {
@@ -208,6 +278,15 @@ export async function updateActivity(
   activityId: string,
   patch: Partial<ActivityInput>
 ): Promise<void> {
+  if (isDevMode()) {
+    const act = _devActs.find((a) => a.id === activityId);
+    if (act) {
+      Object.assign(act, patch);
+      act.status = computeStatus(act);
+      act.updated_at = new Date().toISOString();
+    }
+    return;
+  }
   const admin = createAdminClient();
   const update: Record<string, unknown> = {};
   for (const k of [
@@ -227,6 +306,11 @@ export async function updateActivity(
 }
 
 export async function deleteActivity(activityId: string): Promise<void> {
+  if (isDevMode()) {
+    const idx = _devActs.findIndex((a) => a.id === activityId);
+    if (idx >= 0) _devActs.splice(idx, 1);
+    return;
+  }
   const admin = createAdminClient();
   const { error } = await admin.from("stage_activities").delete().eq("id", activityId);
   if (error) throw error;
@@ -235,6 +319,9 @@ export async function deleteActivity(activityId: string): Promise<void> {
 // === Helpers para verificación de ownership (anti-IDOR) ===
 
 export async function getStageOwnerClient(stageId: string): Promise<string | null> {
+  if (isDevMode()) {
+    return _devStages.find((s) => s.id === stageId) ? "dev-client" : null;
+  }
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("service_stages")
@@ -249,6 +336,11 @@ export async function getStageOwnerClient(stageId: string): Promise<string | nul
 }
 
 export async function getActivityOwnerClient(activityId: string): Promise<string | null> {
+  if (isDevMode()) {
+    const act = _devActs.find((a) => a.id === activityId);
+    if (!act) return null;
+    return _devStages.find((s) => s.id === act.stage_id) ? "dev-client" : null;
+  }
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("stage_activities")

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { updateStage, deleteStage, StageInputSchema } from "@/lib/stages";
 import { logChange } from "@/lib/audit-log";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type Ctx = { params: Promise<{ stageId: string }> };
 
@@ -28,6 +29,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     );
   }
 
+  // D-52: snapshot before para audit trail completo
+  const adminDb = createAdminClient();
+  const { data: before } = await adminDb
+    .from("service_stages")
+    .select("name, order_index")
+    .eq("id", stageId)
+    .single();
+
   try {
     await updateStage(stageId, parsed.data);
     await logChange({
@@ -35,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       entityType: "service_stage",
       entityId: stageId,
       action: "update",
+      before: before ?? undefined,
       after: parsed.data,
     });
     return NextResponse.json({ ok: true });

@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { TeamMember, ConsultantActivity } from "@/app/api/team/occupancy/route";
+import type { EquipoFilters } from "./EquipoFilters";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
 const fetcher = (url: string) =>
@@ -62,7 +63,7 @@ const STATUS_LABEL: Record<string, string> = {
   delayed: "Retrasada",
 };
 
-export function TeamOccupancy() {
+export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
   const { data, error, isLoading } = useSWR("/api/team/occupancy", fetcher);
   const { data: seniorityItems = [] } = useSWR<{ value: string; label: string }[]>(
     "/api/catalogs?category=seniority_levels",
@@ -85,7 +86,34 @@ export function TeamOccupancy() {
       </div>
     );
 
-  const members = data?.data ?? [];
+  const rawMembers = data?.data ?? [];
+  const members = rawMembers
+    .filter((m) => !filters?.consultorEmail || m.email === filters.consultorEmail)
+    .map((m) => {
+      let acts = m.activities;
+      if (filters?.statuses && filters.statuses.size > 0) {
+        acts = acts.filter((a) => filters.statuses.has(a.status));
+      }
+      if (filters?.clientId) {
+        acts = acts.filter((a) => a.client_id === filters.clientId);
+      }
+      const today = Date.now();
+      const horizon = today + 30 * 86_400_000;
+      let active = 0, delayed = 0, upcoming = 0;
+      for (const a of acts) {
+        if (a.status === "in_progress" || a.status === "delayed") active++;
+        if (a.status === "delayed") delayed++;
+        if (a.status === "pending" && a.planned_start) {
+          const ts = new Date(a.planned_start + "T00:00:00").getTime();
+          if (ts >= today && ts <= horizon) upcoming++;
+        }
+      }
+      let projects = m.projects;
+      if (filters?.clientId) {
+        projects = projects.filter((p) => p.client_id === filters.clientId);
+      }
+      return { ...m, activities: acts, active_count: active, delayed_count: delayed, upcoming_count: upcoming, projects };
+    });
   const totalActive = members.reduce((s, m) => s + m.active_count, 0);
   const totalDelayed = members.reduce((s, m) => s + m.delayed_count, 0);
 

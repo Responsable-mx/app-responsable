@@ -69,11 +69,52 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
     const fin = topics.filter((t) => t.color === "teal").length;
     const imp = topics.filter((t) => t.color === "amber").length;
     const seg = topics.filter((t) => t.color === "slate").length;
+    const validated = topics.filter((t) => t.validated === true).length;
     const top = topics
       .filter((t) => t.color === "rose")
       .sort((a, b) => SIZE_PX[b.size] - SIZE_PX[a.size])[0];
-    return { dm, fin, imp, seg, top: top?.label ?? "—" };
+    return { dm, fin, imp, seg, validated, total: topics.length, top: top?.label ?? "—" };
   }, [topics]);
+
+  const [busyBulk, setBusyBulk] = useState(false);
+
+  // Bulk toggle validated. Antes el badge "Todas validadas" se mostraba
+  // automáticamente sin que el consultor confirmara; ahora exige aprobación
+  // explícita uno por uno o vía este botón.
+  async function bulkSetValidated(value: boolean) {
+    if (busyBulk) return;
+    setBusyBulk(true);
+    try {
+      const targets = value
+        ? topics.filter((t) => !t.validated)
+        : topics.filter((t) => t.validated);
+      // PATCH paralelo. Cada falla individual no rompe a las demás.
+      const results = await Promise.allSettled(
+        targets.map((t) =>
+          fetch(`/api/materiality-topics/${t.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ validated: value }),
+          }).then(async (r) => {
+            if (!r.ok) {
+              const j = await r.json().catch(() => ({}));
+              throw new Error(j.error ?? `HTTP ${r.status}`);
+            }
+            return r.json();
+          })
+        )
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      await mutate();
+      if (failed === 0) {
+        toast.push("success", value ? `${targets.length} temas validados` : `${targets.length} validaciones removidas`);
+      } else {
+        toast.push("warning", `${targets.length - failed} OK · ${failed} fallaron`);
+      }
+    } finally {
+      setBusyBulk(false);
+    }
+  }
 
   async function initFromTemplate() {
     setBusyInit(true);
@@ -175,22 +216,54 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Narrative chip */}
+      {/* Narrative chip + bulk validate */}
       <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded">
         <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-        <p className="text-[11px] text-slate-700 font-medium">
+        <p className="flex-1 text-[11px] text-slate-700 font-medium">
           <span className="font-bold text-rose-600">{stats.dm} doble material</span>
           {" · "}
           <span className="font-bold text-brand-primary-dark">{stats.fin} financiero</span>
           {" · "}
           <span className="font-bold text-amber-700">{stats.imp} por impacto</span>
           {" · "}
+          <span
+            className={`font-bold ${
+              stats.validated === stats.total && stats.total > 0
+                ? "text-emerald-700"
+                : "text-slate-700"
+            }`}
+            title="Temas con posicionamiento confirmado por el consultor"
+          >
+            {stats.validated}/{stats.total} validados
+          </span>
           {stats.dm > 0 && (
             <>
+              {" · "}
               Riesgo principal: <span className="font-bold text-slate-900">{stats.top}</span>
             </>
           )}
         </p>
+        {stats.total > 0 && (
+          stats.validated === stats.total ? (
+            <button
+              onClick={() => bulkSetValidated(false)}
+              disabled={busyBulk}
+              className="text-[10px] font-semibold text-slate-600 hover:text-slate-900 hover:underline shrink-0 disabled:opacity-40 disabled:no-underline"
+              title="Quitar validación a todos los temas"
+            >
+              {busyBulk ? "…" : "Quitar validación"}
+            </button>
+          ) : (
+            <button
+              onClick={() => bulkSetValidated(true)}
+              disabled={busyBulk}
+              className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 hover:bg-emerald-100 shrink-0 disabled:opacity-40"
+              title="Marcar todos los temas como validados"
+            >
+              {busyBulk ? "Validando…" : "Validar todos"}
+            </button>
+          )
+        )}
       </div>
 
       <div className="flex gap-4">
@@ -417,8 +490,15 @@ function TopicPopover({
           {COLOR_META[topic.color].label}
         </span>
       </span>
-      <p className="text-[11px] text-slate-500 mb-3 tabular-nums">
+      <p className="text-[11px] text-slate-500 mb-1 tabular-nums">
         Posición: x={topic.x_pos}, y={topic.y_pos}
+      </p>
+      <p className="text-[11px] mb-3">
+        {topic.validated ? (
+          <span className="text-emerald-700 font-semibold">✓ Validado</span>
+        ) : (
+          <span className="text-slate-500">Pendiente de validación</span>
+        )}
       </p>
       {topic.notes && (
         <p className="text-[11px] text-slate-600 mb-3 italic">{topic.notes}</p>

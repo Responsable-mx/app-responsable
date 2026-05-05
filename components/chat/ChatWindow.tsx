@@ -82,6 +82,52 @@ function humanizeError(raw: string): string {
   return raw;
 }
 
+// ID estable de Altamira (seed dummy). Cuando este cliente está seleccionado y no
+// hay mensajes, precargamos conversación de ejemplo (igual que el mockup).
+const ALTAMIRA_ID = "11111111-1111-1111-1111-111111111111";
+
+const ALTAMIRA_DEMO_MSGS: ChatMessage[] = [
+  {
+    role: "user",
+    content: "¿Cuál es la exposición de Altamira al riesgo de refrigerantes HFC para el Estudio de Doble Materialidad?",
+  },
+  {
+    role: "assistant",
+    content: `Basándome en el contexto cargado de Altamira, identifico **tres dimensiones críticas** del riesgo HFC:
+
+**1. Riesgo regulatorio — severidad alta**
+El Protocolo de Kigali obliga la sustitución de HFC a 2026. SENER confirmó restricciones para refrigeración industrial en logística de frío. Altamira depende de HFC en sus 12 CEDIS y flotilla refrigerada completa.
+
+**2. Riesgo financiero — exposición media-alta**
+Costo estimado de transición: $8–12 MDP (dato interno). Riesgo adicional: BBVA tiene una línea de crédito verde condicionada a métricas ESG comprometidas — el incumplimiento afectaría acceso a financiamiento.
+
+**3. Riesgo operativo — proveedor único**
+Honeywell México es el único proveedor de refrigerantes identificado. No hay proveedor alternativo documentado.
+
+_Recomiendo incluir este tema en la matriz de doble materialidad bajo "Transición a economía baja en carbono" — tanto por impacto financiero material como por impacto ambiental (GWP de HFC)._
+
+Campos del contexto utilizados: \`dependencias_criticas\`, \`riesgos_financieros\`, \`riesgos_operativos\`, \`insumos_principales\`.`,
+  },
+  {
+    role: "user",
+    content: "¿Qué stakeholders debo priorizar en el mapeo para este tema?",
+  },
+  {
+    role: "assistant",
+    content: `Para el tema HFC, prioriza estos grupos del mapeo de Altamira:
+
+**Alta prioridad**
+- **SEMARNAT/SENER**: influencia alta, dependencia media. Antecedente: multa por derrame 2021 ya existe en el historial.
+- **BBVA (financiadores)**: influencia media, dependencia alta. Línea de crédito verde condicionada a cumplimiento ESG.
+
+**Media prioridad**
+- **Honeywell México**: proveedor único — la dependencia es crítica para la operación.
+- **Walmart / FEMSA**: exigen CDP Score mínimo C desde 2023. El riesgo HFC puede degradar el score.
+
+Basado en \`influencia_dependencia\`, \`canales_relacion\` y \`riesgos_financieros\` del cuestionario.`,
+  },
+];
+
 const STARTERS: Record<RoleId, string[]> = {
   aurora: [
     "Estructura de un Estudio de Doble Materialidad",
@@ -146,6 +192,15 @@ export function ChatWindow({
       behavior: "smooth",
     });
   }, [messages, streaming]);
+
+  // Auto-load demo conversation when cliente Altamira (seed dummy) y empty.
+  // Reset al cambiar de cliente para no mezclar contextos.
+  useEffect(() => {
+    if (clientId === ALTAMIRA_ID && messages.length === 0 && role === "aurora") {
+      setMessages(ALTAMIRA_DEMO_MSGS);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
 
   const currentRole = ROLES.find((r) => r.id === role)!;
   const selectedClient = clients.find((c) => c.id === clientId) ?? null;
@@ -358,7 +413,7 @@ export function ChatWindow({
             {selectedClient && ctxPct !== null && (
               <>
                 <span
-                  className={`text-[11px] rounded-full px-2 py-0.5 font-medium border tabular-nums ${
+                  className={`text-[10px] rounded-sm px-1.5 py-0.5 font-bold uppercase tracking-wide border tabular-nums ${
                     ctxPct === 100
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : ctxPct >= 50
@@ -469,6 +524,28 @@ export function ChatWindow({
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-3xl mx-auto space-y-4">
+          {/* System message: contexto cargado (estilo mockup) */}
+          {selectedClient && (
+            <div className="flex justify-center pt-1">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-600 bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm">
+                <svg className="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="font-medium text-slate-700">Contexto cargado</span>
+                <span className="text-slate-300">·</span>
+                <span className="font-semibold text-slate-900 truncate max-w-[260px]">{selectedClient.name}</span>
+                <span className="text-slate-300">·</span>
+                <span className="tabular-nums text-slate-600">{selectedClient.completeness.filled}/{selectedClient.completeness.total} campos</span>
+                {selectedClient.sector && (
+                  <>
+                    <span className="text-slate-300">·</span>
+                    <span className="text-slate-600 truncate max-w-[180px]">{selectedClient.sector}</span>
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
           {messages.length === 0 && (
             <div className="py-10 max-w-2xl mx-auto" data-tour="empty-state">
               <div className="flex items-center gap-3 pb-4 mb-5 border-b border-slate-200">
@@ -681,20 +758,31 @@ export function ChatWindow({
             )}
           </form>
           <div className="flex items-center justify-between mt-2 px-1">
-            <p className="text-[10px] text-slate-500">
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${currentRole.color} mr-1 align-middle`} />
-              {currentRole.name} · {MODEL_PER_ROLE[role]} · ↵ enviar · ⇧↵ nueva línea
-            </p>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-wider">
+              <span
+                className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[8px] font-bold text-white ${currentRole.color}`}
+                aria-hidden
+              >
+                {currentRole.mono}
+              </span>
+              <span className="font-semibold text-slate-700">{currentRole.name}</span>
+              <span className="text-slate-400">·</span>
+              <span className="tabular-nums">{MODEL_PER_ROLE[role]}</span>
+              <span className="text-slate-400">·</span>
+              <span className="hidden sm:inline">↵ enviar · ⇧↵ nueva línea</span>
+            </div>
             <div className="flex items-center gap-3">
               {totalTokens > 0 && (
-                <p className="text-[10px] text-slate-500 tabular-nums">
-                  ~${totalCost < 0.01 ? totalCost.toFixed(4) : totalCost.toFixed(3)} · {totalTokens.toLocaleString()} tokens
+                <p className="text-[10px] text-slate-500 tabular-nums uppercase tracking-wider">
+                  ~${totalCost < 0.01 ? totalCost.toFixed(4) : totalCost.toFixed(3)}
+                  <span className="text-slate-400 mx-1">·</span>
+                  {totalTokens.toLocaleString()} tokens
                 </p>
               )}
               {messages.some((m) => m.role === "assistant") && (
                 <button
                   onClick={exportConversation}
-                  className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-brand-primary transition-colors"
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-brand-primary transition-colors"
                   title="Exportar conversación como .md"
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -705,7 +793,7 @@ export function ChatWindow({
               )}
             </div>
           </div>
-          <p className="text-[10px] text-slate-500 text-center mt-1.5 italic">
+          <p className="text-[10px] text-slate-400 text-center mt-2">
             Los modelos IA pueden cometer errores. Verifica antes de entregar al cliente.
           </p>
         </div>

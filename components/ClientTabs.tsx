@@ -352,9 +352,9 @@ function KpiCardLarge({
           </span>
         )}
       </div>
-      <p className={`text-3xl font-bold tabular-nums ${valueClass}`}>
+      <p className={`text-[28px] font-bold tabular-nums tracking-tight leading-none ${valueClass}`}>
         {value}
-        {unit && <span className="text-base font-medium ml-1">{unit}</span>}
+        {unit && <span className="text-sm font-medium ml-1 text-slate-500">{unit}</span>}
       </p>
       {sub && <p className="text-[11px] text-slate-600 mt-1">{sub}</p>}
     </div>

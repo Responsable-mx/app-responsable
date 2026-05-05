@@ -12,7 +12,11 @@ const SYSTEM_ACCOUNTS = new Set([
 
 export function isSystemAccount(email: string | null | undefined): boolean {
   if (!email) return false;
-  return SYSTEM_ACCOUNTS.has(email.trim().toLowerCase());
+  const normalized = email.trim().toLowerCase();
+  if (SYSTEM_ACCOUNTS.has(normalized)) return true;
+  // Defensa extra: cualquier prefijo de scripts (seed-*, system-*, cron-*)
+  // o dominio interno reservado. Evita leakear en UI si seed cambia de nombre.
+  return /^(seed|system|cron)([-_].*)?@/.test(normalized);
 }
 
 export type UserRole = "admin" | "consultor";

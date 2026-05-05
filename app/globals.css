@@ -25,6 +25,31 @@
 
   --color-brand-ink: #0f172a;
   --color-brand-ink-soft: #334155;
+
+  /* Surface tokens — light por default, dark overrides via [data-theme="dark"].
+   * Componentes deben usar var(--surface-*) en lugar de hex literales para
+   * habilitar dark mode futuro sin tocar JSX. */
+  --surface-base: #fafaf9;
+  --surface-card: #ffffff;
+  --surface-muted: #f1f5f9;
+  --surface-border: #e2e8f0;
+  --fg-primary: #0f172a;
+  --fg-secondary: #334155;
+  --fg-muted: #64748b;
+}
+
+/* Dark mode primer — activable opt-in via data-theme="dark" en <html>.
+ * Dejado listo para Sprint C cuando se haga la migración completa de
+ * componentes a tokens. NO activar aún hasta que todos los componentes
+ * usen var(--surface-*) en lugar de bg-white/bg-slate-50 directos. */
+[data-theme="dark"] {
+  --surface-base: #0a0a0a;
+  --surface-card: #1c1917;
+  --surface-muted: #292524;
+  --surface-border: #404040;
+  --fg-primary: #fafafa;
+  --fg-secondary: #d4d4d4;
+  --fg-muted: #a3a3a3;
 }
 
 body {

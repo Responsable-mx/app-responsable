@@ -10,7 +10,6 @@ import {
   IconBrain,
   IconUsers,
   IconTarget,
-  IconGrid,
 } from "@/components/ui/Icons";
 
 const TABS = [
@@ -18,11 +17,6 @@ const TABS = [
     href: "/configuracion/catalogos",
     label: "Catálogos",
     Icon: IconBookOpen,
-  },
-  {
-    href: "/configuracion/equipo",
-    label: "Equipo",
-    Icon: IconGrid,
   },
   {
     href: "/configuracion/preferencias",

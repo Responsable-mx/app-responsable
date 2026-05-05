@@ -10,6 +10,7 @@ import {
   IconBuilding,
   IconSettings,
   IconLogout,
+  IconGrid,
 } from "@/components/ui/Icons";
 import type { ConsultorProject } from "@/lib/consultors";
 
@@ -35,6 +36,12 @@ const NAV_BASE: NavItem[] = [
 ];
 
 const NAV_ADMIN: NavItem[] = [
+  {
+    href: "/equipo",
+    label: "Equipo",
+    tour: "nav-equipo",
+    icon: IconGrid,
+  },
   {
     href: "/configuracion",
     label: "Configuración",

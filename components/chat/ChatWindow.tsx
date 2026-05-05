@@ -554,21 +554,14 @@ export function ChatWindow({
         {/* Cliente badge row */}
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="flex items-center gap-2 min-w-0 flex-1" data-tour="client-picker">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cliente</span>
-            {clientLocked ? (
-              // Dentro de /clientes/[id]: nombre fijo sin dropdown (ya estás en la ficha).
-              <span className="text-sm font-semibold text-slate-900 truncate max-w-[280px]">
-                {selectedClient?.name ?? "—"}
-              </span>
-            ) : (
+            {!clientLocked && <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cliente</span>}
+            {!clientLocked && (
               <select
                 value={clientId}
                 onChange={(e) => {
                   setClientId(e.target.value);
                   resetChat();
                 }}
-                // font-sans fuerza Inter sobre el font default del sistema operativo
-                // (Windows usa Segoe UI en native selects, rompía uniformidad).
                 className="font-sans text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded pl-3 pr-7 py-1 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary/30 max-w-[280px] truncate appearance-none bg-no-repeat bg-[right_0.5rem_center] bg-[length:0.75rem] bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg%20xmlns%3d%22http%3a//www.w3.org/2000/svg%22%20viewBox%3d%220%200%2024%2024%22%20fill%3d%22none%22%20stroke%3d%22%2364748b%22%20stroke-width%3d%222%22%20stroke-linecap%3d%22round%22%20stroke-linejoin%3d%22round%22%3e%3cpolyline%20points%3d%226%209%2012%2015%2018%209%22/%3e%3c/svg%3e')]"
               >
                 <option value="">Sin cliente (metodología general)</option>

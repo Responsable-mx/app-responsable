@@ -4,6 +4,7 @@ import { getClient, clientContextCompleteness, listClients } from "@/lib/clients
 import { ClientTabs } from "@/components/ClientTabs";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
+import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { isSystemAccount } from "@/lib/users";
 import { requireAdmin } from "@/lib/auth";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
@@ -104,7 +105,8 @@ export default async function EditarClientePage({ params }: Props) {
 
       {/* Header con avatar monogram + nombre. White-label scaffold: cuando exista
           schema clients.logo_url, swappear por <img src={client.logo_url}/>. */}
-      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-5">
+      <div className="flex items-start justify-between gap-3 mb-5">
+      <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
         <ClientAvatar name={client.name} logoUrl={client.logo_url} />
         <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
         <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide rounded-sm border px-2 py-0.5 ${statusClasses}`}>
@@ -130,6 +132,10 @@ export default async function EditarClientePage({ params }: Props) {
         <span className="text-xs text-slate-500">
           Actualizado {new Date(client.updated_at).toLocaleDateString("es-MX")}
         </span>
+      </div>
+      <div className="shrink-0 pt-0.5">
+        <ExportPdfButton clientId={client.id} clientName={client.name} />
+      </div>
       </div>
 
       <ClientTabs

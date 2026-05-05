@@ -4,6 +4,13 @@ Stack base: `~/.claude/STACK_BASE.md`. Solo se documenta aquí lo diferente.
 
 ## Diferencias con STACK_BASE
 
+### PDF Export
+- **`@react-pdf/renderer` v4** — generación server-side de PDF entregable al cliente.
+- Endpoint: `GET /api/clients/[id]/export-pdf` (runtime Node.js, no Edge).
+- Template: `lib/pdf/client-report.tsx` — A4, fuente Helvetica integrada, colores brand hex.
+- UI: `components/ExportPdfButton.tsx` — client component con estado `busy` + download vía Blob URL.
+- Cache: `no-store` (siempre datos frescos al exportar).
+
 ### IA
 > Prompt engineering y model selection: ver `~/.claude/STACK_BASE.md` (sección AI / Prompt Engineering)
 

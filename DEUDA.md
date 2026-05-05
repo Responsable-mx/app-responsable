@@ -20,10 +20,6 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Responsable**: Equipo metodología ResponSable
 - **Esfuerzo**: Decisión de negocio, luego 30min de código
 
-### 🟡 D-07 — Export PDF del cliente no existe
-- **Descripción**: No hay forma de exportar el contexto + servicios + cuestionario + materialidad de un cliente en un PDF entregable al cliente final.
-- **Fix sugerido**: Integrar `@react-pdf/renderer` o ruta `/api/clients/[id]/export-pdf` con plantilla.
-- **Esfuerzo**: 1-2 días
 
 ### 🟢 D-10 — Sin trazabilidad Chat → Cuestionario
 - **Descripción**: Los mensajes del chat IA no linkean a campos específicos del cuestionario.
@@ -71,6 +67,7 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 | D-31 | `uso-ia/page.tsx` usaba tokens `stone-*` y `rounded-xl` fuera del design system | may-2026 — migrado a `slate-*` + `rounded` |
 | D-32 | RLS `chat_sessions_owner_delete` permitía hard-DELETE directo desde cliente JS | may-2026 — migración `0031` elimina política; solo service role puede hard-delete |
 | D-03 | Chat IA sin contexto inline en tabs del cliente | may-2026 — sprint añadió tab "Chat IA" en `ClientTabs` con `<ChatWindow clientId>` preseleccionado |
+| D-07 | Export PDF del cliente no existía | may-2026 — `@react-pdf/renderer` + `/api/clients/[id]/export-pdf` + `ExportPdfButton` |
 | D-05 | Sin paginación/search server-side en lista de clientes | may-2026 — `listClients(filter)` + `GET /api/clients?q=` + SWR debounce 300ms en `ClientsList` |
 | D-06 | Audit log faltante en endpoint de cuestionario | may-2026 — `logChange()` ya integrado en `/api/clients/[id]/questionnaire` (PATCH) |
 | D-08 | Stone vs slate: tokens residuales en producción | may-2026 — pase global `stone-*`→`slate-*` + `rounded-xl`→`rounded` en 24 componentes |

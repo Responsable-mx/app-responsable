@@ -247,6 +247,32 @@ function WizardEditor({
 
       {/* Step content */}
       <div className="min-w-0">
+        {/* UDN banner: cuando estás en pasos 5-9 (only_double_materialidad) y el cliente
+            indicó que sus unidades son materialmente distintas (paso 5) */}
+        {step.only_double_materialidad && (() => {
+          const udnRaw = (responses["modelo-de-negocio-estructura"] as Record<string, unknown> | undefined)?.["unidades_distintas"];
+          const udnValue = typeof udnRaw === "object" && udnRaw && "value" in udnRaw ? (udnRaw as { value: unknown }).value : udnRaw;
+          const isDistinct = typeof udnValue === "string" && /^s[ií]/i.test(udnValue.trim());
+          if (!isDistinct) return null;
+          return (
+            <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-start gap-2 text-xs text-amber-800">
+                <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <p className="font-bold mb-0.5">Unidades de negocio materialmente distintas detectadas</p>
+                  <p>
+                    Según el cuestionario, las unidades del cliente son materialmente distintas entre sí. Los campos
+                    de los pasos 5 al 9 deben llenarse <strong>una vez por unidad de negocio</strong> (sectores,
+                    cadenas de valor, perfiles de riesgo distintos). Documenta cada unidad en el campo correspondiente.
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="flex items-start justify-between gap-3 mb-4 px-1">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">

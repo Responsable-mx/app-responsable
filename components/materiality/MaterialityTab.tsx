@@ -530,6 +530,7 @@ function TopicEditor({
   const [color, setColor] = useState<TopicColor>(topic.color);
   const [size, setSize] = useState<TopicSize>(topic.size);
   const [notes, setNotes] = useState(topic.notes ?? "");
+  const [validated, setValidated] = useState(topic.validated);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -538,7 +539,7 @@ function TopicEditor({
   async function handleSave() {
     setBusy(true);
     try {
-      await onSave({ label, x_pos: x, y_pos: y, color, size, notes });
+      await onSave({ label, x_pos: x, y_pos: y, color, size, notes, validated });
     } finally {
       setBusy(false);
     }
@@ -667,6 +668,23 @@ function TopicEditor({
               className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
               placeholder="Justificación, fuentes, observaciones…"
             />
+          </Field>
+
+          <Field label="Validación">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={validated}
+                onChange={(e) => setValidated(e.target.checked)}
+                className="mt-0.5 accent-emerald-600"
+              />
+              <span className="text-xs text-slate-700">
+                <span className="font-semibold">Confirmar posicionamiento.</span>{" "}
+                <span className="text-slate-500">
+                  Marca cuando el consultor confirme que x/y/color reflejan el juicio del cliente. Cuenta hacia "Todas validadas" en el header.
+                </span>
+              </span>
+            </label>
           </Field>
         </div>
 

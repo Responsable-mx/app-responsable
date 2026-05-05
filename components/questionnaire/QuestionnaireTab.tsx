@@ -29,7 +29,7 @@ const fetcher = (url: string) =>
   });
 
 const AUTOSAVE_DELAY_MS = 1200;
-type SaveState = "idle" | "saving" | "saved" | "error";
+type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
 
 const SOURCE_CHIP: Record<SourceType, { dot: string; bg: string; text: string; label: string }> = {
   public: { dot: "bg-emerald-500", bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", label: "público" },
@@ -193,15 +193,14 @@ function WizardEditor({
         }),
       });
       if (res.status === 409) {
-        // Conflicto de edición — no reintentamos automáticamente, el usuario debe
-        // recargar para ver el estado actual. Mantener dirty=true para que un
-        // próximo save (post-reload) tenga el expectedUpdatedAt nuevo.
+        // Conflicto de edición. No reintentamos auto — el usuario debe ver el estado
+        // remoto antes de re-aplicar. Estado dedicado "conflict" con CTA de recarga.
         const json = await res.json().catch(() => ({}));
         if (json.server_updated_at) {
           lastServerUpdatedAt.current = json.server_updated_at as string;
         }
         dirty.current = true;
-        setSaveState("error");
+        setSaveState("conflict");
         setErrorMsg(
           json.error ??
             "Otro consultor guardó cambios. Recarga el cuestionario antes de seguir editando."
@@ -426,6 +425,57 @@ function WizardEditor({
 
       {/* Step content */}
       <div className="min-w-0">
+        {/* Banner conflicto de edición — otro consultor guardó cambios mientras
+            editabas. Bloquea visualmente sobre la lista de campos hasta recargar. */}
+        {saveState === "conflict" && (
+          <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-3 text-xs">
+              <svg
+                className="w-5 h-5 shrink-0 mt-0.5 text-amber-700"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <div className="flex-1">
+                <p className="font-bold text-amber-900 mb-1">
+                  Conflicto de edición — otro consultor guardó cambios
+                </p>
+                <p className="text-amber-800 mb-2">
+                  Tus ediciones no se han guardado. Recarga el cuestionario para ver el estado actual y vuelve a aplicar tus cambios. Si reintentas sin recargar, sobrescribirás lo que guardó el otro consultor.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => mutate()}
+                  >
+                    Recargar cuestionario
+                  </Button>
+                  <button
+                    onClick={() => {
+                      // Forzar reintento sobreescribiendo: limpia expectedUpdatedAt
+                      // para que el server acepte sin chequear lock.
+                      lastServerUpdatedAt.current = null;
+                      dirty.current = true;
+                      void save();
+                    }}
+                    className="text-xs text-amber-700 hover:underline"
+                  >
+                    Sobrescribir igual
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* UDN banner: cuando estás en pasos 5-9 (only_double_materialidad) y el cliente
             indicó que sus unidades son materialmente distintas (paso 5) */}
         {step.only_double_materialidad && (() => {
@@ -601,7 +651,18 @@ function WizardEditor({
 function SaveIndicator({ state, errorMsg }: { state: SaveState; errorMsg: string | null }) {
   if (state === "saving") return <span className="text-[11px] text-slate-500">Guardando…</span>;
   if (state === "saved") return <span className="text-[11px] text-emerald-700">✓ Guardado</span>;
-  if (state === "error") return <span className="text-[11px] text-rose-700" title={errorMsg ?? ""}>Error</span>;
+  if (state === "conflict")
+    return (
+      <span className="text-[11px] text-amber-700 font-semibold" title={errorMsg ?? ""}>
+        Conflicto · recargar
+      </span>
+    );
+  if (state === "error")
+    return (
+      <span className="text-[11px] text-rose-700" title={errorMsg ?? ""}>
+        Reintentando…
+      </span>
+    );
   return <span className="text-[11px] text-slate-400">Autoguardado activo</span>;
 }
 

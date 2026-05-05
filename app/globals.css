@@ -60,6 +60,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Form controls: heredan tipografía del body (Inter) en lugar del font default
+ * del sistema operativo. Sin esto, Windows usa Segoe UI en selects/inputs
+ * nativos y rompe uniformidad visual con el resto del UI. */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+/* Options dentro de select también heredan (Chrome/Edge ignoran este antes de
+ * abrir el dropdown — limitación del browser, pero el control colapsado sí
+ * usa Inter). */
+option {
+  font-family: inherit;
+}
+
 /* Focus ring usa token, no hex literal */
 :focus-visible {
   outline: 2px solid var(--color-brand-primary);

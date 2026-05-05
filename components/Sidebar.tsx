@@ -51,6 +51,7 @@ export function Sidebar({
 
   useEffect(() => {
     const v = localStorage.getItem("sidebar-collapsed");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación inicial desde localStorage (no loop)
     if (v === "1") setCollapsed(true);
   }, []);
 

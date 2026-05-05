@@ -18,6 +18,10 @@ type ChatMessage = {
   content: string;
   rating?: "up" | "down";
   ts?: number;
+  // Identifica qué voz IA respondió. Persistido por mensaje porque el consultor
+  // puede cambiar de rol entre turnos — sin esto los mensajes viejos se renderizarían
+  // con el avatar del rol actual (atribución incorrecta).
+  roleId?: RoleId;
 };
 
 const MODEL_PER_ROLE: Record<RoleId, string> = {
@@ -82,49 +86,20 @@ function humanizeError(raw: string): string {
   return raw;
 }
 
-// ID estable de Altamira (seed dummy). Cuando este cliente está seleccionado y no
-// hay mensajes, precargamos conversación de ejemplo (igual que el mockup).
+// Cliente seed Distribuidora Altamira — UUID hardcoded del seed SQL (dummy-clients.sql).
+// Se usa para hidratar una conversación demo en first-load del cliente seed.
 const ALTAMIRA_ID = "11111111-1111-1111-1111-111111111111";
-
 const ALTAMIRA_DEMO_MSGS: ChatMessage[] = [
   {
     role: "user",
-    content: "¿Cuál es la exposición de Altamira al riesgo de refrigerantes HFC para el Estudio de Doble Materialidad?",
+    content: "Genera estructura de Estudio de Doble Materialidad para Altamira.",
+    ts: Date.now() - 60_000,
   },
   {
     role: "assistant",
-    content: `Basándome en el contexto cargado de Altamira, identifico **tres dimensiones críticas** del riesgo HFC:
-
-**1. Riesgo regulatorio — severidad alta**
-El Protocolo de Kigali obliga la sustitución de HFC a 2026. SENER confirmó restricciones para refrigeración industrial en logística de frío. Altamira depende de HFC en sus 12 CEDIS y flotilla refrigerada completa.
-
-**2. Riesgo financiero — exposición media-alta**
-Costo estimado de transición: $8–12 MDP (dato interno). Riesgo adicional: BBVA tiene una línea de crédito verde condicionada a métricas ESG comprometidas — el incumplimiento afectaría acceso a financiamiento.
-
-**3. Riesgo operativo — proveedor único**
-Honeywell México es el único proveedor de refrigerantes identificado. No hay proveedor alternativo documentado.
-
-_Recomiendo incluir este tema en la matriz de doble materialidad bajo "Transición a economía baja en carbono" — tanto por impacto financiero material como por impacto ambiental (GWP de HFC)._
-
-Campos del contexto utilizados: \`dependencias_criticas\`, \`riesgos_financieros\`, \`riesgos_operativos\`, \`insumos_principales\`.`,
-  },
-  {
-    role: "user",
-    content: "¿Qué stakeholders debo priorizar en el mapeo para este tema?",
-  },
-  {
-    role: "assistant",
-    content: `Para el tema HFC, prioriza estos grupos del mapeo de Altamira:
-
-**Alta prioridad**
-- **SEMARNAT/SENER**: influencia alta, dependencia media. Antecedente: multa por derrame 2021 ya existe en el historial.
-- **BBVA (financiadores)**: influencia media, dependencia alta. Línea de crédito verde condicionada a cumplimiento ESG.
-
-**Media prioridad**
-- **Honeywell México**: proveedor único — la dependencia es crítica para la operación.
-- **Walmart / FEMSA**: exigen CDP Score mínimo C desde 2023. El riesgo HFC puede degradar el score.
-
-Basado en \`influencia_dependencia\`, \`canales_relacion\` y \`riesgos_financieros\` del cuestionario.`,
+    content:
+      "**Estructura — Estudio de Doble Materialidad · Distribuidora Altamira**\n\n1. **Contexto del negocio** — sector alimentos refrigerados, presencia MX, clientes B2B clave (Walmart, OXXO/FEMSA, Costco, La Comer).\n2. **Análisis regulatorio** — NOM-001-STPS-2023, LGPGIR (residuos), CTPAT.\n3. **Identificación de stakeholders** — clientes corporativos, comunidades, transportistas, autoridades.\n4. **Materialidad por impacto** — emisiones GHG (cadena de frío), refrigerantes HFC, residuos.\n5. **Materialidad financiera** — riesgos regulatorios HFC, presión clientes B2B sobre Scope 3, costo energético.\n6. **Matriz de doble materialidad** — 20 temas posicionados (5 doble material, 5 por impacto, 5 financiero, 5 seguimiento).\n7. **Plan de acción** — KPIs, owners, roadmap.\n\n¿Avanzamos con el contexto regulatorio detallado?",
+    ts: Date.now() - 30_000,
   },
 ];
 
@@ -193,12 +168,56 @@ export function ChatWindow({
     });
   }, [messages, streaming]);
 
-  // Auto-load demo conversation when cliente Altamira (seed dummy) y empty.
-  // Reset al cambiar de cliente para no mezclar contextos.
+  // Auto-simula conversación demo cuando cliente Altamira (seed dummy) está
+  // seleccionado y el chat está vacío. Streaming carácter por carácter para
+  // que se vea natural — no flash dump de mensajes.
+  const demoCancelRef = useRef<{ cancelled: boolean } | null>(null);
   useEffect(() => {
-    if (clientId === ALTAMIRA_ID && messages.length === 0 && role === "aurora") {
-      setMessages(ALTAMIRA_DEMO_MSGS);
+    if (clientId !== ALTAMIRA_ID || role !== "aurora") return;
+    if (messages.length > 0) return;
+
+    const ctl = { cancelled: false };
+    demoCancelRef.current = ctl;
+
+    async function sleep(ms: number) {
+      return new Promise<void>((r) => setTimeout(r, ms));
     }
+
+    async function simulate() {
+      for (const msg of ALTAMIRA_DEMO_MSGS) {
+        if (ctl.cancelled) return;
+        if (msg.role === "user") {
+          setMessages((m) => [...m, { ...msg }]);
+          await sleep(700);
+        } else {
+          // Typing indicator: añade msg vacío
+          setStreaming(true);
+          setMessages((m) => [...m, { role: "assistant", content: "", ts: Date.now() }]);
+          await sleep(500);
+          if (ctl.cancelled) return;
+          const fullText = msg.content;
+          const chunkSize = Math.max(3, Math.ceil(fullText.length / 80));
+          for (let j = 0; j < fullText.length; j += chunkSize) {
+            if (ctl.cancelled) return;
+            const slice = fullText.slice(0, Math.min(j + chunkSize, fullText.length));
+            setMessages((m) => {
+              const last = m[m.length - 1];
+              if (!last || last.role !== "assistant") return m;
+              return [...m.slice(0, -1), { ...last, content: slice }];
+            });
+            await sleep(15);
+          }
+          setStreaming(false);
+          await sleep(1200);
+        }
+      }
+    }
+
+    void simulate();
+    return () => {
+      ctl.cancelled = true;
+      setStreaming(false);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
@@ -228,7 +247,9 @@ export function ChatWindow({
   async function send(prompt: string) {
     if (!prompt.trim() || streaming) return;
     setError("");
-    const userMsg: ChatMessage = { role: "user", content: prompt, ts: Date.now() };
+    // eslint-disable-next-line react-hooks/purity -- Date.now() en handler de envío (no es render)
+    const now = Date.now();
+    const userMsg: ChatMessage = { role: "user", content: prompt, ts: now };
     const history = [...messages, userMsg];
     setMessages(history);
     setInput("");
@@ -237,7 +258,10 @@ export function ChatWindow({
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setMessages((m) => [...m, { role: "assistant", content: "", ts: Date.now() }]);
+    setMessages((m) => [
+      ...m,
+      { role: "assistant", content: "", ts: now, roleId: role },
+    ]);
 
     try {
       const res = await fetch("/api/chat", {
@@ -400,7 +424,9 @@ export function ChatWindow({
                 setClientId(e.target.value);
                 resetChat();
               }}
-              className="text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded px-3 py-1 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary/30 max-w-[280px] truncate"
+              // font-sans fuerza Inter sobre el font default del sistema operativo
+              // (Windows usa Segoe UI en native selects, rompía uniformidad).
+              className="font-sans text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded pl-3 pr-7 py-1 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary/30 max-w-[280px] truncate appearance-none bg-no-repeat bg-[right_0.5rem_center] bg-[length:0.75rem] bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg%20xmlns%3d%22http%3a//www.w3.org/2000/svg%22%20viewBox%3d%220%200%2024%2024%22%20fill%3d%22none%22%20stroke%3d%22%2364748b%22%20stroke-width%3d%222%22%20stroke-linecap%3d%22round%22%20stroke-linejoin%3d%22round%22%3e%3cpolyline%20points%3d%226%209%2012%2015%2018%209%22/%3e%3c/svg%3e')]"
             >
               <option value="">Sin cliente (metodología general)</option>
               {clients.map((c) => (
@@ -413,16 +439,17 @@ export function ChatWindow({
             {selectedClient && ctxPct !== null && (
               <>
                 <span
-                  className={`text-[10px] rounded-sm px-1.5 py-0.5 font-bold uppercase tracking-wide border tabular-nums ${
+                  className={`text-[10px] rounded-sm px-1.5 py-0.5 font-bold uppercase tracking-wide border tabular-nums inline-flex items-center gap-1 ${
                     ctxPct === 100
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : ctxPct >= 50
                         ? "bg-brand-primary-light text-brand-primary-dark border-brand-primary/20"
                         : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}
-                  title={`${selectedClient.completeness.filled} de ${selectedClient.completeness.total} campos de contexto llenos`}
+                  title={`Perfil del cliente: ${selectedClient.completeness.filled} de ${selectedClient.completeness.total} atributos llenos (sector, frameworks, certificaciones, riesgos, etc). A más perfil completo, mejor calidad de respuestas IA. Distinto del progreso del Cuestionario.`}
                 >
-                  {selectedClient.completeness.filled}/{selectedClient.completeness.total} campos
+                  <span>Perfil</span>
+                  <span>{selectedClient.completeness.filled}/{selectedClient.completeness.total}</span>
                 </span>
                 <a
                   href={`/clientes/${selectedClient.id}`}
@@ -453,6 +480,11 @@ export function ChatWindow({
         >
           {ROLES.map((r, i) => {
             const isActive = role === r.id;
+            // "Visitado" = un mensaje del assistant en la conversación viene de este rol.
+            // Visualiza el progreso de la cadena de calidad sin requerir flujo forzado.
+            const isVisited = !isActive && messages.some(
+              (m) => m.role === "assistant" && m.roleId === r.id
+            );
             return (
               <div key={r.id} className="flex items-center">
                 <button
@@ -460,18 +492,26 @@ export function ChatWindow({
                   className={`px-2 py-1 text-xs font-semibold rounded transition-colors flex items-center gap-1.5 ${
                     isActive
                       ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
-                      : "text-slate-600 hover:text-slate-900"
+                      : isVisited
+                        ? "text-slate-800 hover:text-slate-900"
+                        : "text-slate-600 hover:text-slate-900"
                   }`}
                   aria-pressed={isActive}
-                  title={`${r.name} · ${r.fn}`}
+                  title={isVisited ? `${r.name} · ${r.fn} · ya intervino` : `${r.name} · ${r.fn}`}
                 >
                   <span
                     aria-hidden
-                    className={`w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-bold tracking-tight text-white ${
-                      isActive ? r.color : "bg-slate-400"
+                    className={`w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-bold tracking-tight text-white relative ${
+                      isActive || isVisited ? r.color : "bg-slate-400"
                     }`}
                   >
                     {r.mono}
+                    {isVisited && (
+                      <span
+                        aria-hidden
+                        className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-1 ring-white"
+                      />
+                    )}
                   </span>
                   <span>{r.name}</span>
                   <span className="text-slate-500 font-normal text-[10px] uppercase tracking-wider">
@@ -535,7 +575,7 @@ export function ChatWindow({
                 <span className="text-slate-300">·</span>
                 <span className="font-semibold text-slate-900 truncate max-w-[260px]">{selectedClient.name}</span>
                 <span className="text-slate-300">·</span>
-                <span className="tabular-nums text-slate-600">{selectedClient.completeness.filled}/{selectedClient.completeness.total} campos</span>
+                <span className="tabular-nums text-slate-600">Perfil {selectedClient.completeness.filled}/{selectedClient.completeness.total}</span>
                 {selectedClient.sector && (
                   <>
                     <span className="text-slate-300">·</span>
@@ -591,25 +631,30 @@ export function ChatWindow({
             const tsLabel = m.ts
               ? new Date(m.ts).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
               : null;
+            // Atribución por mensaje. roleId se persiste al enviar; si falta (mensajes
+            // legacy o demo precargada) cae al rol activo actual.
+            const msgRole = m.role === "assistant"
+              ? ROLES.find((r) => r.id === m.roleId) ?? currentRole
+              : null;
             return (
               <div key={i} className="animate-fade-in">
                 <div className="flex items-start gap-3">
                   <div
                     aria-hidden
                     className={`w-7 h-7 rounded shrink-0 flex items-center justify-center text-[11px] font-bold text-white ${
-                      m.role === "user" ? "bg-slate-700" : currentRole.color
+                      m.role === "user" ? "bg-slate-700" : (msgRole?.color ?? currentRole.color)
                     }`}
                   >
-                    {m.role === "user" ? "Tú" : currentRole.mono}
+                    {m.role === "user" ? "Tú" : (msgRole?.mono ?? currentRole.mono)}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2 mb-1">
                       <p className="text-xs font-semibold text-slate-900 leading-none">
-                        {m.role === "user" ? "Consultor" : currentRole.name}
+                        {m.role === "user" ? "Consultor" : (msgRole?.name ?? currentRole.name)}
                       </p>
                       {m.role === "assistant" && (
                         <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-400">
-                          {currentRole.fn}
+                          {msgRole?.fn ?? currentRole.fn}
                         </span>
                       )}
                       {tsLabel && (

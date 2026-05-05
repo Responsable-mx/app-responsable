@@ -52,6 +52,7 @@ export function ClientTabs({
   useEffect(() => {
     const t = searchParams?.get("tab");
     if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync de URL → state, no loop
       setTab(t);
     }
   }, [searchParams]);

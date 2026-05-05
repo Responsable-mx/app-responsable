@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClient, clientContextCompleteness, listClients } from "@/lib/clients";
 import { ClientTabs } from "@/components/ClientTabs";
+import { ClientAvatar } from "@/components/ClientAvatar";
 import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
 import { isSystemAccount } from "@/lib/users";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
@@ -97,9 +98,11 @@ export default async function EditarClientePage({ params }: Props) {
         )}
       </div>
 
-      {/* Header en una línea estilo mockup */}
+      {/* Header con avatar monogram + nombre. White-label scaffold: cuando exista
+          schema clients.logo_url, swappear por <img src={client.logo_url}/>. */}
       <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-5">
-        <h1 className="text-xl font-bold text-slate-900">{client.name}</h1>
+        <ClientAvatar name={client.name} />
+        <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
         <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide rounded-sm border px-2 py-0.5 ${statusClasses}`}>
           {status.label}
         </span>

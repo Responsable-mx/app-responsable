@@ -205,31 +205,42 @@ function WizardEditor({
     const aiSteps = steps.filter((s) => s.ai_can_fill);
     if (aiSteps.length === 0) return;
     let success = 0;
-    let failed = 0;
+    const failures: { step: string; error: string }[] = [];
     for (let i = 0; i < aiSteps.length; i++) {
       const s = aiSteps[i];
       setAiBulkProgress({ current: i + 1, total: aiSteps.length, stepTitle: s.title });
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 290_000); // 290s timeout
         const res = await fetch(`/api/clients/${clientId}/wizard/${s.key}/ai-fill`, {
           method: "POST",
+          signal: controller.signal,
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json.error ?? `HTTP ${res.status}`);
+        }
         const json = (await res.json()) as { data: Record<string, FieldResponse> };
         setResponses((prev) => ({ ...prev, [s.key]: json.data }));
+        // Save partial progress por paso (no esperar al final)
+        dirty.current = true;
+        void save();
         success++;
       } catch (e) {
-        console.error(`[aiFillAll] ${s.key}:`, e);
-        failed++;
+        const msg = e instanceof Error ? e.message : "Error desconocido";
+        console.error(`[aiFillAll] ${s.key}:`, msg);
+        failures.push({ step: s.title, error: msg });
       }
     }
     setAiBulkProgress(null);
-    dirty.current = true;
-    void save();
     mutate();
-    if (failed === 0) {
-      toast.push("success", `IA llenó ${success} pasos`);
+    if (failures.length === 0) {
+      toast.push("success", `IA llenó ${success} pasos correctamente`);
+    } else if (success === 0) {
+      toast.push("error", `AI fill falló: ${failures[0].error}`);
     } else {
-      toast.push("warning", `${success} pasos OK · ${failed} fallaron`);
+      toast.push("warning", `${success} OK · ${failures.length} fallaron: ${failures.map((f) => f.step).join(", ")}`);
     }
   }
 

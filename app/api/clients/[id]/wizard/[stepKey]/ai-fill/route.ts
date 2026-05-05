@@ -11,6 +11,10 @@ import {
   type WizardStep,
 } from "@/lib/questionnaires/types";
 
+// Timeout serverless: hasta 5 min (web_search tarda ~30-90s por paso)
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
 type Ctx = { params: Promise<{ id: string; stepKey: string }> };
 
 export async function POST(_req: NextRequest, { params }: Ctx) {
@@ -132,7 +136,7 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
   try {
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 8192,
+      max_tokens: 4096,
       system: systemPrompt,
       tools: [
         {
@@ -140,7 +144,7 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           type: "web_search_20250305" as any,
           name: "web_search",
-          max_uses: 8,
+          max_uses: 4,
         },
       ],
       messages: [{ role: "user", content: userPrompt }],

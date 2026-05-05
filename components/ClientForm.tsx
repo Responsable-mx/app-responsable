@@ -420,7 +420,7 @@ export function ClientForm(props: Props) {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3">
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded p-3">
           {error}
         </div>
       )}
@@ -429,7 +429,7 @@ export function ClientForm(props: Props) {
         <button
           type="submit"
           disabled={saving || !form.name.trim()}
-          className="px-5 py-2.5 bg-brand-primary-hover text-white rounded-lg text-sm font-medium hover:bg-brand-primary-dark disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+          className="px-5 py-2.5 bg-brand-primary-hover text-white rounded text-sm font-medium hover:bg-brand-primary-dark disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
         >
           {saving
             ? "Guardando..."
@@ -442,7 +442,7 @@ export function ClientForm(props: Props) {
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
-            className="px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded-lg"
+            className="px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded"
           >
             Eliminar
           </button>
@@ -474,7 +474,7 @@ export function ClientForm(props: Props) {
 }
 
 const inputCls =
-  "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
+  "w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
 
 function Section({
   title,

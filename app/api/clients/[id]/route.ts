@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requireAdmin } from "@/lib/auth";
 import {
   getClient,
   updateClientRow,
@@ -26,8 +26,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  // D-54: mutación del perfil del cliente — solo admin.
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
+  const user = admin;
   const { id } = await params;
 
   let body: unknown;
@@ -72,14 +74,15 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  // D-54: eliminar cliente — solo admin.
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
   const { id } = await params;
   try {
     const before = await getClient(id).catch(() => null);
     await deleteClientRow(id);
     await logChange({
-      actorEmail: user,
+      actorEmail: admin,
       entityType: "clients",
       entityId: id,
       action: "delete",

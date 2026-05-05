@@ -57,13 +57,19 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Bypass de previews `/dev/*` solo en non-prod (sin auth para alinear copy
-  // con stakeholders, debug de render condicional). En prod NODE_ENV es
-  // 'production' → /dev/* requiere login como cualquier ruta. STARTER_UX §6.
-  if (
-    pathname.startsWith("/dev/") &&
-    process.env.NODE_ENV !== "production"
-  ) {
+  // Raíz → mockup público para demos con stakeholders.
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dev/app-preview";
+    return NextResponse.redirect(url);
+  }
+
+  // /dev/app-preview: público siempre — mockup sin backend para demos con stakeholders.
+  // Otros /dev/* solo en non-prod.
+  if (pathname === "/dev/app-preview") {
+    return supabaseResponse;
+  }
+  if (pathname.startsWith("/dev/") && process.env.NODE_ENV !== "production") {
     return supabaseResponse;
   }
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { SelectField } from "@/components/ui/SelectField";
 
 type TplActivity = {
   name: string;
@@ -377,29 +378,28 @@ export function TemplateStructureEditor({
                       >
                         Depende de
                       </span>
-                      <select
-                        value={a.depends_on_path ?? ""}
-                        onChange={(e) =>
-                          updateActivity(sIdx, aIdx, {
-                            depends_on_path: e.target.value || null,
-                          })
-                        }
-                        className="font-sans text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-0.5 flex-1 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                      >
-                        <option value="">— Sin dependencia —</option>
-                        {stages.flatMap((depStage, dsIdx) =>
-                          depStage.activities.map((depAct, daIdx) => {
-                            // No permitir auto-referencia
-                            if (dsIdx === sIdx && daIdx === aIdx) return null;
-                            const path = `${dsIdx}.${daIdx}`;
-                            return (
-                              <option key={path} value={path}>
-                                {depStage.name} → {depAct.name}
-                              </option>
-                            );
-                          })
-                        )}
-                      </select>
+                      <div className="flex-1">
+                        <SelectField
+                          value={a.depends_on_path ?? ""}
+                          onChange={(v) =>
+                            updateActivity(sIdx, aIdx, {
+                              depends_on_path: v || null,
+                            })
+                          }
+                          placeholder="— Sin dependencia —"
+                          options={stages.flatMap((depStage, dsIdx) =>
+                            depStage.activities
+                              .map((depAct, daIdx) => {
+                                if (dsIdx === sIdx && daIdx === aIdx) return null;
+                                return {
+                                  value: `${dsIdx}.${daIdx}`,
+                                  label: `${depStage.name} → ${depAct.name}`,
+                                };
+                              })
+                              .filter((o): o is { value: string; label: string } => o !== null)
+                          )}
+                        />
+                      </div>
                     </div>
                   </div>
                   );

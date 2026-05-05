@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
-import { SkeletonList } from "@/components/ui/Skeleton";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 
 // Saved views: filtros persistidos por usuario en localStorage. Pattern Salesforce
 // "List Views" / Linear "Saved searches". Permite al consultor tener "Mis activos",
@@ -384,7 +384,7 @@ export function ClientsList() {
       </div>
 
       {isLoading && clients.length === 0 ? (
-        <SkeletonList items={6} />
+        <SkeletonTable rows={6} cols={4} />
       ) : filtered.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded p-10 text-center shadow-sm">
           <p className="text-sm text-slate-600">

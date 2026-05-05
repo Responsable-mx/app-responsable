@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { SkeletonDetail } from "@/components/ui/Skeleton";
 import { PROMPT_LABELS } from "@/lib/ai/prompts-public";
 import type { PromptKey } from "@/lib/ai/prompts-public";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -106,7 +107,7 @@ export function PromptEditor({
   }
 
   if (isLoading || !data) {
-    return <div className="text-sm text-slate-600">Cargando…</div>;
+    return <SkeletonDetail />;
   }
 
   const detail = data.data;

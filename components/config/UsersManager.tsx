@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -69,7 +70,7 @@ export function UsersManager() {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">
-            {users.length} {users.length === 1 ? "usuario" : "usuarios"}
+            {isLoading ? "—" : users.length} {isLoading ? "usuarios" : users.length === 1 ? "usuario" : "usuarios"}
           </h2>
         </div>
         <button
@@ -95,7 +96,7 @@ export function UsersManager() {
         </div>
       )}
 
-      {isLoading && <div className="text-sm text-slate-600">Cargando…</div>}
+      {isLoading && <SkeletonTable rows={4} cols={5} />}
 
       {!isLoading && users.length > 0 && (
         <div className="overflow-x-auto">

@@ -154,6 +154,23 @@ export function isFieldFilled(value: FieldValue): boolean {
   return false;
 }
 
+/**
+ * Un campo está "completo" cuando:
+ *  1. Tiene valor, Y
+ *  2. Si source_type es "public" o "interpretation", tiene al menos 1 fuente.
+ *
+ * Usada en computeProgress para que un campo con interpretation+sin sources
+ * cuente como incompleto (pct < 100) y no entre en completedSections,
+ * evitando que el autosave quede bloqueado por la validación server-side.
+ */
+export function isFieldComplete(raw: unknown): boolean {
+  if (!isFieldResponse(raw)) return isFieldFilled(getFieldValue(raw));
+  if (!isFieldFilled(raw.value)) return false;
+  const needsSources = raw.source_type === "public" || raw.source_type === "interpretation";
+  if (needsSources && (!raw.sources || raw.sources.length === 0)) return false;
+  return true;
+}
+
 export function isSourceStale(date: string, asOf: Date = new Date()): boolean {
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return false;
@@ -177,7 +194,9 @@ export function computeProgress(
       let filled = 0;
       for (const field of step.fields) {
         const raw = (stepResp as Record<string, unknown>)[field.key];
-        if (isFieldFilled(getFieldValue(raw))) filled++;
+        // isFieldComplete valida sources en campos public/interpretation —
+        // sin fuentes el campo cuenta como incompleto aunque tenga valor.
+        if (isFieldComplete(raw)) filled++;
       }
       sectionProgress[step.key] = {
         filled,

@@ -14,75 +14,64 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ## Deuda activa
 
-### 🔴 D-01 — Dev preview requiere login en producción
-- **Descripción**: `/dev/app-preview` está protegido por el middleware de auth (líneas 63-68 de `lib/supabase/middleware.ts`). En producción (`app.responsable.net/dev/app-preview`) redirige a login.
-- **Impacto**: El mockup desplegado no es accesible sin cuenta real. El equipo no puede revisar el preview sin credenciales.
-- **Fix sugerido**: Agregar excepción en middleware para `NODE_ENV !== 'production'` O crear ruta pública alternativa sin `/dev/` prefix.
-- **Esfuerzo**: 1h
+### 🔴 D-01 — Cuestionario sin backend (Fase 2 pendiente)
+- **Descripción**: El tab "Cuestionario" en `ClientTabs` muestra un placeholder "Próximamente". No existe schema, endpoint ni UI editable.
+- **Impacto**: El consultor no puede capturar respuestas estructuradas del cuestionario por cliente.
+- **Fix sugerido**:
+  - Migración SQL: tabla `questionnaire_sections`, `questionnaire_fields`, `questionnaire_responses` (FK a `clients.id`).
+  - Endpoint `GET/PATCH /api/clients/[id]/questionnaire`.
+  - Componente `<QuestionnaireTab clientId>` con autosave y progreso por sección.
+- **Esfuerzo**: 3-5 días (Fase 2)
 
-### 🔴 D-02 — Chat IA mockup no conecta a backend real
-- **Descripción**: El tab "Chat IA" en `ClientTabsView` muestra un preview estático con `INITIAL_MSGS`. No usa `ChatSection` real ni llama a `/api/chat`.
-- **Impacto**: El mockup no refleja la experiencia real del chat con Aurora/Rebeca/Elena/Valeria.
-- **Fix sugerido**: Pasar `clientId` como prop a `ClientTabsView` y renderizar `<ChatSection clientId={...} />` en el tab "chat".
+### 🔴 D-02 — Matriz de Materialidad sin backend (Fase 3 pendiente)
+- **Descripción**: El tab "Materialidad" en `ClientTabs` muestra un placeholder "Próximamente". El SVG BCG/McKinsey con 20 temas existe en el git history (`AppShell.tsx` eliminado) pero no está conectado a datos reales.
+- **Impacto**: La matriz de doble materialidad — el entregable principal del MVP — no es funcional.
+- **Fix sugerido**:
+  - Migración SQL: tabla `materiality_topics(client_id, topic_key, label, x_pos, y_pos, color, size)`.
+  - Endpoint `GET/PATCH /api/clients/[id]/materiality`.
+  - Componente `<MaterialityTab clientId>` reusando el SVG del mockup eliminado (recuperar desde git si necesario).
+- **Esfuerzo**: 3-5 días (Fase 3)
+
+### 🟡 D-03 — Chat IA sin contexto inline en tabs del cliente
+- **Descripción**: El `/chat` real opera en su propia ruta. No hay un tab "Chat" dentro de `/clientes/[id]` que cargue contexto del cliente directamente.
+- **Fix sugerido**: Agregar 5to tab "Chat IA" en `ClientTabs` que renderice `<ChatWindow>` con `clientId` preseleccionado, o un drawer lateral.
 - **Esfuerzo**: 2-3h
 
-### 🟡 D-03 — Cuestionario solo lectura
-- **Descripción**: Los campos del Cuestionario en `ClientTabsView` son read-only. El consultor no puede editar valores desde la vista cliente.
-- **Impacto**: Flujo incompleto; el consultor tiene que salir a otra pantalla para editar.
-- **Fix sugerido**: Agregar campos `<input>` / `<select>` con estado local y botón "Guardar sección".
-- **Esfuerzo**: 3-4h
-
-### 🟡 D-04 — Export PDF de Materialidad es placeholder
-- **Descripción**: El botón "Exportar PDF" en la pestaña Materialidad no genera PDF real.
-- **Fix sugerido**: Integrar `@react-pdf/renderer` o llamar a una ruta `/api/export/matrix` que devuelva PDF.
-- **Esfuerzo**: 4-6h
-
-### 🟡 D-05 — Metodología ResponSable: pasos inventados
-- **Descripción**: El stepper "Comprender / Diseñar / Optimizar / Utilizar / Medir" fue inventado para el mockup. No corresponde a la metodología real.
-- **Impacto**: Si se muestra a clientes, genera expectativas falsas sobre el proceso.
-- **Fix sugerido**: Equipo debe definir los 5 pasos reales. Mientras tanto, mostrar "Por definir · Placeholder" (ya implementado en KPI card).
+### 🟡 D-04 — Metodología ResponSable: pasos no definidos
+- **Descripción**: El equipo aún no ha definido los pasos reales de la metodología (anteriormente "Comprender/Diseñar/Optimizar/Utilizar/Medir" — inventados para el mockup, ya eliminados).
+- **Impacto**: La KPI card de Metodología no existe en `ClientTabs` actual. Cuando se defina, agregar.
 - **Responsable**: Equipo metodología ResponSable
 - **Esfuerzo**: Decisión de negocio, luego 30min de código
 
-### 🟡 D-06 — Shape encoding: triángulo con CSS puro
-- **Descripción**: El shape "▲ En seguimiento" usa el carácter Unicode `▲` en el dot del índice. En la matriz visual, se renderiza igual que un círculo. Falta diferenciar visualmente con CSS `clip-path: polygon(...)` o SVG shape real.
-- **Impacto**: Parcialmente daltónico-accesible; el shape encoding no está completo para el punto ▲ en la matriz.
-- **Esfuerzo**: 2h
-
-### 🟡 D-07 — No hay trazabilidad entre Chat IA y Cuestionario
-- **Descripción**: El contexto del cliente que se pasa al chat IA (Aurora/Rebeca/Elena/Valeria) no referencia campos específicos del Cuestionario. No hay drill-down "Ver campo fuente".
-- **Fix sugerido**: `buildClientContext` debería incluir IDs de campo; popover de tema materialidad debería linkear al campo del cuestionario.
-- **Esfuerzo**: 4-6h
-
-### 🟡 D-08 — Sin paginación en índice de clientes
-- **Descripción**: La lista de clientes en el panel izquierdo de `AppShell` es estática (mockup). Sin paginación ni búsqueda real contra Supabase.
-- **Fix sugerido**: Integrar SWR + `/api/clients` con búsqueda server-side.
+### 🟡 D-05 — Sin paginación en lista de clientes
+- **Descripción**: `/clientes` usa filter client-side. Funciona para <100 clientes, no escala.
+- **Fix sugerido**: SWR + `/api/clients?page=&limit=&search=` server-side.
 - **Esfuerzo**: 3-4h
 
-### 🟡 D-09 — Audit log no cubre mutaciones del Cuestionario
-- **Descripción**: `logChange()` cubre endpoints admin pero no las respuestas del cuestionario por consultor.
-- **Fix sugerido**: Al guardar respuesta de cuestionario, llamar `logChange()` con `entityType: "questionnaire_field"`.
-- **Esfuerzo**: 1-2h
+### 🟡 D-06 — Audit log no cubre mutaciones futuras (cuestionario, materialidad)
+- **Descripción**: `logChange()` cubre endpoints admin (clients, prompts, users, catalogs). Cuando se implementen Fase 2/3, integrar audit log desde el día uno.
+- **Fix sugerido**: Al construir `/api/clients/[id]/questionnaire` y `/api/clients/[id]/materiality`, llamar `logChange()`.
+- **Esfuerzo**: 30min por endpoint
 
-### 🟢 D-10 — Thumbs up/down sin backend en Chat mockup
-- **Descripción**: El rating de mensajes IA (calificar) solo actualiza estado local; no persiste en Supabase.
-- **Fix sugerido**: Tabla `chat_ratings(msg_id, rating, actor_email, created_at)` + endpoint `/api/chat/rate`.
-- **Esfuerzo**: 2h
+### 🟡 D-07 — Export PDF del cliente no existe
+- **Descripción**: No hay forma de exportar el contexto + servicios + cuestionario + materialidad de un cliente en un PDF entregable al cliente final.
+- **Fix sugerido**: Integrar `@react-pdf/renderer` o ruta `/api/clients/[id]/export-pdf` con plantilla.
+- **Esfuerzo**: 1-2 días
 
-### 🟢 D-11 — Filtro de cuadrante no persiste al cambiar de tab
-- **Descripción**: `filterQuadrant` es estado local de `ClientTabsView`. Si el consultor va a Cuestionario y vuelve a Materialidad, el filtro se resetea.
-- **Fix sugerido**: Elevar estado a `AppShell` o usar `sessionStorage`.
-- **Esfuerzo**: 30min
+### 🟢 D-08 — Stone vs slate: tokens mezclados
+- **Descripción**: Algunos componentes legacy (`ClientForm`, `ChatWindow`) usan `stone-*` mientras los nuevos (`ClientTabs`) usan `slate-*`. CLAUDE.md decreta `slate-*` como canónico.
+- **Fix sugerido**: Pase global `stone-` → `slate-` en componentes B2B.
+- **Esfuerzo**: 2-3h
 
-### 🟢 D-12 — Sin feedback vacío en búsqueda de clientes
-- **Descripción**: Si el filtro de búsqueda no encuentra clientes, no hay empty state visual.
-- **Fix sugerido**: Agregar `<EmptyState>` con mensaje "Sin clientes que coincidan con la búsqueda".
-- **Esfuerzo**: 30min
-
-### 🟢 D-13 — `ConfirmDialog` deprecado activo en CatalogsManager y PromptsManager
-- **Descripción**: `components/ConfirmDialog.tsx` es wrapper anterior; el nuevo estándar es `components/ui/ConfirmModal.tsx`. Los dos managers usan la versión legacy.
+### 🟢 D-09 — `ConfirmDialog` deprecado activo en CatalogsManager y PromptsManager
+- **Descripción**: `components/ConfirmDialog.tsx` es wrapper anterior; el nuevo estándar es `components/ui/ConfirmModal.tsx`.
 - **Fix sugerido**: Migrar `CatalogsManager` y `PromptsManager` a `ConfirmModal`.
 - **Esfuerzo**: 1h
+
+### 🟢 D-10 — Sin trazabilidad Chat → Cuestionario
+- **Descripción**: Los mensajes del chat IA no linkean a campos específicos del cuestionario.
+- **Fix sugerido**: Cuando exista cuestionario, `buildClientContext` debe incluir field IDs; el chat puede citar `[ver campo X]`.
+- **Esfuerzo**: 4-6h (después de Fase 2)
 
 ---
 
@@ -90,18 +79,31 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 | ID | Descripción | Resuelto |
 |----|-------------|---------|
-| R-01 | Matriz de materialidad sin patrón BCG — solo barra de progreso | may-2026 |
+| R-01 | Matriz de materialidad sin patrón BCG — solo barra de progreso | may-2026 (mockup) |
 | R-02 | Diseño SaaS-startup en lugar de B2B corporativo | may-2026 |
-| R-03 | Sin breadcrumb en vista cliente (sin retorno a lista) | may-2026 |
+| R-03 | Sin breadcrumb en vista cliente | may-2026 |
 | R-04 | Tabs sin badges de progreso | may-2026 |
-| R-05 | Sin narrative chip en matriz | may-2026 |
-| R-06 | Sin filtro por cuadrante en matriz | may-2026 |
-| R-07 | Sin shape encoding para daltonismo | may-2026 |
-| R-08 | Emoji en iconos de sección (desalineación en overlays) | may-2026 |
-| R-09 | Cuestionario tab completamente vacío | may-2026 |
-| R-10 | Chat IA tab sin contexto del cliente | may-2026 |
-| R-11 | `.gitignore` no excluía `.claude/` | may-2026 |
+| R-05 | Emoji en iconos de sección | may-2026 |
+| R-06 | `.gitignore` no excluía `.claude/` | may-2026 |
+| R-07 | `/dev/app-preview` requería login en producción | may-2026 (eliminado) |
+| R-08 | Mockup `AppShell` no conectaba a backend real | may-2026 (eliminado, rutas reales activas) |
+| R-09 | `ClientTabs` real solo tenía 2 tabs (Contexto + Servicios) | may-2026 (4 tabs + KPI header) |
+| R-10 | Chat sin Copy/Thumbs/Export/Retry (S-Peak parity) | may-2026 (en mockup eliminado; pendiente portear a `ChatWindow` real) |
 
 ---
 
-*Última auditoría: may-2026. Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+## Hito: Consolidación de mockup → app real (may-2026)
+
+El mockup `app/dev/app-preview/AppShell.tsx` fue eliminado. Las rutas reales (`/chat`, `/clientes`, `/clientes/[id]`, `/configuracion`) son ahora el único frente productivo en `app.responsable.net`. El diseño corporate B2B se mantiene en:
+- `ClientTabs` (header KPI + 4 tabs con badges)
+- `ClientsList` (tabla con headers uppercase tracking-widest)
+- Tabs placeholder "Próximamente" para Cuestionario y Materialidad
+
+**Próximas fases**:
+- Fase 2 (sprint): Cuestionario funcional → resuelve D-01
+- Fase 3 (sprint): Matriz de Materialidad funcional → resuelve D-02
+- Después: D-03, D-07, D-10 (chat con contexto, export PDF, trazabilidad)
+
+---
+
+*Última auditoría: may-2026 (consolidación). Próxima revisión: ver tareas programadas en `MEMORY.md`.*

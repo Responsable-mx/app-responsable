@@ -85,7 +85,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-white border border-stone-200 rounded-xl p-10 text-center">
+        <div className="bg-white border border-slate-200 rounded p-10 text-center shadow-sm">
           <p className="text-sm text-slate-600">
             {clients.length === 0
               ? "Aún no hay clientes registrados."
@@ -94,22 +94,22 @@ export function ClientsList({ clients }: { clients: Row[] }) {
           {clients.length === 0 && (
             <Link
               href="/clientes/nuevo"
-              className="inline-block mt-3 px-4 py-2 bg-brand-primary-hover text-white text-sm font-medium rounded-lg hover:bg-brand-primary-dark"
+              className="inline-block mt-3 px-4 py-2 bg-brand-primary-hover text-white text-sm font-medium rounded hover:bg-brand-primary-dark"
             >
               Agregar el primero
             </Link>
           )}
         </div>
       ) : (
-        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded overflow-hidden shadow-sm">
           <table className="w-full text-sm">
-            <thead className="bg-stone-50 text-slate-600 text-left">
+            <thead className="bg-slate-50 text-slate-500 text-left">
               <tr>
-                <th className="px-4 py-3 font-medium">Nombre</th>
-                <th className="px-4 py-3 font-medium">Sector</th>
-                <th className="px-4 py-3 font-medium">Países</th>
-                <th className="px-4 py-3 font-medium">Tamaño</th>
-                <th className="px-4 py-3 font-medium text-right">
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Nombre</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Sector</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Países</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Tamaño</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right">
                   Actualizado
                 </th>
               </tr>
@@ -118,7 +118,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
               {filtered.map((c) => (
                 <tr
                   key={c.id}
-                  className="border-t border-stone-100 hover:bg-stone-50"
+                  className="border-t border-slate-100 hover:bg-slate-50/60"
                 >
                   <td className="px-4 py-3">
                     <Link

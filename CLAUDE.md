@@ -82,30 +82,41 @@ Aprobado en sesión de diseño. Clientes son empresas corporativas → UX nivel 
 - **Badges en tabs**: progreso visible inline `[100%]` `[5/5]` `[20/20]`.
 - **Shadow**: `shadow-sm` en cards (no `shadow-md`/`shadow-lg`).
 
-## Matriz de Doble Materialidad — patrón BCG/McKinsey
+## Matriz de Doble Materialidad — patrón BCG/McKinsey (Fase 3 pendiente)
 
-Implementado en `app/dev/app-preview/AppShell.tsx` como referencia canónica.
+Diseño canónico (recuperar SVG desde git history del mockup eliminado `app/dev/app-preview/AppShell.tsx`):
 
 - **20 temas** posicionados en plano X/Y (materialidad financiera × impacto)
 - **Shape encoding**: ● rose=Doble material, ◆ amber=Material por impacto, ■ teal=Material financiero, ▲ slate=En seguimiento — accesible para daltónicos
-- **Narrative chip**: síntesis automática encima del chart (N temas doble material, riesgo principal)
-- **Filtro por cuadrante**: pills que diman dots no activos (15% opacity) + filtran índice lateral
-- **Índice numerado**: panel derecho con símbolo + nombre truncado, clickable
+- **Narrative chip**: síntesis automática (N temas doble material, riesgo principal)
+- **Filtro por cuadrante**: pills que diman dots no activos (15% opacity)
+- **Índice numerado**: panel derecho con símbolo + nombre truncado
 - **Popover al click**: nombre, cuadrante, sección → CTA "Ver en Cuestionario" / "Iniciar Chat IA"
 - **Ejes 0–10** con grid lines, dashed midpoint dividers. Sin fondos pastel.
 - **Esc** cierra popover. Touch targets 40×40px.
 
+Schema pendiente: tabla `materiality_topics(client_id, topic_key, label, x_pos, y_pos, color, size)` + endpoint `/api/clients/[id]/materiality`.
+
 ## Metodología ResponSable — PENDIENTE
 
-El stepper de 5 pasos ("Comprender/Diseñar/Optimizar/Utilizar/Medir") fue **inventado** para el mockup. **No usar** hasta que el equipo defina los pasos reales. Actualmente muestra "Por definir · Placeholder" en la KPI card.
+El equipo aún no ha definido los pasos reales de la metodología. **No inventar** placeholders. Cuando se defina, agregar como 5to KPI card en `ClientTabs`.
 
-## Chat IA — mejores prácticas (paridad S-Peak App)
+## Chat IA — mejores prácticas (paridad S-Peak App, pendiente portear a ChatWindow real)
 
-Funciones requeridas en el chat de mensajes IA (mismo patrón que S-Peak):
+Funciones canónicas (implementadas en mockup eliminado, pendiente migrar a `components/chat/ChatWindow.tsx`):
 - **Copiar respuesta**: botón `Copy` en cada mensaje IA (clipboard API)
-- **Calificar**: thumbs up / thumbs down por mensaje (log sin backend en mockup)
-- **Exportar conversación**: download `.txt` o `.md` de la sesión
+- **Calificar**: thumbs up / thumbs down por mensaje (persistir en tabla `chat_ratings`)
+- **Exportar conversación**: download `.md` de la sesión
 - **Retry/Regenerar**: reenviar el último mensaje con el mismo rol
+
+## Consolidación mayo-2026 — eliminación del mockup `/dev/app-preview`
+
+El mockup `app/dev/app-preview/AppShell.tsx` fue eliminado. La app real en `app.responsable.net` consume los endpoints reales:
+- `/chat` → `ChatWindow` con streaming SSE de `/api/chat`
+- `/clientes` → `ClientsList` con datos de `/api/clients`
+- `/clientes/[id]` → `ClientTabs` con 4 tabs: Contexto + Servicios (reales) + Cuestionario + Materialidad (placeholders "Próximamente")
+
+Diseño corporate aplicado a `ClientTabs` (KPI cards uppercase + tabs con badges) y `ClientsList` (tabla con headers tracking-widest). Login obligatorio en raíz.
 
 ## Primitives canónicos — `components/ui/`
 

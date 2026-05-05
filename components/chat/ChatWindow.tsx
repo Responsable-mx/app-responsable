@@ -766,23 +766,7 @@ export function ChatWindow({
 
           {messages.length === 0 && (
             <div className="py-10 max-w-2xl mx-auto" data-tour="empty-state">
-              <div className="flex items-center gap-3 pb-4 mb-5 border-b border-slate-200">
-                <div
-                  className={`w-9 h-9 rounded flex items-center justify-center text-white text-sm font-bold shrink-0 ${currentRole.color}`}
-                  aria-hidden
-                >
-                  {currentRole.mono}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    {currentRole.fn}
-                  </p>
-                  <h2 className="text-base font-bold text-slate-900 leading-tight truncate">
-                    {currentRole.name}
-                  </h2>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600 mb-4">
+              <p className="text-sm text-slate-600 mb-4 border-b border-slate-200 pb-4">
                 {clientId
                   ? "Contexto de cliente cargado. Comienza con un objetivo o usa una sugerencia."
                   : "Sin cliente seleccionado. Respondo sobre metodología general."}
@@ -1039,15 +1023,7 @@ export function ChatWindow({
             )}
           </form>
           <div className="flex items-center justify-between mt-2 px-1">
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-wider">
-              <span
-                className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[8px] font-bold text-white ${currentRole.color}`}
-                aria-hidden
-              >
-                {currentRole.mono}
-              </span>
-              <span className="font-semibold text-slate-700">{currentRole.name}</span>
-              <span className="text-slate-400">·</span>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
               <span
                 className="hidden sm:inline"
                 title={`Modelo: ${MODEL_PER_ROLE[role]} · ↵ enviar · ⇧↵ nueva línea`}

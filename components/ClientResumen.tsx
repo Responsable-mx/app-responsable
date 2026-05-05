@@ -216,19 +216,16 @@ export function ClientResumen({
               </dl>
             </div>
 
-            <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between gap-3">
-              <span className="text-[11px] text-slate-600 tabular-nums">
+            <div className="px-4 py-2 border-t border-slate-100 flex items-center gap-3">
+              <span className="text-[11px] text-slate-600 tabular-nums shrink-0">
                 {filled}/{total} campos
               </span>
-              <div className="flex-1 h-1 bg-slate-100 rounded-sm overflow-hidden mx-2">
+              <div className="flex-1 h-1 bg-slate-100 rounded-sm overflow-hidden">
                 <div
                   className={`h-full transition-all ${isComplete ? "bg-emerald-500" : pct > 0 ? "bg-brand-primary" : "bg-slate-300"}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className={`text-[11px] font-bold tabular-nums ${isComplete ? "text-emerald-700" : "text-slate-700"}`}>
-                {pct}%
-              </span>
             </div>
           </button>
         );

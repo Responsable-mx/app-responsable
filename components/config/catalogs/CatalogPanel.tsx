@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import type { CATALOG_CATEGORIES as CAT_TYPE } from "@/lib/catalogs/seeds";
 import { Row, type CatalogRowItem } from "./Row";
 import { ItemEditor } from "./ItemEditor";
@@ -125,7 +126,7 @@ export function CatalogPanel({ category }: { category: Category }) {
         </div>
       )}
 
-      {isLoading && <div className="text-sm text-slate-600">Cargando…</div>}
+      {isLoading && <SkeletonList items={4} />}
 
       {!isLoading && items.length === 0 && (
         <div className="text-sm text-slate-600 text-center py-8">

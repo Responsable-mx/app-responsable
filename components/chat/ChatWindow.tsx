@@ -671,6 +671,7 @@ export function ChatWindow({
                         : "bg-transparent text-slate-500 border-transparent hover:bg-slate-50 hover:border-slate-200"
                   }`}
                   aria-pressed={isActive}
+                  aria-label={`${r.name} — ${r.fn}${isVisited ? " (ya intervino)" : ""}`}
                   title={isVisited ? `${r.name} · ya intervino` : r.fn}
                 >
                   <span

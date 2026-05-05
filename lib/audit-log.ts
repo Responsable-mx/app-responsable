@@ -17,7 +17,9 @@ export type AuditEntityType =
   | "client_services"
   | "questionnaire_response"
   | "materiality_topic"
-  | "client_consultors";
+  | "client_consultors"
+  | "service_stage"
+  | "stage_activity";
 
 export type AuditAction = "create" | "update" | "delete" | "restore";
 

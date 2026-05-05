@@ -217,7 +217,7 @@ function renderNarrativeText(text: string | null | undefined): string {
 
 // ── Componentes internos ────────────────────────────────────
 
-function Footer({ clientName, page }: { clientName: string; page: number }) {
+function Footer({ clientName }: { clientName: string }) {
   return (
     <View style={s.footer} fixed>
       <Text>ResponSable · {clientName}</Text>
@@ -406,7 +406,7 @@ export function ClientReport({
           </View>
         )}
 
-        <Footer clientName={client.name} page={2} />
+        <Footer clientName={client.name} />
       </Page>
 
       {/* ── Servicios ────────────────────────────────────── */}
@@ -429,7 +429,7 @@ export function ClientReport({
               </View>
             ))}
           </View>
-          <Footer clientName={client.name} page={3} />
+          <Footer clientName={client.name} />
         </Page>
       )}
 
@@ -474,7 +474,7 @@ export function ClientReport({
               );
             })}
           </View>
-          <Footer clientName={client.name} page={4} />
+          <Footer clientName={client.name} />
         </Page>
       )}
 
@@ -532,7 +532,7 @@ export function ClientReport({
                 </View>
               ))}
           </View>
-          <Footer clientName={client.name} page={5} />
+          <Footer clientName={client.name} />
         </Page>
       )}
     </Document>

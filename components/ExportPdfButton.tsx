@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 export function ExportPdfButton({ clientId, clientName }: {
   clientId: string;
   clientName: string;
 }) {
   const [busy, setBusy] = useState(false);
+  const { push: toast } = useToast();
 
   async function handleExport() {
     if (busy) return;
@@ -15,7 +17,7 @@ export function ExportPdfButton({ clientId, clientName }: {
       const res = await fetch(`/api/clients/${clientId}/export-pdf`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Error al generar el PDF");
+        toast("error", data.error ?? "Error al generar el PDF");
         return;
       }
       const blob = await res.blob();

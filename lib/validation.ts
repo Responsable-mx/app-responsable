@@ -114,21 +114,25 @@ export const ClientInputSchema = z.object({
   logo_url: z.string().trim().url("URL inválida").max(500).optional().nullable(),
 
   // URLs públicas de documentos (PDF, web, Drive). Opcionales.
+  // D-34: .url() previene javascript: URIs y rutas relativas arbitrarias.
   sustainability_strategy_url: z
     .string()
     .trim()
+    .url("URL inválida")
     .max(600)
     .optional()
     .nullable(),
   sustainability_report_url: z
     .string()
     .trim()
+    .url("URL inválida")
     .max(600)
     .optional()
     .nullable(),
   double_materiality_url: z
     .string()
     .trim()
+    .url("URL inválida")
     .max(600)
     .optional()
     .nullable(),

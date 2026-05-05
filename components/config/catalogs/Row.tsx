@@ -48,11 +48,15 @@ export function Row({
     >
       <button
         aria-label="Arrastrar para reordenar"
-        className="cursor-grab text-slate-600 hover:text-slate-700 active:cursor-grabbing"
+        className="cursor-grab text-slate-400 hover:text-slate-600 active:cursor-grabbing flex items-center justify-center"
         {...attributes}
         {...listeners}
       >
-        ⋮⋮
+        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="5" cy="4" r="1.2"/><circle cx="11" cy="4" r="1.2"/>
+          <circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/>
+          <circle cx="5" cy="12" r="1.2"/><circle cx="11" cy="12" r="1.2"/>
+        </svg>
       </button>
       <div>
         <div className="font-medium text-slate-900">{item.label}</div>
@@ -84,16 +88,23 @@ export function Row({
       <div className="flex items-center justify-end gap-1">
         <button
           onClick={onEdit}
-          className="text-xs px-2 py-1 text-slate-700 hover:bg-slate-50 rounded"
+          aria-label={`Editar ${item.label}`}
+          className="text-xs px-3 py-2 text-slate-700 hover:bg-slate-50 rounded min-w-[40px] min-h-[40px] inline-flex items-center gap-1"
         >
-          ✎ Editar
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Editar
         </button>
         {!item.is_system && (
           <button
             onClick={onDelete}
-            className="text-xs px-2 py-1 text-red-700 hover:bg-red-50 rounded"
+            aria-label={`Eliminar ${item.label}`}
+            className="text-xs px-3 py-2 text-red-700 hover:bg-red-50 rounded min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
           >
-            ⊗
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
           </button>
         )}
       </div>

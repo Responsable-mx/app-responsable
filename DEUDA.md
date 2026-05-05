@@ -68,6 +68,13 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 | D-32 | RLS `chat_sessions_owner_delete` permitía hard-DELETE directo desde cliente JS | may-2026 — migración `0031` elimina política; solo service role puede hard-delete |
 | D-03 | Chat IA sin contexto inline en tabs del cliente | may-2026 — sprint añadió tab "Chat IA" en `ClientTabs` con `<ChatWindow clientId>` preseleccionado |
 | D-07 | Export PDF del cliente no existía | may-2026 — `@react-pdf/renderer` + `/api/clients/[id]/export-pdf` + `ExportPdfButton` |
+| D-33 | IDOR en `/api/client-services/[id]` PATCH/DELETE sin ownership check | may-2026 — `getClientService(id)` antes de mutar, 404 si no existe |
+| D-34 | URLs de documentos sin `.url()` — aceptaban `javascript:` | may-2026 — `.url("URL inválida")` en las 3 URLs de `ClientInputSchema` |
+| D-35 | `ExportPdfButton` usaba `alert()` en lugar de `useToast()` | may-2026 — migrado a `push("error", msg)` |
+| D-36 | PATCH/DELETE `client-services` sin `logChange()` | may-2026 — `void logChange(...)` en ambas mutaciones |
+| D-37 | `listConsultorProjects` 3 queries secuenciales, queries 2+3 independientes | may-2026 — `Promise.all([clients, userRow])` |
+| D-38 | Prop `page` dead code en `Footer` de `client-report.tsx` | may-2026 — prop eliminado |
+| D-39 | Sidebar SWR sin manejo de `error` — fallo silencioso en "Mis proyectos" | may-2026 — `error` desestructurado, array vacío en error |
 | D-05 | Sin paginación/search server-side en lista de clientes | may-2026 — `listClients(filter)` + `GET /api/clients?q=` + SWR debounce 300ms en `ClientsList` |
 | D-06 | Audit log faltante en endpoint de cuestionario | may-2026 — `logChange()` ya integrado en `/api/clients/[id]/questionnaire` (PATCH) |
 | D-08 | Stone vs slate: tokens residuales en producción | may-2026 — pase global `stone-*`→`slate-*` + `rounded-xl`→`rounded` en 24 componentes |

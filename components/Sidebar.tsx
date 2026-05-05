@@ -25,7 +25,7 @@ type NavItem = {
 };
 
 const NAV_BASE: NavItem[] = [
-  { href: "/chat", label: "Asistente IA", tour: "nav-chat", icon: IconChat },
+  { href: "/chat", label: "Chat IA", tour: "nav-chat", icon: IconChat },
   {
     href: "/clientes",
     label: "Clientes",
@@ -56,12 +56,13 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState(false);
 
   // Mis proyectos: asignaciones del consultor actual. revalidate 1h (cambia poco).
-  const { data: projectsData } = useSWR<ProjectsResponse>(
+  const { data: projectsData, error: projectsError } = useSWR<ProjectsResponse>(
     "/api/consultors/me",
     projectsFetcher,
     { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
   );
-  const projects = projectsData?.data ?? [];
+  // D-39: error silencioso si la API falla — mantener array vacío pero no ocultar el estado
+  const projects = projectsError ? [] : (projectsData?.data ?? []);
 
   useEffect(() => {
     const v = localStorage.getItem("sidebar-collapsed");

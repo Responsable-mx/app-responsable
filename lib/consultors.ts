@@ -121,21 +121,19 @@ export async function listConsultorProjects(
 
   const clientIds = rows.map((r) => r.client_id as string);
 
-  // 2. Nombres de los clientes
-  const { data: clients } = await admin
-    .from("clients")
-    .select("id, name")
-    .in("id", clientIds);
+  // D-37: queries 2 y 3 son independientes — ejecutar en paralelo
+  const [{ data: clients }, { data: userRow }] = await Promise.all([
+    admin.from("clients").select("id, name").in("id", clientIds),
+    admin
+      .from("authorized_users")
+      .select("seniority_level")
+      .eq("email", email)
+      .maybeSingle(),
+  ]);
+
   const clientMap = new Map(
     (clients ?? []).map((c) => [c.id as string, c.name as string])
   );
-
-  // 3. Seniority global del consultor (una sola fila)
-  const { data: userRow } = await admin
-    .from("authorized_users")
-    .select("seniority_level")
-    .eq("email", email)
-    .maybeSingle();
   const globalSeniority = (userRow?.seniority_level as string | null) ?? null;
 
   return rows.map((row) => ({

@@ -61,7 +61,7 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
   const [confirmInit, setConfirmInit] = useState(false);
   const [busyInit, setBusyInit] = useState(false);
 
-  const topics = data?.data ?? [];
+  const topics = useMemo(() => data?.data ?? [], [data]);
   const selected = topics.find((t) => t.id === selectedId) ?? null;
 
   const stats = useMemo(() => {
@@ -700,7 +700,7 @@ function TopicEditor({
               <span className="text-xs text-slate-700">
                 <span className="font-semibold">Confirmar posicionamiento.</span>{" "}
                 <span className="text-slate-500">
-                  Marca cuando el consultor confirme que x/y/color reflejan el juicio del cliente. Cuenta hacia "Todas validadas" en el header.
+                  Marca cuando el consultor confirme que x/y/color reflejan el juicio del cliente. Cuenta hacia &ldquo;Todas validadas&rdquo; en el header.
                 </span>
               </span>
             </label>

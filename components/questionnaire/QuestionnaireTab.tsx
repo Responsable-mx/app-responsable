@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   computeProgress,
-  getFieldValue,
   isFieldFilled,
   isFieldResponse,
   isSourceStale,
@@ -117,6 +116,47 @@ function WizardEditor({
   useEffect(() => {
     responsesRef.current = responses;
   }, [responses]);
+
+  // Hooks de ciclo de vida — deben estar antes del early-return (Rules of Hooks).
+  // aiFillAll está definida más abajo pero es function declaration → hoisting la hace accesible.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      // D-38: flush inmediato al desmontar (ej. cambio de tab antes de que expire
+      // el debounce de 1.2s). keepalive=true permite que el fetch complete aunque
+      // el componente ya no esté montado.
+      if (dirty.current) {
+        const snap = responsesRef.current;
+        const prog = computeProgress(schema, snap);
+        const completedSections = steps
+          .filter((s) => prog.sectionProgress[s.key]?.pct === 100 && s.fields.length > 0)
+          .map((s) => s.key);
+        void fetch(`/api/clients/${clientId}/questionnaire`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            service: template.service_key,
+            responses: snap,
+            completedSections,
+            expectedUpdatedAt: lastServerUpdatedAt.current,
+          }),
+          keepalive: true,
+        });
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-trigger bulk AI fill al montar (cuando viene de /clientes/nuevo con &autoFill=1)
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoFillOnMount && !autoFiredRef.current && steps.length > 0) {
+      autoFiredRef.current = true;
+      void aiFillAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFillOnMount]);
 
   if (!isWizard) {
     return (
@@ -357,45 +397,6 @@ function WizardEditor({
       toast.push("warning", `${success} OK · ${failures.length} fallaron: ${failures.map((f) => f.step).join(", ")}`);
     }
   }
-
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (retryTimer.current) clearTimeout(retryTimer.current);
-      // D-38: flush inmediato al desmontar (ej. cambio de tab antes de que expire
-      // el debounce de 1.2s). keepalive=true permite que el fetch complete aunque
-      // el componente ya no esté montado.
-      if (dirty.current) {
-        const snap = responsesRef.current;
-        const prog = computeProgress(schema, snap);
-        const completedSections = steps
-          .filter((s) => prog.sectionProgress[s.key]?.pct === 100 && s.fields.length > 0)
-          .map((s) => s.key);
-        void fetch(`/api/clients/${clientId}/questionnaire`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service: template.service_key,
-            responses: snap,
-            completedSections,
-            expectedUpdatedAt: lastServerUpdatedAt.current,
-          }),
-          keepalive: true,
-        });
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Auto-trigger bulk AI fill al montar (cuando viene de /clientes/nuevo con &autoFill=1)
-  const autoFiredRef = useRef(false);
-  useEffect(() => {
-    if (autoFillOnMount && !autoFiredRef.current && steps.length > 0) {
-      autoFiredRef.current = true;
-      void aiFillAll();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFillOnMount]);
 
   const aiCapableCount = steps.filter((s) => s.ai_can_fill).length;
   const someStepHasResponses = Object.values(responses).some(

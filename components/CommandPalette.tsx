@@ -71,6 +71,7 @@ export function CommandPalette() {
   // Reset al abrir + foco input.
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset intencional al abrir el panel
       setQuery("");
       setActiveIdx(0);
       setTimeout(() => inputRef.current?.focus(), 0);
@@ -114,6 +115,7 @@ export function CommandPalette() {
 
   // Reset índice cuando cambia query.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- activeIdx es estado derivado de query; se resetea a 0 en cada nueva búsqueda
     setActiveIdx(0);
   }, [query]);
 

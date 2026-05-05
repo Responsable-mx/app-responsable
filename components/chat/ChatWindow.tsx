@@ -801,9 +801,12 @@ export function ChatWindow({
                     </button>
                   </div>
                   <ul className="space-y-0.5">
-                    {recentSessions.map((s) => {
+                    {(() => {
+                      // eslint-disable-next-line react-hooks/purity
+                      const nowTs = Date.now();
+                      return recentSessions.map((s) => {
                       const daysAgo = Math.floor(
-                        (Date.now() - new Date(s.updated_at).getTime()) / 86400000
+                        (nowTs - new Date(s.updated_at).getTime()) / 86400000
                       );
                       const stamp =
                         daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
@@ -836,7 +839,8 @@ export function ChatWindow({
                           </button>
                         </li>
                       );
-                    })}
+                    });
+                    })()}
                   </ul>
                 </div>
               )}

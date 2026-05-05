@@ -81,24 +81,14 @@ export function ClientTabs({
     }
   );
 
-  const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
+  const questionnaireProgress = questionnaireResp?.data.progress
+    ? {
+        filled: questionnaireResp.data.progress.filledFields,
+        total: questionnaireResp.data.progress.totalFields,
+      }
+    : null;
   const schema = questionnaireResp?.data.template.schema;
-  const totalSteps = schema
-    ? "steps" in schema
-      ? schema.steps.length
-      : schema.sections.length
-    : 0;
   const materialityCount = materialityResp?.data?.length ?? null;
-  // Validación real (migración 0027): cuenta solo topics con validated=true.
-  // Antes era placeholder = materialityCount, lo que mostraba "Todas validadas"
-  // sin que el consultor hubiera revisado nada.
-  const materialityValidated =
-    materialityResp?.data?.filter((t) => t.validated === true).length ?? null;
-  const allValidated =
-    materialityCount !== null &&
-    materialityValidated !== null &&
-    materialityCount > 0 &&
-    materialityValidated === materialityCount;
 
   // Resumen tab: 5 cards macro. Una card está completa si TODOS sus stepKeys están en completed_sections.
   // Mapping idéntico al de ClientResumen.tsx
@@ -153,7 +143,7 @@ export function ClientTabs({
             </svg>
           }
           label="Cuestionario"
-          badge={pctCuestionario === null ? "…" : `${pctCuestionario}%`}
+          badge={questionnaireProgress === null ? "…" : `${questionnaireProgress.filled}/${questionnaireProgress.total}`}
         />
         <TabButton
           active={tab === "chat"}

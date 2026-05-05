@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { ClientsList } from "@/components/ClientsList";
 
 vi.mock("next/link", () => ({

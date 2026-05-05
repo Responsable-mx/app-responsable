@@ -79,11 +79,12 @@ export function ClientsList() {
     revalidateOnFocus: false,
     keepPreviousData: true,
   });
-  const clients = swrData?.data ?? [];
+  const clients = useMemo(() => swrData?.data ?? [], [swrData]);
 
   // Hidratar vistas guardadas en mount + restaurar última vista activa.
   useEffect(() => {
     const views = loadSavedViews();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSavedViews(views);
     // Sync URL con vistas: ?view=<id> aplica al cargar, ?q=&sector=&view=table aplican filtros.
     const params = new URLSearchParams(window.location.search);
@@ -168,6 +169,7 @@ export function ClientsList() {
     const v = savedViews.find((x) => x.id === activeViewId);
     if (!v) return;
     if (v.query !== query || v.sectorFilter !== sectorFilter || v.view !== view) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- derived state: limpia activeViewId cuando filtros divergen de la vista guardada
       setActiveViewId(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -421,6 +423,7 @@ export function ClientsList() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.map((c) => {
+                  // eslint-disable-next-line react-hooks/purity -- timestamp relativo de lista, no requiere reactividad
                   const daysAgo = Math.floor((Date.now() - new Date(c.updated_at).getTime()) / 86400000);
                   const updatedLabel = daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
                   const allTags = [

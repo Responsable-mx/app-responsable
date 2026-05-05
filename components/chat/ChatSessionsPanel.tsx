@@ -100,6 +100,7 @@ export function ChatSessionsPanel({
               {sessions.map((s) => {
                 const active = s.id === currentSessionId;
                 const updated = new Date(s.updated_at);
+                // eslint-disable-next-line react-hooks/purity -- timestamp relativo de lista, aceptable en render
                 const daysAgo = Math.floor((Date.now() - updated.getTime()) / 86400000);
                 const stamp =
                   daysAgo === 0

@@ -144,7 +144,7 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           type: "web_search_20250305" as any,
           name: "web_search",
-          max_uses: 4,
+          max_uses: 2,
         },
       ],
       messages: [{ role: "user", content: userPrompt }],

@@ -204,14 +204,15 @@ function WizardEditor({
   async function aiFillAll() {
     const aiSteps = steps.filter((s) => s.ai_can_fill);
     if (aiSteps.length === 0) return;
+    let completedCount = 0;
     let success = 0;
     const failures: { step: string; error: string }[] = [];
-    for (let i = 0; i < aiSteps.length; i++) {
-      const s = aiSteps[i];
-      setAiBulkProgress({ current: i + 1, total: aiSteps.length, stepTitle: s.title });
+    setAiBulkProgress({ current: 0, total: aiSteps.length, stepTitle: "Iniciando…" });
+
+    async function fillOne(s: WizardStep) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 290_000); // 290s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 290_000);
         const res = await fetch(`/api/clients/${clientId}/wizard/${s.key}/ai-fill`, {
           method: "POST",
           signal: controller.signal,
@@ -223,7 +224,6 @@ function WizardEditor({
         }
         const json = (await res.json()) as { data: Record<string, FieldResponse> };
         setResponses((prev) => ({ ...prev, [s.key]: json.data }));
-        // Save partial progress por paso (no esperar al final)
         dirty.current = true;
         void save();
         success++;
@@ -231,8 +231,23 @@ function WizardEditor({
         const msg = e instanceof Error ? e.message : "Error desconocido";
         console.error(`[aiFillAll] ${s.key}:`, msg);
         failures.push({ step: s.title, error: msg });
+      } finally {
+        completedCount++;
+        setAiBulkProgress({
+          current: completedCount,
+          total: aiSteps.length,
+          stepTitle: `${aiSteps.length - completedCount} pasos restantes`,
+        });
       }
     }
+
+    // Batches de 3 concurrent — paraleliza llamadas Anthropic respetando rate limit
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < aiSteps.length; i += BATCH_SIZE) {
+      const batch = aiSteps.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(fillOne));
+    }
+
     setAiBulkProgress(null);
     mutate();
     if (failures.length === 0) {

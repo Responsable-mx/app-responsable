@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { HelpMenu } from "@/components/HelpMenu";
 import {
   IconChat,
@@ -36,35 +37,85 @@ const NAV_ADMIN: NavItem[] = [
   },
 ];
 
-export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
+export function Sidebar({
+  isAdmin = false,
+  userEmail,
+}: {
+  isAdmin?: boolean;
+  userEmail?: string | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const items = isAdmin ? [...NAV_BASE, ...NAV_ADMIN] : NAV_BASE;
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const v = localStorage.getItem("sidebar-collapsed");
+    if (v === "1") setCollapsed(true);
+  }, []);
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("sidebar-collapsed", next ? "1" : "0");
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleCollapsed();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsed]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 
+  const initial = (userEmail ?? "?").trim().charAt(0).toUpperCase();
+  const userName = userEmail ? userEmail.split("@")[0] : "Usuario";
+
   return (
-    <aside className="w-60 bg-white border-r border-stone-200 flex flex-col">
-      <div className="px-4 py-5 border-b border-stone-200">
-        <div className="flex items-center gap-2.5">
-          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-brand-primary to-brand-primary-dark text-white font-bold flex items-center justify-center text-base shadow-sm ring-1 ring-brand-primary-dark/10">
+    <aside
+      className={`bg-white border-r border-slate-200 flex flex-col transition-all duration-150 ${
+        collapsed ? "w-14" : "w-60"
+      }`}
+    >
+      <div className={`px-3 py-4 border-b border-slate-200 ${collapsed ? "flex flex-col items-center" : ""}`}>
+        <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5"}`}>
+          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-brand-primary to-brand-primary-dark text-white font-bold flex items-center justify-center text-base shadow-sm ring-1 ring-brand-primary-dark/10 shrink-0">
             R
           </div>
-          <div>
-            <div className="text-sm font-bold text-slate-900 leading-tight">
-              App ResponSable
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-900 leading-tight truncate">
+                App ResponSable
+              </div>
+              <div className="text-[10px] text-slate-600 leading-tight mt-0.5 truncate">
+                Consultoría sostenibilidad · IA
+              </div>
             </div>
-            <div className="text-[10px] text-slate-600 leading-tight mt-0.5">
-              Consultoría en sostenibilidad · IA
-            </div>
-          </div>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className={`mt-3 inline-flex items-center justify-center w-7 h-7 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${collapsed ? "" : "ml-auto"}`}
+          title={collapsed ? "Expandir sidebar (Ctrl+B)" : "Colapsar sidebar (Ctrl+B)"}
+          aria-label={collapsed ? "Expandir" : "Colapsar"}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={collapsed ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"} />
+          </svg>
+        </button>
       </div>
 
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
+      <nav className={`flex-1 ${collapsed ? "px-1" : "px-2"} py-3 space-y-0.5`}>
         {items.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
@@ -74,21 +125,20 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
               key={item.href}
               href={item.href}
               data-tour={item.tour}
-              className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              title={collapsed ? item.label : undefined}
+              className={`group flex items-center ${collapsed ? "justify-center" : "gap-2.5 px-3"} py-2 rounded-lg text-sm transition-colors ${
                 active
                   ? "bg-brand-primary-light text-brand-primary-dark font-medium"
-                  : "text-slate-600 hover:bg-stone-50 hover:text-slate-900"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               <Icon
                 className={`w-[18px] h-[18px] shrink-0 ${
-                  active
-                    ? "text-brand-primary-hover"
-                    : "text-slate-600 group-hover:text-slate-600"
+                  active ? "text-brand-primary-hover" : "text-slate-600"
                 }`}
               />
-              <span>{item.label}</span>
-              {active && (
+              {!collapsed && <span className="truncate">{item.label}</span>}
+              {!collapsed && active && (
                 <span className="ml-auto w-1 h-5 rounded-full bg-brand-primary/70" />
               )}
             </Link>
@@ -96,15 +146,32 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
         })}
       </nav>
 
-      <div className="px-2 py-2 border-t border-stone-200 space-y-0.5">
-        <HelpMenu />
+      <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200 space-y-0.5`}>
+        {!collapsed && <HelpMenu />}
         <button
           onClick={handleLogout}
-          className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-stone-50 hover:text-slate-900 transition-colors"
+          title={collapsed ? "Cerrar sesión" : undefined}
+          className={`group w-full flex items-center ${collapsed ? "justify-center" : "gap-2.5 px-3"} py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors`}
         >
-          <IconLogout className="w-[18px] h-[18px] text-slate-600 group-hover:text-slate-600" />
-          <span>Cerrar sesión</span>
+          <IconLogout className="w-[18px] h-[18px] text-slate-600 shrink-0" />
+          {!collapsed && <span>Cerrar sesión</span>}
         </button>
+
+        {/* Avatar usuario */}
+        <div className={`mt-2 pt-2 border-t border-slate-100 flex items-center ${collapsed ? "justify-center" : "gap-2 px-2"}`}>
+          <div
+            className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-white font-bold flex items-center justify-center text-xs shrink-0"
+            title={userEmail ?? ""}
+          >
+            {initial}
+          </div>
+          {!collapsed && userEmail && (
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-700 truncate">{userName}</p>
+              <p className="text-[10px] text-slate-500 truncate">{isAdmin ? "Admin" : "Consultor"}</p>
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );

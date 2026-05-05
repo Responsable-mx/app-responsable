@@ -7,10 +7,12 @@ import { ClientForm } from "@/components/ClientForm";
 import { ClientServicesTab } from "@/components/services/ClientServicesTab";
 import { QuestionnaireTab } from "@/components/questionnaire/QuestionnaireTab";
 import { MaterialityTab } from "@/components/materiality/MaterialityTab";
+import { ClientResumen } from "@/components/ClientResumen";
+import { ChatWindow } from "@/components/chat/ChatWindow";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 import type { MaterialityTopic } from "@/lib/materiality/types";
 
-type Tab = "contexto" | "servicios" | "cuestionario" | "materialidad";
+type Tab = "resumen" | "contexto" | "servicios" | "cuestionario" | "materialidad" | "chat";
 
 type Props = {
   client: Client;
@@ -36,7 +38,7 @@ const materialityFetcher = (url: string) =>
   });
 
 export function ClientTabs({ client, completeness }: Props) {
-  const [tab, setTab] = useState<Tab>("contexto");
+  const [tab, setTab] = useState<Tab>("resumen");
   const { data: servicesResp } = useSWR(
     `/api/clients/${client.id}/services`,
     servicesFetcher
@@ -53,6 +55,9 @@ export function ClientTabs({ client, completeness }: Props) {
   const pctContexto = Math.round((completeness.filled / completeness.total) * 100);
   const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
   const materialityCount = materialityResp?.data?.length ?? null;
+
+  // Para Chat IA inline: usa completeness ya pasado como prop
+  const ctxCompleteness = completeness;
 
   return (
     <div>
@@ -127,6 +132,12 @@ export function ClientTabs({ client, completeness }: Props) {
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-slate-200 mb-5 overflow-x-auto">
         <TabButton
+          active={tab === "resumen"}
+          onClick={() => setTab("resumen")}
+          label="Resumen"
+          badge={null}
+        />
+        <TabButton
           active={tab === "contexto"}
           onClick={() => setTab("contexto")}
           label="Contexto"
@@ -150,12 +161,44 @@ export function ClientTabs({ client, completeness }: Props) {
           label="Materialidad"
           badge={materialityCount === null ? "…" : String(materialityCount)}
         />
+        <TabButton
+          active={tab === "chat"}
+          onClick={() => setTab("chat")}
+          label="Chat IA"
+          badge={null}
+        />
       </div>
 
+      {tab === "resumen" && (
+        <ClientResumen
+          client={client}
+          completeness={completeness}
+          questionnaire={questionnaireResp?.data ?? null}
+          materialityTopics={materialityResp?.data ?? []}
+          servicesCount={servicesCount}
+          onJumpToTab={(t) => setTab(t)}
+        />
+      )}
       {tab === "contexto" && <ClientForm mode="edit" initial={client} />}
       {tab === "servicios" && <ClientServicesTab clientId={client.id} />}
       {tab === "cuestionario" && <QuestionnaireTab clientId={client.id} />}
       {tab === "materialidad" && <MaterialityTab clientId={client.id} />}
+      {tab === "chat" && (
+        <div className="border border-slate-200 rounded shadow-sm overflow-hidden bg-white" style={{ height: "min(75vh, 720px)" }}>
+          <ChatWindow
+            key={client.id}
+            clients={[
+              {
+                id: client.id,
+                name: client.name,
+                sector: client.sector,
+                completeness: ctxCompleteness,
+              },
+            ]}
+            initialClientId={client.id}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -199,13 +242,11 @@ function TabButton({
   onClick,
   label,
   badge,
-  muted = false,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   badge: string | null;
-  muted?: boolean;
 }) {
   return (
     <button
@@ -213,9 +254,7 @@ function TabButton({
       className={`px-3 py-2 text-xs font-bold uppercase tracking-wider border-b-2 -mb-px transition-colors flex items-center gap-1.5 whitespace-nowrap ${
         active
           ? "border-brand-primary text-brand-primary-dark"
-          : muted
-            ? "border-transparent text-slate-400 hover:text-slate-600"
-            : "border-transparent text-slate-500 hover:text-slate-900"
+          : "border-transparent text-slate-500 hover:text-slate-900"
       }`}
     >
       {label}
@@ -224,41 +263,12 @@ function TabButton({
           className={`text-[10px] font-semibold rounded-sm px-1.5 py-0.5 tabular-nums ${
             active
               ? "bg-brand-primary-light text-brand-primary-dark"
-              : muted
-                ? "bg-slate-100 text-slate-400"
-                : "bg-slate-100 text-slate-600"
+              : "bg-slate-100 text-slate-600"
           }`}
         >
           {badge}
         </span>
       )}
     </button>
-  );
-}
-
-function PlaceholderTab({ title }: { title: string }) {
-  return (
-    <div className="border border-slate-200 rounded bg-slate-50/50 p-8 text-center">
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 mb-3">
-        <svg
-          className="w-6 h-6 text-slate-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      </div>
-      <h3 className="text-sm font-bold text-slate-700 mb-1">{title}</h3>
-      <p className="text-xs text-slate-500 max-w-sm mx-auto">
-        Esta sección estará disponible próximamente. El backend y la UI editable
-        se entregan en sprints siguientes.
-      </p>
-    </div>
   );
 }

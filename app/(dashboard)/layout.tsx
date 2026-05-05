@@ -13,8 +13,8 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
-      <div className="h-screen bg-stone-50 flex overflow-hidden">
-        <Sidebar isAdmin={admin} />
+      <div className="h-screen bg-slate-50 flex overflow-hidden">
+        <Sidebar isAdmin={admin} userEmail={email} />
         <main id="main-content" className="flex-1 overflow-y-auto">
           {children}
         </main>

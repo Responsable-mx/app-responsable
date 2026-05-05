@@ -16,9 +16,12 @@ type Row = Pick<
   | "certifications"
 >;
 
+type ViewMode = "cards" | "table";
+
 export function ClientsList({ clients }: { clients: Row[] }) {
   const [query, setQuery] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
+  const [view, setView] = useState<ViewMode>("cards");
 
   const sectors = useMemo(() => {
     const s = new Set<string>();
@@ -50,7 +53,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por nombre, sector, país, marco, certificación…"
-            className="w-full pl-10 pr-3 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
           />
           <svg
             viewBox="0 0 24 24"
@@ -59,7 +62,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
             strokeWidth={1.75}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
+            className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
           >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -69,7 +72,7 @@ export function ClientsList({ clients }: { clients: Row[] }) {
           <select
             value={sectorFilter}
             onChange={(e) => setSectorFilter(e.target.value)}
-            className="px-3 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="px-3 py-2 border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
           >
             <option value="">Todos los sectores</option>
             {sectors.map((s) => (
@@ -79,8 +82,32 @@ export function ClientsList({ clients }: { clients: Row[] }) {
             ))}
           </select>
         )}
-        <div className="text-xs text-slate-600 whitespace-nowrap">
+        <div className="text-xs text-slate-600 whitespace-nowrap tabular-nums">
           {filtered.length} de {clients.length}
+        </div>
+        <div className="ml-auto inline-flex items-center bg-slate-100 rounded p-0.5">
+          <button
+            type="button"
+            onClick={() => setView("cards")}
+            className={`px-2.5 py-1 text-xs rounded transition-colors ${view === "cards" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            title="Vista cards"
+            aria-pressed={view === "cards"}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("table")}
+            className={`px-2.5 py-1 text-xs rounded transition-colors ${view === "table" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            title="Vista tabla"
+            aria-pressed={view === "table"}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 10h18M3 14h18M3 6h18M3 18h18" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -99,6 +126,12 @@ export function ClientsList({ clients }: { clients: Row[] }) {
               Agregar el primero
             </Link>
           )}
+        </div>
+      ) : view === "cards" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filtered.map((c) => (
+            <ClientCard key={c.id} client={c} />
+          ))}
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded overflow-hidden shadow-sm">
@@ -128,14 +161,12 @@ export function ClientsList({ clients }: { clients: Row[] }) {
                       {c.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {c.sector ?? "—"}
-                  </td>
+                  <td className="px-4 py-3 text-slate-600">{c.sector ?? "—"}</td>
                   <td className="px-4 py-3 text-slate-600">
                     {c.countries?.join(", ") ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{c.size ?? "—"}</td>
-                  <td className="px-4 py-3 text-right text-slate-600 text-xs">
+                  <td className="px-4 py-3 text-right text-slate-600 text-xs tabular-nums">
                     {new Date(c.updated_at).toLocaleDateString("es-MX")}
                   </td>
                 </tr>
@@ -145,5 +176,67 @@ export function ClientsList({ clients }: { clients: Row[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ClientCard({ client }: { client: Row }) {
+  const initials = client.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+  const updated = new Date(client.updated_at);
+  const daysAgo = Math.floor((Date.now() - updated.getTime()) / 86400000);
+  const updatedLabel =
+    daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
+
+  return (
+    <Link
+      href={`/clientes/${client.id}`}
+      className="group block bg-white border border-slate-200 rounded shadow-sm hover:shadow-md hover:border-brand-primary/40 transition-all p-4"
+    >
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded bg-gradient-to-br from-brand-primary to-brand-primary-dark text-white font-bold flex items-center justify-center text-sm shrink-0 ring-1 ring-brand-primary-dark/10">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-slate-900 leading-tight truncate group-hover:text-brand-primary-hover transition-colors">
+            {client.name}
+          </h3>
+          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+            {client.sector ?? "Sin sector"}
+            {client.size ? ` · ${client.size}` : ""}
+          </p>
+        </div>
+      </div>
+
+      {(client.countries?.length || client.frameworks?.length || client.certifications?.length) ? (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {client.countries?.slice(0, 3).map((p) => (
+            <span key={p} className="text-[10px] bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5 font-medium">
+              {p}
+            </span>
+          ))}
+          {client.frameworks?.slice(0, 2).map((f) => (
+            <span key={f} className="text-[10px] bg-brand-primary-light text-brand-primary-dark rounded-sm px-1.5 py-0.5 font-medium">
+              {f}
+            </span>
+          ))}
+          {client.certifications?.slice(0, 2).map((c) => (
+            <span key={c} className="text-[10px] bg-amber-50 text-amber-700 rounded-sm px-1.5 py-0.5 font-medium">
+              {c}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[10px] text-slate-400 italic mb-3">Sin marcos ni certificaciones registrados.</p>
+      )}
+
+      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+        <span className="uppercase tracking-widest font-bold">Actualizado</span>
+        <span className="tabular-nums text-slate-600">{updatedLabel}</span>
+      </div>
+    </Link>
   );
 }

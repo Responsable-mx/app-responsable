@@ -934,6 +934,15 @@ function SourceDrawer({
                 );
               })}
             </div>
+            {/* Aviso inline: "public" e "interpretation" exigen al menos 1 fuente */}
+            {(response?.source_type === "public" || response?.source_type === "interpretation") &&
+              (!response?.sources || response.sources.length === 0) && (
+                <p className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+                  {response.source_type === "interpretation"
+                    ? "Interpretación requiere al menos una fuente que sustente el juicio. Agrega una URL abajo o cambia a «solo consultor»."
+                    : "Dato público requiere al menos una fuente verificable. Agrega una URL abajo."}
+                </p>
+              )}
           </div>
 
           <div>

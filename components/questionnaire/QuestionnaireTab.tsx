@@ -656,11 +656,11 @@ function FieldRow({
       </div>
 
       {field.type === "textarea" ? (
-        <textarea
-          className={`${baseInput} px-3 py-2 min-h-[64px] resize-y`}
+        <AutoResizeTextarea
+          className={`${baseInput} px-3 py-2 min-h-[40px] resize-none overflow-hidden`}
           value={typeof value === "string" ? value : ""}
           placeholder={field.placeholder}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => onChange(v)}
         />
       ) : field.type === "number" ? (
         <input
@@ -846,5 +846,44 @@ function SourceDrawer({
         </div>
       </div>
     </>
+  );
+}
+
+function AutoResizeTextarea({
+  value,
+  placeholder,
+  className,
+  onChange,
+}: {
+  value: string;
+  placeholder?: string;
+  className: string;
+  onChange: (v: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  function resize() {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }
+
+  useEffect(() => {
+    resize();
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      className={className}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => {
+        onChange(e.target.value);
+        resize();
+      }}
+      onInput={resize}
+    />
   );
 }

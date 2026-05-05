@@ -44,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (parsed.data.name !== undefined) update.name = parsed.data.name;
   if (parsed.data.description !== undefined) update.description = parsed.data.description;
   if (parsed.data.service !== undefined) update.service = parsed.data.service;
+  if (parsed.data.data !== undefined) update.data = parsed.data.data;
 
   try {
     const adminDb = createAdminClient();

@@ -30,10 +30,29 @@ export type StageTemplate = {
   updated_at: string;
 };
 
+export const TemplateActivitySchema = z.object({
+  name: z.string().trim().min(1, "Nombre requerido").max(200),
+  description: z.string().max(2000).nullable().optional(),
+  order_index: z.number().int().min(0),
+  offset_start_days: z.number().int().nullable().optional(),
+  offset_end_days: z.number().int().nullable().optional(),
+});
+
+export const TemplateStageSchema = z.object({
+  name: z.string().trim().min(1, "Nombre requerido").max(200),
+  order_index: z.number().int().min(0),
+  activities: z.array(TemplateActivitySchema),
+});
+
+export const TemplateDataSchema = z.object({
+  stages: z.array(TemplateStageSchema),
+});
+
 export const TemplateInputSchema = z.object({
   name: z.string().trim().min(1, "Nombre requerido").max(200),
   description: z.string().max(2000).nullable().optional(),
   service: z.string().max(100).nullable().optional(),
+  data: TemplateDataSchema.optional(),
 });
 
 export const CreateFromServiceSchema = TemplateInputSchema.extend({

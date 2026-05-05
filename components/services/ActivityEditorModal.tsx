@@ -2,7 +2,11 @@
 
 // Modal CRUD compartido entre vista Lista y vista Gantt.
 // Si activity → editar; si no → crear.
-// Permisos: admin edita todo; consultor solo actual_start/actual_end.
+// Permisos:
+//  - admin edita todo (en /configuracion/plantillas o cuando lockStructure=false)
+//  - consultor solo actual_start/actual_end
+//  - lockStructure=true: incluso admin solo edita actual_*+assignee (cliente cronograma view)
+//    porque la estructura se define en /configuracion/plantillas, no en el cliente.
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +20,7 @@ export function ActivityEditorModal({
   activity,
   consultorEmails,
   isAdmin,
+  lockStructure = false,
   onClose,
   onSaved,
 }: {
@@ -23,6 +28,7 @@ export function ActivityEditorModal({
   activity?: StageActivity;
   consultorEmails: string[];
   isAdmin: boolean;
+  lockStructure?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -43,11 +49,14 @@ export function ActivityEditorModal({
     setBusy(true);
     try {
       const body: Record<string, unknown> = {};
-      if (isAdmin || !isEditing) {
+      if ((isAdmin && !lockStructure) || !isEditing) {
         body.name = name.trim();
         body.description = description.trim() || null;
         body.planned_start = plannedStart || null;
         body.planned_end = plannedEnd || null;
+      }
+      // assignee_email es decisión de proyecto, no estructura: admin la edita siempre
+      if (isAdmin || !isEditing) {
         body.assignee_email = assigneeEmail || null;
       }
       body.actual_start = actualStart || null;
@@ -104,11 +113,11 @@ export function ActivityEditorModal({
           label="Nombre"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          disabled={isEditing && !isAdmin}
+          disabled={isEditing && (!isAdmin || lockStructure)}
           placeholder="Ej: Entrevistas a stakeholders"
         />
 
-        {(isAdmin || !isEditing) && (
+        {((isAdmin && !lockStructure) || !isEditing) && (
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Descripción
@@ -122,6 +131,12 @@ export function ActivityEditorModal({
             />
           </div>
         )}
+        {isEditing && lockStructure && description && (
+          <div className="bg-slate-50 border border-slate-200 rounded px-3 py-2 text-xs text-slate-600">
+            <span className="font-bold text-[10px] uppercase tracking-widest text-slate-400">Descripción</span>
+            <p className="mt-0.5">{description}</p>
+          </div>
+        )}
 
         <fieldset className="border border-slate-200 rounded p-2.5">
           <legend className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">
@@ -133,14 +148,14 @@ export function ActivityEditorModal({
               type="date"
               value={plannedStart}
               onChange={(e) => setPlannedStart(e.target.value)}
-              disabled={isEditing && !isAdmin}
+              disabled={isEditing && (!isAdmin || lockStructure)}
             />
             <Input
               label="Fin plan"
               type="date"
               value={plannedEnd}
               onChange={(e) => setPlannedEnd(e.target.value)}
-              disabled={isEditing && !isAdmin}
+              disabled={isEditing && (!isAdmin || lockStructure)}
             />
           </div>
         </fieldset>

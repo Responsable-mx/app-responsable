@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
+import { TemplateStructureEditor } from "./TemplateStructureEditor";
 
 type Template = {
   id: string;
@@ -44,6 +45,8 @@ export function TemplatesManager() {
   const [editing, setEditing] = useState<Template | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [previewing, setPreviewing] = useState<Template | null>(null);
+  const [editingStructure, setEditingStructure] = useState<Template | null>(null);
+  const [creatingNew, setCreatingNew] = useState(false);
   const { push } = useToast();
 
   const serviceLabel = (key: string | null) =>
@@ -86,6 +89,12 @@ export function TemplatesManager() {
           {templates.length}{" "}
           {templates.length === 1 ? "plantilla" : "plantillas"} guardadas
         </span>
+        <button
+          onClick={() => setCreatingNew(true)}
+          className="px-3 py-1.5 bg-brand-primary-hover text-white text-sm font-medium rounded hover:bg-brand-primary-dark"
+        >
+          + Nueva plantilla
+        </button>
       </div>
 
       {templates.length === 0 ? (
@@ -149,10 +158,18 @@ export function TemplatesManager() {
                       Ver
                     </button>
                     <button
-                      onClick={() => setEditing(t)}
+                      onClick={() => setEditingStructure(t)}
                       className="text-[11px] text-brand-primary-dark hover:underline"
+                      title="Editar etapas y actividades"
                     >
-                      Editar
+                      Estructura
+                    </button>
+                    <button
+                      onClick={() => setEditing(t)}
+                      className="text-[11px] text-slate-600 hover:text-brand-primary-dark hover:underline"
+                      title="Editar nombre/descripción/servicio"
+                    >
+                      Metadata
                     </button>
                     <button
                       onClick={() => setDeleteTarget(t)}
@@ -175,6 +192,40 @@ export function TemplatesManager() {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
+            mutate();
+          }}
+        />
+      )}
+
+      {editingStructure && (
+        <TemplateStructureEditor
+          templateId={editingStructure.id}
+          templateName={editingStructure.name}
+          initial={{ stages: editingStructure.data.stages.map((s) => ({
+            name: s.name,
+            order_index: 0,
+            activities: s.activities.map((a) => ({
+              name: a.name,
+              description: null,
+              order_index: 0,
+              offset_start_days: a.offset_start_days,
+              offset_end_days: a.offset_end_days,
+            })),
+          })) }}
+          onClose={() => setEditingStructure(null)}
+          onSaved={() => {
+            setEditingStructure(null);
+            mutate();
+          }}
+        />
+      )}
+
+      {creatingNew && (
+        <CreateTemplateModal
+          serviceCat={serviceCat}
+          onClose={() => setCreatingNew(false)}
+          onSaved={() => {
+            setCreatingNew(false);
             mutate();
           }}
         />
@@ -365,6 +416,113 @@ function PreviewTemplateModal({
             </div>
           ))}
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+function CreateTemplateModal({
+  serviceCat,
+  onClose,
+  onSaved,
+}: {
+  serviceCat: { value: string; label: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [service, setService] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const { push } = useToast();
+
+  async function handleCreate() {
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/stage-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+          service: service || null,
+          data: { stages: [] },
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error ?? `Error ${res.status}`);
+        return;
+      }
+      push("success", "Plantilla creada. Ahora define la estructura.");
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Nueva plantilla"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={handleCreate} disabled={!name.trim() || busy} loading={busy}>
+            Crear
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {err && (
+          <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded p-2">
+            {err}
+          </div>
+        )}
+        <Input
+          label="Nombre"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ej: Doble Materialidad estándar"
+        />
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">
+            Descripción (opcional)
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+            placeholder="Cuándo usar esta plantilla, scope típico, etc."
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">
+            Servicio asociado (opcional)
+          </label>
+          <select
+            value={service}
+            onChange={(e) => setService(e.target.value)}
+            className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+          >
+            <option value="">Genérica (sin servicio)</option>
+            {serviceCat.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded p-2.5">
+          Después de crear la plantilla, usa &quot;Estructura&quot; para agregar etapas y actividades con offsets.
+        </p>
       </div>
     </Modal>
   );

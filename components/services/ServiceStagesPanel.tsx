@@ -217,46 +217,41 @@ export function ServiceStagesPanel({
         )}
       </div>
 
-      {stages.map((s, i) => (
+      {/* Cliente cronograma: estructura read-only.
+          Estructura se define en /configuracion/plantillas y se aplica con TemplateActions. */}
+      {stages.map((s) => (
         <StageRow
           key={s.id}
           stage={s}
-          isAdmin={isAdmin}
-          canMoveUp={i > 0}
-          canMoveDown={i < stages.length - 1}
-          onAddActivity={() => setEditingActivity({ stageId: s.id })}
+          isAdmin={false}
+          canMoveUp={false}
+          canMoveDown={false}
+          onAddActivity={() => {}}
           onEditActivity={(act) => setEditingActivity({ stageId: s.id, activity: act })}
-          onDeleteStage={() => setDeleteStageId(s.id)}
-          onDeleteActivity={(actId) => setDeleteActivityId(actId)}
-          onRenameStage={(name) => renameStage(s.id, name)}
-          onMoveStage={(dir) => moveStage(s.id, dir)}
-          onRenameActivity={(actId, name) => renameActivity(actId, name)}
-          onMoveActivity={(actId, dir) => moveActivity(s.id, actId, dir)}
+          onDeleteStage={() => {}}
+          onDeleteActivity={() => {}}
+          onRenameStage={() => {}}
+          onMoveStage={() => {}}
+          onRenameActivity={() => {}}
+          onMoveActivity={() => {}}
         />
       ))}
 
-      {isAdmin && (
-        <div className="flex items-center gap-2 pt-1">
-          <Input
-            value={newStageName}
-            onChange={(e) => setNewStageName(e.target.value)}
-            placeholder="Nueva etapa (ej: Diagnóstico)"
-            className="text-sm"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleCreateStage();
-              }
-            }}
-          />
-          <Button
-            size="sm"
-            onClick={handleCreateStage}
-            disabled={!newStageName.trim() || creatingStage}
-            loading={creatingStage}
-          >
-            + Etapa
-          </Button>
+      {stages.length === 0 && isAdmin && (
+        <div className="bg-slate-50 border border-slate-200 rounded p-3 text-center">
+          <p className="text-[11px] text-slate-600 mb-1">
+            Sin estructura. Aplica una plantilla desde el botón superior.
+          </p>
+          <p className="text-[10px] text-slate-500">
+            Las plantillas se definen en{" "}
+            <a
+              href="/configuracion/plantillas"
+              className="text-brand-primary-dark underline hover:no-underline"
+            >
+              Configuración → Plantillas
+            </a>
+            .
+          </p>
         </div>
       )}
 
@@ -266,6 +261,7 @@ export function ServiceStagesPanel({
           activity={editingActivity.activity}
           consultorEmails={consultorEmails}
           isAdmin={isAdmin}
+          lockStructure
           onClose={() => setEditingActivity(null)}
           onSaved={() => {
             setEditingActivity(null);

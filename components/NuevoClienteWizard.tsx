@@ -18,6 +18,7 @@ type FormState = {
   nombre: string;
   servicio: string;
   alcance: string;
+  pagina_web: string;
   propuesta_url: string;
   relacion: string;
 };
@@ -30,6 +31,7 @@ export function NuevoClienteWizard() {
     nombre: "",
     servicio: SERVICIOS[0],
     alcance: "",
+    pagina_web: "",
     propuesta_url: "",
     relacion: "",
   });
@@ -57,6 +59,7 @@ export function NuevoClienteWizard() {
             nombre_empresa: form.nombre,
             servicio_contratado: form.servicio,
             alcance_geografico: form.alcance,
+            pagina_web: form.pagina_web || null,
             propuesta_comercial_url: form.propuesta_url || null,
             relacion_empresas: form.relacion || null,
           },
@@ -123,6 +126,16 @@ export function NuevoClienteWizard() {
             type="text"
             value={form.alcance}
             onChange={(e) => set("alcance", e.target.value)}
+            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+          />
+        </Field>
+
+        <Field label="Página web corporativa" helper="URL del sitio oficial — la IA usará este dominio como fuente primaria para llenar pasos 2-9">
+          <input
+            type="url"
+            value={form.pagina_web}
+            onChange={(e) => set("pagina_web", e.target.value)}
+            placeholder="https://empresa.com.mx"
             className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
           />
         </Field>

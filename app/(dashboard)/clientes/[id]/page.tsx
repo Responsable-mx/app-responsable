@@ -109,7 +109,10 @@ export default async function EditarClientePage({ params }: Props) {
       <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
         <ClientAvatar name={client.name} logoUrl={client.logo_url} />
         <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
-        <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide rounded-sm border px-2 py-0.5 ${statusClasses}`}>
+        <span
+          title={`Perfil del cliente: ${completeness.filled}/${completeness.total} campos contextuales completados`}
+          className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide rounded-sm border px-2 py-0.5 ${statusClasses}`}
+        >
           {status.label}
         </span>
         {meta && <span className="text-slate-300">|</span>}

@@ -1084,8 +1084,8 @@ export function ChatWindow({
               )}
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 text-center mt-2">
-            Los modelos IA pueden cometer errores. Verifica antes de entregar al cliente.
+          <p className="text-[10px] text-slate-300 text-center mt-1 select-none" title="Los modelos IA pueden cometer errores. Verifica antes de entregar al cliente.">
+            IA · verifica antes de entregar
           </p>
         </div>
       </footer>

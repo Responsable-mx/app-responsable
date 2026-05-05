@@ -13,9 +13,6 @@ export default function ClientesPage() {
             Clientes
           </p>
           <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
-          <p className="text-sm text-slate-600 mt-0.5">
-            Todos los consultores pueden ver y editar.
-          </p>
         </div>
         <Link
           href="/clientes/nuevo"

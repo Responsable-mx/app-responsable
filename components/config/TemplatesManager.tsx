@@ -109,14 +109,16 @@ export function TemplatesManager() {
       ) : (
         <ul className="divide-y divide-slate-100">
           {templates.map((t) => {
-            const totalActivities = t.data.stages.reduce(
-              (s, st) => s + st.activities.length,
+            // Null guard: data puede ser null en plantillas antiguas o con data corrupta
+            const stages = t.data?.stages ?? [];
+            const totalActivities = stages.reduce(
+              (s, st) => s + (st.activities?.length ?? 0),
               0
             );
             // Calcular duración total estimada (max offset_end_days)
             let maxOffset = 0;
-            for (const st of t.data.stages) {
-              for (const a of st.activities) {
+            for (const st of stages) {
+              for (const a of st.activities ?? []) {
                 if (a.offset_end_days !== null && a.offset_end_days > maxOffset) {
                   maxOffset = a.offset_end_days;
                 }
@@ -202,10 +204,10 @@ export function TemplatesManager() {
         <TemplateStructureEditor
           templateId={editingStructure.id}
           templateName={editingStructure.name}
-          initial={{ stages: editingStructure.data.stages.map((s) => ({
+          initial={{ stages: (editingStructure.data?.stages ?? []).map((s) => ({
             name: s.name,
             order_index: 0,
-            activities: s.activities.map((a) => ({
+            activities: (s.activities ?? []).map((a) => ({
               name: a.name,
               description: null,
               order_index: 0,
@@ -380,7 +382,7 @@ function PreviewTemplateModal({
           <p className="text-slate-700">{template.description}</p>
         )}
         <div className="space-y-2">
-          {template.data.stages.map((s, i) => (
+          {(template.data?.stages ?? []).map((s, i) => (
             <div key={i} className="bg-slate-50 border border-slate-200 rounded p-3">
               <p className="font-bold text-slate-900 mb-1.5">
                 {i + 1}. {s.name}

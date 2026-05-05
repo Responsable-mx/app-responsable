@@ -88,6 +88,64 @@ export async function updateConsultorSeniority(
   if (error) throw new Error(`updateConsultorSeniority: ${error.message}`);
 }
 
+// ── Vista inversa: proyectos asignados a un consultor ──────────────────────────
+
+export type ConsultorProject = {
+  client_id: string;
+  client_name: string;
+  /** Override de seniority específico para este proyecto. null = usa global. */
+  override_seniority: string | null;
+  /** Seniority global del consultor en authorized_users. */
+  global_seniority: string | null;
+};
+
+/**
+ * Retorna los proyectos (clientes) en que está asignado el consultor,
+ * con su nivel de seniority efectivo (override > global).
+ * Usado en el sidebar para mostrar "Mis proyectos".
+ */
+export async function listConsultorProjects(
+  userEmail: string
+): Promise<ConsultorProject[]> {
+  const email = userEmail.trim().toLowerCase();
+  const admin = createAdminClient();
+
+  // 1. Asignaciones del consultor
+  const { data: rows, error } = await admin
+    .from("client_consultors")
+    .select("client_id, seniority_level")
+    .eq("user_email", email)
+    .order("assigned_at", { ascending: true });
+  if (error) throw new Error(`listConsultorProjects: ${error.message}`);
+  if (!rows || rows.length === 0) return [];
+
+  const clientIds = rows.map((r) => r.client_id as string);
+
+  // 2. Nombres de los clientes
+  const { data: clients } = await admin
+    .from("clients")
+    .select("id, name")
+    .in("id", clientIds);
+  const clientMap = new Map(
+    (clients ?? []).map((c) => [c.id as string, c.name as string])
+  );
+
+  // 3. Seniority global del consultor (una sola fila)
+  const { data: userRow } = await admin
+    .from("authorized_users")
+    .select("seniority_level")
+    .eq("email", email)
+    .maybeSingle();
+  const globalSeniority = (userRow?.seniority_level as string | null) ?? null;
+
+  return rows.map((row) => ({
+    client_id: row.client_id as string,
+    client_name: clientMap.get(row.client_id as string) ?? "Cliente",
+    override_seniority: (row.seniority_level as string | null) ?? null,
+    global_seniority: globalSeniority,
+  }));
+}
+
 export async function removeConsultor(
   clientId: string,
   userEmail: string

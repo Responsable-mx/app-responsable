@@ -60,7 +60,7 @@ export function ClientsList() {
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
-  const [view, setView] = useState<ViewMode>("cards");
+  const [view, setView] = useState<ViewMode>("table");
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -407,44 +407,68 @@ export function ClientsList() {
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-left">
-              <tr>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Nombre</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Sector</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Países</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest">Tamaño</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-right">
-                  Actualizado
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-t border-slate-100 hover:bg-slate-50/60"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/clientes/${c.id}`}
-                      className="font-medium text-slate-900 hover:text-brand-primary-hover"
-                    >
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{c.sector ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {c.countries?.join(", ") ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{c.size ?? "—"}</td>
-                  <td className="px-4 py-3 text-right text-slate-600 text-xs tabular-nums">
-                    {new Date(c.updated_at).toLocaleDateString("es-MX")}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full w-max text-sm">
+              <thead className="bg-slate-50 text-left">
+                <tr>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Nombre</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Sector · Tamaño</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Países</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Marcos</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Actualizado</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map((c) => {
+                  const daysAgo = Math.floor((Date.now() - new Date(c.updated_at).getTime()) / 86400000);
+                  const updatedLabel = daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
+                  const allTags = [
+                    ...(c.frameworks ?? []).map((f) => ({ label: f, cls: "bg-brand-primary-light text-brand-primary-dark" })),
+                    ...(c.certifications ?? []).map((f) => ({ label: f, cls: "bg-amber-50 text-amber-700" })),
+                  ].slice(0, 3);
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50/60 group">
+                      <td className="px-4 py-2.5">
+                        <Link href={`/clientes/${c.id}`} className="font-semibold text-slate-900 hover:text-brand-primary-hover transition-colors">
+                          {c.name}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600 text-xs">
+                        {c.sector ?? <span className="text-slate-400">—</span>}
+                        {c.size && <span className="text-slate-400"> · {c.size}</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600 text-xs">{c.countries?.join(", ") ?? <span className="text-slate-400">—</span>}</td>
+                      <td className="px-4 py-2.5">
+                        {allTags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {allTags.map((t) => (
+                              <span key={t.label} className={`text-[10px] rounded-sm px-1.5 py-0.5 font-medium ${t.cls}`}>{t.label}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs tabular-nums text-slate-500">{updatedLabel}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        <Link
+                          href={`/clientes/${c.id}?tab=chat`}
+                          title="Chat IA"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/20 rounded px-2 py-1 hover:bg-brand-primary/20"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                          </svg>
+                          Chat
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -549,13 +573,15 @@ function ClientCard({ client }: { client: Row }) {
             ))}
           </div>
         ) : (
-          <p className="text-[10px] text-slate-400 italic mb-3">Sin marcos ni certificaciones registrados.</p>
+          <div className="mb-3" />
         )}
 
-        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-100">
-          <span className="uppercase tracking-widest font-bold">Actualizado</span>
-          <span className="tabular-nums text-slate-600">{updatedLabel}</span>
-        </div>
+        {daysAgo > 0 && (
+          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+            <span className="uppercase tracking-widest font-bold">Actualizado</span>
+            <span className="tabular-nums text-slate-600">{updatedLabel}</span>
+          </div>
+        )}
       </Link>
 
       {/* Acceso rápido a Chat IA — aparece en hover, no interrumpe el link principal */}

@@ -148,7 +148,7 @@ function PreviewInner() {
 
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-slate-700">SkipLink</h2>
-        <div className="bg-stone-100 rounded-lg p-4 text-sm text-slate-700 space-y-2">
+        <div className="bg-slate-100 rounded-lg p-4 text-sm text-slate-700 space-y-2">
           <p>
             <strong>Patrón:</strong> oculto fuera de viewport hasta recibir
             foco con Tab. Al primer Tab desde la barra de URL aparece arriba
@@ -156,7 +156,7 @@ function PreviewInner() {
           </p>
           <p>
             <strong>Cómo probarlo:</strong> click en la barra de URL,
-            presiona <kbd className="px-1.5 py-0.5 bg-white rounded border border-stone-300 font-mono text-xs">Tab</kbd>{" "}
+            presiona <kbd className="px-1.5 py-0.5 bg-white rounded border border-slate-300 font-mono text-xs">Tab</kbd>{" "}
             una vez. El link &quot;Saltar al contenido principal&quot; debe
             aparecer en la esquina superior izquierda. Otro Tab y desaparece.
           </p>

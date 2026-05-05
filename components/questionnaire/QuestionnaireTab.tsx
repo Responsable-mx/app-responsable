@@ -705,8 +705,8 @@ function SaveIndicator({ state, errorMsg }: { state: SaveState; errorMsg: string
     );
   if (state === "error")
     return (
-      <span className="text-[11px] text-rose-700" title={errorMsg ?? ""}>
-        Reintentando…
+      <span className="text-[11px] text-rose-700 max-w-[200px] text-right leading-tight block">
+        {errorMsg ?? "Error al guardar"}
       </span>
     );
   return (

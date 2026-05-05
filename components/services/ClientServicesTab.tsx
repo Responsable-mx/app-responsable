@@ -99,7 +99,7 @@ export function ClientServicesTab({ clientId }: { clientId: string }) {
               >
                 <div className="flex items-start gap-3">
                   <div
-                    className={`shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center text-lg ${schema?.color ?? "bg-stone-50 border-stone-200"}`}
+                    className={`shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center text-lg ${schema?.color ?? "bg-slate-50 border-slate-200"}`}
                   >
                     {schema?.icon ?? "❓"}
                   </div>

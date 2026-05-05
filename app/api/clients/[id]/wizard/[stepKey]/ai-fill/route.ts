@@ -18,25 +18,23 @@ import { logAiCall } from "@/lib/ai/logging";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-// D-14: Rate limit in-memory por usuario. No persiste entre instancias serverless,
-// pero cubre el caso de abuso desde un mismo cliente en corto tiempo.
-// Limite: MAX_CALLS_PER_WINDOW calls en WINDOW_MS milisegundos por usuario.
-// Con 8 consultores y bulk fill de 9 pasos (~3 lotes), el límite protege contra
-// click repetido del botón "Refrescar todo" o llamadas maliciosas en loop.
+// D-14: Rate limit por usuario — dos capas:
+// 1. In-memory (fast path, misma instancia serverless)
+// 2. DB via ai_calls (cross-instance — funciona con múltiples lambdas en paralelo)
+// Límite: MAX_CALLS_PER_WINDOW calls en WINDOW_MS por usuario.
 const WINDOW_MS = 60_000; // 1 minuto
-const MAX_CALLS_PER_WINDOW = 15; // 9 pasos bulk + 6 individuales
+const MAX_CALLS_PER_WINDOW = 15; // 9 pasos bulk + 6 individuales de margen
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-function checkRateLimit(userEmail: string): boolean {
+function checkRateLimitMemory(userEmail: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(userEmail);
   if (!entry || now >= entry.resetAt) {
     rateLimitMap.set(userEmail, { count: 1, resetAt: now + WINDOW_MS });
-    return true; // OK
+    return true;
   }
   entry.count += 1;
-  if (entry.count > MAX_CALLS_PER_WINDOW) return false; // límite superado
-  return true;
+  return entry.count <= MAX_CALLS_PER_WINDOW;
 }
 
 // D-13: allowlist de caracteres válidos para stepKey (alfanumérico + guion).
@@ -74,12 +72,29 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "stepKey inválido" }, { status: 400 });
   }
 
-  // D-14: rate limit por usuario — evita gasto Anthropic masivo por click repetido.
-  if (!checkRateLimit(user)) {
+  // D-14: rate limit capa 1 (in-memory, fast path).
+  if (!checkRateLimitMemory(user)) {
     return NextResponse.json(
       { error: "Demasiadas solicitudes. Espera 1 minuto antes de reintentar." },
       { status: 429 }
     );
+  }
+  // D-14: rate limit capa 2 (DB — funciona cross-instancias serverless).
+  {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const windowStart = new Date(Date.now() - WINDOW_MS).toISOString();
+    const { count } = await admin
+      .from("ai_calls")
+      .select("id", { count: "exact", head: true })
+      .eq("user_email", user)
+      .gte("created_at", windowStart);
+    if ((count ?? 0) >= MAX_CALLS_PER_WINDOW) {
+      return NextResponse.json(
+        { error: "Demasiadas solicitudes. Espera 1 minuto antes de reintentar." },
+        { status: 429 }
+      );
+    }
   }
 
   let bundle;
@@ -152,7 +167,9 @@ PARA CADA CAMPO retorna:
 - source_type: "public" | "interpretation" | "consultor_only"
 - sources: [{url, title, date (YYYY-MM-DD)}] — vacío si consultor_only
 
-Retorna SOLO JSON válido sin texto extra:
+FORMATO DE RESPUESTA — OBLIGATORIO:
+Tu mensaje final DEBE empezar con { y terminar con }. Cero texto antes o después del JSON.
+No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
 { "campo_key": { "value": "...", "source_type": "...", "sources": [{"url":"...","title":"...","date":"YYYY-MM-DD"}] }, ... }`;
 
   // Contexto del cliente desde DB + pasos previos llenos

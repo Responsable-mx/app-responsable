@@ -127,7 +127,6 @@ export function ClientTabs({
 
   return (
     <div>
-      {/* KPI cards en una sola línea: solo métricas reales (no inventar placeholders). */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
         <KpiCardLarge
           label="Cuestionario"
@@ -139,15 +138,11 @@ export function ClientTabs({
               : "Cargando…"
           }
           tone={
-            pctCuestionario === null
-              ? "neutral"
-              : pctCuestionario === 100
-                ? "success"
-                : pctCuestionario >= 50
-                  ? "primary"
-                  : pctCuestionario > 0
-                    ? "warn"
-                    : "neutral"
+            pctCuestionario === null ? "neutral"
+              : pctCuestionario === 100 ? "success"
+              : pctCuestionario >= 50 ? "primary"
+              : pctCuestionario > 0 ? "warn"
+              : "neutral"
           }
         />
         <KpiCardLarge
@@ -159,24 +154,17 @@ export function ClientTabs({
               ? `${materialityValidated} de ${materialityCount} validados`
               : null
           }
-          rightBadge={
-            allValidated
-              ? { label: "Todas validadas", tone: "success" }
-              : null
-          }
+          rightBadge={allValidated ? { label: "Todas validadas", tone: "success" } : null}
           tone={
-            materialityCount === null
-              ? "neutral"
-              : materialityCount >= 20
-                ? "success"
-                : materialityCount > 0
-                  ? "primary"
-                  : "neutral"
+            materialityCount === null ? "neutral"
+              : materialityCount >= 20 ? "success"
+              : materialityCount > 0 ? "primary"
+              : "neutral"
           }
         />
       </div>
 
-      {/* Tabs: 4 según mockup */}
+      {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 mb-5 overflow-x-auto">
         <TabButton
           active={tab === "resumen"}
@@ -300,94 +288,6 @@ export function ClientTabs({
         </TabErrorBoundary>
       )}
 
-      {/* Acceso secundario a Contexto/Servicios */}
-      {tab === "resumen" && (
-        <details className="mt-6 pt-4 border-t border-slate-200 group">
-          <summary className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 cursor-pointer hover:text-slate-600 transition-colors list-none select-none w-fit">
-            <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            Opciones avanzadas
-          </summary>
-          <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
-            <a href={`/clientes/${client.id}?legacy=context`} className="hover:text-brand-primary hover:underline transition-colors">
-              Editar atributos legacy →
-            </a>
-            <a href={`/clientes/${client.id}?legacy=services`} className="hover:text-brand-primary hover:underline transition-colors">
-              Servicios contratados →
-            </a>
-          </div>
-        </details>
-      )}
-    </div>
-  );
-}
-
-function KpiCardLarge({
-  label,
-  value,
-  unit,
-  sub,
-  tone,
-  rightBadge,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  sub: string | null;
-  tone: "success" | "primary" | "warn" | "neutral" | "placeholder";
-  rightBadge?: { label: string; tone: "success" | "warn" } | null;
-}) {
-  const valueClass =
-    tone === "success"
-      ? "text-emerald-700"
-      : tone === "primary"
-        ? "text-brand-primary-dark"
-        : tone === "warn"
-          ? "text-amber-700"
-          : tone === "placeholder"
-            ? "text-slate-400"
-            : "text-slate-900";
-  const accentClass =
-    tone === "success"
-      ? "border-l-emerald-500"
-      : tone === "primary"
-        ? "border-l-brand-primary"
-        : tone === "warn"
-          ? "border-l-amber-500"
-          : tone === "placeholder"
-            ? "border-l-slate-300"
-            : "border-l-slate-400";
-  return (
-    <div className={`bg-white border border-slate-200 ${accentClass} border-l-4 rounded px-3 py-2.5 shadow-sm flex items-center justify-between gap-3`}>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-          {label}
-        </p>
-        <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
-          <span className={`text-xl font-bold tabular-nums tracking-tight leading-none ${valueClass}`}>
-            {value}
-          </span>
-          {unit && <span className="text-xs font-medium text-slate-500">{unit}</span>}
-          {sub && <span className="text-[11px] text-slate-500">{sub}</span>}
-        </div>
-      </div>
-      {rightBadge && (
-        <span
-          className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded-sm px-1.5 py-0.5 shrink-0 ${
-            rightBadge.tone === "success"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-amber-50 text-amber-700"
-          }`}
-        >
-          {rightBadge.tone === "success" && (
-            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-          {rightBadge.label}
-        </span>
-      )}
     </div>
   );
 }
@@ -428,5 +328,66 @@ function TabButton({
         </span>
       )}
     </button>
+  );
+}
+
+function KpiCardLarge({
+  label,
+  value,
+  unit,
+  sub,
+  tone,
+  rightBadge,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  sub: string | null;
+  tone: "success" | "primary" | "warn" | "neutral" | "placeholder";
+  rightBadge?: { label: string; tone: "success" | "warn" } | null;
+}) {
+  const valueClass =
+    tone === "success" ? "text-emerald-700"
+      : tone === "primary" ? "text-brand-primary-dark"
+      : tone === "warn" ? "text-amber-700"
+      : tone === "placeholder" ? "text-slate-400"
+      : "text-slate-900";
+  const accentClass =
+    tone === "success" ? "border-l-emerald-500"
+      : tone === "primary" ? "border-l-brand-primary"
+      : tone === "warn" ? "border-l-amber-500"
+      : tone === "placeholder" ? "border-l-slate-300"
+      : "border-l-slate-400";
+  return (
+    <div className={`bg-white border border-slate-200 ${accentClass} border-l-4 rounded px-3 py-2.5 shadow-sm flex items-center justify-between gap-3`}>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+          {label}
+        </p>
+        <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+          <span className={`text-xl font-bold tabular-nums tracking-tight leading-none ${valueClass}`}>
+            {value}
+          </span>
+          {unit && <span className="text-xs font-medium text-slate-500">{unit}</span>}
+          {sub && <span className="text-[11px] text-slate-500">{sub}</span>}
+        </div>
+      </div>
+      {rightBadge && (
+        <span
+          className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded-sm px-1.5 py-0.5 shrink-0 ${
+            rightBadge.tone === "success"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          {rightBadge.tone === "success" && (
+            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {rightBadge.label}
+        </span>
+      )}
+    </div>
   );
 }

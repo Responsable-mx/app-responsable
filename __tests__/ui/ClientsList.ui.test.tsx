@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ClientsList } from "@/components/ClientsList";
 
@@ -92,15 +92,15 @@ describe("ClientsList", () => {
     expect(screen.getByText(/2 clientes/)).toBeTruthy();
   });
 
-  it("filtra por nombre (server-side debounce 300ms)", async () => {
+  it("filtra por nombre (server-side debounce 300ms)", () => {
     mockClients = [base("Heineken"), base("IKEA"), base("Sanofi")];
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ClientsList />);
     const input = screen.getByPlaceholderText(/Buscar/i);
-    await user.type(input, "ike");
-    // Avanzar debounce para que SWR key cambie a ?q=ike
-    await act(async () => {
-      vi.advanceTimersByTime(300);
+    // fireEvent.change es síncrono — setQuery dispara inmediatamente.
+    // act + vi.runAllTimers ejecuta el setTimeout del debounce → setDebouncedQ → re-render.
+    act(() => {
+      fireEvent.change(input, { target: { value: "ike" } });
+      vi.runAllTimers();
     });
     expect(screen.queryByText("Heineken")).toBeNull();
     expect(screen.getByText("IKEA")).toBeTruthy();
@@ -108,16 +108,17 @@ describe("ClientsList", () => {
     expect(screen.getByText(/1 cliente/)).toBeTruthy();
   });
 
-  it("filtra por framework reportado", async () => {
+  it("filtra por framework reportado", () => {
     mockClients = [
       base("Heineken", { frameworks: ["gri", "sbti"] }),
       base("IKEA", { frameworks: ["issb"] }),
     ];
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ClientsList />);
-    await user.type(screen.getByPlaceholderText(/Buscar/i), "sbti");
-    await act(async () => {
-      vi.advanceTimersByTime(300);
+    act(() => {
+      fireEvent.change(screen.getByPlaceholderText(/Buscar/i), {
+        target: { value: "sbti" },
+      });
+      vi.runAllTimers();
     });
     expect(screen.getByText("Heineken")).toBeTruthy();
     expect(screen.queryByText("IKEA")).toBeNull();

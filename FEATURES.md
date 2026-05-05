@@ -37,7 +37,7 @@
 - [B] Expansión a otros entregables (propuestas, diagnósticos, reportes GRI)
 - [B] Métricas de calidad (iteraciones, tiempo, score por entregable)
 - [B] ✅ Integrar navegación de la app en system prompt de los 4 roles — `DEFAULT_APP_NAVIGATION` en `lib/ai/prompts.ts`, may-2026
-- [B] Guided tour onboarding con driver.js para primer login
+- [B] ✅ Guided tour onboarding con driver.js para primer login — `components/GuidedTour.tsx` + `/api/settings/tour-version`, auto-bump via POST (admin), may-2026
 - [B] ✅ Cron `daily-qa-responsable` (operacional, solo reporta fallos) — `app/api/cron/daily-qa/route.ts` + `vercel.json`, may-2026
 - [B] ✅ Cron `audit-health` quincenal (cobertura + deuda + costo API) — schedule en `vercel.json`, may-2026
 

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { listClients, clientContextCompleteness } from "@/lib/clients";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { GuidedTour } from "@/components/GuidedTour";
 import { requireUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/users";
+
+export const metadata: Metadata = { title: "Chat IA · App ResponSable" };
 
 export const dynamic = "force-dynamic";
 

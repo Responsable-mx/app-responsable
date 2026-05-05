@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ClientsList } from "@/components/ClientsList";
+
+export const metadata: Metadata = { title: "Clientes · App ResponSable" };
 
 // D-05: búsqueda server-side. La página ya no carga todos los clientes en el servidor;
 // ClientsList usa SWR con debounce 300ms → /api/clients?q=... para filtrar en Supabase.

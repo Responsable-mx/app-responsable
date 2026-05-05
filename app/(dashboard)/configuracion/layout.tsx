@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { ConfigTabs } from "@/components/config/ConfigTabs";
 import { ConfigSWRProvider } from "@/components/config/ConfigSWRProvider";
+
+export const metadata: Metadata = { title: "Configuración · App ResponSable" };
 
 export default function ConfigLayout({
   children,

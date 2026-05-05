@@ -101,20 +101,20 @@ Schema pendiente: tabla `materiality_topics(client_id, topic_key, label, x_pos, 
 
 El equipo aún no ha definido los pasos reales de la metodología. **No inventar** placeholders. Cuando se defina, agregar como 5to KPI card en `ClientTabs`.
 
-## Chat IA — mejores prácticas (paridad S-Peak App, pendiente portear a ChatWindow real)
+## Chat IA — mejores prácticas (implementadas en ChatWindow, may-2026)
 
-Funciones canónicas (implementadas en mockup eliminado, pendiente migrar a `components/chat/ChatWindow.tsx`):
-- **Copiar respuesta**: botón `Copy` en cada mensaje IA (clipboard API)
-- **Calificar**: thumbs up / thumbs down por mensaje (persistir en tabla `chat_ratings`)
-- **Exportar conversación**: download `.md` de la sesión
-- **Retry/Regenerar**: reenviar el último mensaje con el mismo rol
+Funciones activas en `components/chat/ChatWindow.tsx`:
+- **Copiar respuesta**: `copyMessage()` en cada mensaje IA (clipboard API) — botón ✕ en toolbar
+- **Calificar**: thumbs up/down por mensaje (`rateMessage()`), persiste en sesión local y `chat_sessions`
+- **Exportar conversación**: `exportMd()` → descarga `.md` con timestamp
+- **Retry/Regenerar**: `retryLast()` — reenvía último mensaje del usuario con el mismo rol
 
 ## Consolidación mayo-2026 — eliminación del mockup `/dev/app-preview`
 
 El mockup `app/dev/app-preview/AppShell.tsx` fue eliminado. La app real en `app.responsable.net` consume los endpoints reales:
 - `/chat` → `ChatWindow` con streaming SSE de `/api/chat`
 - `/clientes` → `ClientsList` con datos de `/api/clients`
-- `/clientes/[id]` → `ClientTabs` con 4 tabs: Contexto + Servicios (reales) + Cuestionario + Materialidad (placeholders "Próximamente")
+- `/clientes/[id]` → `ClientTabs` con 5 tabs: Contexto + Servicios + Cuestionario (wizard AI-fill) + Materialidad (lista con X/Y) + Equipo (seniority)
 
 Diseño corporate aplicado a `ClientTabs` (KPI cards uppercase + tabs con badges) y `ClientsList` (tabla con headers tracking-widest). Login obligatorio en raíz.
 

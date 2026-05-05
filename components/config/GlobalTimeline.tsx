@@ -8,7 +8,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
 import type { ActivityStatus } from "@/lib/stages";
-import type { EquipoFilters } from "./EquipoFilters";
+import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
 const fetcher = (url: string) =>
@@ -79,6 +79,13 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
           for (const a of st.activities) {
             if (filters?.statuses && filters.statuses.size > 0 && !filters.statuses.has(a.status)) continue;
             if (filters?.consultorEmail && a.assignee_email !== filters.consultorEmail) continue;
+            if (filters?.dateRange && filters.dateRange !== "all") {
+              if (filters.dateRange === "overdue") {
+                if (a.status !== "delayed") continue;
+              } else if (!activityInDateRange(filters.dateRange, a.planned_start, a.planned_end)) {
+                continue;
+              }
+            }
             out.push({
               id: a.id,
               name: a.name,

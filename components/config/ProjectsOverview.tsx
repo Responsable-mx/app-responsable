@@ -7,7 +7,7 @@ import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
-import type { EquipoFilters } from "./EquipoFilters";
+import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { ServiceGantt } from "@/components/services/ServiceGantt";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
@@ -75,6 +75,13 @@ export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) 
             activities: st.activities.filter((a) => {
               if (filters?.statuses && filters.statuses.size > 0 && !filters.statuses.has(a.status)) return false;
               if (filters?.consultorEmail && a.assignee_email !== filters.consultorEmail) return false;
+              if (filters?.dateRange && filters.dateRange !== "all") {
+                if (filters.dateRange === "overdue") {
+                  if (a.status !== "delayed") return false;
+                } else if (!activityInDateRange(filters.dateRange, a.planned_start, a.planned_end)) {
+                  return false;
+                }
+              }
               return true;
             }),
           }))

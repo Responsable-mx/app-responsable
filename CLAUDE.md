@@ -132,18 +132,27 @@ Diseño corporate aplicado a `ClientTabs` (KPI cards uppercase + tabs con badges
 
 `ConfirmDialog` (`components/ConfirmDialog.tsx`) es el wrapper anterior — sigue activo en CatalogsManager y PromptsManager por compat. Para código nuevo, usar `ConfirmModal` de `components/ui/`.
 
-### Fuente en modales — regla global
+### Fuente en form controls — reglas globales
 
-`globals.css` ya aplica `font-family: inherit` a todos los form controls (`input`, `select`, `textarea`, `button`). Esto garantiza que Inter se use automáticamente sin importar dónde estén los controles.
+`globals.css` aplica `font-family: inherit` a `input`, `select`, `textarea`, `button` — garantiza Inter en el control colapsado.
 
-**Al crear un nuevo modal con `<textarea>` o `<select>`:** agregar clase `font-sans` explícitamente aunque sea redundante — hace el intent visible y protege contra resets de CSS de terceros:
+**Limitación conocida de browsers:** el popup nativo de `<select>` en Windows/Chrome/Edge usa el font del SO (Segoe UI) cuando está abierto. CSS no puede sobrescribir esto.
+
+**Regla:** nunca usar `<select>` nativo donde el dropdown sea visible al usuario. Usar `<SelectField>` de `components/ui/SelectField.tsx` — custom listbox con Inter garantizado.
 
 ```tsx
-<textarea className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30" />
-<select className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30" />
+// ✅ Correcto
+import { SelectField } from "@/components/ui/SelectField";
+<SelectField value={val} onChange={setVal} options={[{ value: "x", label: "X" }]} placeholder="Todos" />
+
+// ❌ Evitar en dropdowns visibles
+<select className="font-sans ...">...</select>
 ```
 
-Patrón tomado de `TemplatesManager.tsx` y `TemplateActions.tsx` como referencia canónica.
+**Al crear un modal con `<textarea>`:** agregar `font-sans` explícitamente aunque `globals.css` ya lo cubre — hace el intent visible:
+```tsx
+<textarea className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30" />
+```
 
 ## Audit log de mutaciones admin
 

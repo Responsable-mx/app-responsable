@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { TeamMember, ConsultantActivity } from "@/app/api/team/occupancy/route";
-import type { EquipoFilters } from "./EquipoFilters";
+import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
 const fetcher = (url: string) =>
@@ -96,6 +96,13 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
       }
       if (filters?.clientId) {
         acts = acts.filter((a) => a.client_id === filters.clientId);
+      }
+      if (filters?.dateRange && filters.dateRange !== "all") {
+        if (filters.dateRange === "overdue") {
+          acts = acts.filter((a) => a.status === "delayed");
+        } else {
+          acts = acts.filter((a) => activityInDateRange(filters.dateRange, a.planned_start, a.planned_end));
+        }
       }
       const today = Date.now();
       const horizon = today + 30 * 86_400_000;

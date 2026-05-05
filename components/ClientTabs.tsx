@@ -56,15 +56,38 @@ export function ClientTabs({ client, completeness }: Props) {
 
   const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
   const schema = questionnaireResp?.data.template.schema;
-  const totalSections = schema
+  const totalSteps = schema
     ? "steps" in schema
       ? schema.steps.length
       : schema.sections.length
     : 0;
-  const completedSections = questionnaireResp?.data.response?.completed_sections.length ?? 0;
   const materialityCount = materialityResp?.data?.length ?? null;
-  const materialityValidated = materialityCount; // placeholder: en futuro será # validados
-  const isQuestionnaireComplete = pctCuestionario === 100;
+  const materialityValidated = materialityCount;
+
+  // Resumen tab: 5 cards macro. Una card está completa si TODOS sus stepKeys están en completed_sections.
+  // Mapping idéntico al de ClientResumen.tsx
+  const MACRO_STEP_KEYS: Record<string, string[]> = {
+    "informacion-base": ["informacion-base"],
+    "contexto-general": ["informacion-general"],
+    "contexto-sostenibilidad": ["estrategia-y-madurez"],
+    "regulatorio": ["regulacion-y-sector"],
+    "modelo-negocio": [
+      "modelo-de-negocio-estructura",
+      "modelo-de-negocio-detalle",
+      "cadena-de-valor",
+      "riesgos-y-oportunidades",
+      "stakeholders",
+    ],
+  };
+  const completedMacro = (() => {
+    const completedSet = new Set(questionnaireResp?.data.response?.completed_sections ?? []);
+    let count = 0;
+    for (const stepKeys of Object.values(MACRO_STEP_KEYS)) {
+      if (stepKeys.every((sk) => completedSet.has(sk))) count++;
+    }
+    return count;
+  })();
+  const totalMacro = Object.keys(MACRO_STEP_KEYS).length;
 
   return (
     <div>
@@ -76,7 +99,7 @@ export function ClientTabs({ client, completeness }: Props) {
           unit={pctCuestionario === null ? "" : "%"}
           sub={
             questionnaireResp?.data
-              ? `${questionnaireResp.data.progress.filledFields}/${questionnaireResp.data.progress.totalFields} campos · ${totalSections} secciones`
+              ? `${questionnaireResp.data.progress.filledFields}/${questionnaireResp.data.progress.totalFields} campos · ${totalSteps} pasos`
               : "Cargando…"
           }
           tone={
@@ -134,7 +157,7 @@ export function ClientTabs({ client, completeness }: Props) {
           label="Resumen"
           badge={
             questionnaireResp?.data
-              ? `${completedSections}/${totalSections}`
+              ? `${completedMacro}/${totalMacro}`
               : null
           }
         />

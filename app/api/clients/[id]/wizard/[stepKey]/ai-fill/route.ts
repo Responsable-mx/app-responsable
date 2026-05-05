@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
@@ -10,12 +11,28 @@ import {
   type FieldResponse,
   type WizardStep,
 } from "@/lib/questionnaires/types";
+import { getModelConfig } from "@/lib/ai/models";
+import { logAiCall } from "@/lib/ai/logging";
 
 // Timeout serverless: hasta 5 min (web_search tarda ~30-90s por paso)
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string; stepKey: string }> };
+
+// Schema Zod del JSON que retorna la IA — bloquea formas inválidas en lugar de
+// guardarlas en la DB del cliente.
+const AiSourceSchema = z.object({
+  url: z.string().min(1),
+  title: z.string().min(1),
+  date: z.string().optional().default(""),
+});
+const AiFieldSchema = z.object({
+  value: z.union([z.string(), z.number(), z.null()]).optional(),
+  source_type: z.enum(["public", "interpretation", "consultor_only"]).optional(),
+  sources: z.array(AiSourceSchema).optional(),
+});
+const AiResponseSchema = z.record(z.string(), AiFieldSchema);
 
 export async function POST(_req: NextRequest, { params }: Ctx) {
   const user = await requireUser();
@@ -129,13 +146,22 @@ ${fieldsList}
 
 Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"} y retorna el JSON con los campos llenos siguiendo las 8 reglas operativas. No inventes URLs.`;
 
+  // Modelo desde config centralizada (Aurora = autor, mismo rol que llena cuestionarios).
+  const modelCfg = getModelConfig("aurora");
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   let textOut = "";
-  let citationsCollected: { url: string; title: string }[] = [];
+  const citationsCollected: { url: string; title: string }[] = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheCreationTokens = 0;
+  let cacheReadTokens = 0;
+  let stopReason: string | null = null;
+  const startedAt = Date.now();
+
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: modelCfg.model,
       max_tokens: 4096,
       system: systemPrompt,
       tools: [
@@ -144,11 +170,18 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           type: "web_search_20250305" as any,
           name: "web_search",
-          max_uses: 2,
+          max_uses: 4,
         },
       ],
       messages: [{ role: "user", content: userPrompt }],
     });
+    inputTokens = msg.usage?.input_tokens ?? 0;
+    outputTokens = msg.usage?.output_tokens ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    cacheCreationTokens = (msg.usage as any)?.cache_creation_input_tokens ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    cacheReadTokens = (msg.usage as any)?.cache_read_input_tokens ?? 0;
+    stopReason = msg.stop_reason ?? null;
     for (const block of msg.content) {
       if (block.type === "text") {
         textOut += block.text;
@@ -163,26 +196,60 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
       }
     }
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error Anthropic" },
-      { status: 500 }
-    );
+    const errorMsg = e instanceof Error ? e.message : "Error Anthropic";
+    void logAiCall({
+      userEmail: user,
+      role: "aurora",
+      clientId: id,
+      model: modelCfg.model,
+      inputTokens,
+      outputTokens,
+      cacheCreationTokens,
+      cacheReadTokens,
+      stopReason,
+      latencyMs: Date.now() - startedAt,
+      error: errorMsg,
+    });
+    return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 
-  // Extraer JSON del output (puede venir en code block)
-  const jsonMatch = textOut.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/) ?? textOut.match(/(\{[\s\S]*\})/);
-  if (!jsonMatch) {
+  // Loggear uso real de tokens (visible en /configuracion/uso-ia).
+  void logAiCall({
+    userEmail: user,
+    role: "aurora",
+    clientId: id,
+    model: modelCfg.model,
+    inputTokens,
+    outputTokens,
+    cacheCreationTokens,
+    cacheReadTokens,
+    stopReason,
+    latencyMs: Date.now() - startedAt,
+    error: null,
+  });
+
+  // Extraer JSON del output. Prefiere code block; fallback a primer objeto balanceado.
+  const jsonText = extractJsonObject(textOut);
+  if (!jsonText) {
     return NextResponse.json({ error: "Respuesta IA sin JSON parseable" }, { status: 502 });
   }
 
-  let parsed: Record<string, { value: unknown; source_type?: string; sources?: unknown[] }>;
+  let parsed: z.infer<typeof AiResponseSchema>;
   try {
-    parsed = JSON.parse(jsonMatch[1]);
+    const raw = JSON.parse(jsonText);
+    const result = AiResponseSchema.safeParse(raw);
+    if (!result.success) {
+      return NextResponse.json(
+        { error: `Schema IA inválido: ${result.error.issues.map((i) => i.message).join("; ")}` },
+        { status: 502 }
+      );
+    }
+    parsed = result.data;
   } catch {
     return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
   }
 
-  // Construir FieldResponse por campo
+  // Construir FieldResponse por campo (solo campos del paso actual; descartar extras).
   const now = new Date().toISOString();
   const result: Record<string, FieldResponse> = {};
   for (const field of step.fields) {
@@ -197,17 +264,13 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
       };
       continue;
     }
-    const sourceType =
-      ai.source_type === "public" || ai.source_type === "interpretation"
-        ? ai.source_type
-        : "consultor_only";
-    let sources = Array.isArray(ai.sources)
-      ? ai.sources
-          .filter((s): s is { url: string; title: string; date: string } =>
-            typeof s === "object" && s !== null && "url" in s && "title" in s && "date" in s
-          )
-          .map((s) => ({ url: s.url, title: s.title, date: s.date, type: "web" as const }))
-      : [];
+    const sourceType = ai.source_type ?? "consultor_only";
+    let sources = (ai.sources ?? []).map((s) => ({
+      url: s.url,
+      title: s.title,
+      date: s.date || "",
+      type: "web" as const,
+    }));
     // Fallback: si IA llenó pero olvidó sources Y hay citations recolectadas → tomar las primeras 2
     if (sources.length === 0 && ai.value && sourceType !== "consultor_only" && citationsCollected.length > 0) {
       sources = citationsCollected.slice(0, 2).map((c) => ({
@@ -227,4 +290,39 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
   }
 
   return NextResponse.json({ data: result });
+}
+
+// Extrae primer objeto JSON balanceado del texto. Prefiere code block.
+// Reemplaza regex permisiva original que podía capturar JSON parcial.
+function extractJsonObject(text: string): string | null {
+  const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+  if (codeBlockMatch) return codeBlockMatch[1];
+
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
 }

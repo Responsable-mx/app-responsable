@@ -72,12 +72,22 @@ export async function getQuestionnaireBundle(
   return { template, response, progress };
 }
 
+// Error tipado para conflicto optimistic-lock — el caller mapea a HTTP 409.
+export class QuestionnaireConflictError extends Error {
+  constructor(public serverUpdatedAt: string) {
+    super("CONFLICT");
+    this.name = "QuestionnaireConflictError";
+  }
+}
+
 export async function upsertQuestionnaireResponse(opts: {
   clientId: string;
   serviceKey: string;
   responses: QuestionnaireResponseData;
   completedSections: string[];
   actorEmail: string;
+  // Optimistic lock: si viene, debe coincidir con updated_at server actual o se rechaza.
+  expectedUpdatedAt?: string | null;
 }): Promise<QuestionnaireResponse> {
   if (isDevMode()) {
     throw new Error("Supabase no configurado (dev mode). Llena .env.local para guardar respuestas.");
@@ -87,12 +97,20 @@ export async function upsertQuestionnaireResponse(opts: {
 
   const { data: existing } = await supabase
     .from("questionnaire_responses")
-    .select("id, created_by")
+    .select("id, created_by, updated_at")
     .eq("client_id", opts.clientId)
     .eq("service_key", opts.serviceKey)
     .maybeSingle();
 
   if (existing) {
+    // Optimistic concurrency: rechazar si otro consultor ya guardó cambios.
+    if (
+      opts.expectedUpdatedAt !== undefined &&
+      opts.expectedUpdatedAt !== null &&
+      existing.updated_at !== opts.expectedUpdatedAt
+    ) {
+      throw new QuestionnaireConflictError(existing.updated_at);
+    }
     const { data, error } = await supabase
       .from("questionnaire_responses")
       .update({

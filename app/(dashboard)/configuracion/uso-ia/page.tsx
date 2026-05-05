@@ -1,4 +1,5 @@
 import { getUsageSummary } from "@/lib/ai/usage";
+import { Sparkline } from "@/components/Sparkline";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,15 @@ export default async function UsoIaPage() {
 
   return (
     <div className="px-8 py-6 max-w-6xl mx-auto">
-      <p className="text-sm text-slate-600 mb-4">
-        Uso de los 4 roles IA en los últimos 30 días. Costo estimado es un
-        techo — asume Sonnet para todo (Valeria en realidad corre Haiku que es
-        5× más barato). Cache hits reducen ~90% el costo de input.
+      <p className="text-sm text-slate-600 mb-4 inline-flex items-center gap-1.5">
+        Uso de los 4 roles IA en los últimos 30 días.
+        <span
+          className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold cursor-help"
+          title="Costo estimado es techo (asume Sonnet para todo). Valeria corre Haiku 5× más barato. Cache hits reducen ~90% el costo de input."
+          aria-label="Más información sobre el cálculo de costo"
+        >
+          ⓘ
+        </span>
       </p>
 
       {!s ? (
@@ -26,39 +32,72 @@ export default async function UsoIaPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <Metric label="Llamadas" value={numFmt.format(s.total_calls)} />
-            <Metric
-              label="Costo estimado (USD)"
-              value={usdFmt.format(s.cost_usd_estimate_max)}
-            />
-            <Metric
-              label="Cache hits"
-              value={numFmt.format(s.total_cache_read_tokens) + " tokens"}
-              hint={
-                s.total_input_tokens > 0
-                  ? `${Math.round(
-                      (s.total_cache_read_tokens /
-                        (s.total_input_tokens + s.total_cache_read_tokens)) *
-                        100
-                    )}% del input`
-                  : undefined
-              }
-            />
-            <Metric
-              label="Errores"
-              value={String(s.total_errors)}
-              tone={s.total_errors > 0 ? "red" : "ok"}
-              hint={`Latencia ~${s.avg_latency_ms}ms`}
-            />
-          </div>
+          {(() => {
+            // Bucketear by_day_role en serie diaria total para sparkline.
+            // Trend visual >= 1 valor numérico aislado.
+            const byDay = new Map<string, { calls: number; cost: number; cache: number; errors: number }>();
+            for (const r of s.by_day_role) {
+              const k = r.day.slice(0, 10);
+              const acc = byDay.get(k) ?? { calls: 0, cost: 0, cache: 0, errors: 0 };
+              acc.calls += r.calls;
+              acc.cache += r.total_cache_hits;
+              acc.errors += r.errors;
+              // Estimación simple por día (input + output Sonnet).
+              acc.cost += (r.total_input_tokens * 3 + r.total_output_tokens * 15) / 1_000_000;
+              byDay.set(k, acc);
+            }
+            const sortedDays = Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+            const callsSeries = sortedDays.map(([, v]) => v.calls);
+            const costSeries = sortedDays.map(([, v]) => v.cost);
+            const cacheSeries = sortedDays.map(([, v]) => v.cache);
+            const errorsSeries = sortedDays.map(([, v]) => v.errors);
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <Metric
+                  label="Llamadas"
+                  value={numFmt.format(s.total_calls)}
+                  spark={callsSeries}
+                  sparkColor="#0f766e"
+                />
+                <Metric
+                  label="Costo estimado (USD)"
+                  value={usdFmt.format(s.cost_usd_estimate_max)}
+                  spark={costSeries}
+                  sparkColor="#7c3aed"
+                />
+                <Metric
+                  label="Cache hits"
+                  value={numFmt.format(s.total_cache_read_tokens) + " tokens"}
+                  hint={
+                    s.total_input_tokens > 0
+                      ? `${Math.round(
+                          (s.total_cache_read_tokens /
+                            (s.total_input_tokens + s.total_cache_read_tokens)) *
+                            100
+                        )}% del input`
+                      : undefined
+                  }
+                  spark={cacheSeries}
+                  sparkColor="#0891b2"
+                />
+                <Metric
+                  label="Errores"
+                  value={String(s.total_errors)}
+                  tone={s.total_errors > 0 ? "red" : "ok"}
+                  hint={`Latencia ~${s.avg_latency_ms}ms`}
+                  spark={errorsSeries}
+                  sparkColor={s.total_errors > 0 ? "#be123c" : "#94a3b8"}
+                />
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Panel title="Top consultores">
               {s.top_users.length === 0 ? (
                 <Empty />
               ) : (
-                <ul className="text-sm divide-y divide-stone-100">
+                <ul className="text-sm divide-y divide-slate-100">
                   {s.top_users.map((u) => (
                     <li
                       key={u.user_email}
@@ -79,7 +118,7 @@ export default async function UsoIaPage() {
               {s.top_clients.length === 0 ? (
                 <Empty />
               ) : (
-                <ul className="text-sm divide-y divide-stone-100">
+                <ul className="text-sm divide-y divide-slate-100">
                   {s.top_clients.map((c) => (
                     <li
                       key={c.client_id}
@@ -120,7 +159,7 @@ export default async function UsoIaPage() {
                       <th className="py-2 pr-3 text-right">Errores</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-stone-100">
+                  <tbody className="divide-y divide-slate-100">
                     {s.by_day_role.map((r, i) => (
                       <tr key={i}>
                         <td className="py-1.5 pr-3 text-slate-600">
@@ -172,11 +211,15 @@ function Metric({
   value,
   hint,
   tone = "neutral",
+  spark,
+  sparkColor,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "neutral" | "ok" | "red";
+  spark?: number[];
+  sparkColor?: string;
 }) {
   const valueClass =
     tone === "red"
@@ -185,9 +228,14 @@ function Metric({
       ? "text-green-700"
       : "text-slate-900";
   return (
-    <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wide text-slate-600">
-        {label}
+    <div className="bg-white border border-slate-200 rounded px-4 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[10px] uppercase tracking-wide text-slate-600">
+          {label}
+        </div>
+        {spark && spark.length > 0 && (
+          <Sparkline values={spark} color={sparkColor} width={64} height={20} />
+        )}
       </div>
       <div className={`text-xl font-bold mt-1 ${valueClass}`}>{value}</div>
       {hint && <div className="text-[10px] text-slate-600 mt-0.5">{hint}</div>}
@@ -203,7 +251,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4">
+    <div className="bg-white border border-slate-200 rounded p-4">
       <div className="text-xs uppercase tracking-wide text-slate-600 mb-3">
         {title}
       </div>

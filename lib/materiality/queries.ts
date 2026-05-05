@@ -84,8 +84,28 @@ export async function createMaterialityTopic(opts: {
   return data as MaterialityTopic;
 }
 
+// D-12: obtener un tema verificando que pertenece al clientId esperado.
+// Usar antes de cualquier mutación para prevenir IDOR (acceso a temas ajenos).
+export async function getMaterialityTopicVerified(
+  topicId: string,
+  expectedClientId: string
+): Promise<MaterialityTopic | null> {
+  if (isDevMode()) return null;
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("materiality_topics")
+    .select("*")
+    .eq("id", topicId)
+    .eq("client_id", expectedClientId)
+    .maybeSingle();
+  if (error) throw new Error(`Error verificando tema: ${error.message}`);
+  return (data as MaterialityTopic | null) ?? null;
+}
+
 export async function updateMaterialityTopic(opts: {
   topicId: string;
+  // D-12: clientId obligatorio para verificar ownership antes de update.
+  clientId: string;
   patch: Partial<MaterialityTopicInput>;
   actorEmail: string;
 }): Promise<MaterialityTopic> {
@@ -95,18 +115,24 @@ export async function updateMaterialityTopic(opts: {
     .from("materiality_topics")
     .update({ ...opts.patch, updated_by: opts.actorEmail })
     .eq("id", opts.topicId)
+    .eq("client_id", opts.clientId) // ownership enforced at DB query level
     .select()
     .single();
   if (error) throw new Error(`Error actualizando tema: ${error.message}`);
   return data as MaterialityTopic;
 }
 
-export async function deleteMaterialityTopic(topicId: string): Promise<void> {
+export async function deleteMaterialityTopic(
+  topicId: string,
+  // D-12: clientId obligatorio para prevenir borrado de temas ajenos.
+  clientId: string
+): Promise<void> {
   if (isDevMode()) throw new Error("Supabase no configurado (dev mode).");
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("materiality_topics")
     .delete()
-    .eq("id", topicId);
+    .eq("id", topicId)
+    .eq("client_id", clientId); // ownership enforced at DB query level
   if (error) throw new Error(`Error eliminando tema: ${error.message}`);
 }

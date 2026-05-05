@@ -49,13 +49,25 @@ function getInitials(name: string): string {
 export function ClientAvatar({ name, size = "md", logoUrl = null }: Props) {
   const sizeClass = SIZE_MAP[size];
 
-  if (logoUrl) {
+  // D-24: validar que logoUrl sea https:// antes de renderizar. Sin esta validación,
+  // valores como "javascript:..." serían inyectables como src. onError hace fallback
+  // al monogram si la URL 404s en lugar de mostrar broken image.
+  const safeLogoUrl =
+    logoUrl && (logoUrl.startsWith("https://") || logoUrl.startsWith("http://"))
+      ? logoUrl
+      : null;
+
+  if (safeLogoUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- logos son URLs externas variables, no candidatas a next/image
       <img
-        src={logoUrl}
+        src={safeLogoUrl}
         alt={`${name} logo`}
         className={`${sizeClass} rounded shrink-0 object-cover bg-white border border-slate-200`}
+        onError={(e) => {
+          // Fallback al monogram si la URL rompe — evita broken image icon.
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
       />
     );
   }

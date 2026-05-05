@@ -11,12 +11,14 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 import type { MaterialityTopic } from "@/lib/materiality/types";
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
+import { TeamTab } from "@/components/equipo/TeamTab";
 
-type Tab = "resumen" | "cuestionario" | "chat" | "materialidad";
+type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "equipo";
 
 type Props = {
   client: Client;
   completeness: { filled: number; total: number };
+  isAdmin?: boolean;
   // Datos prefetched server-side. SWR los usa como fallback inicial y revalida
   // en background. Evita waterfall de 2 fetches al montar tabs.
   initialQuestionnaire?: QuestionnaireBundle | null;
@@ -38,20 +40,21 @@ const materialityFetcher = (url: string) =>
 export function ClientTabs({
   client,
   completeness,
+  isAdmin = false,
   initialQuestionnaire,
   initialMateriality,
 }: Props) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(
-    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad"
+    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad" || initialTab === "equipo"
       ? initialTab
       : "resumen"
   );
 
   useEffect(() => {
     const t = searchParams?.get("tab");
-    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad") {
+    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad" || t === "equipo") {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync de URL → state, no loop
       setTab(t);
     }
@@ -224,6 +227,17 @@ export function ClientTabs({
           label="Materialidad"
           badge={materialityCount === null ? "…" : `${materialityCount}/20`}
         />
+        <TabButton
+          active={tab === "equipo"}
+          onClick={() => setTab("equipo")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          }
+          label="Equipo"
+          badge={null}
+        />
       </div>
 
       {tab === "resumen" && (
@@ -279,17 +293,30 @@ export function ClientTabs({
         </TabErrorBoundary>
       )}
 
+      {tab === "equipo" && (
+        <TabErrorBoundary tabName="Equipo">
+          <TeamTab clientId={client.id} isAdmin={isAdmin} />
+        </TabErrorBoundary>
+      )}
+
       {/* Acceso secundario a Contexto/Servicios */}
       {tab === "resumen" && (
-        <div className="mt-6 pt-4 border-t border-slate-200 flex items-center gap-3 text-xs text-slate-500">
-          <span className="uppercase tracking-widest font-bold text-[10px] text-slate-400">Avanzado:</span>
-          <a href={`/clientes/${client.id}?legacy=context`} className="hover:text-brand-primary hover:underline">
-            Editar atributos legacy del cliente →
-          </a>
-          <a href={`/clientes/${client.id}?legacy=services`} className="hover:text-brand-primary hover:underline">
-            Servicios contratados →
-          </a>
-        </div>
+        <details className="mt-6 pt-4 border-t border-slate-200 group">
+          <summary className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 cursor-pointer hover:text-slate-600 transition-colors list-none select-none w-fit">
+            <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            Opciones avanzadas
+          </summary>
+          <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
+            <a href={`/clientes/${client.id}?legacy=context`} className="hover:text-brand-primary hover:underline transition-colors">
+              Editar atributos legacy →
+            </a>
+            <a href={`/clientes/${client.id}?legacy=services`} className="hover:text-brand-primary hover:underline transition-colors">
+              Servicios contratados →
+            </a>
+          </div>
+        </details>
       )}
     </div>
   );

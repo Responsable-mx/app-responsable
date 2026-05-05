@@ -101,7 +101,9 @@ function WizardEditor({
   // El PATCH lo manda como expectedUpdatedAt; si otro consultor escribió en el medio
   // el server retorna 409 y reload manual.
   const lastServerUpdatedAt = useRef<string | null>(initial.response?.updated_at ?? null);
-  // Backoff exponencial: 0=primero, 1=1s, 2=2s, 3=4s, max 8s. Reset al success.
+  // Backoff exponencial: 1s, 2s, 4s, 8s. Tope en MAX_RETRIES para evitar
+  // loop infinito en falla de red prolongada (D-15).
+  const MAX_RETRIES = 5;
   const retryAttempt = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -226,8 +228,15 @@ function WizardEditor({
       dirty.current = true;
       setSaveState("error");
       setErrorMsg(e instanceof Error ? e.message : "Error al guardar");
-      // Backoff exponencial: 1s, 2s, 4s, 8s. Tope 8s, reintentos infinitos
-      // hasta que el usuario salga del paso o el server vuelva.
+      // D-15: tope en MAX_RETRIES. Sin este límite, retryAttempt crece indefinidamente
+      // y el componente reintenta cada 8s para siempre si el server está caído.
+      if (retryAttempt.current >= MAX_RETRIES) {
+        // Dejar en estado error persistente; el consultor ve CTA "Guardar manualmente".
+        setSaveState("error");
+        setErrorMsg("Guardado automático falló repetidamente. Recarga la página para reintentar.");
+        return;
+      }
+      // Backoff exponencial: 1s, 2s, 4s, 8s.
       const delay = Math.min(1000 * 2 ** retryAttempt.current, 8000);
       retryAttempt.current += 1;
       if (retryTimer.current) clearTimeout(retryTimer.current);
@@ -315,12 +324,17 @@ function WizardEditor({
       await Promise.all(batch.map(fillOne));
     }
 
-    // Save único con todos los pasos llenos por IA + responses previos.
+    // D-16: usar functional update para obtener el estado ACTUAL de responses al
+    // momento del merge final — evita stale closure si el consultor editó campos
+    // manualmente mientras el bulk AI corría en paralelo.
     if (Object.keys(accum).length > 0) {
-      const merged: QuestionnaireResponseData = { ...responses, ...accum };
-      setResponses(merged);
+      let mergedForSave: QuestionnaireResponseData = {};
+      setResponses((prev) => {
+        mergedForSave = { ...prev, ...accum };
+        return mergedForSave;
+      });
       dirty.current = true;
-      await save(merged);
+      await save(mergedForSave);
     }
 
     setAiBulkProgress(null);
@@ -663,7 +677,12 @@ function SaveIndicator({ state, errorMsg }: { state: SaveState; errorMsg: string
         Reintentando…
       </span>
     );
-  return <span className="text-[11px] text-slate-400">Autoguardado activo</span>;
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+      Autoguardado activo
+    </span>
+  );
 }
 
 function FieldRow({
@@ -836,8 +855,13 @@ function SourceDrawer({
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
 
+  // D-26: validar que la URL sea http/https antes de agregar. Previene XSS via
+  // "javascript:" URIs que se renderizan como <a href> en la lista de fuentes.
+  const isValidUrl =
+    url.startsWith("https://") || url.startsWith("http://");
+
   function handleAdd() {
-    if (!url || !title) return;
+    if (!url || !title || !isValidUrl) return;
     onAddSource({ url, title, date, type: "manual" });
     setUrl(""); setTitle(""); setDate(new Date().toISOString().slice(0, 10));
   }
@@ -917,10 +941,15 @@ function SourceDrawer({
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Agregar fuente</p>
             <div className="space-y-2">
-              <input type="url" placeholder="URL" value={url} onChange={(e) => setUrl(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs" />
+              <div>
+                <input type="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} className={`w-full border rounded px-2 py-1.5 text-xs ${url && !isValidUrl ? "border-rose-400 bg-rose-50" : "border-slate-300"}`} />
+                {url && !isValidUrl && (
+                  <p className="text-[10px] text-rose-600 mt-0.5">La URL debe iniciar con https:// o http://</p>
+                )}
+              </div>
               <input type="text" placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs" />
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs" />
-              <Button variant="primary" size="sm" onClick={handleAdd} disabled={!url || !title}>+ Agregar</Button>
+              <Button variant="primary" size="sm" onClick={handleAdd} disabled={!url || !title || !isValidUrl}>+ Agregar</Button>
             </div>
           </div>
         </div>

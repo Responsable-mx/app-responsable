@@ -14,17 +14,34 @@ type User = {
   active: boolean;
   invited_by: string | null;
   last_login: string | null;
+  seniority_level: string | null;
   created_at: string;
 };
+
+type SeniorityItem = { value: string; label: string };
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<{ data: User[] }>;
+    return r.json();
   });
 
+const seniorityFetcher = (url: string): Promise<SeniorityItem[]> =>
+  fetch(url)
+    .then((r) => r.json())
+    .then((j) => (j.data ?? []).map((i: { value: string; label: string }) => ({ value: i.value, label: i.label })));
+
 export function UsersManager() {
-  const { data, error, isLoading, mutate } = useSWR("/api/users", fetcher);
+  const { data, error, isLoading, mutate } = useSWR<{ data: User[] }>(
+    "/api/users",
+    fetcher
+  );
+  const { data: seniorityItems = [] } = useSWR<SeniorityItem[]>(
+    "/api/catalogs?category=seniority_levels",
+    seniorityFetcher,
+    { revalidateOnFocus: false }
+  );
+
   const [inviting, setInviting] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
@@ -48,7 +65,7 @@ export function UsersManager() {
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-6">
+    <div className="bg-white border border-slate-200 rounded p-6 shadow-sm">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">
@@ -57,26 +74,23 @@ export function UsersManager() {
         </div>
         <button
           onClick={() => setInviting(true)}
-          className="px-3 py-1.5 bg-brand-primary-hover text-white text-sm font-medium rounded-lg hover:bg-brand-primary-dark"
+          className="px-3 py-1.5 bg-brand-primary text-white text-sm font-medium rounded hover:bg-brand-primary-hover"
         >
           + Invitar usuario
         </button>
       </div>
 
       {feedback && (
-        <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg p-2 flex items-center justify-between">
+        <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded p-2 flex items-center justify-between">
           <span>{feedback}</span>
-          <button
-            onClick={() => setFeedback("")}
-            className="text-amber-700 hover:underline"
-          >
+          <button onClick={() => setFeedback("")} className="text-amber-700 hover:underline">
             ×
           </button>
         </div>
       )}
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">
           Error: {(error as Error).message}
         </div>
       )}
@@ -84,72 +98,87 @@ export function UsersManager() {
       {isLoading && <div className="text-sm text-slate-600">Cargando…</div>}
 
       {!isLoading && users.length > 0 && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-[10px] uppercase tracking-wide text-slate-600">
-              <th className="pb-2">Email</th>
-              <th className="pb-2">Nombre</th>
-              <th className="pb-2">Rol</th>
-              <th className="pb-2">Estado</th>
-              <th className="pb-2">Último login</th>
-              <th className="pb-2 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100">
-            {users.map((u) => (
-              <tr key={u.email}>
-                <td className="py-2 font-mono text-xs">{u.email}</td>
-                <td className="py-2 text-slate-700">{u.full_name ?? "—"}</td>
-                <td className="py-2">
-                  <span
-                    className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
-                      u.role === "admin"
-                        ? "bg-indigo-50 text-indigo-800"
-                        : "bg-stone-100 text-slate-700"
-                    }`}
-                  >
-                    {u.role}
-                  </span>
-                </td>
-                <td className="py-2">
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full ${
-                      u.active
-                        ? "bg-green-50 text-green-800"
-                        : "bg-stone-100 text-slate-600"
-                    }`}
-                  >
-                    {u.active ? "Activo" : "Inactivo"}
-                  </span>
-                </td>
-                <td className="py-2 text-xs text-slate-600">
-                  {u.last_login
-                    ? new Date(u.last_login).toLocaleDateString("es-MX")
-                    : "Nunca"}
-                </td>
-                <td className="py-2 text-right">
-                  <button
-                    onClick={() => setEditing(u)}
-                    className="text-xs px-2 py-1 text-slate-700 hover:bg-stone-50 rounded"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(u)}
-                    className="text-xs px-2 py-1 text-red-700 hover:bg-red-50 rounded ml-1"
-                  >
-                    ⊗
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="min-w-full w-max text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                <th className="pb-2 pr-4">Email</th>
+                <th className="pb-2 pr-4">Nombre</th>
+                <th className="pb-2 pr-4">Rol</th>
+                <th className="pb-2 pr-4">Seniority</th>
+                <th className="pb-2 pr-4">Estado</th>
+                <th className="pb-2 pr-4">Último login</th>
+                <th className="pb-2 text-right">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {users.map((u) => (
+                <tr key={u.email} className="hover:bg-slate-50">
+                  <td className="py-2 pr-4 font-mono text-xs">{u.email}</td>
+                  <td className="py-2 pr-4 text-slate-700">{u.full_name ?? "—"}</td>
+                  <td className="py-2 pr-4">
+                    <span
+                      className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm ${
+                        u.role === "admin"
+                          ? "bg-indigo-50 text-indigo-800"
+                          : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4">
+                    {u.seniority_level ? (
+                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm bg-teal-50 text-teal-800">
+                        {seniorityItems.find((s) => s.value === u.seniority_level)?.label ?? u.seniority_level}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-4">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-sm ${
+                        u.active
+                          ? "bg-green-50 text-green-800"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {u.active ? "Activo" : "Inactivo"}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4 text-xs text-slate-600">
+                    {u.last_login ? (
+                      new Date(u.last_login).toLocaleDateString("es-MX")
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="py-2 text-right">
+                    <button
+                      onClick={() => setEditing(u)}
+                      className="text-xs px-2 py-1 text-slate-700 hover:bg-slate-100 rounded"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(u)}
+                      className="text-xs px-2 py-1 text-red-700 hover:bg-red-50 rounded ml-1"
+                    >
+                      ⊗
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {(inviting || editing) && (
         <UserEditor
           user={editing}
+          seniorityItems={seniorityItems}
           onClose={() => {
             setInviting(false);
             setEditing(null);
@@ -178,19 +207,20 @@ export function UsersManager() {
 
 function UserEditor({
   user,
+  seniorityItems,
   onClose,
   onSaved,
 }: {
   user: User | null;
+  seniorityItems: SeniorityItem[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [email, setEmail] = useState(user?.email ?? "");
   const [fullName, setFullName] = useState(user?.full_name ?? "");
-  const [role, setRole] = useState<"admin" | "consultor">(
-    user?.role ?? "consultor"
-  );
+  const [role, setRole] = useState<"admin" | "consultor">(user?.role ?? "consultor");
   const [active, setActive] = useState(user?.active ?? true);
+  const [seniorityLevel, setSeniorityLevel] = useState(user?.seniority_level ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -200,8 +230,19 @@ function UserEditor({
     setSaving(true);
     try {
       const payload = user
-        ? { role, active, full_name: fullName.trim() || null }
-        : { email, role, active, full_name: fullName.trim() || null };
+        ? {
+            role,
+            active,
+            full_name: fullName.trim() || null,
+            seniority_level: seniorityLevel || null,
+          }
+        : {
+            email,
+            role,
+            active,
+            full_name: fullName.trim() || null,
+            seniority_level: seniorityLevel || null,
+          };
       const url = user
         ? `/api/users/${encodeURIComponent(user.email)}`
         : "/api/users";
@@ -263,27 +304,39 @@ function UserEditor({
           placeholder="María López"
         />
         <div className="flex flex-col gap-1">
-          <label
-            htmlFor="user-role-select"
-            className="text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="user-role-select" className="text-sm font-medium text-slate-700">
             Rol
           </label>
           <select
             id="user-role-select"
             value={role}
-            onChange={(e) =>
-              setRole(e.target.value as "admin" | "consultor")
-            }
-            className="rounded-lg border border-stone-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            onChange={(e) => setRole(e.target.value as "admin" | "consultor")}
+            className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
           >
-            <option value="consultor">
-              Consultor · solo chat y clientes
-            </option>
-            <option value="admin">
-              Admin · además gestiona configuración
-            </option>
+            <option value="consultor">Consultor · solo chat y clientes</option>
+            <option value="admin">Admin · además gestiona configuración</option>
           </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="user-seniority-select" className="text-sm font-medium text-slate-700">
+            Nivel de seniority (default)
+          </label>
+          <select
+            id="user-seniority-select"
+            value={seniorityLevel}
+            onChange={(e) => setSeniorityLevel(e.target.value)}
+            className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          >
+            <option value="">— Sin asignar —</option>
+            {seniorityItems.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500">
+            Nivel global del consultor. Puede sobreescribirse por proyecto en la pestaña Equipo del cliente.
+          </p>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input
@@ -296,15 +349,11 @@ function UserEditor({
         </label>
 
         {error && (
-          <div
-            role="alert"
-            className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded-lg p-2"
-          >
+          <div role="alert" className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded p-2">
             {error}
           </div>
         )}
 
-        {/* Submit oculto para que Enter dentro del form lance handleSubmit */}
         <button type="submit" className="sr-only" tabIndex={-1} aria-hidden="true">
           Submit
         </button>

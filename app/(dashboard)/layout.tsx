@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { requireUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/users";
 import { ToastProvider } from "@/components/ui/Toast";
+import { CommandPalette } from "@/components/CommandPalette";
 
 export default async function DashboardLayout({
   children,
@@ -19,6 +20,7 @@ export default async function DashboardLayout({
           {children}
         </main>
       </div>
+      <CommandPalette />
     </ToastProvider>
   );
 }

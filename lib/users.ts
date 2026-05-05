@@ -28,6 +28,7 @@ export type AuthorizedUser = {
   active: boolean;
   invited_by: string | null;
   last_login: string | null;
+  seniority_level: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -37,6 +38,7 @@ export type UserInput = {
   role: UserRole;
   full_name?: string | null;
   active?: boolean;
+  seniority_level?: string | null;
 };
 
 /**
@@ -60,6 +62,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     active: true,
     invited_by: null,
     last_login: null,
+    seniority_level: "director",
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -70,6 +73,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     active: true,
     invited_by: null,
     last_login: null,
+    seniority_level: "director",
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -80,6 +84,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     active: true,
     invited_by: null,
     last_login: null,
+    seniority_level: null,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -97,9 +102,17 @@ export async function listUsers(): Promise<AuthorizedUser[]> {
     console.error("[users] list error:", error.message);
     return SEED_DEV_USERS;
   }
-  return ((data ?? []) as AuthorizedUser[]).length > 0
-    ? (data as AuthorizedUser[])
-    : SEED_DEV_USERS;
+  // D-23: si la tabla devuelve cero filas en producción (wipe accidental, migración mala),
+  // el fallback a cuentas hardcodeadas es silencioso. Logear explícitamente para que
+  // el admin vea la alerta en los logs del servidor y pueda investigar.
+  if (((data ?? []) as AuthorizedUser[]).length === 0) {
+    console.error(
+      "[users] WARN: authorized_users vacío en producción — usando fallback de emergencia. " +
+      "Verificar integridad de DB: SELECT count(*) FROM authorized_users;"
+    );
+    return SEED_DEV_USERS;
+  }
+  return (data as AuthorizedUser[]);
 }
 
 export async function getUser(email: string): Promise<AuthorizedUser | null> {
@@ -181,6 +194,7 @@ export async function updateUser(
   if (patch.role !== undefined) update.role = patch.role;
   if (patch.full_name !== undefined) update.full_name = patch.full_name;
   if (patch.active !== undefined) update.active = patch.active;
+  if (patch.seniority_level !== undefined) update.seniority_level = patch.seniority_level;
 
   const { data, error } = await admin
     .from("authorized_users")

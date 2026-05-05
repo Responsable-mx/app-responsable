@@ -77,6 +77,10 @@ export type Client = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+
+  // Logo opcional (migración 0029). Null/undefined = render monogram fallback en
+  // ClientAvatar. Optional para no romper fixtures existentes que no traen el campo.
+  logo_url?: string | null;
 };
 
 const NARRATIVE_BLOCKS: NarrativeBlockKey[] = [
@@ -107,7 +111,7 @@ const JSON_BLOCKS = [
 ] as const;
 
 const ALL_COLUMNS = [
-  "id,name,sector,subsector,countries,size",
+  "id,name,sector,subsector,countries,size,logo_url",
   "business_segments,frameworks,applicable_regulations,policies_in_place",
   "certifications,material_topics,maturity_level",
   "has_double_materiality,has_sustainability_report,has_sustainability_strategy",

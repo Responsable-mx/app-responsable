@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import {
   updateMaterialityTopic,
   deleteMaterialityTopic,
+  getMaterialityTopicVerified,
 } from "@/lib/materiality/queries";
 import type { TopicColor, TopicSize, MaterialityTopicInput } from "@/lib/materiality/types";
 import { logChange } from "@/lib/audit-log";
@@ -17,11 +18,24 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { topicId } = await params;
 
-  let body: Partial<MaterialityTopicInput>;
+  let body: Partial<MaterialityTopicInput> & { clientId?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  // D-12: clientId requerido en body para verificar ownership (previene IDOR).
+  // Antes, cualquier consultor podía modificar temas de otros clientes por UUID.
+  const clientId = typeof body.clientId === "string" ? body.clientId.trim() : null;
+  if (!clientId) {
+    return NextResponse.json({ error: "clientId requerido" }, { status: 400 });
+  }
+
+  // Verificar que el topicId pertenezca al clientId declarado.
+  const existing = await getMaterialityTopicVerified(topicId, clientId).catch(() => null);
+  if (!existing) {
+    return NextResponse.json({ error: "Tema no encontrado" }, { status: 404 });
   }
 
   const patch: Partial<MaterialityTopicInput> = {};
@@ -38,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
     const topic = await updateMaterialityTopic({
       topicId,
+      clientId,
       patch,
       actorEmail: user,
     });
@@ -46,7 +61,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       entityType: "materiality_topic",
       entityId: topic.id,
       action: "update",
-      before: null,
+      before: existing,
       after: topic,
     });
     return NextResponse.json({ data: topic });
@@ -56,18 +71,32 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
+export async function DELETE(req: NextRequest, { params }: Ctx) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { topicId } = await params;
+
+  // D-12: clientId requerido vía query param para verificar ownership.
+  const url = new URL(req.url);
+  const clientId = url.searchParams.get("clientId");
+  if (!clientId) {
+    return NextResponse.json({ error: "clientId requerido" }, { status: 400 });
+  }
+
+  // Verificar que el topicId pertenezca al clientId declarado.
+  const existing = await getMaterialityTopicVerified(topicId, clientId).catch(() => null);
+  if (!existing) {
+    return NextResponse.json({ error: "Tema no encontrado" }, { status: 404 });
+  }
+
   try {
-    await deleteMaterialityTopic(topicId);
+    await deleteMaterialityTopic(topicId, clientId);
     void logChange({
       actorEmail: user,
       entityType: "materiality_topic",
       entityId: topicId,
       action: "delete",
-      before: null,
+      before: existing,
       after: null,
     });
     return NextResponse.json({ ok: true });

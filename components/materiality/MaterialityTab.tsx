@@ -94,7 +94,8 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
           fetch(`/api/materiality-topics/${t.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ validated: value }),
+            // D-12: incluir clientId para ownership check en el server.
+            body: JSON.stringify({ validated: value, clientId }),
           }).then(async (r) => {
             if (!r.ok) {
               const j = await r.json().catch(() => ({}));
@@ -141,7 +142,8 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
       const res = await fetch(`/api/materiality-topics/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        // D-12: siempre incluir clientId para ownership check.
+        body: JSON.stringify({ ...patch, clientId }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error");
@@ -153,7 +155,8 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
 
   async function deleteTopic(id: string) {
     try {
-      const res = await fetch(`/api/materiality-topics/${id}`, { method: "DELETE" });
+      // D-12: clientId como query param — el server verifica ownership antes de borrar.
+      const res = await fetch(`/api/materiality-topics/${id}?clientId=${encodeURIComponent(clientId)}`, { method: "DELETE" });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.error ?? "Error");
@@ -197,7 +200,20 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
             Carga la plantilla con 20 temas pre-clasificados (5 doble material,
             5 impacto, 5 financiero, 5 seguimiento). Editables después.
           </p>
-          <Button variant="primary" size="md" onClick={() => setConfirmInit(true)}>
+          {/* D-22: la plantilla default contiene temas de distribución de alimentos refrigerados.
+              El disclaimer advierte al consultor que los temas son un punto de partida y
+              deben adaptarse al sector real del cliente. */}
+          <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 max-w-md mx-auto mb-4">
+            La plantilla usa temas de referencia (GHG, agua, cadena de suministro, etc.).
+            Revisa y adapta al sector real del cliente antes de validar.
+          </p>
+          {/* D-30: deshabilitar botón mientras busyInit para evitar doble submit. */}
+          <Button
+            variant="primary"
+            size="md"
+            disabled={busyInit}
+            onClick={() => setConfirmInit(true)}
+          >
             Cargar plantilla (20 temas)
           </Button>
         </div>
@@ -273,8 +289,11 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
           <div className="flex">
             <div className="w-12 shrink-0 flex flex-col justify-between items-end pr-2 pt-1 pb-1" style={{ height: 320 }}>
               <span className="text-[9px] text-slate-400 tabular-nums">10</span>
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.12em] -rotate-90 whitespace-nowrap origin-center">
-                Impacto
+              <span
+                className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.12em] -rotate-90 whitespace-nowrap origin-center"
+                title="Impacto del negocio en sociedad y medio ambiente"
+              >
+                Impacto sociedad/medio amb.
               </span>
               <span className="text-[9px] text-slate-400 tabular-nums">0</span>
             </div>

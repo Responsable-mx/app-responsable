@@ -19,7 +19,7 @@ type NavItem = {
 };
 
 const NAV_BASE: NavItem[] = [
-  { href: "/chat", label: "Chat IA", tour: "nav-chat", icon: IconChat },
+  { href: "/chat", label: "Asistente IA", tour: "nav-chat", icon: IconChat },
   {
     href: "/clientes",
     label: "Clientes",

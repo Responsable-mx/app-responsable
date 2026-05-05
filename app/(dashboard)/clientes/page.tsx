@@ -12,7 +12,7 @@ export default async function ClientesPage() {
       <div className="flex items-end justify-between mb-5 pb-4 border-b border-slate-200">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Cartera · Cliente
+            Clientes
           </p>
           <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
           <p className="text-sm text-slate-600 mt-0.5">

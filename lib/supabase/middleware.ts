@@ -81,7 +81,7 @@ export async function updateSession(request: NextRequest) {
   // Con sesión en /login → dashboard
   if (user && pathname.startsWith("/login")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/chat";
+    url.pathname = "/clientes";
     return NextResponse.redirect(url);
   }
 

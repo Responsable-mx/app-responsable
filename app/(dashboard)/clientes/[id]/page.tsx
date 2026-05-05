@@ -5,6 +5,7 @@ import { ClientTabs } from "@/components/ClientTabs";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
 import { isSystemAccount } from "@/lib/users";
+import { requireAdmin } from "@/lib/auth";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import { listMaterialityTopics } from "@/lib/materiality/queries";
 
@@ -18,12 +19,15 @@ export default async function EditarClientePage({ params }: Props) {
   // Antes ClientTabs hacía 2 fetches client-side en cascada al montar tabs (cuestionario,
   // materialidad), causando spinners visibles. Ahora SWR arranca con datos en memoria
   // y solo revalida en background.
-  const [client, allClients, questionnaireBundle, materialityTopics] = await Promise.all([
-    getClient(id).catch(() => null),
-    listClients().catch(() => []),
-    getQuestionnaireBundle(id, "doble-materialidad").catch(() => null),
-    listMaterialityTopics(id).catch(() => []),
-  ]);
+  const [client, allClients, questionnaireBundle, materialityTopics, adminEmail] =
+    await Promise.all([
+      getClient(id).catch(() => null),
+      listClients().catch(() => []),
+      getQuestionnaireBundle(id, "doble-materialidad").catch(() => null),
+      listMaterialityTopics(id).catch(() => []),
+      requireAdmin(),
+    ]);
+  const isAdmin = !!adminEmail;
   if (!client) notFound();
 
   const completeness = clientContextCompleteness(client);
@@ -73,7 +77,7 @@ export default async function EditarClientePage({ params }: Props) {
         </div>
         {counter && (
           <div className="flex items-center gap-2 text-slate-500 shrink-0">
-            <span className="tabular-nums">{counter}</span>
+            <span className="tabular-nums" title="Orden alfabético">{counter}</span>
             <Link
               href={prev ? `/clientes/${prev.id}` : "#"}
               aria-disabled={!prev}
@@ -101,7 +105,7 @@ export default async function EditarClientePage({ params }: Props) {
       {/* Header con avatar monogram + nombre. White-label scaffold: cuando exista
           schema clients.logo_url, swappear por <img src={client.logo_url}/>. */}
       <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-5">
-        <ClientAvatar name={client.name} />
+        <ClientAvatar name={client.name} logoUrl={client.logo_url} />
         <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
         <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide rounded-sm border px-2 py-0.5 ${statusClasses}`}>
           {status.label}
@@ -131,6 +135,7 @@ export default async function EditarClientePage({ params }: Props) {
       <ClientTabs
         client={client}
         completeness={completeness}
+        isAdmin={isAdmin}
         initialQuestionnaire={questionnaireBundle}
         initialMateriality={materialityTopics}
       />

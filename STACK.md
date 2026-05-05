@@ -63,6 +63,14 @@ app/
     chat/route.ts                → SSE streaming con prompt caching
 ```
 
+## Caché
+
+| Dato | Frecuencia cambio | Estrategia |
+|------|------------------|------------|
+| `catalog_items` (seniority_levels, frameworks, etc.) | Casi nunca | `revalidate: 86400` (ISR diario) |
+| `client_consultors` (asignaciones consultor↔cliente) | Poco — meses | `revalidate: 3600` |
+| `authorized_users` (lista usuarios + seniority default) | Poco — meses | `revalidate: 3600` |
+
 ### Aplicar migraciones
 - Helper: `node scripts/apply-sql.mjs` (modo paranoico, 17 patrones bloqueados)
 - PAT en `~/.claude/.env.global`

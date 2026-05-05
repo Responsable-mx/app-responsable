@@ -1,10 +1,21 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import useSWR from "swr";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { isChatStreamEvent } from "@/lib/ai/stream-types";
+import { ChatSessionsPanel } from "@/components/chat/ChatSessionsPanel";
+
+type SessionPreview = {
+  id: string;
+  client_id: string | null;
+  role: RoleId;
+  title: string;
+  message_count: number;
+  updated_at: string;
+};
 
 type ClientOption = {
   id: string;
@@ -68,6 +79,45 @@ const ROLES: Array<{
  * Convierte errores técnicos del backend en mensajes accionables para el consultor.
  * Nunca exponer "Invalid UUID", códigos HTTP crudos ni stack traces.
  */
+// Descarga conversación como archivo Markdown. Pattern ChatGPT/Claude.
+// Útil para entregables a comité — el consultor pega el .md en docs.
+function exportConversationMd(
+  messages: ChatMessage[],
+  clientName: string | undefined,
+  currentRoleName: string
+) {
+  const lines: string[] = [];
+  lines.push(`# Conversación IA${clientName ? ` · ${clientName}` : ""}`);
+  lines.push("");
+  lines.push(`_Generado: ${new Date().toLocaleString("es-MX")}_`);
+  lines.push("");
+  for (const m of messages) {
+    if (!m.content.trim()) continue;
+    const author =
+      m.role === "user"
+        ? "**Consultor**"
+        : `**${m.roleId ? ROLES.find((r) => r.id === m.roleId)?.name ?? currentRoleName : currentRoleName}**`;
+    const stamp = m.ts ? ` _(${new Date(m.ts).toLocaleTimeString("es-MX")})_` : "";
+    lines.push(`### ${author}${stamp}`);
+    lines.push("");
+    lines.push(m.content);
+    lines.push("");
+    lines.push("---");
+    lines.push("");
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  const slug = (clientName ?? "general").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  a.href = url;
+  a.download = `chat-${slug}-${stamp}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function humanizeError(raw: string): string {
   const m = raw.toLowerCase();
   if (m.includes("invalid uuid") || m.includes("uuid")) {
@@ -155,8 +205,21 @@ export function ChatWindow({
     cacheReadTokens: 0,
     costUsd: 0,
   });
+  // Sesión persistente: id de la conversación actual (null = nueva sin guardar).
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [showSessionsPanel, setShowSessionsPanel] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sesiones recientes: solo se cargan en empty state para no pagar el fetch cuando
+  // ya hay conversación activa. revalidateOnFocus:false evita refetch al volver de otra tab.
+  const { data: recentData } = useSWR<{ data: SessionPreview[] }>(
+    messages.length === 0 ? "/api/chat-sessions?limit=5" : null,
+    (url: string) => fetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false }
+  );
+  const recentSessions = recentData?.data ?? [];
 
   const totalTokens = usageAcc.inputTokens + usageAcc.outputTokens + usageAcc.cacheReadTokens;
   const totalCost = usageAcc.costUsd;
@@ -356,6 +419,96 @@ export function ChatWindow({
     setMessages([]);
     setError("");
     setUsageAcc({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 });
+    setSessionId(null);
+  }
+
+  // Persiste la sesión actual a /api/chat-sessions con debounce. Se dispara cada
+  // vez que `messages` cambia post-streaming. Soporta crear nueva (id null) o
+  // actualizar existente. Fail-open — si falla, conversación local no se rompe.
+  async function persistSession(msgs: ChatMessage[]) {
+    if (msgs.length === 0) return;
+    // D-17: no persistir sesiones de demo (Altamira seed) — generan rows basura en DB.
+    if (clientId === ALTAMIRA_ID) return;
+    // Solo persistir conversaciones reales (al menos 1 turno completo).
+    const hasAssistantReply = msgs.some(
+      (m) => m.role === "assistant" && m.content.trim().length > 0
+    );
+    if (!hasAssistantReply) return;
+    try {
+      const res = await fetch("/api/chat-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: sessionId,
+          clientId: clientId || null,
+          role,
+          messages: msgs,
+        }),
+      });
+      if (!res.ok) return;
+      const json = (await res.json()) as { data: { id: string } };
+      if (!sessionId && json.data?.id) {
+        setSessionId(json.data.id);
+      }
+    } catch {
+      // Silent fail — UX local intacta.
+    }
+  }
+
+  // Trigger autosave cuando termina streaming (messages estables).
+  useEffect(() => {
+    if (streaming) return;
+    if (messages.length === 0) return;
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      void persistSession(messages);
+    }, 800);
+    return () => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, streaming]);
+
+  // Cargar sesión histórica desde API.
+  async function loadSession(id: string) {
+    try {
+      const res = await fetch(`/api/chat-sessions/${id}`);
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        data: {
+          id: string;
+          role: RoleId;
+          client_id: string | null;
+          messages: unknown[];
+        };
+      };
+      const s = json.data;
+      // D-19: validar shape de messages antes de setMessages. JSONB corrupto
+      // en DB (insert directo, seed bug) crashea ReactMarkdown sin este guard.
+      const safeMessages: ChatMessage[] = Array.isArray(s.messages)
+        ? s.messages.flatMap((m): ChatMessage[] => {
+            if (typeof m !== "object" || m === null) return [];
+            const raw = m as Record<string, unknown>;
+            if (raw.role !== "user" && raw.role !== "assistant") return [];
+            return [{
+              role: raw.role as "user" | "assistant",
+              content: typeof raw.content === "string" ? raw.content : "",
+              ts: typeof raw.ts === "number" ? raw.ts : undefined,
+              roleId: raw.roleId as RoleId | undefined,
+              rating: raw.rating as "up" | "down" | undefined,
+            }];
+          })
+        : [];
+      setRole(s.role);
+      setClientId(s.client_id ?? "");
+      setMessages(safeMessages);
+      setSessionId(s.id);
+      setError("");
+      setUsageAcc({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 });
+      setShowSessionsPanel(false);
+    } catch {
+      setError("No se pudo cargar la conversación.");
+    }
   }
 
   function rateMessage(idx: number, rating: "up" | "down") {
@@ -384,28 +537,8 @@ export function ChatWindow({
     void send(lastUser.content);
   }
 
-  function exportConversation() {
-    const lines: string[] = [
-      `# Conversación con ${currentRole.name} (${currentRole.fn})`,
-      ``,
-      selectedClient ? `Cliente: ${selectedClient.name}` : `Sin cliente · metodología general`,
-      `Fecha: ${new Date().toLocaleString("es-MX")}`,
-      ``,
-      `---`,
-      ``,
-    ];
-    for (const m of messages) {
-      if (m.role === "user") lines.push(`**Consultor:** ${m.content}`, "");
-      else lines.push(`**${currentRole.name}:** ${m.content}`, "");
-    }
-    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `chat-${currentRole.name.toLowerCase()}-${Date.now()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  // D-27: exportConversation() eliminado — era duplicado inferior de exportConversationMd().
+  // Los dos botones de export (header y footer) ahora usan la misma función.
 
   const ctxPct = selectedClient
     ? Math.round((selectedClient.completeness.filled / Math.max(selectedClient.completeness.total, 1)) * 100)
@@ -461,17 +594,54 @@ export function ChatWindow({
               </>
             )}
           </div>
-          {selectedClient && messages.length > 0 && (
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={resetChat}
-              className="text-[11px] text-slate-500 hover:text-rose-600 transition-colors"
-              title="Limpiar conversación"
+              onClick={() => setShowSessionsPanel(true)}
+              className="text-[11px] text-slate-500 hover:text-brand-primary-dark transition-colors inline-flex items-center gap-1"
+              title="Ver historial de conversaciones"
             >
-              Limpiar
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Historial
             </button>
-          )}
+            {messages.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => exportConversationMd(messages, selectedClient?.name, currentRole.name)}
+                  className="text-[11px] text-slate-500 hover:text-brand-primary-dark transition-colors inline-flex items-center gap-1"
+                  title="Descargar conversación como archivo Markdown"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                  Exportar
+                </button>
+                <button
+                  type="button"
+                  onClick={resetChat}
+                  className="text-[11px] text-slate-500 hover:text-rose-600 transition-colors"
+                  title="Nueva conversación (la actual queda guardada en historial)"
+                >
+                  Nueva
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        <ChatSessionsPanel
+          open={showSessionsPanel}
+          onClose={() => setShowSessionsPanel(false)}
+          onSelect={(id) => void loadSession(id)}
+          onArchive={(id) => {
+            if (id === sessionId) resetChat();
+          }}
+          filterClientId={initialClientId ?? null}
+          currentSessionId={sessionId}
+        />
 
         {/* Role chain */}
         <div
@@ -597,7 +767,7 @@ export function ChatWindow({
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    {currentRole.fn} · {MODEL_PER_ROLE[role]}
+                    {currentRole.fn}
                   </p>
                   <h2 className="text-base font-bold text-slate-900 leading-tight truncate">
                     {currentRole.name}
@@ -620,6 +790,61 @@ export function ChatWindow({
                   </button>
                 ))}
               </div>
+
+              {recentSessions.length > 0 && (
+                <div className="mt-6 pt-5 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      Recientes
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowSessionsPanel(true)}
+                      className="text-[10px] text-slate-400 hover:text-brand-primary transition-colors"
+                    >
+                      Ver todo →
+                    </button>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {recentSessions.map((s) => {
+                      const daysAgo = Math.floor(
+                        (Date.now() - new Date(s.updated_at).getTime()) / 86400000
+                      );
+                      const stamp =
+                        daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
+                      const roleData = ROLES.find((r) => r.id === s.role) ?? ROLES[0];
+                      const clientMatch = clients.find((c) => c.id === s.client_id);
+                      return (
+                        <li key={s.id}>
+                          <button
+                            type="button"
+                            onClick={() => void loadSession(s.id)}
+                            className="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded hover:bg-slate-100 transition-colors"
+                          >
+                            <span
+                              className={`w-5 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${roleData.color}`}
+                              aria-hidden
+                            >
+                              {roleData.mono}
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="text-xs text-slate-700 line-clamp-1 block">{s.title}</span>
+                              {clientMatch && (
+                                <span className="text-[10px] text-slate-500 block truncate">
+                                  {clientMatch.name}
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0 tabular-nums">
+                              {stamp}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
@@ -812,9 +1037,12 @@ export function ChatWindow({
               </span>
               <span className="font-semibold text-slate-700">{currentRole.name}</span>
               <span className="text-slate-400">·</span>
-              <span className="tabular-nums">{MODEL_PER_ROLE[role]}</span>
-              <span className="text-slate-400">·</span>
-              <span className="hidden sm:inline">↵ enviar · ⇧↵ nueva línea</span>
+              <span
+                className="hidden sm:inline"
+                title={`Modelo: ${MODEL_PER_ROLE[role]} · ↵ enviar · ⇧↵ nueva línea`}
+              >
+                ↵ enviar
+              </span>
             </div>
             <div className="flex items-center gap-3">
               {totalTokens > 0 && (
@@ -826,7 +1054,7 @@ export function ChatWindow({
               )}
               {messages.some((m) => m.role === "assistant") && (
                 <button
-                  onClick={exportConversation}
+                  onClick={() => exportConversationMd(messages, selectedClient?.name, currentRole.name)}
                   className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-brand-primary transition-colors"
                   title="Exportar conversación como .md"
                 >

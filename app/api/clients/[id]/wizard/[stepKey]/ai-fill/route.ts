@@ -18,6 +18,31 @@ import { logAiCall } from "@/lib/ai/logging";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
+// D-14: Rate limit in-memory por usuario. No persiste entre instancias serverless,
+// pero cubre el caso de abuso desde un mismo cliente en corto tiempo.
+// Limite: MAX_CALLS_PER_WINDOW calls en WINDOW_MS milisegundos por usuario.
+// Con 8 consultores y bulk fill de 9 pasos (~3 lotes), el límite protege contra
+// click repetido del botón "Refrescar todo" o llamadas maliciosas en loop.
+const WINDOW_MS = 60_000; // 1 minuto
+const MAX_CALLS_PER_WINDOW = 15; // 9 pasos bulk + 6 individuales
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(userEmail: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(userEmail);
+  if (!entry || now >= entry.resetAt) {
+    rateLimitMap.set(userEmail, { count: 1, resetAt: now + WINDOW_MS });
+    return true; // OK
+  }
+  entry.count += 1;
+  if (entry.count > MAX_CALLS_PER_WINDOW) return false; // límite superado
+  return true;
+}
+
+// D-13: allowlist de caracteres válidos para stepKey (alfanumérico + guion).
+// Previene inputs maliciosos aunque el lookup string-equality ya es seguro.
+const VALID_STEP_KEY = /^[a-z0-9-]{1,64}$/;
+
 type Ctx = { params: Promise<{ id: string; stepKey: string }> };
 
 // Schema Zod del JSON que retorna la IA — bloquea formas inválidas en lugar de
@@ -43,6 +68,19 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   }
 
   const { id, stepKey } = await params;
+
+  // D-13: validar formato de stepKey antes de cualquier DB call.
+  if (!VALID_STEP_KEY.test(stepKey)) {
+    return NextResponse.json({ error: "stepKey inválido" }, { status: 400 });
+  }
+
+  // D-14: rate limit por usuario — evita gasto Anthropic masivo por click repetido.
+  if (!checkRateLimit(user)) {
+    return NextResponse.json(
+      { error: "Demasiadas solicitudes. Espera 1 minuto antes de reintentar." },
+      { status: 429 }
+    );
+  }
 
   let bundle;
   try {
@@ -318,19 +356,22 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
   return NextResponse.json({ data: result });
 }
 
-// Extrae primer objeto JSON balanceado del texto. Prefiere code block.
-// Reemplaza regex permisiva original que podía capturar JSON parcial.
+// Extrae primer objeto JSON balanceado del texto.
+// D-20: el regex original de code block usaba `*?` non-greedy que paraba en el
+// primer `}`, truncando JSON anidado. Ahora extrae el contenido del code block
+// y luego aplica el mismo balanced-brace parser para ambos casos.
 function extractJsonObject(text: string): string | null {
-  const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-  if (codeBlockMatch) return codeBlockMatch[1];
+  // Si hay code block, extraer solo el contenido entre ``` y ``` para parsear.
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const searchText = codeBlockMatch ? codeBlockMatch[1] : text;
 
-  const start = text.indexOf("{");
+  const start = searchText.indexOf("{");
   if (start < 0) return null;
   let depth = 0;
   let inString = false;
   let escape = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
+  for (let i = start; i < searchText.length; i++) {
+    const ch = searchText[i];
     if (escape) {
       escape = false;
       continue;
@@ -347,7 +388,7 @@ function extractJsonObject(text: string): string | null {
     if (ch === "{") depth++;
     else if (ch === "}") {
       depth--;
-      if (depth === 0) return text.slice(start, i + 1);
+      if (depth === 0) return searchText.slice(start, i + 1);
     }
   }
   return null;

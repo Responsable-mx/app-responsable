@@ -45,10 +45,14 @@ export class TabErrorBoundary extends Component<Props, State> {
               Reintentar
             </button>
           </div>
-          <details className="mt-3 text-xs text-rose-600">
-            <summary className="cursor-pointer">Detalle técnico</summary>
-            <pre className="mt-2 whitespace-pre-wrap break-all">{this.state.message}</pre>
-          </details>
+          {/* D-28: solo exponer el mensaje técnico en entornos de desarrollo.
+              En producción puede contener stack traces o mensajes de Anthropic API. */}
+          {process.env.NODE_ENV !== "production" && (
+            <details className="mt-3 text-xs text-rose-600">
+              <summary className="cursor-pointer">Detalle técnico (dev)</summary>
+              <pre className="mt-2 whitespace-pre-wrap break-all">{this.state.message}</pre>
+            </details>
+          )}
         </div>
       );
     }

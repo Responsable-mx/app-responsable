@@ -14,6 +14,7 @@ export const CatalogCategorySchema = z.enum([
   "revenue_models",
   "client_sizes",
   "services",
+  "seniority_levels",
 ]);
 export type CatalogCategoryId = z.infer<typeof CatalogCategorySchema>;
 
@@ -46,6 +47,16 @@ export const UserInputSchema = z.object({
   role: UserRoleSchema,
   full_name: z.string().trim().max(120).optional().nullable(),
   active: z.boolean().optional(),
+  seniority_level: z.string().trim().max(60).optional().nullable(),
+});
+
+export const AssignConsultorSchema = z.object({
+  user_email: z.string().trim().toLowerCase().email().max(200),
+  seniority_level: z.string().trim().max(60).optional().nullable(),
+});
+
+export const UpdateConsultorSenioritySchema = z.object({
+  seniority_level: z.string().trim().max(60).nullable(),
 });
 
 export const UserPatchSchema = UserInputSchema.partial().omit({ email: true });

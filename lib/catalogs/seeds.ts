@@ -18,7 +18,8 @@ export type CatalogCategory =
   | "countries"
   | "revenue_models"
   | "client_sizes"
-  | "services";
+  | "services"
+  | "seniority_levels";
 
 // Orden alfabético por label (es-MX).
 export const CATALOG_CATEGORIES: Array<{
@@ -40,6 +41,7 @@ export const CATALOG_CATEGORIES: Array<{
   { key: "business_segments",       label: "Segmentos de negocio",    description: "B2B, B2C, gobierno, etc.",                              hasSearch: false, hasGroups: false },
   { key: "material_topics",         label: "Temas materiales",        description: "Temas priorizables en materialidad (basado en GRI).", hasSearch: true,  hasGroups: true },
   { key: "services",                label: "Servicios",               description: "Portafolio de servicios ResponSable (ESR, doble materialidad, informe de sostenibilidad).", hasSearch: false, hasGroups: false },
+  { key: "seniority_levels",        label: "Niveles de seniority",    description: "Niveles de experiencia de los consultores (Junior, Consultor, Senior, Gerente, Director).", hasSearch: false, hasGroups: false },
 ];
 
 export type CatalogSeedItem = {
@@ -196,4 +198,11 @@ export const CATALOG_SEEDS: CatalogSeedItem[] = [
   { category: "services", value: "doble_materialidad",    label: "Doble materialidad",       sort_order: 10 },
   { category: "services", value: "esr",                   label: "ESR",                      sort_order: 20 },
   { category: "services", value: "informe_sostenibilidad",label: "Informe de sostenibilidad",sort_order: 30 },
+
+  // seniority_levels — escala lógica (NO alfabético, intencionalmente)
+  { category: "seniority_levels", value: "junior",    label: "Junior",              sort_order: 10 },
+  { category: "seniority_levels", value: "consultor", label: "Consultor",           sort_order: 20 },
+  { category: "seniority_levels", value: "senior",    label: "Senior",              sort_order: 30 },
+  { category: "seniority_levels", value: "gerente",   label: "Gerente de proyecto", sort_order: 40 },
+  { category: "seniority_levels", value: "director",  label: "Director",            sort_order: 50 },
 ];

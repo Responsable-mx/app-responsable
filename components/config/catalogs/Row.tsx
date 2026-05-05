@@ -70,7 +70,16 @@ export function Row({
         {item.is_active ? "Activo" : "Inactivo"}
       </button>
       <div className="text-xs text-slate-600">
-        {item.is_system ? "🔒 Sistema" : "Custom"}
+        {item.is_system ? (
+          <span className="inline-flex items-center gap-1" title="Item del sistema · no se puede eliminar, solo desactivar o renombrar">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Sistema
+          </span>
+        ) : (
+          "Custom"
+        )}
       </div>
       <div className="flex items-center justify-end gap-1">
         <button

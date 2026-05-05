@@ -34,5 +34,8 @@ export type ChatStreamEvent = ChatStreamDelta | ChatStreamDone | ChatStreamError
 export function isChatStreamEvent(v: unknown): v is ChatStreamEvent {
   if (typeof v !== "object" || v === null) return false;
   const t = (v as { type?: unknown }).type;
-  return t === "delta" || t === "done" || t === "error";
+  // D-21: validar también que `text` sea string en delta — evita "...undefined" en UI
+  // si Anthropic cambia el formato del evento.
+  if (t === "delta") return typeof (v as { text?: unknown }).text === "string";
+  return t === "done" || t === "error";
 }

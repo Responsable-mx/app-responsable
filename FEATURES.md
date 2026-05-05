@@ -29,6 +29,7 @@
 - [B] Web Research con citas y protección de KB (Brave Search API)
 - [B] Documentos por cliente (PDFs, DOCX) con extracción automática
 - [B] Control de acceso RBAC (admin gestiona prompts/KB/logs, consultor solo usa)
+- [B] Seniority + asignación consultores — niveles de seniority por catálogo, default en usuario, override por proyecto; tabla `client_consultors`; tab "Equipo" en cliente; predev completado may-2026
 - [B] Historial de conversaciones persistido por cliente
 - [B] Trazabilidad básica (log de uso por rol/usuario/fecha)
 - [B] Expansión a otros entregables (propuestas, diagnósticos, reportes GRI)

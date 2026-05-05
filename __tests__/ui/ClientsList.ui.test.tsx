@@ -1,8 +1,15 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ClientsList } from "@/components/ClientsList";
+
+// Cada test arranca con URL limpia para evitar que el useEffect de sincronización
+// de URL lea parámetros ?q= de pruebas anteriores y pre-llene el input.
+beforeEach(() => {
+  window.history.replaceState({}, "", "/");
+  localStorage.clear();
+});
 
 vi.mock("next/link", () => ({
   default: ({

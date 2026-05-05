@@ -1,7 +1,7 @@
 // Dev preview ChatWindow rediseño enterprise. Solo non-prod (middleware bypass).
 import { ChatWindow } from "@/components/chat/ChatWindow";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 const MOCK_CLIENTS = [
   {

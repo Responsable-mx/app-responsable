@@ -100,6 +100,7 @@ export function ServiceGantt({
   }
 
   const totalMs = range.max - range.min;
+  // eslint-disable-next-line react-hooks/purity -- Date.now() fuera de useMemo; valor estable dentro del render
   const todayPct = ((Date.now() - range.min) / totalMs) * 100;
   const todayInRange = todayPct >= 0 && todayPct <= 100;
 

@@ -2,6 +2,19 @@ import "server-only";
 import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Cuentas del sistema (seed scripts, servicios automáticos). No representan
+// consultores reales — la UI no debe mostrar su email/nombre como autor.
+const SYSTEM_ACCOUNTS = new Set([
+  "seed@responsable.net",
+  "system@responsable.net",
+  "cron@responsable.net",
+]);
+
+export function isSystemAccount(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return SYSTEM_ACCOUNTS.has(email.trim().toLowerCase());
+}
+
 export type UserRole = "admin" | "consultor";
 
 export type AuthorizedUser = {

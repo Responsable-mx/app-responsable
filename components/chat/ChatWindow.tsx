@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { isChatStreamEvent } from "@/lib/ai/stream-types";
 
 type ClientOption = {
   id: string;
@@ -170,18 +171,23 @@ export function ChatWindow({
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           try {
-            const evt = JSON.parse(line.slice(6));
-            if (evt.type === "delta") {
+            const raw: unknown = JSON.parse(line.slice(6));
+            if (!isChatStreamEvent(raw)) {
+              // Evento desconocido — log silencioso. Antes se ignoraba sin pista.
+              console.warn("[chat] evento SSE desconocido:", raw);
+              continue;
+            }
+            if (raw.type === "delta") {
               setMessages((m) => {
                 const last = m[m.length - 1];
                 if (!last || last.role !== "assistant") return m;
                 return [
                   ...m.slice(0, -1),
-                  { ...last, content: last.content + evt.text },
+                  { ...last, content: last.content + raw.text },
                 ];
               });
-            } else if (evt.type === "error") {
-              setError(evt.error);
+            } else if (raw.type === "error") {
+              setError(raw.error);
             }
           } catch {
             /* ignore partial json */

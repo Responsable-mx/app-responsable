@@ -88,7 +88,7 @@ export function Sidebar({
     >
       <div className={`px-3 py-4 border-b border-slate-200 ${collapsed ? "flex flex-col items-center" : ""}`}>
         <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5"}`}>
-          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-brand-primary to-brand-primary-dark text-white font-bold flex items-center justify-center text-base shadow-sm ring-1 ring-brand-primary-dark/10 shrink-0">
+          <div className="relative w-9 h-9 rounded bg-brand-primary-dark text-white font-bold flex items-center justify-center text-base shadow-sm shrink-0">
             R
           </div>
           {!collapsed && (
@@ -97,7 +97,7 @@ export function Sidebar({
                 ResponSable
               </div>
               <div className="text-[10px] text-slate-500 leading-tight mt-0.5 truncate uppercase tracking-widest font-semibold">
-                app interna · MVP
+                Consultoría sustentabilidad
               </div>
             </div>
           )}

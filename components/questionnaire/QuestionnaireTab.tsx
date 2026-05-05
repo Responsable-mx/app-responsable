@@ -40,9 +40,11 @@ const SOURCE_CHIP: Record<SourceType, { dot: string; bg: string; text: string; l
 export function QuestionnaireTab({
   clientId,
   initialStepIndex = 0,
+  autoFillOnMount = false,
 }: {
   clientId: string;
   initialStepIndex?: number;
+  autoFillOnMount?: boolean;
 }) {
   const { data, error, isLoading, mutate } = useSWR(
     `/api/clients/${clientId}/questionnaire`,
@@ -61,7 +63,7 @@ export function QuestionnaireTab({
     );
   }
 
-  return <WizardEditor clientId={clientId} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} />;
+  return <WizardEditor clientId={clientId} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} />;
 }
 
 function WizardEditor({
@@ -69,11 +71,13 @@ function WizardEditor({
   initial,
   mutate,
   initialStepIndex = 0,
+  autoFillOnMount = false,
 }: {
   clientId: string;
   initial: QuestionnaireBundle;
   mutate: () => void;
   initialStepIndex?: number;
+  autoFillOnMount?: boolean;
 }) {
   const { template } = initial;
   const schema = template.schema;
@@ -264,6 +268,16 @@ function WizardEditor({
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, []);
+
+  // Auto-trigger bulk AI fill al montar (cuando viene de /clientes/nuevo con &autoFill=1)
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoFillOnMount && !autoFiredRef.current && steps.length > 0) {
+      autoFiredRef.current = true;
+      void aiFillAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFillOnMount]);
 
   const aiCapableCount = steps.filter((s) => s.ai_can_fill).length;
   const someStepHasResponses = Object.values(responses).some(

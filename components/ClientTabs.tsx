@@ -45,13 +45,20 @@ export function ClientTabs({ client, completeness }: Props) {
       setTab(t);
     }
   }, [searchParams]);
+
+  // Override de step desde Resumen (click en card macro → paso específico)
+  const [jumpToStep, setJumpToStep] = useState<number | null>(null);
+  // Ambos fetches inmediatos: KPIs los necesitan para count.
+  // revalidateOnFocus: false evita spam si el usuario alterna tabs.
   const { data: questionnaireResp } = useSWR(
     `/api/clients/${client.id}/questionnaire`,
-    questionnaireFetcher
+    questionnaireFetcher,
+    { revalidateOnFocus: false }
   );
   const { data: materialityResp } = useSWR(
     `/api/clients/${client.id}/materiality`,
-    materialityFetcher
+    materialityFetcher,
+    { revalidateOnFocus: false }
   );
 
   const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
@@ -62,7 +69,16 @@ export function ClientTabs({ client, completeness }: Props) {
       : schema.sections.length
     : 0;
   const materialityCount = materialityResp?.data?.length ?? null;
-  const materialityValidated = materialityCount;
+  // Validación real (migración 0027): cuenta solo topics con validated=true.
+  // Antes era placeholder = materialityCount, lo que mostraba "Todas validadas"
+  // sin que el consultor hubiera revisado nada.
+  const materialityValidated =
+    materialityResp?.data?.filter((t) => t.validated === true).length ?? null;
+  const allValidated =
+    materialityCount !== null &&
+    materialityValidated !== null &&
+    materialityCount > 0 &&
+    materialityValidated === materialityCount;
 
   // Resumen tab: 5 cards macro. Una card está completa si TODOS sus stepKeys están en completed_sections.
   // Mapping idéntico al de ClientResumen.tsx
@@ -91,8 +107,8 @@ export function ClientTabs({ client, completeness }: Props) {
 
   return (
     <div>
-      {/* KPI cards: 3 columnas según mockup */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
+      {/* KPI cards: solo métricas reales (regla CLAUDE.md: no inventar placeholders). */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
         <KpiCardLarge
           label="Cuestionario"
           value={pctCuestionario === null ? "—" : `${pctCuestionario}`}
@@ -118,9 +134,13 @@ export function ClientTabs({ client, completeness }: Props) {
           label="Matrices materialidad"
           value={materialityCount === null ? "—" : String(materialityCount)}
           unit={materialityCount === null ? "" : "/20"}
-          sub={null}
+          sub={
+            materialityCount !== null && materialityValidated !== null && !allValidated
+              ? `${materialityValidated} de ${materialityCount} validados`
+              : null
+          }
           rightBadge={
-            materialityCount !== null && materialityValidated !== null && materialityValidated > 0
+            allValidated
               ? { label: "Todas validadas", tone: "success" }
               : null
           }
@@ -200,17 +220,26 @@ export function ClientTabs({ client, completeness }: Props) {
       {tab === "resumen" && (
         <ClientResumen
           questionnaire={questionnaireResp?.data ?? null}
-          onJumpToCuestionario={() => setTab("cuestionario")}
+          onJumpToCuestionario={(firstStepKey) => {
+            setTab("cuestionario");
+            if (firstStepKey && schema && "steps" in schema) {
+              const idx = schema.steps.findIndex((s) => s.key === firstStepKey);
+              if (idx >= 0) setJumpToStep(idx);
+            }
+          }}
         />
       )}
       {tab === "cuestionario" && (
         <QuestionnaireTab
+          key={`q-${jumpToStep ?? "default"}`}
           clientId={client.id}
           initialStepIndex={(() => {
+            if (jumpToStep !== null) return jumpToStep;
             const s = searchParams?.get("step");
             const n = s ? parseInt(s, 10) - 1 : 0;
             return isNaN(n) || n < 0 ? 0 : n;
           })()}
+          autoFillOnMount={searchParams?.get("autoFill") === "1"}
         />
       )}
       {tab === "materialidad" && <MaterialityTab clientId={client.id} />}

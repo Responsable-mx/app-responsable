@@ -8,6 +8,7 @@ import { logAiCall } from "@/lib/ai/logging";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 import { ChatRequestSchema } from "@/lib/validation";
+import type { ChatStreamEvent } from "@/lib/ai/stream-types";
 
 export const maxDuration = 60;
 
@@ -114,8 +115,9 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (obj: unknown) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      // Emite eventos tipados — schema en lib/ai/stream-types.ts.
+      const send = (event: ChatStreamEvent) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
 
       const logUsage = (

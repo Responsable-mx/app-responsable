@@ -33,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (body.section_key !== undefined) patch.section_key = body.section_key;
   if (typeof body.position_index === "number") patch.position_index = body.position_index;
   if (body.notes !== undefined) patch.notes = body.notes;
+  if (typeof body.validated === "boolean") patch.validated = body.validated;
 
   try {
     const topic = await updateMaterialityTopic({

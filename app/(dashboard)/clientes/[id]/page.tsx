@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClient, clientContextCompleteness, listClients } from "@/lib/clients";
 import { ClientTabs } from "@/components/ClientTabs";
+import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
+import { isSystemAccount } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,7 @@ export default async function EditarClientePage({ params }: Props) {
 
   return (
     <div className="px-6 py-4 max-w-6xl mx-auto">
+      <ClientNavShortcuts prevId={prev?.id ?? null} nextId={next?.id ?? null} />
       {/* Breadcrumb compacto */}
       <div className="flex items-center justify-between gap-3 mb-4 text-xs">
         <div className="flex items-center gap-2 min-w-0">
@@ -66,7 +69,7 @@ export default async function EditarClientePage({ params }: Props) {
               href={prev ? `/clientes/${prev.id}` : "#"}
               aria-disabled={!prev}
               className={`p-1 rounded ${prev ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
-              title={prev?.name ?? "Sin anterior"}
+              title={prev ? `${prev.name} · Alt+←` : "Sin anterior"}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -76,7 +79,7 @@ export default async function EditarClientePage({ params }: Props) {
               href={next ? `/clientes/${next.id}` : "#"}
               aria-disabled={!next}
               className={`p-1 rounded ${next ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
-              title={next?.name ?? "Sin siguiente"}
+              title={next ? `${next.name} · Alt+→` : "Sin siguiente"}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -102,7 +105,7 @@ export default async function EditarClientePage({ params }: Props) {
             </span>
           </>
         )}
-        {client.created_by && (
+        {client.created_by && !isSystemAccount(client.created_by) && (
           <>
             <span className="text-slate-300">|</span>
             <span className="text-xs text-slate-600">{client.created_by.split("@")[0]}</span>

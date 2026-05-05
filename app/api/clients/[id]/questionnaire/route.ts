@@ -3,8 +3,16 @@ import { requireUser } from "@/lib/auth";
 import {
   getQuestionnaireBundle,
   upsertQuestionnaireResponse,
+  QuestionnaireConflictError,
 } from "@/lib/questionnaires/queries";
-import type { QuestionnaireResponseData } from "@/lib/questionnaires/types";
+import {
+  isWizardSchema,
+  isFieldResponse,
+  getFieldValue,
+  isFieldFilled,
+  type QuestionnaireResponseData,
+} from "@/lib/questionnaires/types";
+import { getClient } from "@/lib/clients";
 import { logChange } from "@/lib/audit-log";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -44,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     service?: string;
     responses?: QuestionnaireResponseData;
     completedSections?: string[];
+    expectedUpdatedAt?: string | null;
   };
   try {
     body = await req.json();
@@ -58,12 +67,63 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
   try {
     const before = await getQuestionnaireBundle(id, serviceKey);
+    if (!before) {
+      return NextResponse.json({ error: "Template no encontrado" }, { status: 404 });
+    }
+
+    // ── Validación server-side: required + only_double_materialidad ──
+    const schema = before.template.schema;
+    const completedSections = body.completedSections ?? [];
+    const responsesIn = body.responses;
+    const validationErrors: string[] = [];
+
+    if (isWizardSchema(schema)) {
+      // only_double_materialidad: verificar flag del cliente. Si el paso solo aplica
+      // a clientes con doble materialidad y el cliente NO la tiene, rechazar payload
+      // que intente guardar respuestas en ese paso.
+      const client = await getClient(id).catch(() => null);
+      const hasDoubleMat = client?.has_double_materiality === true;
+
+      for (const step of schema.steps) {
+        const stepResp = (responsesIn[step.key] as Record<string, unknown> | undefined) ?? {};
+        const hasAnyValue = Object.values(stepResp).some((raw) => isFieldFilled(getFieldValue(raw)));
+        if (step.only_double_materialidad && !hasDoubleMat && hasAnyValue) {
+          validationErrors.push(
+            `Paso "${step.title}" solo aplica a clientes con Doble Materialidad. Activa el flag en el cliente o limpia el paso.`
+          );
+          continue;
+        }
+        // Required: solo se valida cuando el consultor marca el paso como completo.
+        // Mientras edita libremente, autosave no debe bloquear progreso parcial.
+        if (completedSections.includes(step.key)) {
+          for (const field of step.fields) {
+            if (!field.required) continue;
+            const raw = stepResp[field.key];
+            const value = isFieldResponse(raw) ? raw.value : getFieldValue(raw);
+            if (!isFieldFilled(value)) {
+              validationErrors.push(
+                `Paso "${step.title}": campo "${field.label}" es requerido para marcarlo completo.`
+              );
+            }
+          }
+        }
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { error: validationErrors.join(" · "), validation_errors: validationErrors },
+        { status: 422 }
+      );
+    }
+
     const saved = await upsertQuestionnaireResponse({
       clientId: id,
       serviceKey,
-      responses: body.responses,
-      completedSections: body.completedSections ?? [],
+      responses: responsesIn,
+      completedSections,
       actorEmail: user,
+      expectedUpdatedAt: body.expectedUpdatedAt ?? null,
     });
 
     void logChange({
@@ -77,6 +137,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     return NextResponse.json({ data: saved });
   } catch (e) {
+    if (e instanceof QuestionnaireConflictError) {
+      return NextResponse.json(
+        {
+          error:
+            "Otro consultor guardó cambios mientras editabas. Recarga el cuestionario para ver el estado actual y reaplica tus cambios.",
+          server_updated_at: e.serverUpdatedAt,
+        },
+        { status: 409 }
+      );
+    }
     const msg = e instanceof Error ? e.message : "Error al guardar";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

@@ -127,7 +127,7 @@ export function ClientResumen({
   onJumpToCuestionario,
 }: {
   questionnaire: QuestionnaireBundle | null;
-  onJumpToCuestionario: () => void;
+  onJumpToCuestionario: (firstStepKey?: string) => void;
 }) {
   if (!questionnaire) {
     return (
@@ -176,7 +176,7 @@ export function ClientResumen({
           <button
             key={card.key}
             type="button"
-            onClick={onJumpToCuestionario}
+            onClick={() => onJumpToCuestionario(card.stepKeys[0])}
             className={`group bg-white border border-slate-200 ${card.accentBorder} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:border-brand-primary/40 transition-all`}
           >
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">

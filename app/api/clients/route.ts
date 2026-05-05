@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { listClients, createClientRow } from "@/lib/clients";
+import { listClients, createClientRow, deleteClientRow } from "@/lib/clients";
 import { ClientInputSchema } from "@/lib/validation";
 import { upsertQuestionnaireResponse } from "@/lib/questionnaires/queries";
 import type { FieldResponse, QuestionnaireResponseData, SourceItem } from "@/lib/questionnaires/types";
@@ -54,7 +54,9 @@ export async function POST(req: NextRequest) {
   try {
     const data = await createClientRow(parsed.data, user);
 
-    // Si viene wizardStep1 → seed inicial de questionnaire_responses
+    // Si viene wizardStep1 → seed inicial de questionnaire_responses.
+    // Atomicidad: si el seed falla, hacer rollback del cliente para evitar
+    // estado parcial (cliente sin cuestionario inicial cuando el flujo lo requiere).
     if (wizardStep1 && data.id) {
       const now = new Date().toISOString();
       const stepData: Record<string, FieldResponse> = {};
@@ -77,8 +79,19 @@ export async function POST(req: NextRequest) {
           actorEmail: user,
         });
       } catch (e) {
-        console.error("[POST /api/clients] seed wizardStep1 falló:", e);
-        // No rompe la creación del cliente
+        console.error("[POST /api/clients] seed wizardStep1 falló — rollback cliente:", e);
+        try {
+          await deleteClientRow(data.id);
+        } catch (rollbackErr) {
+          console.error("[POST /api/clients] rollback también falló:", rollbackErr);
+        }
+        return NextResponse.json(
+          {
+            error:
+              "Cliente creado pero seed inicial falló. Operación revertida — vuelve a intentar.",
+          },
+          { status: 500 }
+        );
       }
     }
 

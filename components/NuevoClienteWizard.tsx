@@ -69,8 +69,8 @@ export function NuevoClienteWizard() {
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       const newId = json.data?.id;
       if (!newId) throw new Error("Sin ID en respuesta");
-      toast.push("success", "Cliente creado · paso 1 guardado");
-      router.push(`/clientes/${newId}?tab=cuestionario&step=2`);
+      toast.push("success", "Cliente creado · iniciando IA");
+      router.push(`/clientes/${newId}?tab=cuestionario&step=2&autoFill=1`);
     } catch (e) {
       toast.push("error", e instanceof Error ? e.message : "Error al crear");
       setBusy(false);

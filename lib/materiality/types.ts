@@ -16,6 +16,9 @@ export type MaterialityTopic = {
   section_key: string | null;
   position_index: number;
   notes: string | null;
+  // Validación real (migración 0027). Default false hasta que el consultor confirme
+  // posicionamiento. La UI cuenta validated=true para "Todas validadas".
+  validated: boolean;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -32,6 +35,7 @@ export type MaterialityTopicInput = {
   section_key?: string | null;
   position_index?: number;
   notes?: string | null;
+  validated?: boolean;
 };
 
 export const COLOR_META: Record<TopicColor, { label: string; symbol: string; quadrant: string }> = {
@@ -41,10 +45,20 @@ export const COLOR_META: Record<TopicColor, { label: string; symbol: string; qua
   slate: { label: "En seguimiento", symbol: "▲", quadrant: "Bajo impacto + baja materialidad financiera" },
 };
 
+// Clamp a [0, 100]. Defensivo contra inputs fuera de rango (drag bug, payload malo).
+export function clampPos(n: number): number {
+  if (typeof n !== "number" || Number.isNaN(n)) return 50;
+  if (n < 0) return 0;
+  if (n > 100) return 100;
+  return n;
+}
+
 export function deriveColor(x: number, y: number): TopicColor {
   // x: financiera (0-100), y: impacto (0=arriba/alto impacto, 100=abajo/bajo impacto)
-  const highImpact = y < 50;
-  const highFinancial = x > 50;
+  const cx = clampPos(x);
+  const cy = clampPos(y);
+  const highImpact = cy < 50;
+  const highFinancial = cx > 50;
   if (highImpact && highFinancial) return "rose";
   if (highImpact && !highFinancial) return "amber";
   if (!highImpact && highFinancial) return "teal";

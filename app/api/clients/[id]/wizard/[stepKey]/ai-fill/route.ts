@@ -163,14 +163,24 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
     const msg = await anthropic.messages.create({
       model: modelCfg.model,
       max_tokens: 4096,
-      system: systemPrompt,
+      // System prompt como bloque cacheable (ephemeral) — system prompt es
+      // constante en todas las llamadas (8 reglas + fuentes). Hits subsequentes
+      // pagan 10% del costo input por estos tokens. Ahorro ~80-90% en bulk fill.
+      system: [
+        {
+          type: "text",
+          text: systemPrompt,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          cache_control: { type: "ephemeral" } as any,
+        },
+      ],
       tools: [
         {
           // Web search tool: la IA busca fuentes públicas reales (no inventa)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           type: "web_search_20250305" as any,
           name: "web_search",
-          max_uses: 4,
+          max_uses: 2,
         },
       ],
       messages: [{ role: "user", content: userPrompt }],

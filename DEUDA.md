@@ -20,30 +20,10 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Responsable**: Equipo metodología ResponSable
 - **Esfuerzo**: Decisión de negocio, luego 30min de código
 
-### 🟡 D-05 — Sin paginación en lista de clientes
-- **Descripción**: `/clientes` usa filter client-side. Funciona para <100 clientes, no escala.
-- **Fix sugerido**: SWR + `/api/clients?page=&limit=&search=` server-side.
-- **Esfuerzo**: 3-4h
-
-### 🟡 D-06 — Audit log faltante en endpoint de cuestionario
-- **Descripción**: `logChange()` ahora cubre materialidad (D-12, may-2026). Falta integrar en `/api/clients/[id]/questionnaire` (POST/PATCH).
-- **Fix sugerido**: Llamar `logChange({ actorEmail, entityType: "questionnaire_response", entityId: clientId, action, before, after })` en cada mutación del endpoint de cuestionario.
-- **Esfuerzo**: 30min
-
 ### 🟡 D-07 — Export PDF del cliente no existe
 - **Descripción**: No hay forma de exportar el contexto + servicios + cuestionario + materialidad de un cliente en un PDF entregable al cliente final.
 - **Fix sugerido**: Integrar `@react-pdf/renderer` o ruta `/api/clients/[id]/export-pdf` con plantilla.
 - **Esfuerzo**: 1-2 días
-
-### 🟢 D-08 — Stone vs slate: tokens residuales
-- **Descripción**: `uso-ia/page.tsx` migrado (may-2026). `UsersManager.tsx` migrado (may-2026). Pueden quedar instancias en `ClientForm`, `ChatWindow` y otros componentes legacy.
-- **Fix sugerido**: `grep -r "stone-" components/ app/` y reemplazar remanentes.
-- **Esfuerzo**: 30min
-
-### 🟢 D-09 — `ConfirmDialog` deprecado activo en CatalogsManager y PromptsManager
-- **Descripción**: `components/ConfirmDialog.tsx` es wrapper anterior; el nuevo estándar es `components/ui/ConfirmModal.tsx`.
-- **Fix sugerido**: Migrar `CatalogsManager` y `PromptsManager` a `ConfirmModal`.
-- **Esfuerzo**: 1h
 
 ### 🟢 D-10 — Sin trazabilidad Chat → Cuestionario
 - **Descripción**: Los mensajes del chat IA no linkean a campos específicos del cuestionario.
@@ -91,6 +71,10 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 | D-31 | `uso-ia/page.tsx` usaba tokens `stone-*` y `rounded-xl` fuera del design system | may-2026 — migrado a `slate-*` + `rounded` |
 | D-32 | RLS `chat_sessions_owner_delete` permitía hard-DELETE directo desde cliente JS | may-2026 — migración `0031` elimina política; solo service role puede hard-delete |
 | D-03 | Chat IA sin contexto inline en tabs del cliente | may-2026 — sprint añadió tab "Chat IA" en `ClientTabs` con `<ChatWindow clientId>` preseleccionado |
+| D-05 | Sin paginación/search server-side en lista de clientes | may-2026 — `listClients(filter)` + `GET /api/clients?q=` + SWR debounce 300ms en `ClientsList` |
+| D-06 | Audit log faltante en endpoint de cuestionario | may-2026 — `logChange()` ya integrado en `/api/clients/[id]/questionnaire` (PATCH) |
+| D-08 | Stone vs slate: tokens residuales en producción | may-2026 — pase global `stone-*`→`slate-*` + `rounded-xl`→`rounded` en 24 componentes |
+| D-09 | `ConfirmDialog` deprecado activo en CatalogsManager/PromptsManager | may-2026 — `ConfirmDialog.tsx` ya no existe; ambos componentes usan `ConfirmModal` |
 
 ---
 

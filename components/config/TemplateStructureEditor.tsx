@@ -43,6 +43,12 @@ export function TemplateStructureEditor({
   const [err, setErr] = useState<string | null>(null);
   const { push } = useToast();
 
+  // Drag state — track type + indices. Native HTML5 DnD para zero-deps.
+  const [dragStage, setDragStage] = useState<number | null>(null);
+  const [dragActivity, setDragActivity] = useState<{ stageIdx: number; actIdx: number } | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<number | null>(null);
+  const [dragOverActivity, setDragOverActivity] = useState<{ stageIdx: number; actIdx: number } | null>(null);
+
   function reindexStages(arr: TplStage[]): TplStage[] {
     return arr.map((s, i) => ({ ...s, order_index: i }));
   }
@@ -67,6 +73,29 @@ export function TemplateStructureEditor({
       [next[i], next[j]] = [next[j], next[i]];
       return reindexStages(next);
     });
+  }
+
+  // Drag-and-drop: mover stage `from` antes de `to`. Splice + reindex.
+  function dropStageOn(from: number, to: number) {
+    if (from === to) return;
+    setStages((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return reindexStages(next);
+    });
+  }
+  function dropActivityOn(stageIdx: number, from: number, to: number) {
+    if (from === to) return;
+    setStages((prev) =>
+      prev.map((s, idx) => {
+        if (idx !== stageIdx) return s;
+        const next = [...s.activities];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return { ...s, activities: reindexActivities(next) };
+      })
+    );
   }
 
   function addActivity(stageIdx: number) {
@@ -163,15 +192,49 @@ export function TemplateStructureEditor({
           </div>
         )}
         <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded p-2.5">
-          <strong>Offset en días</strong> = posición relativa a la fecha base elegida al aplicar la
-          plantilla. Ej: actividad &quot;Diagnóstico&quot; con offset 0–5 dura del día 0 al 5
-          desde el inicio del proyecto. Vacío = sin fecha plan.
+          <strong>Días desde inicio</strong> = posición relativa a la fecha base elegida al aplicar
+          la plantilla. Ej: &quot;Diagnóstico&quot; con días <strong>0 → 5</strong> arranca el día
+          que inicias el proyecto y dura 5 días. Vacío = sin fecha plan. Arrastra ⋮⋮ para
+          reordenar etapas o actividades.
         </p>
 
         <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
           {stages.map((s, sIdx) => (
-            <div key={sIdx} className="bg-slate-50 border border-slate-200 rounded p-3 space-y-2">
+            <div
+              key={sIdx}
+              draggable
+              onDragStart={(e) => {
+                setDragStage(sIdx);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (dragStage !== null) {
+                  e.preventDefault();
+                  setDragOverStage(sIdx);
+                }
+              }}
+              onDragLeave={() => setDragOverStage(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragStage !== null) dropStageOn(dragStage, sIdx);
+                setDragStage(null);
+                setDragOverStage(null);
+              }}
+              onDragEnd={() => {
+                setDragStage(null);
+                setDragOverStage(null);
+              }}
+              className={`bg-slate-50 border rounded p-3 space-y-2 transition-all ${
+                dragStage === sIdx ? "opacity-40" : ""
+              } ${dragOverStage === sIdx && dragStage !== sIdx ? "border-brand-primary border-2" : "border-slate-200"}`}
+            >
               <div className="flex items-center gap-2">
+                <span
+                  className="text-slate-400 hover:text-slate-700 cursor-grab active:cursor-grabbing text-sm leading-none select-none px-1"
+                  title="Arrastra para reordenar etapa"
+                >
+                  ⋮⋮
+                </span>
                 <input
                   value={s.name}
                   onChange={(e) => renameStage(sIdx, e.target.value)}
@@ -203,9 +266,50 @@ export function TemplateStructureEditor({
               </div>
 
               <div className="space-y-1">
-                {s.activities.map((a, aIdx) => (
-                  <div key={aIdx} className="bg-white border border-slate-200 rounded p-2 space-y-1.5">
+                {s.activities.map((a, aIdx) => {
+                  const isDragging = dragActivity?.stageIdx === sIdx && dragActivity?.actIdx === aIdx;
+                  const isDragOver = dragOverActivity?.stageIdx === sIdx && dragOverActivity?.actIdx === aIdx;
+                  return (
+                  <div
+                    key={aIdx}
+                    draggable
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      setDragActivity({ stageIdx: sIdx, actIdx: aIdx });
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      if (dragActivity?.stageIdx === sIdx) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDragOverActivity({ stageIdx: sIdx, actIdx: aIdx });
+                      }
+                    }}
+                    onDragLeave={() => setDragOverActivity(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (dragActivity?.stageIdx === sIdx) {
+                        dropActivityOn(sIdx, dragActivity.actIdx, aIdx);
+                      }
+                      setDragActivity(null);
+                      setDragOverActivity(null);
+                    }}
+                    onDragEnd={() => {
+                      setDragActivity(null);
+                      setDragOverActivity(null);
+                    }}
+                    className={`bg-white border rounded p-2 space-y-1.5 transition-all ${
+                      isDragging ? "opacity-40" : ""
+                    } ${isDragOver && !isDragging ? "border-brand-primary border-2" : "border-slate-200"}`}
+                  >
                     <div className="flex items-center gap-2">
+                      <span
+                        className="text-slate-300 hover:text-slate-600 cursor-grab active:cursor-grabbing text-xs leading-none select-none"
+                        title="Arrastra para reordenar"
+                      >
+                        ⋮⋮
+                      </span>
                       <input
                         value={a.name}
                         onChange={(e) => updateActivity(sIdx, aIdx, { name: e.target.value })}
@@ -234,8 +338,11 @@ export function TemplateStructureEditor({
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 shrink-0">
-                        Offset
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-widest text-slate-400 shrink-0"
+                        title="Días desde la fecha base del proyecto"
+                      >
+                        Día
                       </span>
                       <input
                         type="number"
@@ -263,7 +370,8 @@ export function TemplateStructureEditor({
                       <span className="text-[10px] text-slate-500">días</span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 <button
                   onClick={() => addActivity(sIdx)}
                   className="text-[11px] text-brand-primary-dark hover:underline mt-1"

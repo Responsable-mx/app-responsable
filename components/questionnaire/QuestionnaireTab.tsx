@@ -18,6 +18,7 @@ import {
   type WizardStep,
 } from "@/lib/questionnaires/types";
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/SelectField";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 
@@ -819,18 +820,20 @@ function FieldRow({
           ))}
         </div>
       ) : field.type === "select" ? (
-        <select
-          className={`${baseInput} px-3 py-2`}
+        <SelectField
           value={typeof value === "string" ? value : ""}
-          onChange={(e) => onChange(e.target.value || null)}
-        >
-          <option value="">— Seleccionar —</option>
-          {Array.isArray(field.options) && field.options.map((opt, i) => {
-            const v = typeof opt === "string" ? opt : opt.value;
-            const l = typeof opt === "string" ? opt : opt.label;
-            return <option key={`${v}-${i}`} value={v}>{l}</option>;
-          })}
-        </select>
+          onChange={(v) => onChange(v || null)}
+          options={
+            Array.isArray(field.options)
+              ? field.options.map((opt) => {
+                  const v = typeof opt === "string" ? opt : opt.value;
+                  const l = typeof opt === "string" ? opt : opt.label;
+                  return { value: v, label: l };
+                })
+              : []
+          }
+          placeholder="— Seleccionar —"
+        />
       ) : field.type === "multiselect" ? (
         <div className="flex flex-wrap gap-1.5">
           {(field.options ?? []).map((opt, i) => {

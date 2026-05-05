@@ -48,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
   try {
     const adminDb = createAdminClient();
+    const before = await getTemplate(id);
     const { error } = await adminDb.from("stage_templates").update(update).eq("id", id);
     if (error) throw error;
     await logChange({
@@ -55,6 +56,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       entityType: "stage_template",
       entityId: id,
       action: "update",
+      before: before ? { name: before.name, description: before.description, service: before.service } : null,
       after: update,
     });
     return NextResponse.json({ ok: true });

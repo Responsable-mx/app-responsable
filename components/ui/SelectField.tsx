@@ -14,12 +14,14 @@ export function SelectField({
   options,
   placeholder = "Todos",
   className,
+  id,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: SelectOption[];
   placeholder?: string;
   className?: string;
+  id?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -45,6 +47,7 @@ export function SelectField({
   return (
     <div ref={ref} className={`relative ${className ?? ""}`}>
       <button
+        id={id}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center justify-between gap-1.5 w-full text-xs border border-slate-200 rounded px-2 py-1 bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 transition-colors"

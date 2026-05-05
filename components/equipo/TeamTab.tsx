@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 
 type Consultor = {
@@ -312,39 +313,29 @@ function AssignModal({
               Todos los consultores ya están asignados a este cliente.
             </p>
           ) : (
-            <select
+            <SelectField
               id="assign-email-select"
               value={selectedEmail}
-              onChange={(e) => setSelectedEmail(e.target.value)}
-              className="font-sans rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              autoFocus
-            >
-              <option value="">— Selecciona un consultor —</option>
-              {available.map((u) => (
-                <option key={u.email} value={u.email}>
-                  {u.full_name ? `${u.full_name} (${u.email})` : u.email}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedEmail}
+              options={available.map((u) => ({
+                value: u.email,
+                label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
+              }))}
+              placeholder="— Selecciona un consultor —"
+            />
           )}
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="assign-seniority-select" className="text-sm font-medium text-slate-700">
             Seniority en este proyecto
           </label>
-          <select
+          <SelectField
             id="assign-seniority-select"
             value={seniorityLevel}
-            onChange={(e) => setSeniorityLevel(e.target.value)}
-            className="font-sans rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <option value="">— Usar nivel global del consultor —</option>
-            {seniorityItems.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            onChange={setSeniorityLevel}
+            options={seniorityItems}
+            placeholder="— Usar nivel global del consultor —"
+          />
           <p className="text-xs text-slate-500">
             Opcional. Si no se elige, se muestra el nivel global del consultor.
           </p>
@@ -424,20 +415,13 @@ function EditSeniorityModal({
           <label htmlFor="edit-seniority-select" className="text-sm font-medium text-slate-700">
             Seniority en este proyecto
           </label>
-          <select
+          <SelectField
             id="edit-seniority-select"
             value={seniorityLevel}
-            onChange={(e) => setSeniorityLevel(e.target.value)}
-            className="font-sans rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            autoFocus
-          >
-            <option value="">— Usar nivel global del consultor —</option>
-            {seniorityItems.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            onChange={setSeniorityLevel}
+            options={seniorityItems}
+            placeholder="— Usar nivel global del consultor —"
+          />
           <p className="text-xs text-slate-500">
             Nivel global de {consultor.full_name ?? consultor.user_email}:{" "}
             <strong>

@@ -339,7 +339,8 @@ export async function getStageOwnerClient(stageId: string): Promise<string | nul
     .single();
   if (error || !data) return null;
   // Supabase tipo nested: client_services puede ser objeto o array según el join.
-  const cs = (data as unknown as { client_services: { client_id: string } | { client_id: string }[] }).client_services;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cs = (data as any).client_services;
   if (Array.isArray(cs)) return cs[0]?.client_id ?? null;
   return cs?.client_id ?? null;
 }
@@ -357,8 +358,9 @@ export async function getActivityOwnerClient(activityId: string): Promise<string
     .eq("id", activityId)
     .single();
   if (error || !data) return null;
-  const stage = (data as unknown as { service_stages: { client_services: { client_id: string } | { client_id: string }[] } | { client_services: { client_id: string } | { client_id: string }[] }[] }).service_stages;
-  const stageRow = Array.isArray(stage) ? stage[0] : stage;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = data as any;
+  const stageRow = Array.isArray(raw.service_stages) ? raw.service_stages[0] : raw.service_stages;
   const cs = stageRow?.client_services;
   if (!cs) return null;
   if (Array.isArray(cs)) return cs[0]?.client_id ?? null;

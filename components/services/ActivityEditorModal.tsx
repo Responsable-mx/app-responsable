@@ -12,6 +12,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 import type { StageActivity } from "@/lib/stages";
 
@@ -185,18 +186,12 @@ export function ActivityEditorModal({
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Asignado a
             </label>
-            <select
+            <SelectField
               value={assigneeEmail}
-              onChange={(e) => setAssigneeEmail(e.target.value)}
-              className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-            >
-              <option value="">Sin asignar</option>
-              {consultorEmails.map((email) => (
-                <option key={email} value={email}>
-                  {email}
-                </option>
-              ))}
-            </select>
+              onChange={setAssigneeEmail}
+              options={consultorEmails.map((email) => ({ value: email, label: email }))}
+              placeholder="Sin asignar"
+            />
           </div>
         )}
       </div>

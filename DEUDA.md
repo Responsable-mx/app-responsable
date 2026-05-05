@@ -28,6 +28,17 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+## Deuda resuelta (sesión 5 — may-2026)
+
+| ID | Descripción | Resuelto |
+|----|-------------|---------|
+| D-54 | Native `<select>` en 7 lugares — violaba regla SelectField | may-2026 — migrados a SelectField en ActivityEditorModal, TemplatesManager (x2), TeamTab (x3), ChatWindow, QuestionnaireTab |
+| D-55 | `team/occupancy` full-scan sin filtro temporal — actividades completadas acumulándose | may-2026 — `.or("actual_end.is.null,actual_end.gte.${oneYearAgoStr}")` en query de actividades |
+| D-56 | PATCH `/api/stage-templates/:id` audit log sin snapshot `before` | may-2026 — `getTemplate(id)` previo al UPDATE + before incluido en `logChange` |
+| D-57 | `getActivityOwnerClient` tipo assertion doble-cast 3 líneas — fragile | may-2026 — colapsado a `data as any` con eslint-disable comment |
+
+---
+
 ## Deuda resuelta
 
 | ID | Descripción | Resuelto |

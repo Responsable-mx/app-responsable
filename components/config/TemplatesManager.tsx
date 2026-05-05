@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 import { TemplateStructureEditor } from "./TemplateStructureEditor";
 
@@ -336,18 +337,12 @@ function EditTemplateModal({
           <label className="block text-xs font-medium text-slate-700 mb-1">
             Servicio asociado
           </label>
-          <select
+          <SelectField
             value={service}
-            onChange={(e) => setService(e.target.value)}
-            className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          >
-            <option value="">Sin servicio (genérica)</option>
-            {serviceCat.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            onChange={setService}
+            options={serviceCat}
+            placeholder="Sin servicio (genérica)"
+          />
           <p className="text-[10px] text-slate-500 mt-1">
             Si se asocia a un servicio, las plantillas pueden filtrarse al aplicarlas.
           </p>
@@ -507,18 +502,12 @@ function CreateTemplateModal({
           <label className="block text-xs font-medium text-slate-700 mb-1">
             Servicio asociado (opcional)
           </label>
-          <select
+          <SelectField
             value={service}
-            onChange={(e) => setService(e.target.value)}
-            className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          >
-            <option value="">Genérica (sin servicio)</option>
-            {serviceCat.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            onChange={setService}
+            options={serviceCat}
+            placeholder="Genérica (sin servicio)"
+          />
         </div>
         <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded p-2.5">
           Después de crear la plantilla, usa &quot;Estructura&quot; para agregar etapas y actividades con offsets.

@@ -10,7 +10,7 @@ SELECT
 {
   "stages": [
     {
-      "name": "1. Diagnóstico inicial",
+      "name": "Diagnóstico inicial",
       "order_index": 0,
       "activities": [
         { "name": "Kickoff con cliente y alineación de alcance", "description": "Reunión inicial: confirmar objetivo, marco de referencia (CSRD/GRI), entregables, calendario, equipo del cliente y nuestro.", "order_index": 0, "offset_start_days": 0, "offset_end_days": 1 },
@@ -20,7 +20,7 @@ SELECT
       ]
     },
     {
-      "name": "2. Mapeo de stakeholders",
+      "name": "Mapeo de stakeholders",
       "order_index": 1,
       "activities": [
         { "name": "Categorización de stakeholders", "description": "Clasificación por tipo (interno/externo), influencia, dependencia, urgencia. Matriz Mendelow o similar.", "order_index": 0, "offset_start_days": 10, "offset_end_days": 14 },
@@ -29,7 +29,7 @@ SELECT
       ]
     },
     {
-      "name": "3. Identificación de temas materiales",
+      "name": "Identificación de temas materiales",
       "order_index": 2,
       "activities": [
         { "name": "Benchmark sectorial", "description": "Análisis de 5-10 empresas peer del sector: temas materiales reportados, frameworks aplicados, brechas vs cliente.", "order_index": 0, "offset_start_days": 15, "offset_end_days": 22 },
@@ -39,7 +39,7 @@ SELECT
       ]
     },
     {
-      "name": "4. Consulta a stakeholders",
+      "name": "Consulta a stakeholders",
       "order_index": 3,
       "activities": [
         { "name": "Diseño de instrumentos de consulta", "description": "Guion de entrevistas, cuestionario online, agenda de workshops. Validación con cliente antes de campo.", "order_index": 0, "offset_start_days": 25, "offset_end_days": 30 },
@@ -50,7 +50,7 @@ SELECT
       ]
     },
     {
-      "name": "5. Análisis y priorización",
+      "name": "Análisis y priorización",
       "order_index": 4,
       "activities": [
         { "name": "Evaluación de materialidad de impacto", "description": "Por cada tema: severidad, escala, alcance, irremediabilidad, probabilidad. Score 0-10 según ESRS.", "order_index": 0, "offset_start_days": 45, "offset_end_days": 55 },
@@ -60,7 +60,7 @@ SELECT
       ]
     },
     {
-      "name": "6. Reporte y entrega",
+      "name": "Reporte y entrega",
       "order_index": 5,
       "activities": [
         { "name": "Redacción del informe completo", "description": "Documento entregable: metodología, mapeo stakeholders, IROs, matriz, temas materiales priorizados, recomendaciones.", "order_index": 0, "offset_start_days": 60, "offset_end_days": 72 },

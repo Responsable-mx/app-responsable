@@ -57,6 +57,11 @@ export async function GET() {
 
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
 
+  // Solo actividades activas o completadas en el último año — evita acumulación indefinida.
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10);
+
   // Query 2: actividades con assignee + cadena de joins hasta cliente
   const { data: activitiesRaw, error: e2 } = await admin
     .from("stage_activities")
@@ -64,7 +69,8 @@ export async function GET() {
       `id, name, planned_start, planned_end, actual_start, actual_end, assignee_email,
        service_stages!inner ( name, client_services!inner ( service, clients!inner ( id, name ) ) )`
     )
-    .not("assignee_email", "is", null);
+    .not("assignee_email", "is", null)
+    .or(`actual_end.is.null,actual_end.gte.${oneYearAgoStr}`);
 
   if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
 

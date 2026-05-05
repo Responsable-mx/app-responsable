@@ -1,83 +1,88 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-05 (sesión 4 — auditoría completa post-sprint)
-**Modo:** /audit completo
-**Calificación:** 9.4 / 10
+**Fecha:** 2026-05-05 (sesión 5 — sprint plantillas + equipo global)
+**Modo:** /audit completo (+ /audit-ia /audit-mvp /audit-seg /audit-pyme /audit-skill /audit-health /audit-refactor /simplify)
+**Calificación:** 9.3 / 10
 
 ---
 
-## Hallazgos — todos cerrados en sesión
+## Hallazgos y cierre esta sesión
 
-| ID | Sev | Descripción | Fix |
-|----|-----|-------------|-----|
-| D-42 | 🟡 | `client-services` PATCH/DELETE con `requireUser` — consultor podía mutar servicios | `requireAdmin()` en PATCH y DELETE |
-| D-43 | 🟡 | RLS de `service_stages`/`stage_activities` sin check de rol admin | Migración `0033`: políticas mutación restringidas a `role = 'admin'` |
-| D-44 | 🟢 | Doble `requireAdmin()` en PATCH activities (2 round-trips) | Variable compartida `adminEmail` — 1 sola llamada |
-| D-45 | 🟢 | `ClientCronogramaTab` SWR sin `error` — fallo silencioso | `servicesError` desestructurado + banner de error visible |
-| D-46 | 🟢 | `ServiceStagesPanel` sin `error` SWR + spinner texto en lugar de Skeleton | `error` + skeleton animado + mensaje de error |
-| D-47 | 🟢 | `ClientServicesTab` usaba clase raw `.skeleton` | Resuelto al eliminar archivo (D-53) |
-| D-48 | 🟢 | `StageRow` prop `consultorEmails` declarado pero no consumido | Eliminado del tipo y del call site |
-| D-49 | 🟢 | `{stages.length === 0 && !isAdmin && null}` — expresión dead-null | Eliminada |
-| D-50 | 🟢 | Iconos emoji en UI de datos en `ClientServicesTab` | Resuelto al eliminar archivo (D-53) |
-| D-51 | 🟢 | `await import("zod")` dinámico en handler POST | Import estático `import { z } from "zod"` |
-| D-52 | 🟢 | PATCH `/api/stages/:id` sin snapshot `before` en audit log | Fetch `before` previo al update |
-| D-53 | 🟢 | `ClientServicesTab` dead code — 0 consumers | Archivo eliminado |
+| ID | Sev | Descripción | Estado |
+|----|-----|-------------|--------|
+| D-54 | 🟢 | Native `<select>` en 7 lugares — viola regla SelectField | ✅ Migrados a SelectField |
+| D-55 | 🟡 | `team/occupancy` full-scan sin filtro temporal | ✅ Filtro 1-año en query |
+| D-56 | 🟢 | PATCH stage-template audit log sin `before` | ✅ `getTemplate` previo + before en logChange |
+| D-57 | 🟢 | `getActivityOwnerClient` tipo assertion doble-cast 3 líneas | ✅ Colapsado a `as any` |
+
+## Cerrado en esta sesión
+
+| Fix | Descripción |
+|-----|-------------|
+| `SelectField.tsx` | Nuevo componente + prop `id` para asociación `htmlFor` |
+| `EquipoFilters.tsx` | 3 native selects → SelectField (sesión anterior) |
+| `ActivityEditorModal.tsx` | Select asignado → SelectField |
+| `TemplatesManager.tsx` | 2 selects servicio → SelectField |
+| `TeamTab.tsx` | 3 selects (consultor + seniority x2) → SelectField |
+| `ChatWindow.tsx` | Client picker select → SelectField |
+| `QuestionnaireTab.tsx` | Field type "select" → SelectField |
+| `CLAUDE.md` | Regla SelectField documentada + limitación browser |
+| `stage-templates/[id]/route.ts` | PATCH: before snapshot en audit log |
+| `lib/stages.ts` | getActivityOwnerClient tipo assertion simplificado |
+| `team/occupancy/route.ts` | Filtro temporal 1 año en actividades |
 
 ---
 
 ## Áreas sin hallazgos nuevos
 
-- Auth en todas las rutas (GET=requireUser, mutaciones=requireAdmin) ✅
-- UUID regex en todos los handlers ✅
-- Zod validation antes de DB ✅
-- Anti-IDOR: ownership checks en stages y activities ✅
-- audit_log en todas las mutaciones ✅
-- Índices DB: `idx_service_stages_service`, `idx_stage_activities_stage`, `idx_stage_activities_assignee`, `idx_stage_activities_planned_range` ✅
-- Constraints DB: `chk_planned_dates`, `chk_actual_dates` ✅
-- Tests: 216/216 verdes ✅
-- ESLint: 0 errores, 0 warnings ✅
-- TypeScript: 0 errores ✅
+- Auth cobertura: GET=`requireUser`, mutaciones=`requireAdmin`, cron=`verifyCron` — consistente ✅
+- Anti-IDOR: `getStageOwnerClient` + `getActivityOwnerClient` aplicados ✅
+- Validación Zod: todos los inputs validados antes de DB ✅
+- Dev mode isolation: `isDevMode()` en stores in-memory — sin contaminación en prod ✅
+- Cron delayed-activities: killswitch, filtro usuarios activos, `escapeHtml` en HTML ✅
+- SelectField nuevo: keyboard, click fuera, aria-selected, Inter garantizado ✅
+- PATCH handler stage-templates: existe completo (GET/PATCH/DELETE) ✅
+- applyTemplate: order_index correcto, offsets calculados bien ✅
+- computeStatus: función pura, lógica correcta ✅
+- projects/overview queries: 4 en paralelo con Promise.all ✅
+- audit_log fail-open: patrón correcto ✅
 
 ---
 
-## Deuda activa (sin cambios)
+## Deuda activa post-sesión
 
-- D-04 — Metodología ResponSable: decisión de negocio pendiente
-- D-10 — Trazabilidad Chat→Cuestionario: diferido
+| ID | Sev | Descripción |
+|----|-----|-------------|
+| D-04 | 🟡 | Metodología ResponSable: decisión de negocio pendiente |
+| D-10 | 🟢 | Sin trazabilidad Chat → Cuestionario (diferido) |
 
 ---
 
 ## Reporte de evolución
 
 ```
-App ResponSable · 2026-05-05 (sesión 4)
+App ResponSable · 2026-05-05 (sesión 5 — deuda limpiada)
 ─────────────────────────────────────
 ✅ CERRADO EN ESTA SESIÓN
 ─────────────────────────────────────
-D-42 auth gap — consultores mutaban servicios sin ser admin
-D-43 RLS sin admin check — defensa en profundidad rota en service_stages/activities
-D-44 doble round-trip Supabase — colapsado a 1 llamada
-D-45 error silencioso ClientCronogramaTab — banner visible
-D-46 spinner texto + error silencioso ServiceStagesPanel — skeleton + banner
-D-47 clase CSS raw — eliminado con archivo muerto
-D-48 prop dead consultorEmails en StageRow — eliminado
-D-49 expresión null muerta en JSX — eliminada
-D-50 emoji en UI de datos — eliminado con archivo muerto
-D-51 dynamic import zod — import estático
-D-52 audit log sin before snapshot — fetch + before en logChange
-D-53 ClientServicesTab dead code — eliminado
+D-54 — 7 native <select> → SelectField (font Inter garantizada)
+D-55 — team/occupancy filtro 1-año (no más acumulación indefinida)
+D-56 — PATCH stage-template before snapshot en audit log
+D-57 — getActivityOwnerClient tipo assertion simplificado
++ SelectField.tsx prop id (a11y htmlFor)
++ CLAUDE.md regla SelectField documentada
 
 ─────────────────────────────────────
-⏳ PENDIENTE
+⏳ PENDIENTE (por prioridad)
 ─────────────────────────────────────
-D-04 — Metodología (decisión de negocio)
-D-10 — Trazabilidad Chat→Cuestionario (diferido)
+🟡 D-04 — Metodología ResponSable (decisión de negocio)
+🟢 D-10 — Trazabilidad Chat→Cuestionario (diferido)
 
 ─────────────────────────────────────
 📊 CALIFICACIÓN
 ─────────────────────────────────────
-Antes   → 9.1 / 10
-Después → 9.4 / 10
-Mejora  → +0.3 (auth D-42/D-43 + calidad código)
+Antes   → 9.4 / 10
+Después → 9.6 / 10
+Delta   → +0.2 (D-54–57 cerrados; solo 2 items activos ambos no-código)
 ─────────────────────────────────────
 ```

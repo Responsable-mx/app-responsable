@@ -67,16 +67,16 @@ export default async function UsoIaPage() {
                 />
                 <Metric
                   label="Cache hits"
-                  value={numFmt.format(s.total_cache_read_tokens) + " tokens"}
-                  hint={
+                  value={
                     s.total_input_tokens > 0
                       ? `${Math.round(
                           (s.total_cache_read_tokens /
                             (s.total_input_tokens + s.total_cache_read_tokens)) *
                             100
-                        )}% del input`
-                      : undefined
+                        )}%`
+                      : "—"
                   }
+                  hint={`${numFmt.format(s.total_cache_read_tokens)} tokens ahorrados`}
                   spark={cacheSeries}
                   sparkColor="#0891b2"
                 />

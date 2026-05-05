@@ -87,7 +87,7 @@ export const ActivityInputSchema = z.object({
   actual_start: dateOrNull,
   actual_end: dateOrNull,
   assignee_email: z.string().email().nullable().optional(),
-  depends_on_activity_id: z.string().uuid().nullable().optional(),
+  depends_on_activity_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "UUID inválido").nullable().optional(),
 });
 export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 

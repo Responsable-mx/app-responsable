@@ -10,9 +10,10 @@ import type { TeamMember } from "@/app/api/team/occupancy/route";
 import { TeamOccupancy } from "./TeamOccupancy";
 import { ProjectsOverview } from "./ProjectsOverview";
 import { GlobalTimeline } from "./GlobalTimeline";
+import { GanttPorProyecto } from "./GanttPorProyecto";
 import { FiltersBar, emptyFilters, type EquipoFilters } from "./EquipoFilters";
 
-type View = "consultor" | "proyecto" | "timeline";
+type View = "consultor" | "proyecto" | "timeline" | "gantt";
 
 const INTRO: Record<View, string> = {
   consultor:
@@ -20,6 +21,8 @@ const INTRO: Record<View, string> = {
   proyecto: "Tus proyectos con etapas, actividades y fechas. Click en un proyecto para expandir.",
   timeline:
     "Timeline cross-project: 1 fila por consultor, todas sus actividades en una línea.",
+  gantt:
+    "Gantt por proyecto: cada cliente con su cronograma plan vs real. Click en barra → ficha del cliente.",
 };
 
 const fetcher = (url: string) =>
@@ -104,6 +107,18 @@ export function EquipoView() {
               </svg>
             }
           />
+          <ToggleButton
+            active={view === "gantt"}
+            onClick={() => setView("gantt")}
+            label="Gantt"
+            icon={
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <rect x="3" y="5" width="10" height="2.5" rx="1" />
+                <rect x="7" y="10" width="14" height="2.5" rx="1" />
+                <rect x="5" y="15" width="11" height="2.5" rx="1" />
+              </svg>
+            }
+          />
         </div>
       </div>
 
@@ -117,6 +132,7 @@ export function EquipoView() {
       {view === "consultor" && <TeamOccupancy filters={filters} />}
       {view === "proyecto" && <ProjectsOverview filters={filters} />}
       {view === "timeline" && <GlobalTimeline filters={filters} />}
+      {view === "gantt" && <GanttPorProyecto filters={filters} />}
     </div>
   );
 }

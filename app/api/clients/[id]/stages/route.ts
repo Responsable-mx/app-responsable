@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // En dev mode, client_service_id puede ser "dev-svc-N" (no UUID) — omitir validación UUID.
   const clientServiceIdSchema = isDevMode()
     ? z.string().min(1)
-    : z.string().uuid();
+    : z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "UUID inválido");
   const ext = StageInputSchema.extend({
     client_service_id: clientServiceIdSchema,
   }).safeParse(body);

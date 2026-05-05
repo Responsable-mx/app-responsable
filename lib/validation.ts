@@ -167,7 +167,7 @@ export const ChatMessageSchema = z.object({
 
 export const ChatRequestSchema = z.object({
   role: RoleSchema,
-  clientId: z.string().uuid().optional().nullable(),
+  clientId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "UUID inválido").optional().nullable(),
   messages: z.array(ChatMessageSchema).min(1).max(50),
 });
 

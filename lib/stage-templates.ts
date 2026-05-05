@@ -61,11 +61,11 @@ export const TemplateInputSchema = z.object({
 });
 
 export const CreateFromServiceSchema = TemplateInputSchema.extend({
-  fromClientServiceId: z.string().uuid(),
+  fromClientServiceId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "UUID inválido"),
 });
 
 export const ApplyTemplateSchema = z.object({
-  client_service_id: z.string().uuid(),
+  client_service_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "UUID inválido"),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (YYYY-MM-DD)"),
 });
 

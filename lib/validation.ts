@@ -110,6 +110,9 @@ export const ClientInputSchema = z.object({
   has_sustainability_report: z.boolean().optional().nullable(),
   has_sustainability_strategy: z.boolean().optional().nullable(),
 
+  // Logo del cliente (URL pública https://)
+  logo_url: z.string().trim().url("URL inválida").max(500).optional().nullable(),
+
   // URLs públicas de documentos (PDF, web, Drive). Opcionales.
   sustainability_strategy_url: z
     .string()

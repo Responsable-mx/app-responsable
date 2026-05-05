@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Client } from "@/lib/clients";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ClientAvatar } from "@/components/ClientAvatar";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 import { StructuredBlockEditor } from "@/components/StructuredBlockEditor";
 import { BoolTriField } from "@/components/fields/BoolTriField";
@@ -39,6 +40,9 @@ type FormState = {
   has_double_materiality: boolean | null;
   has_sustainability_report: boolean | null;
   has_sustainability_strategy: boolean | null;
+
+  // Logo
+  logo_url: string;
 
   // URLs de documentos
   sustainability_strategy_url: string;
@@ -96,6 +100,7 @@ export function ClientForm(props: Props) {
     has_sustainability_strategy: toBool(
       props.initial?.has_sustainability_strategy
     ),
+    logo_url: props.initial?.logo_url ?? "",
     sustainability_strategy_url:
       props.initial?.sustainability_strategy_url ?? "",
     sustainability_report_url:
@@ -137,6 +142,7 @@ export function ClientForm(props: Props) {
         has_double_materiality: form.has_double_materiality,
         has_sustainability_report: form.has_sustainability_report,
         has_sustainability_strategy: form.has_sustainability_strategy,
+        logo_url: form.logo_url.trim() || null,
         sustainability_strategy_url:
           form.sustainability_strategy_url.trim() || null,
         sustainability_report_url:
@@ -257,6 +263,46 @@ export function ClientForm(props: Props) {
           hasGroups
           placeholder="México, Colombia, España…"
         />
+
+        {/* Logo URL */}
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">
+            URL del logo
+          </label>
+          <div className="flex items-center gap-3">
+            {/* Preview avatar */}
+            <ClientAvatar
+              name={form.name || "?"}
+              logoUrl={form.logo_url.trim() || null}
+              size="sm"
+            />
+            <div className="flex-1 relative">
+              <input
+                type="url"
+                value={form.logo_url}
+                onChange={(e) => update("logo_url", e.target.value)}
+                className={inputCls + " pr-8"}
+                placeholder="https://example.com/logo.png"
+              />
+              {form.logo_url && (
+                <button
+                  type="button"
+                  onClick={() => update("logo_url", "")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                  title="Limpiar logo"
+                  aria-label="Limpiar logo"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">
+            URL pública de la imagen (PNG, SVG, JPG). Si no se carga, se muestra el monograma.
+          </p>
+        </div>
       </Section>
 
       {/* ═══ Atributos estructurados ═════════════════════════ */}

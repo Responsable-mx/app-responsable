@@ -14,11 +14,6 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ## Deuda activa
 
-### 🟡 D-03 — Chat IA sin contexto inline en tabs del cliente
-- **Descripción**: El `/chat` real opera en su propia ruta. No hay un tab "Chat" dentro de `/clientes/[id]` que cargue contexto del cliente directamente.
-- **Fix sugerido**: Agregar 5to tab "Chat IA" en `ClientTabs` que renderice `<ChatWindow>` con `clientId` preseleccionado, o un drawer lateral.
-- **Esfuerzo**: 2-3h
-
 ### 🟡 D-04 — Metodología ResponSable: pasos no definidos
 - **Descripción**: El equipo aún no ha definido los pasos reales de la metodología.
 - **Impacto**: La KPI card de Metodología no existe en `ClientTabs`. Cuando se defina, agregar.
@@ -41,9 +36,9 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Esfuerzo**: 1-2 días
 
 ### 🟢 D-08 — Stone vs slate: tokens residuales
-- **Descripción**: Pase global `stone-` → `slate-` completado en `uso-ia/page.tsx` (D-31, may-2026). Pueden quedar instancias en `ClientForm`, `ChatWindow` y otros componentes legacy.
+- **Descripción**: `uso-ia/page.tsx` migrado (may-2026). `UsersManager.tsx` migrado (may-2026). Pueden quedar instancias en `ClientForm`, `ChatWindow` y otros componentes legacy.
 - **Fix sugerido**: `grep -r "stone-" components/ app/` y reemplazar remanentes.
-- **Esfuerzo**: 1h
+- **Esfuerzo**: 30min
 
 ### 🟢 D-09 — `ConfirmDialog` deprecado activo en CatalogsManager y PromptsManager
 - **Descripción**: `components/ConfirmDialog.tsx` es wrapper anterior; el nuevo estándar es `components/ui/ConfirmModal.tsx`.
@@ -95,6 +90,7 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 | D-30 | Botón "Cargar plantilla" de materialidad activo mientras cargaba — doble-click race | may-2026 — `disabled={busyInit}` añadido |
 | D-31 | `uso-ia/page.tsx` usaba tokens `stone-*` y `rounded-xl` fuera del design system | may-2026 — migrado a `slate-*` + `rounded` |
 | D-32 | RLS `chat_sessions_owner_delete` permitía hard-DELETE directo desde cliente JS | may-2026 — migración `0031` elimina política; solo service role puede hard-delete |
+| D-03 | Chat IA sin contexto inline en tabs del cliente | may-2026 — sprint añadió tab "Chat IA" en `ClientTabs` con `<ChatWindow clientId>` preseleccionado |
 
 ---
 
@@ -104,14 +100,20 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 **Estado post-limpieza:**
 - Cero ítems 🔴 Críticos activos
-- 5 ítems 🟡 Moderados: D-03 D-04 D-05 D-06 D-07
+- 4 ítems 🟡 Moderados: D-04 D-05 D-06 D-07
 - 3 ítems 🟢 Menores: D-08 D-09 D-10
-- Migración `0031` creada — aplicar a producción via `apply-sql.mjs`
+
+**Sesión may-2026 (seniority + equipo):**
+- Seniority levels: catálogo `seniority_levels` en `catalog_items`, columna en `authorized_users`, override por proyecto en `client_consultors`
+- Tab Equipo en `ClientTabs`: asignar/remover consultores por cliente con seniority override
+- API `/api/clients/[id]/consultors` + `/[userEmail]` (GET público, POST/PATCH/DELETE admin + audit log)
+- `UsersManager`: columna seniority + select desde catálogo + stone→slate (D-08 parcial)
+- Migración `0030` aplicada a producción
+- Patrón clave: **seniority default en usuario, override en asignación** — no duplicar lógica en dos tablas
 
 **Próximas fases:**
-- Aplicar migración 0031 a producción (eliminar RLS DELETE de chat_sessions)
 - D-06: audit log en endpoint de cuestionario (30min)
-- D-03: tab Chat IA inline en vista cliente
+- D-08: grep residuos stone→slate en ClientForm y ChatWindow
 - D-07: export PDF entregable
 
 ---

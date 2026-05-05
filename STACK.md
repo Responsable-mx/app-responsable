@@ -51,7 +51,7 @@ app/
     clientes/
       page.tsx                   → lista
       nuevo/page.tsx             → crear
-      [id]/page.tsx              → editar
+      [id]/page.tsx              → editar (prefetch paralelo: client+questionnaire+materiality+requireAdmin)
   api/
     auth/
       send-code/route.ts         → OTP email
@@ -60,8 +60,26 @@ app/
     clients/
       route.ts                   → GET list, POST create
       [id]/route.ts              → GET, PATCH, DELETE
+      [id]/consultors/route.ts   → GET (requireUser), POST (requireAdmin) — asignar consultores
+      [id]/consultors/[email]/route.ts → PATCH/DELETE (requireAdmin) — seniority override + remover
     chat/route.ts                → SSE streaming con prompt caching
 ```
+
+### Patrón seniority (may-2026)
+
+Dos niveles sin duplicar lógica:
+1. **Default global**: `authorized_users.seniority_level` — nivel base del consultor
+2. **Override por proyecto**: `client_consultors.seniority_level` — NULL = "usa global"
+
+En UI: si `client_consultors.seniority_level` es NULL, mostrar "Usa global" y mostrar `authorized_users.seniority_level` en columna separada. Si no es NULL, mostrar badge con el override.
+
+Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una categoría nueva en `lib/catalogs/seeds.ts`, el UI de `CatalogsManager` la incluye automáticamente sin cambios de código.
+
+### Patrón auth en endpoints de equipo
+
+- `GET /api/clients/[id]/consultors` → `requireUser` (todos los autenticados ven el equipo)
+- `POST/PATCH/DELETE` → `requireAdmin` + `logChange()` con audit log
+- Patrón extrapolable a cualquier sub-recurso de cliente donde lectura es pública para consultores pero mutación es solo admin.
 
 ## Caché
 

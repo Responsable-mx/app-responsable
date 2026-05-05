@@ -134,9 +134,23 @@ Diseño corporate aplicado a `ClientTabs` (KPI cards uppercase + tabs con badges
 
 ## Audit log de mutaciones admin
 
-Toda mutación admin (POST/PATCH/DELETE en `/api/prompts/[key]`, `/api/users`, `/api/users/[email]`, `/api/catalogs`, `/api/catalogs/[id]`, `/api/clients/[id]`) llama a `logChange()` de `lib/audit-log.ts` con before/after snapshots. La tabla `audit_log` solo es legible por admins activos via RLS (migración `0020`).
+Toda mutación admin (POST/PATCH/DELETE en `/api/prompts/[key]`, `/api/users`, `/api/users/[email]`, `/api/catalogs`, `/api/catalogs/[id]`, `/api/clients/[id]`, `/api/clients/[id]/consultors`, `/api/clients/[id]/consultors/[email]`) llama a `logChange()` de `lib/audit-log.ts` con before/after snapshots. La tabla `audit_log` solo es legible por admins activos via RLS (migración `0020`).
 
 Al agregar un nuevo endpoint admin con mutación: integrar `logChange({ actorEmail, entityType, entityId, action, before, after })`. El helper es fail-open (no rompe la mutación si la inserción falla).
+
+## Seniority + equipo por cliente (may-2026)
+
+**Arquitectura dos niveles** — no duplicar lógica en dos tablas:
+- `authorized_users.seniority_level` → nivel global del consultor (default)
+- `client_consultors.seniority_level` → override por proyecto (NULL = "usa global")
+
+**Tab Equipo** en `ClientTabs`: renderiza `<TeamTab clientId isAdmin>`. El prop `isAdmin` viene del server component `[id]/page.tsx` vía `requireAdmin()` en `Promise.all` paralelo — el server component decide autorización, el client component solo recibe boolean.
+
+**CatalogsManager auto-incluye** cualquier categoría nueva agregada a `lib/catalogs/seeds.ts` sin cambios de código en el manager.
+
+**Auth pattern para sub-recursos de cliente:**
+- Lectura → `requireUser` (todos los consultores activos)
+- Mutaciones → `requireAdmin` + `logChange()`
 
 ## Cache breakpoints IA
 

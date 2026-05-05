@@ -30,7 +30,7 @@ const GROUPS: Array<{
   {
     key: "operacion",
     label: "Operación interna",
-    members: ["services", "revenue_models", "maturity_levels"],
+    members: ["services", "revenue_models", "maturity_levels", "seniority_levels"],
   },
   {
     key: "materialidad",
@@ -58,7 +58,7 @@ export function CatalogsManager({ categories }: { categories: Category[] }) {
   return (
     <div>
       {/* Nivel 1: grupos principales */}
-      <div className="flex flex-wrap gap-1 bg-stone-100 p-1 rounded-lg mb-3">
+      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg mb-3">
         {GROUPS.map((g) => (
           <button
             key={g.key}

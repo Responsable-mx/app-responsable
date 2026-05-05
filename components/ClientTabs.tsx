@@ -12,8 +12,9 @@ import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 import type { MaterialityTopic } from "@/lib/materiality/types";
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 import { TeamTab } from "@/components/equipo/TeamTab";
+import { ClientCronogramaTab } from "@/components/services/ClientCronogramaTab";
 
-type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "equipo";
+type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "cronograma" | "equipo";
 
 type Props = {
   client: Client;
@@ -47,14 +48,14 @@ export function ClientTabs({
   const searchParams = useSearchParams();
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(
-    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad" || initialTab === "equipo"
+    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad" || initialTab === "cronograma" || initialTab === "equipo"
       ? initialTab
       : "resumen"
   );
 
   useEffect(() => {
     const t = searchParams?.get("tab");
-    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad" || t === "equipo") {
+    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad" || t === "cronograma" || t === "equipo") {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync de URL → state, no loop
       setTab(t);
     }
@@ -169,6 +170,17 @@ export function ClientTabs({
           badge={materialityCount === null ? "…" : `${materialityCount}/20`}
         />
         <TabButton
+          active={tab === "cronograma"}
+          onClick={() => setTab("cronograma")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          }
+          label="Cronograma"
+          badge={null}
+        />
+        <TabButton
           active={tab === "equipo"}
           onClick={() => setTab("equipo")}
           icon={
@@ -232,6 +244,12 @@ export function ClientTabs({
               clientLocked
             />
           </div>
+        </TabErrorBoundary>
+      )}
+
+      {tab === "cronograma" && (
+        <TabErrorBoundary tabName="Cronograma">
+          <ClientCronogramaTab clientId={client.id} isAdmin={isAdmin} />
         </TabErrorBoundary>
       )}
 

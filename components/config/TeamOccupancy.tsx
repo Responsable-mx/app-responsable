@@ -16,11 +16,13 @@ const seniorityFetcher = (url: string): Promise<{ value: string; label: string }
     .then((r) => r.json())
     .then((j) => (j.data ?? []).map((i: { value: string; label: string }) => ({ value: i.value, label: i.label })));
 
-function loadBadge(count: number) {
-  if (count === 0) return "bg-slate-100 text-slate-500";
-  if (count <= 2) return "bg-emerald-100 text-emerald-700";
-  if (count <= 4) return "bg-amber-100 text-amber-700";
-  return "bg-rose-100 text-rose-700";
+type LoadLevel = { css: string; label: string; icon: string };
+
+function loadLevel(count: number): LoadLevel {
+  if (count === 0) return { css: "bg-slate-100 text-slate-500", label: "Sin proyectos", icon: "—" };
+  if (count <= 2) return { css: "bg-emerald-100 text-emerald-700", label: "Capacidad disponible", icon: "↓" };
+  if (count <= 4) return { css: "bg-amber-100 text-amber-700", label: "Carga alta", icon: "↑" };
+  return { css: "bg-rose-100 text-rose-700", label: "Sobrecargado", icon: "⚠" };
 }
 
 function initials(name: string | null, email: string) {
@@ -154,13 +156,20 @@ export function TeamOccupancy() {
                       )}
                     </td>
 
-                    {/* Total badge */}
+                    {/* Total badge — color + icon para daltónicos */}
                     <td className="px-4 py-3 text-center">
-                      <span
-                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold tabular-nums ${loadBadge(m.projects.length)}`}
-                      >
-                        {m.projects.length}
-                      </span>
+                      {(() => {
+                        const lvl = loadLevel(m.projects.length);
+                        return (
+                          <span
+                            title={lvl.label}
+                            className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-sm text-xs font-bold tabular-nums ${lvl.css}`}
+                          >
+                            <span aria-hidden>{lvl.icon}</span>
+                            {m.projects.length}
+                          </span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

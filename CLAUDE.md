@@ -154,6 +154,20 @@ import { SelectField } from "@/components/ui/SelectField";
 <textarea className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30" />
 ```
 
+### Checklist obligatorio al crear cualquier modal nuevo
+
+Antes de cerrar un nuevo componente `<Modal>`, verificar:
+
+| Control | ✅ Correcto | ❌ Prohibido |
+|---------|------------|-------------|
+| Dropdown | `<SelectField>` de `components/ui/SelectField.tsx` | `<select>` nativo |
+| Texto largo | `<textarea className="font-sans ...">` | `<textarea>` sin `font-sans` |
+| Input fecha/número | `<Input>` de `components/ui/Input.tsx` | `<input>` raw |
+| Confirmación destructiva | `<ConfirmModal>` de `components/ui/` | `window.confirm` |
+| Notificación post-acción | `useToast().push(...)` | `alert()` o banner con `setTimeout` |
+
+**Regla de oro:** si el modal tiene un `<select>` nativo → reemplazar con `<SelectField>` antes del commit. Windows/Chrome no puede sobrescribir la fuente del SO en el dropdown abierto.
+
 ## Audit log de mutaciones admin
 
 Toda mutación admin (POST/PATCH/DELETE en `/api/prompts/[key]`, `/api/users`, `/api/users/[email]`, `/api/catalogs`, `/api/catalogs/[id]`, `/api/clients/[id]`, `/api/clients/[id]/consultors`, `/api/clients/[id]/consultors/[email]`) llama a `logChange()` de `lib/audit-log.ts` con before/after snapshots. La tabla `audit_log` solo es legible por admins activos via RLS (migración `0020`).

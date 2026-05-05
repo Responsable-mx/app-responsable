@@ -11,6 +11,7 @@ import { ObjectListField } from "@/components/fields/ObjectListField";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 
 type AvailableTemplate = {
@@ -401,18 +402,12 @@ function ApplyTemplatePrompt({
         </p>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Plantilla</label>
-          <select
+          <SelectField
             value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          >
-            <option value="">— Selecciona una plantilla —</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setSelectedId(v)}
+            placeholder="— Selecciona una plantilla —"
+            options={templates.map((t) => ({ value: t.id, label: t.name }))}
+          />
         </div>
         {selected && (
           <div className="bg-slate-50 border border-slate-200 rounded p-2.5 text-xs space-y-1">

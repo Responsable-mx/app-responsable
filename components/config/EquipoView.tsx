@@ -1,26 +1,29 @@
 "use client";
 
-// /equipo con 2 vistas: Por consultor (carga) y Por proyecto (overview).
-// Toggle persistido en URL via ?vista=consultor|proyecto.
+// /equipo con 3 vistas: Por consultor · Por proyecto · Timeline global.
 
 import { useState } from "react";
 import { TeamOccupancy } from "./TeamOccupancy";
 import { ProjectsOverview } from "./ProjectsOverview";
+import { GlobalTimeline } from "./GlobalTimeline";
 
-type View = "consultor" | "proyecto";
+type View = "consultor" | "proyecto" | "timeline";
+
+const INTRO: Record<View, string> = {
+  consultor:
+    "Carga del equipo derivada de actividades activas. Click en un consultor para ver el detalle.",
+  proyecto: "Tus proyectos con etapas, actividades y fechas. Click en un proyecto para expandir.",
+  timeline:
+    "Timeline cross-project: 1 fila por consultor, todas sus actividades en una línea. Detecta solapamientos al instante.",
+};
 
 export function EquipoView() {
   const [view, setView] = useState<View>("consultor");
 
-  const intro =
-    view === "consultor"
-      ? "Carga del equipo derivada de actividades activas. Click en un consultor para ver el detalle."
-      : "Tus proyectos con etapas, actividades y fechas. Click en un proyecto para expandir.";
-
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <p className="text-sm text-slate-600 max-w-2xl">{intro}</p>
+        <p className="text-sm text-slate-600 max-w-2xl">{INTRO[view]}</p>
         <div className="inline-flex items-center bg-white border border-slate-200 rounded p-0.5 shadow-sm">
           <ToggleButton
             active={view === "consultor"}
@@ -52,10 +55,27 @@ export function EquipoView() {
               </svg>
             }
           />
+          <ToggleButton
+            active={view === "timeline"}
+            onClick={() => setView("timeline")}
+            label="Timeline"
+            icon={
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.75}
+                  d="M4 6h8M8 12h10M6 18h12"
+                />
+              </svg>
+            }
+          />
         </div>
       </div>
 
-      {view === "consultor" ? <TeamOccupancy /> : <ProjectsOverview />}
+      {view === "consultor" && <TeamOccupancy />}
+      {view === "proyecto" && <ProjectsOverview />}
+      {view === "timeline" && <GlobalTimeline />}
     </div>
   );
 }

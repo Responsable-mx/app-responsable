@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requireAdmin } from "@/lib/auth";
 import {
   updateClientService,
   deleteClientService,
@@ -19,8 +19,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  // D-42: mutaciones de servicios requieren admin
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
+  const user = admin;
   const { id } = await params;
 
   // D-33: verificar ownership antes de mutar
@@ -56,8 +58,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  // D-42: mutaciones de servicios requieren admin
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
+  const user = admin;
   const { id } = await params;
 
   // D-33: verificar ownership antes de borrar

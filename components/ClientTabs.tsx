@@ -10,6 +10,7 @@ import { ClientResumen } from "@/components/ClientResumen";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 import type { MaterialityTopic } from "@/lib/materiality/types";
+import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 
 type Tab = "resumen" | "cuestionario" | "chat" | "materialidad";
 
@@ -122,8 +123,8 @@ export function ClientTabs({
 
   return (
     <div>
-      {/* KPI cards: 3 columnas alineadas al mockup (Cuestionario, Materialidad, Metodología). */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+      {/* KPI cards en una sola línea: solo métricas reales (no inventar placeholders). */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
         <KpiCardLarge
           label="Cuestionario"
           value={pctCuestionario === null ? "—" : `${pctCuestionario}`}
@@ -225,46 +226,56 @@ export function ClientTabs({
       </div>
 
       {tab === "resumen" && (
-        <ClientResumen
-          questionnaire={questionnaireResp?.data ?? null}
-          onJumpToCuestionario={(firstStepKey) => {
-            setTab("cuestionario");
-            if (firstStepKey && schema && "steps" in schema) {
-              const idx = schema.steps.findIndex((s) => s.key === firstStepKey);
-              if (idx >= 0) setJumpToStep(idx);
-            }
-          }}
-        />
+        <TabErrorBoundary tabName="Resumen">
+          <ClientResumen
+            questionnaire={questionnaireResp?.data ?? null}
+            onJumpToCuestionario={(firstStepKey) => {
+              setTab("cuestionario");
+              if (firstStepKey && schema && "steps" in schema) {
+                const idx = schema.steps.findIndex((s) => s.key === firstStepKey);
+                if (idx >= 0) setJumpToStep(idx);
+              }
+            }}
+          />
+        </TabErrorBoundary>
       )}
       {tab === "cuestionario" && (
-        <QuestionnaireTab
-          key={`q-${jumpToStep ?? "default"}`}
-          clientId={client.id}
-          initialStepIndex={(() => {
-            if (jumpToStep !== null) return jumpToStep;
-            const s = searchParams?.get("step");
-            const n = s ? parseInt(s, 10) - 1 : 0;
-            return isNaN(n) || n < 0 ? 0 : n;
-          })()}
-          autoFillOnMount={searchParams?.get("autoFill") === "1"}
-        />
-      )}
-      {tab === "materialidad" && <MaterialityTab clientId={client.id} />}
-      {tab === "chat" && (
-        <div className="border border-slate-200 rounded shadow-sm overflow-hidden bg-white" style={{ height: "min(75vh, 720px)" }}>
-          <ChatWindow
-            key={client.id}
-            clients={[
-              {
-                id: client.id,
-                name: client.name,
-                sector: client.sector,
-                completeness,
-              },
-            ]}
-            initialClientId={client.id}
+        <TabErrorBoundary tabName="Cuestionario">
+          <QuestionnaireTab
+            key={`q-${jumpToStep ?? "default"}`}
+            clientId={client.id}
+            initialStepIndex={(() => {
+              if (jumpToStep !== null) return jumpToStep;
+              const s = searchParams?.get("step");
+              const n = s ? parseInt(s, 10) - 1 : 0;
+              return isNaN(n) || n < 0 ? 0 : n;
+            })()}
+            autoFillOnMount={searchParams?.get("autoFill") === "1"}
           />
-        </div>
+        </TabErrorBoundary>
+      )}
+      {tab === "materialidad" && (
+        <TabErrorBoundary tabName="Materialidad">
+          <MaterialityTab clientId={client.id} />
+        </TabErrorBoundary>
+      )}
+      {tab === "chat" && (
+        <TabErrorBoundary tabName="Chat IA">
+          <div className="border border-slate-200 rounded shadow-sm overflow-hidden bg-white" style={{ height: "min(75vh, 720px)" }}>
+            <ChatWindow
+              key={client.id}
+              clients={[
+                {
+                  id: client.id,
+                  name: client.name,
+                  sector: client.sector,
+                  completeness,
+                },
+              ]}
+              initialClientId={client.id}
+            />
+          </div>
+        </TabErrorBoundary>
       )}
 
       {/* Acceso secundario a Contexto/Servicios */}

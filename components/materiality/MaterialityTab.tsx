@@ -484,7 +484,7 @@ function TopicPopover({
   const goUp = topic.y_pos > 55;
   return (
     <div
-      className="absolute z-30 bg-white border border-slate-200 rounded-xl shadow-2xl p-4 w-56"
+      className="absolute z-30 bg-white border border-slate-200 rounded shadow-md p-4 w-56"
       style={{
         ...(goLeft ? { right: `calc(${100 - topic.x_pos}% + 6px)` } : { left: `calc(${topic.x_pos}% + 6px)` }),
         ...(goUp ? { bottom: `calc(${100 - topic.y_pos}% + 6px)` } : { top: `calc(${topic.y_pos}% + 6px)` }),

@@ -50,23 +50,41 @@ export const PROMPT_DESCRIPTIONS: Record<PromptKey, string> = {
 // ═════════════════════════════════════════════════════════════
 
 const DEFAULT_APP_NAVIGATION = `<app_navigation>
-App ResponSable tiene tres vistas principales:
-- /chat — conversación con los 4 roles IA. Incluye un selector de cliente en
-  el header: si no hay cliente elegido, respondes con metodología general;
-  si hay cliente, el contexto aparece en el tag <client> de abajo.
-- /clientes — lista y edición de clientes. Cada cliente tiene identificación
-  (nombre, sector, países, tamaño), atributos de sostenibilidad estructurados (marcos
-  reportados, regulaciones aplicables, políticas formalizadas, certificaciones,
-  temas materiales, madurez, booleanos sobre estrategia/reporte/doble
-  materialidad) y 6 bloques narrativos (operaciones, modelo de negocio,
-  impactos actuales, contexto sectorial, estrategia, stakeholders).
-- /configuracion — solo para administradores. Gestiona catálogos (sectores,
-  marcos, regulaciones, políticas, certificaciones, temas materiales,
-  madurez, países) y usuarios autorizados.
+App ResponSable — vistas y herramientas disponibles:
 
-Si el usuario te pide trabajar con un cliente y no está seleccionado, sugiérele:
-"Elige el cliente en el selector de arriba, o créalo en /clientes si aún no
-existe."
+/chat
+  Conversación con los 4 roles IA (Aurora autora, Rebeca revisora, Elena elevadora,
+  Valeria validadora). Selector de cliente en el header: sin cliente = metodología
+  general; con cliente = contexto completo en el tag <client> de abajo.
+
+/clientes
+  Lista de clientes. Cada ficha tiene:
+  • Identificación: nombre, sector, subsector, países, tamaño, logo.
+  • Atributos: marcos (GRI, CSRD, SBTi…), regulaciones, políticas, certificaciones,
+    temas materiales, nivel de madurez, booleanos (doble materialidad / reporte /
+    estrategia) y URLs de documentos de referencia.
+  • 6 bloques narrativos: operaciones, modelo de negocio, impactos, contexto
+    regulatorio, estrategia de sostenibilidad, stakeholders.
+  • Cuestionario: wizard de Doble Materialidad con autosave, AI-fill por paso y
+    trazabilidad de fuentes (URL + tipo de fuente).
+  • Materialidad: matriz X/Y (materialidad financiera × impacto) con 20 temas
+    codificados por color (● doble material, ◆ impacto, ■ financiero, ▲ seguimiento).
+  • Equipo: consultores asignados al cliente con nivel de seniority (global u override).
+  • Export PDF: botón "Exportar PDF" en el header descarga ficha completa del cliente.
+
+/configuracion (solo administradores)
+  • Catálogos: sectores, marcos, regulaciones, políticas, certificaciones, temas
+    materiales, madurez, países, seniority. Editables con drag & drop para reordenar.
+  • Usuarios autorizados: alta/baja/edición de consultores, asignación de rol y seniority.
+  • Prompts IA: edición de los system prompts de los 4 roles y del bloque de navegación.
+  • Preferencias: configuración del tour de onboarding.
+
+Sidebar izquierdo
+  Menú principal (Chat IA, Clientes, Configuración). Los consultores con proyectos
+  asignados ven "Mis proyectos" con acceso directo a cada cliente y su nivel de seniority.
+
+Si el consultor pide trabajar con un cliente y no está seleccionado, sugiérele:
+"Elige el cliente en el selector de arriba, o créalo en /clientes si aún no existe."
 </app_navigation>`;
 
 const DEFAULT_BASE_RULES = `<rules>

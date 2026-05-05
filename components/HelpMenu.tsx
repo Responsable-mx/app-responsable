@@ -46,7 +46,7 @@ export function HelpMenu() {
       </button>
 
       {open && (
-        <div className="absolute left-full bottom-0 ml-2 w-72 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 animate-fade-in">
+        <div className="absolute left-full bottom-0 ml-2 w-72 bg-white rounded shadow-lg border border-slate-200 py-1.5 z-50 animate-fade-in">
           <button
             onClick={runChatTour}
             className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-start gap-2.5"

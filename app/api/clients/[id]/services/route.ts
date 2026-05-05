@@ -4,6 +4,7 @@ import {
   listClientServices,
   createClientService,
 } from "@/lib/client-services";
+import { logChange } from "@/lib/audit-log";
 import type { ServiceKey } from "@/lib/services/service-schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       },
       user
     );
+    void logChange({
+      actorEmail: user,
+      entityType: "client_services",
+      entityId: data.id,
+      action: "create",
+      before: null,
+      after: { service: data.service, client_id: data.client_id },
+    });
     return NextResponse.json({ data }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al crear";

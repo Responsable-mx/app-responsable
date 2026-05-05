@@ -79,6 +79,18 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 | D-06 | Audit log faltante en endpoint de cuestionario | may-2026 — `logChange()` ya integrado en `/api/clients/[id]/questionnaire` (PATCH) |
 | D-08 | Stone vs slate: tokens residuales en producción | may-2026 — pase global `stone-*`→`slate-*` + `rounded-xl`→`rounded` en 24 componentes |
 | D-09 | `ConfirmDialog` deprecado activo en CatalogsManager/PromptsManager | may-2026 — `ConfirmDialog.tsx` ya no existe; ambos componentes usan `ConfirmModal` |
+| D-42 | `client-services` PATCH/DELETE con `requireUser` — consultor podía mutar servicios | may-2026 — `requireAdmin()` en PATCH y DELETE |
+| D-43 | RLS `service_stages`/`stage_activities` sin check de rol admin — defensa en profundidad rota | may-2026 — migración `0033`: políticas mutación restringidas a `role = 'admin'` |
+| D-44 | Doble `requireAdmin()` en PATCH activities (2 round-trips Supabase) | may-2026 — variable compartida `adminEmail` — 1 sola llamada |
+| D-45 | `ClientCronogramaTab` SWR sin `error` — fallo silencioso en carga de servicios | may-2026 — `servicesError` desestructurado + banner de error visible |
+| D-46 | `ServiceStagesPanel` sin `error` SWR + spinner texto en lugar de Skeleton | may-2026 — `error` + skeleton animado + mensaje de error |
+| D-47 | `ClientServicesTab` usaba clase raw `.skeleton` | may-2026 — resuelto al eliminar archivo muerto (D-53) |
+| D-48 | `StageRow` prop `consultorEmails` declarado pero no consumido | may-2026 — eliminado del tipo y del call site |
+| D-49 | `{stages.length === 0 && !isAdmin && null}` — expresión dead-null en JSX | may-2026 — eliminada |
+| D-50 | Iconos emoji en UI de datos en `ClientServicesTab` | may-2026 — resuelto al eliminar archivo muerto (D-53) |
+| D-51 | `await import("zod")` dinámico en handler POST `/api/clients/:id/stages` | may-2026 — import estático `import { z } from "zod"` |
+| D-52 | PATCH `/api/stages/:id` sin snapshot `before` en audit log | may-2026 — fetch `before` previo al update + incluido en `logChange` |
+| D-53 | `ClientServicesTab` dead code — 0 consumers en toda la app | may-2026 — archivo eliminado |
 
 ---
 

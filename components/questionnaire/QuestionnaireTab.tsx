@@ -88,6 +88,7 @@ function WizardEditor({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [drawerField, setDrawerField] = useState<{ stepKey: string; fieldKey: string } | null>(null);
   const [aiFilling, setAiFilling] = useState<string | null>(null); // step.key
+  const [aiBulkProgress, setAiBulkProgress] = useState<{ current: number; total: number; stepTitle: string } | null>(null);
   const toast = useToast();
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -200,13 +201,78 @@ function WizardEditor({
     }
   }
 
+  async function aiFillAll() {
+    const aiSteps = steps.filter((s) => s.ai_can_fill);
+    if (aiSteps.length === 0) return;
+    let success = 0;
+    let failed = 0;
+    for (let i = 0; i < aiSteps.length; i++) {
+      const s = aiSteps[i];
+      setAiBulkProgress({ current: i + 1, total: aiSteps.length, stepTitle: s.title });
+      try {
+        const res = await fetch(`/api/clients/${clientId}/wizard/${s.key}/ai-fill`, {
+          method: "POST",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as { data: Record<string, FieldResponse> };
+        setResponses((prev) => ({ ...prev, [s.key]: json.data }));
+        success++;
+      } catch (e) {
+        console.error(`[aiFillAll] ${s.key}:`, e);
+        failed++;
+      }
+    }
+    setAiBulkProgress(null);
+    dirty.current = true;
+    void save();
+    mutate();
+    if (failed === 0) {
+      toast.push("success", `IA llenó ${success} pasos`);
+    } else {
+      toast.push("warning", `${success} pasos OK · ${failed} fallaron`);
+    }
+  }
+
   useEffect(() => {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, []);
 
+  const aiCapableCount = steps.filter((s) => s.ai_can_fill).length;
+  const someStepHasResponses = Object.values(responses).some(
+    (v) => typeof v === "object" && v !== null && Object.keys(v as object).length > 0
+  );
+
   return (
+    <div>
+      {/* Banner global AI fill */}
+      <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-brand-primary-light to-slate-50 border border-brand-primary/30 rounded">
+        <div className="flex items-start gap-3 min-w-0">
+          <svg className="w-5 h-5 text-brand-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-900">IA llena {aiCapableCount} pasos automáticamente</p>
+            <p className="text-[11px] text-slate-600">
+              Click una vez para llenar todos los pasos con datos públicos verificables y citados (sigue las 8 reglas operativas del cuestionario). Puedes refrescar después por paso individual.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="primary"
+          size="sm"
+          loading={!!aiBulkProgress}
+          onClick={aiFillAll}
+        >
+          {aiBulkProgress
+            ? `${aiBulkProgress.current}/${aiBulkProgress.total} · ${aiBulkProgress.stepTitle}`
+            : someStepHasResponses
+              ? "✨ Refrescar con IA"
+              : "✨ Llenar todos con IA"}
+        </Button>
+      </div>
+
     <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-5">
       {/* Stepper lateral */}
       <aside className="space-y-1">
@@ -288,16 +354,20 @@ function WizardEditor({
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <SaveIndicator state={saveState} errorMsg={errorMsg} />
-            {step.ai_can_fill && (
-              <Button
-                variant="primary"
-                size="sm"
-                loading={aiFilling === step.key}
-                onClick={() => aiFill(step.key)}
-              >
-                ✨ Llenar con IA
-              </Button>
-            )}
+            {step.ai_can_fill && (() => {
+              const stepHasData = stepProgress.filled > 0;
+              return (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={aiFilling === step.key}
+                  onClick={() => aiFill(step.key)}
+                  disabled={!!aiBulkProgress}
+                >
+                  {stepHasData ? "✨ Refrescar este paso" : "✨ Llenar con IA"}
+                </Button>
+              );
+            })()}
           </div>
         </div>
 
@@ -410,6 +480,7 @@ function WizardEditor({
           />
         );
       })()}
+    </div>
     </div>
   );
 }

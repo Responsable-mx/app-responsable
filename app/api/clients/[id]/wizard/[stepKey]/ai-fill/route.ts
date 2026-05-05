@@ -56,14 +56,21 @@ REGLAS OPERATIVAS (Cuestionario_Contexto_Negocio.md):
 7. **Fuente >2 años**: agregar al final del value "(Fuente con más de 2 años — verificar vigencia con el cliente.)"
 8. **Diferenciar reportado vs real**: si es dato de informe público, indicar "Reportado en informe público — el asesor confirma datos internos no reportados."
 
-FUENTES PERMITIDAS (públicas verificables):
-- Sitio corporativo del cliente
+FUENTES PERMITIDAS (búscalas con web_search):
+- Sitio corporativo del cliente (la página web está en el contexto del paso 1)
 - LinkedIn de la empresa
 - Informes de sostenibilidad públicos
 - Registros regulatorios (SEMARNAT, PROFEPA, INAI, CONDUSEF, COFECE, BMV, SAT)
 - Prensa profesional (Reforma, Expansión, El Economista, Bloomberg LATAM)
 - Asociaciones sectoriales (CANACAR, CANAINTRA, CONCAMIN)
 - Bases ESG (CDP, GRI Database)
+
+USO OBLIGATORIO DE web_search:
+- Antes de escribir cualquier value distinto de null, USA la herramienta web_search
+- Busca primero el sitio corporativo del cliente
+- Después busca LinkedIn y prensa
+- Cita cada URL exactamente como aparece en los resultados (no inventes)
+- Si web_search no devuelve resultados confiables → value: null, source_type: "consultor_only"
 
 PARA CADA CAMPO retorna:
 - value: contenido (string máx 500 chars) o null
@@ -121,15 +128,35 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   let textOut = "";
+  let citationsCollected: { url: string; title: string }[] = [];
   try {
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: systemPrompt,
+      tools: [
+        {
+          // Web search tool: la IA busca fuentes públicas reales (no inventa)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          type: "web_search_20250305" as any,
+          name: "web_search",
+          max_uses: 8,
+        },
+      ],
       messages: [{ role: "user", content: userPrompt }],
     });
     for (const block of msg.content) {
-      if (block.type === "text") textOut += block.text;
+      if (block.type === "text") {
+        textOut += block.text;
+        // Extraer citations del bloque de texto si vienen en formato Anthropic
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const citations = (block as any).citations as Array<{ url?: string; title?: string }> | undefined;
+        if (Array.isArray(citations)) {
+          for (const c of citations) {
+            if (c.url && c.title) citationsCollected.push({ url: c.url, title: c.title });
+          }
+        }
+      }
     }
   } catch (e) {
     return NextResponse.json(
@@ -170,13 +197,22 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
       ai.source_type === "public" || ai.source_type === "interpretation"
         ? ai.source_type
         : "consultor_only";
-    const sources = Array.isArray(ai.sources)
+    let sources = Array.isArray(ai.sources)
       ? ai.sources
           .filter((s): s is { url: string; title: string; date: string } =>
             typeof s === "object" && s !== null && "url" in s && "title" in s && "date" in s
           )
           .map((s) => ({ url: s.url, title: s.title, date: s.date, type: "web" as const }))
       : [];
+    // Fallback: si IA llenó pero olvidó sources Y hay citations recolectadas → tomar las primeras 2
+    if (sources.length === 0 && ai.value && sourceType !== "consultor_only" && citationsCollected.length > 0) {
+      sources = citationsCollected.slice(0, 2).map((c) => ({
+        url: c.url,
+        title: c.title,
+        date: new Date().toISOString().slice(0, 10),
+        type: "web" as const,
+      }));
+    }
     result[field.key] = {
       value: typeof ai.value === "string" || typeof ai.value === "number" ? ai.value : null,
       source_type: sourceType,

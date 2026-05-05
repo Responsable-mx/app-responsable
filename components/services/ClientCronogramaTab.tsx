@@ -113,7 +113,7 @@ export function ClientCronogramaTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
             Cronograma del cliente
@@ -122,7 +122,21 @@ export function ClientCronogramaTab({
             Etapas y actividades por servicio. Plan vs real, status automático.
           </p>
         </div>
-        <ViewToggle value={view} onChange={setView} />
+        <div className="flex items-center gap-2">
+          <a
+            href={`/api/clients/${clientId}/export-cronograma-pdf`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-slate-200 bg-white text-slate-700 hover:border-brand-primary hover:text-brand-primary-dark transition-colors"
+            title="Descargar cronograma como PDF"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            PDF
+          </a>
+          <ViewToggle value={view} onChange={setView} />
+        </div>
       </div>
 
       {!isAdmin && (

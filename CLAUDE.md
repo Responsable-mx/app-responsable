@@ -132,6 +132,19 @@ Diseño corporate aplicado a `ClientTabs` (KPI cards uppercase + tabs con badges
 
 `ConfirmDialog` (`components/ConfirmDialog.tsx`) es el wrapper anterior — sigue activo en CatalogsManager y PromptsManager por compat. Para código nuevo, usar `ConfirmModal` de `components/ui/`.
 
+### Fuente en modales — regla global
+
+`globals.css` ya aplica `font-family: inherit` a todos los form controls (`input`, `select`, `textarea`, `button`). Esto garantiza que Inter se use automáticamente sin importar dónde estén los controles.
+
+**Al crear un nuevo modal con `<textarea>` o `<select>`:** agregar clase `font-sans` explícitamente aunque sea redundante — hace el intent visible y protege contra resets de CSS de terceros:
+
+```tsx
+<textarea className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30" />
+<select className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30" />
+```
+
+Patrón tomado de `TemplatesManager.tsx` y `TemplateActions.tsx` como referencia canónica.
+
 ## Audit log de mutaciones admin
 
 Toda mutación admin (POST/PATCH/DELETE en `/api/prompts/[key]`, `/api/users`, `/api/users/[email]`, `/api/catalogs`, `/api/catalogs/[id]`, `/api/clients/[id]`, `/api/clients/[id]/consultors`, `/api/clients/[id]/consultors/[email]`) llama a `logChange()` de `lib/audit-log.ts` con before/after snapshots. La tabla `audit_log` solo es legible por admins activos via RLS (migración `0020`).

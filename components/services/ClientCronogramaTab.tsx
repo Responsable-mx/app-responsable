@@ -1,11 +1,16 @@
 "use client";
 
 // Tab "Cronograma" — etapas + actividades por servicio del cliente.
-// Fase 1: lista jerárquica editable. Fase 2 portará un Gantt visual.
+// 2 vistas: Lista (jerárquica editable) y Gantt (timeline plan vs real).
+// Toggle de vista al lado del header.
 
+import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { ServiceStagesPanel } from "./ServiceStagesPanel";
+import { ServiceGantt } from "./ServiceGantt";
+import { ActivityEditorModal } from "./ActivityEditorModal";
+import type { ServiceStage, StageActivity } from "@/lib/stages";
 
 type ServiceRow = {
   id: string;
@@ -25,6 +30,8 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
+type ViewMode = "list" | "gantt";
+
 export function ClientCronogramaTab({
   clientId,
   isAdmin,
@@ -32,6 +39,12 @@ export function ClientCronogramaTab({
   clientId: string;
   isAdmin: boolean;
 }) {
+  const [view, setView] = useState<ViewMode>("list");
+  const [editingActivity, setEditingActivity] = useState<{
+    stageId: string;
+    activity?: StageActivity;
+  } | null>(null);
+
   const { data: servicesData, isLoading: loadingServices } = useSWR<{ data: ServiceRow[] }>(
     `/api/clients/${clientId}/services`,
     fetcher
@@ -41,8 +54,16 @@ export function ClientCronogramaTab({
     fetcher
   );
 
+  // En modo Gantt necesitamos las stages aplanadas. Reutiliza el mismo endpoint
+  // que ServiceStagesPanel — SWR comparte cache, sin doble fetch.
+  const { data: stagesData, mutate: mutateStages } = useSWR<{ data: ServiceStage[] }>(
+    view === "gantt" ? `/api/clients/${clientId}/stages` : null,
+    fetcher
+  );
+
   const services = servicesData?.data ?? [];
   const consultorEmails = (consultorsData?.data ?? []).map((c) => c.user_email);
+  const allStages = stagesData?.data ?? [];
 
   if (loadingServices) {
     return (
@@ -57,7 +78,9 @@ export function ClientCronogramaTab({
   if (services.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded p-12 text-center">
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">Sin servicios contratados</h2>
+        <h2 className="text-sm font-semibold text-slate-900 mb-2">
+          Sin servicios contratados
+        </h2>
         <p className="text-xs text-slate-600 max-w-md mx-auto">
           El cronograma se construye sobre los servicios contratados del cliente.
           Primero agrega servicios desde la edición del cliente.
@@ -80,33 +103,133 @@ export function ClientCronogramaTab({
             Cronograma del cliente
           </h2>
           <p className="text-xs text-slate-600 mt-0.5">
-            Etapas y actividades por servicio. Fechas plan vs reales — el status se calcula automáticamente.
+            Etapas y actividades por servicio. Plan vs real, status automático.
           </p>
         </div>
+        <ViewToggle value={view} onChange={setView} />
       </div>
 
       {!isAdmin && (
         <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded p-2.5">
-          Solo admin puede crear etapas/actividades o cambiar fechas plan. Tú puedes
-          actualizar fechas reales de las actividades donde estés asignado.
+          Solo admin crea etapas/actividades o cambia fechas plan. Tú actualizas
+          fechas reales de las actividades donde estés asignado.
         </div>
       )}
 
-      {services.map((s) => (
-        <div key={s.id} className="bg-white border border-slate-200 rounded p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-900">{s.service}</h3>
-            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-              Servicio
-            </span>
+      {view === "list" &&
+        services.map((s) => (
+          <div key={s.id} className="bg-white border border-slate-200 rounded p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-900">{s.service}</h3>
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                Servicio
+              </span>
+            </div>
+            <ServiceStagesPanel
+              clientId={clientId}
+              clientServiceId={s.id}
+              isAdmin={isAdmin}
+              consultorEmails={consultorEmails}
+            />
           </div>
-          <ServiceStagesPanel
-            clientId={clientId}
-            clientServiceId={s.id}
-            isAdmin={isAdmin}
-            consultorEmails={consultorEmails}
+        ))}
+
+      {view === "gantt" &&
+        services.map((s) => {
+          const stagesForService = allStages.filter((st) => st.client_service_id === s.id);
+          return (
+            <div key={s.id} className="space-y-2">
+              <div className="flex items-center justify-between gap-2 px-1">
+                <h3 className="text-sm font-semibold text-slate-900">{s.service}</h3>
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                  Servicio
+                </span>
+              </div>
+              {stagesForService.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded p-6 text-center text-xs text-slate-500">
+                  Sin etapas. Cambia a vista Lista para crear la primera.
+                </div>
+              ) : (
+                <ServiceGantt
+                  stages={stagesForService}
+                  onEditActivity={(stageId, activity) =>
+                    setEditingActivity({ stageId, activity })
+                  }
+                />
+              )}
+            </div>
+          );
+        })}
+
+      {editingActivity && (
+        <ActivityEditorModal
+          stageId={editingActivity.stageId}
+          activity={editingActivity.activity}
+          consultorEmails={consultorEmails}
+          isAdmin={isAdmin}
+          onClose={() => setEditingActivity(null)}
+          onSaved={() => {
+            setEditingActivity(null);
+            mutateStages();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: ViewMode;
+  onChange: (v: ViewMode) => void;
+}) {
+  const opts: { v: ViewMode; label: string; icon: React.ReactNode }[] = [
+    {
+      v: "list",
+      label: "Lista",
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.75}
+            d="M4 6h16M4 12h16M4 18h16"
           />
-        </div>
+        </svg>
+      ),
+    },
+    {
+      v: "gantt",
+      label: "Gantt",
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.75}
+            d="M4 6h8M8 12h10M6 18h12"
+          />
+        </svg>
+      ),
+    },
+  ];
+  return (
+    <div className="inline-flex items-center bg-slate-100 rounded p-0.5">
+      {opts.map((o) => (
+        <button
+          key={o.v}
+          onClick={() => onChange(o.v)}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded transition-colors ${
+            value === o.v
+              ? "bg-white text-brand-primary-dark shadow-sm"
+              : "text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          {o.icon}
+          {o.label}
+        </button>
       ))}
     </div>
   );

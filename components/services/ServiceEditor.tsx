@@ -10,6 +10,15 @@ import { StringListField } from "@/components/fields/StringListField";
 import { ObjectListField } from "@/components/fields/ObjectListField";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { useToast } from "@/components/ui/Toast";
+
+type AvailableTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  data: { stages: { name: string; activities: { name: string }[] }[] };
+};
 
 type Mode =
   | { kind: "create"; clientId: string }
@@ -32,6 +41,11 @@ export function ServiceEditor({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Post-create: si hay plantillas para el servicio, prompt para aplicar.
+  const [postCreate, setPostCreate] = useState<{
+    serviceId: string;
+    templates: AvailableTemplate[];
+  } | null>(null);
 
   const schema = SERVICE_BY_KEY[service];
 
@@ -51,6 +65,28 @@ export function ServiceEditor({
           setSaving(false);
           return;
         }
+        const j = await res.json().catch(() => ({}));
+        const newServiceId = j.data?.id as string | undefined;
+
+        // Buscar plantillas que matchean el servicio recién creado
+        if (newServiceId) {
+          try {
+            const tplRes = await fetch(
+              `/api/stage-templates?service=${encodeURIComponent(service)}`
+            );
+            if (tplRes.ok) {
+              const tplJson = await tplRes.json();
+              const templates: AvailableTemplate[] = tplJson.data ?? [];
+              if (templates.length > 0) {
+                setPostCreate({ serviceId: newServiceId, templates });
+                setSaving(false);
+                return; // No cerrar todavía — mostrar prompt
+              }
+            }
+          } catch {
+            // Falló búsqueda de plantillas — no bloquea creación, solo skipea prompt
+          }
+        }
       } else {
         const res = await fetch(`/api/client-services/${mode.serviceId}`, {
           method: "PATCH",
@@ -69,6 +105,17 @@ export function ServiceEditor({
       setError("Error de conexión");
       setSaving(false);
     }
+  }
+
+  if (postCreate) {
+    return (
+      <ApplyTemplatePrompt
+        clientServiceId={postCreate.serviceId}
+        templates={postCreate.templates}
+        onSkip={() => onSaved()}
+        onApplied={() => onSaved()}
+      />
+    );
   }
 
   return (
@@ -270,4 +317,121 @@ function FieldRenderer({
         />
       );
   }
+}
+
+function ApplyTemplatePrompt({
+  clientServiceId,
+  templates,
+  onSkip,
+  onApplied,
+}: {
+  clientServiceId: string;
+  templates: AvailableTemplate[];
+  onSkip: () => void;
+  onApplied: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState<string>(
+    templates.length === 1 ? templates[0].id : ""
+  );
+  const [startDate, setStartDate] = useState<string>(
+    () => new Date().toISOString().slice(0, 10)
+  );
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const { push } = useToast();
+
+  const selected = templates.find((t) => t.id === selectedId);
+
+  async function handleApply() {
+    if (!selectedId) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/stage-templates/${selectedId}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_service_id: clientServiceId,
+          start_date: startDate,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error ?? `Error ${res.status}`);
+        return;
+      }
+      const j = await res.json().catch(() => ({}));
+      const r = j.data ?? {};
+      push(
+        "success",
+        `Servicio creado · plantilla aplicada (${r.stagesCreated} etapas, ${r.activitiesCreated} actividades)`
+      );
+      onApplied();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={busy ? () => {} : onSkip}
+      title="Aplicar plantilla al cronograma"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onSkip} disabled={busy}>
+            Saltar (sin estructura)
+          </Button>
+          <Button onClick={handleApply} disabled={!selectedId || busy} loading={busy}>
+            Aplicar plantilla
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {err && (
+          <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded p-2">
+            {err}
+          </div>
+        )}
+        <p className="text-xs text-slate-700 bg-brand-primary-light border border-brand-primary/20 rounded p-2.5">
+          Servicio creado. Encontramos {templates.length}{" "}
+          {templates.length === 1 ? "plantilla" : "plantillas"} para este servicio. Aplica una
+          ahora para inicializar el cronograma con etapas y actividades.
+        </p>
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Plantilla</label>
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+          >
+            <option value="">— Selecciona una plantilla —</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {selected && (
+          <div className="bg-slate-50 border border-slate-200 rounded p-2.5 text-xs space-y-1">
+            {selected.description && <p className="text-slate-700">{selected.description}</p>}
+            <p className="text-slate-600">
+              {selected.data.stages.length}{" "}
+              {selected.data.stages.length === 1 ? "etapa" : "etapas"} ·{" "}
+              {selected.data.stages.reduce((s, st) => s + st.activities.length, 0)} actividades
+            </p>
+          </div>
+        )}
+        <Input
+          label="Fecha base (día 0)"
+          helper="Las fechas plan se calculan sumando los offsets desde aquí."
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+      </div>
+    </Modal>
+  );
 }

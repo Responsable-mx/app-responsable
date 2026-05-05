@@ -176,6 +176,16 @@ export function ServiceGantt({
               const planStyle = barStyle(a.planned_start, a.planned_end);
               const realStyle = barStyle(a.actual_start, a.actual_end);
               const barColor = STATUS_BAR[a.status];
+              // Resolver dependencia: buscar predecesor y detectar conflicto de fechas
+              const dep = a.depends_on_activity_id
+                ? stages.flatMap((st) => st.activities).find((x) => x.id === a.depends_on_activity_id)
+                : null;
+              const conflict = !!(
+                dep &&
+                a.planned_start &&
+                dep.planned_end &&
+                a.planned_start < dep.planned_end
+              );
               return (
                 <div
                   key={a.id}
@@ -192,6 +202,18 @@ export function ServiceGantt({
                         title={a.assignee_email}
                       >
                         @ {a.assignee_email.split("@")[0]}
+                      </p>
+                    )}
+                    {dep && (
+                      <p
+                        className={`text-[10px] truncate ${conflict ? "text-rose-700 font-bold" : "text-slate-400"}`}
+                        title={
+                          conflict
+                            ? `⚠ Conflicto: empieza antes de que "${dep.name}" termine`
+                            : `Depende de: ${dep.name}`
+                        }
+                      >
+                        {conflict ? "⚠ " : "↳ "}depende: {dep.name}
                       </p>
                     )}
                   </div>

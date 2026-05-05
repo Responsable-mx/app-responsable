@@ -235,6 +235,10 @@ export function ClientCronogramaTab({
           activity={editingActivity.activity}
           consultorEmails={consultorEmails}
           isAdmin={isAdmin}
+          lockStructure
+          siblingActivities={allStages.flatMap((st) =>
+            st.activities.map((a) => ({ id: a.id, name: a.name, stage_name: st.name }))
+          )}
           onClose={() => setEditingActivity(null)}
           onSaved={() => {
             setEditingActivity(null);

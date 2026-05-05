@@ -15,6 +15,7 @@ type TplActivity = {
   order_index: number;
   offset_start_days: number | null;
   offset_end_days: number | null;
+  depends_on_path?: string | null;
 };
 
 type TplStage = {
@@ -368,6 +369,37 @@ export function TemplateStructureEditor({
                         className="font-sans text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-0.5 w-20 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
                       />
                       <span className="text-[10px] text-slate-500">días</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-widest text-slate-400 shrink-0"
+                        title="Esta actividad no debe iniciar antes de que la dependencia termine"
+                      >
+                        Depende de
+                      </span>
+                      <select
+                        value={a.depends_on_path ?? ""}
+                        onChange={(e) =>
+                          updateActivity(sIdx, aIdx, {
+                            depends_on_path: e.target.value || null,
+                          })
+                        }
+                        className="font-sans text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-0.5 flex-1 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                      >
+                        <option value="">— Sin dependencia —</option>
+                        {stages.flatMap((depStage, dsIdx) =>
+                          depStage.activities.map((depAct, daIdx) => {
+                            // No permitir auto-referencia
+                            if (dsIdx === sIdx && daIdx === aIdx) return null;
+                            const path = `${dsIdx}.${daIdx}`;
+                            return (
+                              <option key={path} value={path}>
+                                {depStage.name} → {depAct.name}
+                              </option>
+                            );
+                          })
+                        )}
+                      </select>
                     </div>
                   </div>
                   );

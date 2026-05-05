@@ -262,6 +262,9 @@ export function ServiceStagesPanel({
           consultorEmails={consultorEmails}
           isAdmin={isAdmin}
           lockStructure
+          siblingActivities={stages.flatMap((st) =>
+            st.activities.map((a) => ({ id: a.id, name: a.name, stage_name: st.name }))
+          )}
           onClose={() => setEditingActivity(null)}
           onSaved={() => {
             setEditingActivity(null);

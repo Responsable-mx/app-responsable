@@ -9,6 +9,8 @@ export type TemplateActivity = {
   // Offsets en días desde fecha base. Null = actividad sin fecha plan en el origen.
   offset_start_days: number | null;
   offset_end_days: number | null;
+  // Path "stageIdx.actIdx" del predecesor; resuelto a UUID real al aplicar.
+  depends_on_path?: string | null;
 };
 
 export type TemplateStage = {
@@ -36,6 +38,9 @@ export const TemplateActivitySchema = z.object({
   order_index: z.number().int().min(0),
   offset_start_days: z.number().int().nullable().optional(),
   offset_end_days: z.number().int().nullable().optional(),
+  // Referencia por path: "stageIdx.actIdx" del predecesor en la misma plantilla.
+  // Al aplicar, se resuelve a stage_activities.id real.
+  depends_on_path: z.string().regex(/^\d+\.\d+$/).nullable().optional(),
 });
 
 export const TemplateStageSchema = z.object({
@@ -214,7 +219,12 @@ export async function applyTemplate(input: {
   let stagesCreated = 0;
   let activitiesCreated = 0;
 
-  for (const tplStage of tpl.data.stages) {
+  // Pass 1: crear stages + activities; capturar mapping path "sIdx.aIdx" → activityId real.
+  const idMap = new Map<string, string>();
+  const pendingDeps: { activityId: string; dependsOnPath: string }[] = [];
+
+  for (let sIdx = 0; sIdx < tpl.data.stages.length; sIdx++) {
+    const tplStage = tpl.data.stages[sIdx];
     const { data: stage, error: e2 } = await admin
       .from("service_stages")
       .insert({
@@ -227,19 +237,37 @@ export async function applyTemplate(input: {
     if (e2) throw e2;
     stagesCreated++;
 
-    if (tplStage.activities.length > 0) {
-      const rows = tplStage.activities.map((a) => ({
-        stage_id: stage.id,
-        name: a.name,
-        description: a.description,
-        order_index: a.order_index,
-        planned_start: a.offset_start_days !== null ? addDays(input.startDate, a.offset_start_days) : null,
-        planned_end: a.offset_end_days !== null ? addDays(input.startDate, a.offset_end_days) : null,
-      }));
-      const { error: e3 } = await admin.from("stage_activities").insert(rows);
+    for (let aIdx = 0; aIdx < tplStage.activities.length; aIdx++) {
+      const a = tplStage.activities[aIdx];
+      const { data: act, error: e3 } = await admin
+        .from("stage_activities")
+        .insert({
+          stage_id: stage.id,
+          name: a.name,
+          description: a.description,
+          order_index: a.order_index,
+          planned_start: a.offset_start_days !== null && a.offset_start_days !== undefined ? addDays(input.startDate, a.offset_start_days) : null,
+          planned_end: a.offset_end_days !== null && a.offset_end_days !== undefined ? addDays(input.startDate, a.offset_end_days) : null,
+        })
+        .select("id")
+        .single();
       if (e3) throw e3;
-      activitiesCreated += rows.length;
+      idMap.set(`${sIdx}.${aIdx}`, act.id);
+      if (a.depends_on_path) {
+        pendingDeps.push({ activityId: act.id, dependsOnPath: a.depends_on_path });
+      }
+      activitiesCreated++;
     }
+  }
+
+  // Pass 2: resolver dependencias (paths → UUIDs reales)
+  for (const dep of pendingDeps) {
+    const targetId = idMap.get(dep.dependsOnPath);
+    if (!targetId) continue; // path inválido, ignorar
+    await admin
+      .from("stage_activities")
+      .update({ depends_on_activity_id: targetId })
+      .eq("id", dep.activityId);
   }
 
   return { stagesCreated, activitiesCreated };

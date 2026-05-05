@@ -22,6 +22,7 @@ export function ActivityEditorModal({
   consultorEmails,
   isAdmin,
   lockStructure = false,
+  siblingActivities = [],
   onClose,
   onSaved,
 }: {
@@ -30,6 +31,7 @@ export function ActivityEditorModal({
   consultorEmails: string[];
   isAdmin: boolean;
   lockStructure?: boolean;
+  siblingActivities?: { id: string; name: string; stage_name?: string }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -41,6 +43,7 @@ export function ActivityEditorModal({
   const [actualStart, setActualStart] = useState(activity?.actual_start ?? "");
   const [actualEnd, setActualEnd] = useState(activity?.actual_end ?? "");
   const [assigneeEmail, setAssigneeEmail] = useState(activity?.assignee_email ?? "");
+  const [dependsOn, setDependsOn] = useState(activity?.depends_on_activity_id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { push } = useToast();
@@ -59,6 +62,7 @@ export function ActivityEditorModal({
       // assignee_email es decisión de proyecto, no estructura: admin la edita siempre
       if (isAdmin || !isEditing) {
         body.assignee_email = assigneeEmail || null;
+        body.depends_on_activity_id = dependsOn || null;
       }
       body.actual_start = actualStart || null;
       body.actual_end = actualEnd || null;
@@ -192,6 +196,32 @@ export function ActivityEditorModal({
               options={consultorEmails.map((email) => ({ value: email, label: email }))}
               placeholder="Sin asignar"
             />
+          </div>
+        )}
+
+        {(isAdmin || !isEditing) && siblingActivities.length > 0 && (
+          <div>
+            <label
+              className="block text-xs font-medium text-slate-700 mb-1"
+              title="Esta actividad no debe iniciar antes de que la dependencia termine"
+            >
+              Depende de
+            </label>
+            <select
+              value={dependsOn}
+              onChange={(e) => setDependsOn(e.target.value)}
+              className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+            >
+              <option value="">Sin dependencia</option>
+              {siblingActivities
+                .filter((s) => !activity || s.id !== activity.id)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.stage_name ? `${s.stage_name} → ` : ""}
+                    {s.name}
+                  </option>
+                ))}
+            </select>
           </div>
         )}
       </div>

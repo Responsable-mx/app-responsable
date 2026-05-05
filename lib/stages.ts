@@ -16,6 +16,7 @@ export type StageActivity = {
   actual_start: string | null;
   actual_end: string | null;
   assignee_email: string | null;
+  depends_on_activity_id: string | null;
   status: ActivityStatus;
   created_at: string;
   updated_at: string;
@@ -86,6 +87,7 @@ export const ActivityInputSchema = z.object({
   actual_start: dateOrNull,
   actual_end: dateOrNull,
   assignee_email: z.string().email().nullable().optional(),
+  depends_on_activity_id: z.string().uuid().nullable().optional(),
 });
 export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 
@@ -246,6 +248,7 @@ export async function createActivity(
       actual_start: input.actual_start ?? null,
       actual_end: input.actual_end ?? null,
       assignee_email: input.assignee_email ?? null,
+      depends_on_activity_id: input.depends_on_activity_id ?? null,
       status: computeStatus(input as Parameters<typeof computeStatus>[0]),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -276,6 +279,7 @@ export async function createActivity(
       actual_start: input.actual_start ?? null,
       actual_end: input.actual_end ?? null,
       assignee_email: input.assignee_email ?? null,
+      depends_on_activity_id: input.depends_on_activity_id ?? null,
     })
     .select()
     .single();
@@ -307,6 +311,7 @@ export async function updateActivity(
     "actual_start",
     "actual_end",
     "assignee_email",
+    "depends_on_activity_id",
   ] as const) {
     if (patch[k] !== undefined) update[k] = patch[k];
   }

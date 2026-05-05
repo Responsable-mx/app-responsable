@@ -5,6 +5,8 @@ import useSWR from "swr";
 import type { Client } from "@/lib/clients";
 import { ClientForm } from "@/components/ClientForm";
 import { ClientServicesTab } from "@/components/services/ClientServicesTab";
+import { QuestionnaireTab } from "@/components/questionnaire/QuestionnaireTab";
+import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 
 type Tab = "contexto" | "servicios" | "cuestionario" | "materialidad";
 
@@ -13,20 +15,31 @@ type Props = {
   completeness: { filled: number; total: number };
 };
 
-const fetcher = (url: string) =>
+const servicesFetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json() as Promise<{ data: unknown[] }>;
+  });
+
+const questionnaireFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<{ data: QuestionnaireBundle }>;
   });
 
 export function ClientTabs({ client, completeness }: Props) {
   const [tab, setTab] = useState<Tab>("contexto");
   const { data: servicesResp } = useSWR(
     `/api/clients/${client.id}/services`,
-    fetcher
+    servicesFetcher
+  );
+  const { data: questionnaireResp } = useSWR(
+    `/api/clients/${client.id}/questionnaire`,
+    questionnaireFetcher
   );
   const servicesCount = servicesResp?.data?.length ?? null;
   const pctContexto = Math.round((completeness.filled / completeness.total) * 100);
+  const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
 
   return (
     <div>
@@ -54,9 +67,27 @@ export function ClientTabs({ client, completeness }: Props) {
         />
         <KpiCard
           label="Cuestionario"
-          value="—"
-          sub="Próximamente"
-          tone="placeholder"
+          value={pctCuestionario === null ? "—" : `${pctCuestionario}%`}
+          sub={
+            pctCuestionario === null
+              ? "Cargando…"
+              : pctCuestionario === 100
+                ? "Completo"
+                : pctCuestionario === 0
+                  ? "Sin iniciar"
+                  : "En progreso"
+          }
+          tone={
+            pctCuestionario === null
+              ? "neutral"
+              : pctCuestionario === 100
+                ? "success"
+                : pctCuestionario >= 50
+                  ? "primary"
+                  : pctCuestionario > 0
+                    ? "warn"
+                    : "neutral"
+          }
         />
         <KpiCard
           label="Materialidad"
@@ -84,8 +115,7 @@ export function ClientTabs({ client, completeness }: Props) {
           active={tab === "cuestionario"}
           onClick={() => setTab("cuestionario")}
           label="Cuestionario"
-          badge="Próx."
-          muted
+          badge={pctCuestionario === null ? "…" : `${pctCuestionario}%`}
         />
         <TabButton
           active={tab === "materialidad"}
@@ -98,7 +128,7 @@ export function ClientTabs({ client, completeness }: Props) {
 
       {tab === "contexto" && <ClientForm mode="edit" initial={client} />}
       {tab === "servicios" && <ClientServicesTab clientId={client.id} />}
-      {tab === "cuestionario" && <PlaceholderTab title="Cuestionario" />}
+      {tab === "cuestionario" && <QuestionnaireTab clientId={client.id} />}
       {tab === "materialidad" && <PlaceholderTab title="Matriz de Materialidad" />}
     </div>
   );

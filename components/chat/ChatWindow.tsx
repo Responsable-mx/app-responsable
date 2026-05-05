@@ -13,7 +13,12 @@ type ClientOption = {
   completeness: { filled: number; total: number };
 };
 type RoleId = "aurora" | "rebeca" | "elena" | "valeria";
-type ChatMessage = { role: "user" | "assistant"; content: string; rating?: "up" | "down" };
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  rating?: "up" | "down";
+  ts?: number;
+};
 
 const MODEL_PER_ROLE: Record<RoleId, string> = {
   aurora: "Sonnet",
@@ -28,20 +33,42 @@ const MODEL_COST: Record<string, number> = {
   Haiku: 1.25 / 1_000_000,
 };
 
-// Orden alfabético por nombre (es-MX).
+// Orden lógico cadena calidad: Autor → Revisor → Elevador → Validador.
+// Sin emoji (regla CLAUDE.md: cero emoji en UI cliente). Avatar = monogram.
 const ROLES: Array<{
   id: RoleId;
   name: string;
   fn: string;
   color: string;
-  emoji: string;
+  mono: string;
 }> = [
-  // Orden lógico de la cadena de calidad: Autor → Revisor → Elevador → Validador.
-  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-brand-primary-hover", emoji: "✍️" },
-  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-amber-600", emoji: "🔍" },
-  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-indigo-700", emoji: "⭐" },
-  { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-rose-700", emoji: "✅" },
+  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-brand-primary-dark", mono: "A" },
+  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-slate-700", mono: "R" },
+  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-indigo-800", mono: "E" },
+  { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-emerald-800", mono: "V" },
 ];
+
+/**
+ * Convierte errores técnicos del backend en mensajes accionables para el consultor.
+ * Nunca exponer "Invalid UUID", códigos HTTP crudos ni stack traces.
+ */
+function humanizeError(raw: string): string {
+  const m = raw.toLowerCase();
+  if (m.includes("invalid uuid") || m.includes("uuid")) {
+    return "El cliente seleccionado no es válido. Recarga la página o vuelve a Clientes.";
+  }
+  if (m.includes("anthropic_api_key")) {
+    return "El servicio de IA no está configurado. Avísale al administrador.";
+  }
+  if (m.includes("no autorizado")) {
+    return "Tu sesión expiró. Vuelve a iniciar sesión.";
+  }
+  if (m.includes("json inválido") || m.includes("json invalido")) {
+    return "Error técnico al enviar. Reintenta en unos segundos.";
+  }
+  // Si ya viene en español natural (rate limit, timeout), pasar tal cual.
+  return raw;
+}
 
 const STARTERS: Record<RoleId, string[]> = {
   aurora: [
@@ -127,7 +154,7 @@ export function ChatWindow({
   async function send(prompt: string) {
     if (!prompt.trim() || streaming) return;
     setError("");
-    const userMsg: ChatMessage = { role: "user", content: prompt };
+    const userMsg: ChatMessage = { role: "user", content: prompt, ts: Date.now() };
     const history = [...messages, userMsg];
     setMessages(history);
     setInput("");
@@ -136,7 +163,7 @@ export function ChatWindow({
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setMessages((m) => [...m, { role: "assistant", content: "" }]);
+    setMessages((m) => [...m, { role: "assistant", content: "", ts: Date.now() }]);
 
     try {
       const res = await fetch("/api/chat", {
@@ -152,7 +179,7 @@ export function ChatWindow({
 
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({ error: "Error" }));
-        setError(data.error ?? "Error al enviar");
+        setError(humanizeError(data.error ?? "Error al enviar"));
         setMessages((m) => m.slice(0, -1));
         setStreaming(false);
         return;
@@ -198,7 +225,7 @@ export function ChatWindow({
       const err = e as { name?: string };
       if (err.name !== "AbortError") {
         console.error(e);
-        setError("Error de conexión");
+        setError("Sin conexión con el servidor. Reintenta cuando recuperes la red.");
       }
     } finally {
       setStreaming(false);
@@ -332,27 +359,41 @@ export function ChatWindow({
           className="flex items-center gap-1 bg-slate-100 rounded p-0.5 w-fit"
           data-tour="role-selector"
         >
-          {ROLES.map((r, i) => (
-            <div key={r.id} className="flex items-center">
-              <button
-                onClick={() => handleRoleClick(r.id)}
-                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
-                  role === r.id
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <span>{r.emoji}</span>
-                <span>{r.name}</span>
-                <span className="text-slate-500 font-normal text-[10px]">· {r.fn}</span>
-              </button>
-              {i < ROLES.length - 1 && (
-                <svg className="w-3 h-3 text-slate-300 mx-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              )}
-            </div>
-          ))}
+          {ROLES.map((r, i) => {
+            const isActive = role === r.id;
+            return (
+              <div key={r.id} className="flex items-center">
+                <button
+                  onClick={() => handleRoleClick(r.id)}
+                  className={`px-2 py-1 text-xs font-semibold rounded transition-colors flex items-center gap-1.5 ${
+                    isActive
+                      ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                  aria-pressed={isActive}
+                  title={`${r.name} · ${r.fn}`}
+                >
+                  <span
+                    aria-hidden
+                    className={`w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-bold tracking-tight text-white ${
+                      isActive ? r.color : "bg-slate-400"
+                    }`}
+                  >
+                    {r.mono}
+                  </span>
+                  <span>{r.name}</span>
+                  <span className="text-slate-500 font-normal text-[10px] uppercase tracking-wider">
+                    {r.fn}
+                  </span>
+                </button>
+                {i < ROLES.length - 1 && (
+                  <svg className="w-3 h-3 text-slate-300 mx-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
+              </div>
+            );
+          })}
         </div>
       </header>
 
@@ -361,14 +402,27 @@ export function ChatWindow({
           role="status"
           className="bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-6 py-2 flex items-center gap-2"
         >
-          <span>⚠️</span>
+          <svg
+            aria-hidden
+            className="w-3.5 h-3.5 shrink-0 text-amber-700"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.75}
+              d="M12 9v2m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            />
+          </svg>
           <span>
             El contexto de <strong>{selectedClient.name}</strong> tiene{" "}
             {selectedClient.completeness.filled}/6 bloques llenos. Los roles
             responden mejor cuando está completo.{" "}
             <a
               href={`/clientes/${selectedClient.id}`}
-              className="underline hover:text-amber-700"
+              className="underline hover:text-amber-700 font-medium"
             >
               Completar ahora →
             </a>
@@ -379,26 +433,34 @@ export function ChatWindow({
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 && (
-            <div className="text-center py-12" data-tour="empty-state">
-              <div
-                className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl ${currentRole.color} text-white text-2xl mb-3`}
-              >
-                {currentRole.emoji}
+            <div className="py-10 max-w-2xl mx-auto" data-tour="empty-state">
+              <div className="flex items-center gap-3 pb-4 mb-5 border-b border-slate-200">
+                <div
+                  className={`w-9 h-9 rounded flex items-center justify-center text-white text-sm font-bold shrink-0 ${currentRole.color}`}
+                  aria-hidden
+                >
+                  {currentRole.mono}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    {currentRole.fn} · {MODEL_PER_ROLE[role]}
+                  </p>
+                  <h2 className="text-base font-bold text-slate-900 leading-tight truncate">
+                    {currentRole.name}
+                  </h2>
+                </div>
               </div>
-              <h2 className="text-lg font-bold text-slate-900">
-                {currentRole.name} · {currentRole.fn}
-              </h2>
-              <p className="text-sm text-slate-600 mt-1 mb-6">
+              <p className="text-sm text-slate-600 mb-4">
                 {clientId
-                  ? `Contexto de cliente activo. Pregunta lo que necesites.`
+                  ? "Contexto de cliente cargado. Comienza con un objetivo o usa una sugerencia."
                   : "Sin cliente seleccionado. Respondo sobre metodología general."}
               </p>
-              <div className="grid grid-cols-2 gap-2 max-w-xl mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {STARTERS[role].map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="text-left text-xs px-3 py-2 bg-white border border-stone-200 rounded-lg hover:border-brand-primary hover:bg-brand-primary-light transition-colors"
+                    className="text-left text-xs px-3 py-2.5 bg-white border border-slate-200 rounded hover:border-brand-primary hover:bg-brand-primary-light transition-colors text-slate-700"
                   >
                     {s}
                   </button>
@@ -412,23 +474,36 @@ export function ChatWindow({
               m.role === "assistant" &&
               i === messages.map((mm, k) => (mm.role === "assistant" ? k : -1)).filter((k) => k >= 0).at(-1);
             const showActions = m.role === "assistant" && !!m.content && !streaming;
+            const tsLabel = m.ts
+              ? new Date(m.ts).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
+              : null;
             return (
-              <div
-                key={i}
-                className={`animate-fade-in ${
-                  m.role === "user" ? "flex justify-end" : ""
-                }`}
-              >
-                <div className="max-w-2xl">
+              <div key={i} className="animate-fade-in">
+                <div className="flex items-start gap-3">
                   <div
-                    className={
-                      m.role === "user"
-                        ? "bg-brand-primary-hover text-white rounded-2xl rounded-br-md px-4 py-2.5"
-                        : "bg-white border border-stone-200 rounded-2xl rounded-bl-md px-4 py-3"
-                    }
+                    aria-hidden
+                    className={`w-7 h-7 rounded shrink-0 flex items-center justify-center text-[11px] font-bold text-white ${
+                      m.role === "user" ? "bg-slate-700" : currentRole.color
+                    }`}
                   >
+                    {m.role === "user" ? "Tú" : currentRole.mono}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <p className="text-xs font-semibold text-slate-900 leading-none">
+                        {m.role === "user" ? "Consultor" : currentRole.name}
+                      </p>
+                      {m.role === "assistant" && (
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-400">
+                          {currentRole.fn}
+                        </span>
+                      )}
+                      {tsLabel && (
+                        <span className="text-[10px] text-slate-400 tabular-nums">{tsLabel}</span>
+                      )}
+                    </div>
                     {m.role === "assistant" ? (
-                      <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1">
+                      <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1 text-slate-800">
                         {m.content ? (
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {m.content}
@@ -438,9 +513,8 @@ export function ChatWindow({
                         )}
                       </div>
                     ) : (
-                      <p className="whitespace-pre-wrap text-sm">{m.content}</p>
+                      <p className="whitespace-pre-wrap text-sm text-slate-800">{m.content}</p>
                     )}
-                  </div>
                   {showActions && (
                     <div className="flex items-center gap-1 mt-1 px-2">
                       <button
@@ -487,6 +561,7 @@ export function ChatWindow({
                       )}
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             );
@@ -495,15 +570,39 @@ export function ChatWindow({
           {error && (
             <div
               role="alert"
-              className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3"
+              className="bg-rose-50 border border-rose-200 rounded p-3 flex items-start gap-3"
             >
-              {error}
+              <svg
+                aria-hidden
+                className="w-4 h-4 text-rose-700 shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <circle cx="12" cy="12" r="10" strokeWidth={1.5} />
+                <path strokeLinecap="round" strokeWidth={1.75} d="M12 8v4M12 16h.01" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-rose-900">{error}</p>
+                {messages.some((m) => m.role === "user") && (
+                  <button
+                    type="button"
+                    onClick={retryLast}
+                    className="mt-1.5 text-xs font-semibold text-rose-700 hover:text-rose-900 transition-colors inline-flex items-center gap-1"
+                  >
+                    Reintentar
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      <footer className="bg-white border-t border-stone-200 px-6 py-3">
+      <footer className="bg-white border-t border-slate-200 px-6 py-3">
         <div className="max-w-3xl mx-auto">
           <form
             onSubmit={(e) => {
@@ -523,14 +622,14 @@ export function ChatWindow({
               }}
               placeholder={`Escribe a ${currentRole.name}...`}
               rows={1}
-              className="flex-1 px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none max-h-40"
+              className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none max-h-40"
               disabled={streaming}
             />
             {streaming ? (
               <button
                 type="button"
                 onClick={stop}
-                className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800"
+                className="px-4 py-2 bg-slate-700 text-white rounded text-sm font-medium hover:bg-slate-800"
               >
                 Detener
               </button>
@@ -538,7 +637,7 @@ export function ChatWindow({
               <button
                 type="submit"
                 disabled={!input.trim()}
-                className="px-4 py-2 bg-brand-primary-hover text-white rounded-lg text-sm font-medium hover:bg-brand-primary-dark disabled:bg-stone-300 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-brand-primary-hover text-white rounded text-sm font-medium hover:bg-brand-primary-dark disabled:bg-slate-300 disabled:cursor-not-allowed"
               >
                 Enviar
               </button>

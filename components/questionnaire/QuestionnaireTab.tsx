@@ -97,6 +97,13 @@ function WizardEditor({
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
+  // Optimistic concurrency: trackeamos updated_at del último response server-side.
+  // El PATCH lo manda como expectedUpdatedAt; si otro consultor escribió en el medio
+  // el server retorna 409 y reload manual.
+  const lastServerUpdatedAt = useRef<string | null>(initial.response?.updated_at ?? null);
+  // Backoff exponencial: 0=primero, 1=1s, 2=2s, 3=4s, max 8s. Reset al success.
+  const retryAttempt = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progress = useMemo(() => computeProgress(schema, responses), [schema, responses]);
 
@@ -158,6 +165,11 @@ function WizardEditor({
 
   async function save() {
     if (!dirty.current) return;
+    // Cancelar retry pendiente — esta save reemplaza al pendiente.
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
     dirty.current = false;
     setSaveState("saving");
     setErrorMsg(null);
@@ -168,17 +180,58 @@ function WizardEditor({
       const res = await fetch(`/api/clients/${clientId}/questionnaire`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service: template.service_key, responses, completedSections }),
+        body: JSON.stringify({
+          service: template.service_key,
+          responses,
+          completedSections,
+          // Optimistic lock: server rechaza con 409 si alguien más escribió primero.
+          expectedUpdatedAt: lastServerUpdatedAt.current,
+        }),
       });
+      if (res.status === 409) {
+        // Conflicto de edición — no reintentamos automáticamente, el usuario debe
+        // recargar para ver el estado actual. Mantener dirty=true para que un
+        // próximo save (post-reload) tenga el expectedUpdatedAt nuevo.
+        const json = await res.json().catch(() => ({}));
+        if (json.server_updated_at) {
+          lastServerUpdatedAt.current = json.server_updated_at as string;
+        }
+        dirty.current = true;
+        setSaveState("error");
+        setErrorMsg(
+          json.error ??
+            "Otro consultor guardó cambios. Recarga el cuestionario antes de seguir editando."
+        );
+        retryAttempt.current = 0;
+        return;
+      }
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.error ?? `HTTP ${res.status}`);
       }
+      const json = (await res.json().catch(() => ({}))) as {
+        data?: { updated_at?: string };
+      };
+      if (json.data?.updated_at) {
+        lastServerUpdatedAt.current = json.data.updated_at;
+      }
+      retryAttempt.current = 0;
       setSaveState("saved");
       setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2000);
     } catch (e) {
+      // Re-marcar dirty para que el próximo schedule/retry reintente con cambios actuales.
+      dirty.current = true;
       setSaveState("error");
       setErrorMsg(e instanceof Error ? e.message : "Error al guardar");
+      // Backoff exponencial: 1s, 2s, 4s, 8s. Tope 8s, reintentos infinitos
+      // hasta que el usuario salga del paso o el server vuelva.
+      const delay = Math.min(1000 * 2 ** retryAttempt.current, 8000);
+      retryAttempt.current += 1;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      retryTimer.current = setTimeout(() => {
+        retryTimer.current = null;
+        void save();
+      }, delay);
     }
   }
 
@@ -266,6 +319,7 @@ function WizardEditor({
   useEffect(() => {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
     };
   }, []);
 

@@ -16,6 +16,10 @@ type Tab = "resumen" | "cuestionario" | "chat" | "materialidad";
 type Props = {
   client: Client;
   completeness: { filled: number; total: number };
+  // Datos prefetched server-side. SWR los usa como fallback inicial y revalida
+  // en background. Evita waterfall de 2 fetches al montar tabs.
+  initialQuestionnaire?: QuestionnaireBundle | null;
+  initialMateriality?: MaterialityTopic[];
 };
 
 const questionnaireFetcher = (url: string) =>
@@ -30,7 +34,12 @@ const materialityFetcher = (url: string) =>
     return r.json() as Promise<{ data: MaterialityTopic[] }>;
   });
 
-export function ClientTabs({ client, completeness }: Props) {
+export function ClientTabs({
+  client,
+  completeness,
+  initialQuestionnaire,
+  initialMateriality,
+}: Props) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(
@@ -53,12 +62,18 @@ export function ClientTabs({ client, completeness }: Props) {
   const { data: questionnaireResp } = useSWR(
     `/api/clients/${client.id}/questionnaire`,
     questionnaireFetcher,
-    { revalidateOnFocus: false }
+    {
+      revalidateOnFocus: false,
+      fallbackData: initialQuestionnaire ? { data: initialQuestionnaire } : undefined,
+    }
   );
   const { data: materialityResp } = useSWR(
     `/api/clients/${client.id}/materiality`,
     materialityFetcher,
-    { revalidateOnFocus: false }
+    {
+      revalidateOnFocus: false,
+      fallbackData: initialMateriality ? { data: initialMateriality } : undefined,
+    }
   );
 
   const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
@@ -107,8 +122,8 @@ export function ClientTabs({ client, completeness }: Props) {
 
   return (
     <div>
-      {/* KPI cards: solo métricas reales (regla CLAUDE.md: no inventar placeholders). */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
+      {/* KPI cards: 3 columnas alineadas al mockup (Cuestionario, Materialidad, Metodología). */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
         <KpiCardLarge
           label="Cuestionario"
           value={pctCuestionario === null ? "—" : `${pctCuestionario}`}
@@ -153,14 +168,6 @@ export function ClientTabs({ client, completeness }: Props) {
                   ? "primary"
                   : "neutral"
           }
-        />
-        <KpiCardLarge
-          label="Metodología ResponSable"
-          value="Por definir"
-          unit=""
-          sub="Los pasos de la metodología se definirán con el equipo."
-          rightBadge={{ label: "Placeholder", tone: "warn" }}
-          tone="placeholder"
         />
       </div>
 

@@ -4,6 +4,8 @@ import { getClient, clientContextCompleteness, listClients } from "@/lib/clients
 import { ClientTabs } from "@/components/ClientTabs";
 import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
 import { isSystemAccount } from "@/lib/users";
+import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
+import { listMaterialityTopics } from "@/lib/materiality/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +13,15 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function EditarClientePage({ params }: Props) {
   const { id } = await params;
-  const [client, allClients] = await Promise.all([
+  // Prefetch paralelo: cliente + clients list (nav) + questionnaire + materiality.
+  // Antes ClientTabs hacía 2 fetches client-side en cascada al montar tabs (cuestionario,
+  // materialidad), causando spinners visibles. Ahora SWR arranca con datos en memoria
+  // y solo revalida en background.
+  const [client, allClients, questionnaireBundle, materialityTopics] = await Promise.all([
     getClient(id).catch(() => null),
     listClients().catch(() => []),
+    getQuestionnaireBundle(id, "doble-materialidad").catch(() => null),
+    listMaterialityTopics(id).catch(() => []),
   ]);
   if (!client) notFound();
 
@@ -117,7 +125,12 @@ export default async function EditarClientePage({ params }: Props) {
         </span>
       </div>
 
-      <ClientTabs client={client} completeness={completeness} />
+      <ClientTabs
+        client={client}
+        completeness={completeness}
+        initialQuestionnaire={questionnaireBundle}
+        initialMateriality={materialityTopics}
+      />
     </div>
   );
 }

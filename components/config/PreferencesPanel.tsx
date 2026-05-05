@@ -63,7 +63,7 @@ export function PreferencesPanel({
           <button
             onClick={() => setConfirm(true)}
             disabled={busy}
-            className="px-4 py-2 bg-brand-primary-hover text-white text-sm font-medium rounded-lg hover:bg-brand-primary-dark disabled:bg-slate-300 whitespace-nowrap"
+            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 whitespace-nowrap"
           >
             Reiniciar tour para todo el equipo
           </button>

@@ -211,6 +211,7 @@ function Metric({
   value,
   hint,
   tone = "neutral",
+  hintTone,
   spark,
   sparkColor,
 }: {
@@ -218,6 +219,7 @@ function Metric({
   value: string;
   hint?: string;
   tone?: "neutral" | "ok" | "red";
+  hintTone?: "ok" | "warn" | "red";
   spark?: number[];
   sparkColor?: string;
 }) {
@@ -227,6 +229,14 @@ function Metric({
       : tone === "ok"
       ? "text-green-700"
       : "text-slate-900";
+  const hintClass =
+    hintTone === "ok"
+      ? "text-emerald-700"
+      : hintTone === "warn"
+      ? "text-amber-600"
+      : hintTone === "red"
+      ? "text-red-700"
+      : "text-slate-600";
   return (
     <div className="bg-white border border-slate-200 rounded px-4 py-3">
       <div className="flex items-start justify-between gap-2">
@@ -238,7 +248,7 @@ function Metric({
         )}
       </div>
       <div className={`text-xl font-bold mt-1 ${valueClass}`}>{value}</div>
-      {hint && <div className="text-[10px] text-slate-600 mt-0.5">{hint}</div>}
+      {hint && <div className={`text-[10px] mt-0.5 ${hintClass}`}>{hint}</div>}
     </div>
   );
 }

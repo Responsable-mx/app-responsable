@@ -6,10 +6,12 @@ import {
   getStageOwnerClient,
 } from "@/lib/stages";
 import { logChange } from "@/lib/audit-log";
+import { isDevMode } from "@/lib/env";
 
 type Ctx = { params: Promise<{ stageId: string }> };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const validId = (id: string) => isDevMode() || UUID_RE.test(id);
 
 // POST /api/stages/:stageId/activities
 // Body: ActivityInput. Solo admin (lectura va por GET /api/clients/:id/stages).
@@ -17,10 +19,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
   const { stageId } = await params;
-  if (!UUID_RE.test(stageId))
+  if (!validId(stageId))
     return NextResponse.json({ error: "stageId inválido" }, { status: 400 });
 
-  // Validar que la etapa existe (anti-IDOR previo)
+  // Validar que la etapa existe (anti-IDOR previo) — en dev mode stages están en memoria
   const owner = await getStageOwnerClient(stageId);
   if (!owner) return NextResponse.json({ error: "Etapa no encontrada" }, { status: 404 });
 
@@ -60,7 +62,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   const { stageId } = await params;
-  if (!UUID_RE.test(stageId))
+  if (!validId(stageId))
     return NextResponse.json({ error: "stageId inválido" }, { status: 400 });
   return NextResponse.json({
     error: "Use GET /api/clients/:id/stages para listar actividades.",

@@ -3,16 +3,18 @@ import { requireAdmin } from "@/lib/auth";
 import { updateStage, deleteStage, StageInputSchema } from "@/lib/stages";
 import { logChange } from "@/lib/audit-log";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isDevMode } from "@/lib/env";
 
 type Ctx = { params: Promise<{ stageId: string }> };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const validId = (id: string) => isDevMode() || UUID_RE.test(id);
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
   const { stageId } = await params;
-  if (!UUID_RE.test(stageId))
+  if (!validId(stageId))
     return NextResponse.json({ error: "stageId inválido" }, { status: 400 });
 
   let body: unknown;
@@ -29,13 +31,17 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // D-52: snapshot before para audit trail completo
-  const adminDb = createAdminClient();
-  const { data: before } = await adminDb
-    .from("service_stages")
-    .select("name, order_index")
-    .eq("id", stageId)
-    .single();
+  // D-52: snapshot before para audit trail completo (solo en prod — dev no tiene DB)
+  let before: { name: string; order_index: number } | undefined;
+  if (!isDevMode()) {
+    const adminDb = createAdminClient();
+    const { data } = await adminDb
+      .from("service_stages")
+      .select("name, order_index")
+      .eq("id", stageId)
+      .single();
+    before = data ?? undefined;
+  }
 
   try {
     await updateStage(stageId, parsed.data);
@@ -44,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       entityType: "service_stage",
       entityId: stageId,
       action: "update",
-      before: before ?? undefined,
+      before,
       after: parsed.data,
     });
     return NextResponse.json({ ok: true });
@@ -58,7 +64,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
   const { stageId } = await params;
-  if (!UUID_RE.test(stageId))
+  if (!validId(stageId))
     return NextResponse.json({ error: "stageId inválido" }, { status: 400 });
 
   try {

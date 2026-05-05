@@ -3,26 +3,6 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 
-// ─── Dev-mode in-memory store ─────────────────────────────
-let _seq = 0;
-const _devStages: (ServiceStage & { _clientServiceId: string })[] = [];
-const _devActs: StageActivity[] = [];
-function devId(p: string) { return `${p}-${String(++_seq)}`; }
-function _hydrateStages(stages: typeof _devStages): ServiceStage[] {
-  return stages.map((s) => ({
-    id: s.id,
-    client_service_id: s.client_service_id,
-    name: s.name,
-    order_index: s.order_index,
-    created_at: s.created_at,
-    updated_at: s.updated_at,
-    activities: _devActs
-      .filter((a) => a.stage_id === s.id)
-      .sort((a, b) => a.order_index - b.order_index)
-      .map((a) => ({ ...a, status: computeStatus(a) })),
-  }));
-}
-
 export type ActivityStatus = "pending" | "in_progress" | "completed" | "delayed";
 
 export type StageActivity = {
@@ -50,6 +30,26 @@ export type ServiceStage = {
   updated_at: string;
   activities: StageActivity[];
 };
+
+// ─── Dev-mode in-memory store ─────────────────────────────
+let _seq = 0;
+const _devStages: (ServiceStage & { _clientServiceId: string })[] = [];
+const _devActs: StageActivity[] = [];
+function devId(p: string) { return `${p}-${String(++_seq)}`; }
+function _hydrateStages(stages: typeof _devStages): ServiceStage[] {
+  return stages.map((s) => ({
+    id: s.id,
+    client_service_id: s.client_service_id,
+    name: s.name,
+    order_index: s.order_index,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+    activities: _devActs
+      .filter((a) => a.stage_id === s.id)
+      .sort((a, b) => a.order_index - b.order_index)
+      .map((a) => ({ ...a, status: computeStatus(a) })),
+  }));
+}
 
 // Status computado desde fechas — nunca se almacena.
 export function computeStatus(a: {
@@ -199,6 +199,15 @@ export async function updateStage(
   stageId: string,
   patch: Partial<StageInput>
 ): Promise<void> {
+  if (isDevMode()) {
+    const s = _devStages.find((st) => st.id === stageId);
+    if (s) {
+      if (patch.name !== undefined) s.name = patch.name;
+      if (patch.order_index !== undefined) s.order_index = patch.order_index;
+      s.updated_at = new Date().toISOString();
+    }
+    return;
+  }
   const admin = createAdminClient();
   const update: Record<string, unknown> = {};
   if (patch.name !== undefined) update.name = patch.name;

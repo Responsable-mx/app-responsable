@@ -8,10 +8,12 @@ import {
 } from "@/lib/stages";
 import { logChange } from "@/lib/audit-log";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isDevMode } from "@/lib/env";
 
 type Ctx = { params: Promise<{ activityId: string }> };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const validId = (id: string) => isDevMode() || UUID_RE.test(id);
 
 // PATCH: actualizar fechas, asignación o nombre.
 // Permitido a CONSULTOR (no solo admin) si solo actualiza actual_start/actual_end
@@ -20,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   const { activityId } = await params;
-  if (!UUID_RE.test(activityId))
+  if (!validId(activityId))
     return NextResponse.json({ error: "activityId inválido" }, { status: 400 });
 
   const owner = await getActivityOwnerClient(activityId);
@@ -63,8 +65,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   // Si el actor no es admin, debe estar en el equipo del cliente o ser el assignee
+  // En dev mode no hay DB real — cualquier usuario autenticado puede editar.
   const isAdminEmail = adminEmail !== null;
-  if (!isAdminEmail) {
+  if (!isAdminEmail && !isDevMode()) {
     const adminDb = createAdminClient();
     const { data: act } = await adminDb
       .from("stage_activities")
@@ -107,7 +110,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
   const { activityId } = await params;
-  if (!UUID_RE.test(activityId))
+  if (!validId(activityId))
     return NextResponse.json({ error: "activityId inválido" }, { status: 400 });
 
   const owner = await getActivityOwnerClient(activityId);

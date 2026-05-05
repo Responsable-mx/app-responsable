@@ -6,7 +6,9 @@ import type { Client } from "@/lib/clients";
 import { ClientForm } from "@/components/ClientForm";
 import { ClientServicesTab } from "@/components/services/ClientServicesTab";
 import { QuestionnaireTab } from "@/components/questionnaire/QuestionnaireTab";
+import { MaterialityTab } from "@/components/materiality/MaterialityTab";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
+import type { MaterialityTopic } from "@/lib/materiality/types";
 
 type Tab = "contexto" | "servicios" | "cuestionario" | "materialidad";
 
@@ -27,6 +29,12 @@ const questionnaireFetcher = (url: string) =>
     return r.json() as Promise<{ data: QuestionnaireBundle }>;
   });
 
+const materialityFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<{ data: MaterialityTopic[] }>;
+  });
+
 export function ClientTabs({ client, completeness }: Props) {
   const [tab, setTab] = useState<Tab>("contexto");
   const { data: servicesResp } = useSWR(
@@ -37,9 +45,14 @@ export function ClientTabs({ client, completeness }: Props) {
     `/api/clients/${client.id}/questionnaire`,
     questionnaireFetcher
   );
+  const { data: materialityResp } = useSWR(
+    `/api/clients/${client.id}/materiality`,
+    materialityFetcher
+  );
   const servicesCount = servicesResp?.data?.length ?? null;
   const pctContexto = Math.round((completeness.filled / completeness.total) * 100);
   const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
+  const materialityCount = materialityResp?.data?.length ?? null;
 
   return (
     <div>
@@ -91,9 +104,23 @@ export function ClientTabs({ client, completeness }: Props) {
         />
         <KpiCard
           label="Materialidad"
-          value="—"
-          sub="Próximamente"
-          tone="placeholder"
+          value={materialityCount === null ? "—" : String(materialityCount)}
+          sub={
+            materialityCount === null
+              ? "Cargando…"
+              : materialityCount === 0
+                ? "Sin iniciar"
+                : `${materialityCount} temas`
+          }
+          tone={
+            materialityCount === null
+              ? "neutral"
+              : materialityCount === 0
+                ? "neutral"
+                : materialityCount >= 15
+                  ? "success"
+                  : "primary"
+          }
         />
       </div>
 
@@ -121,15 +148,14 @@ export function ClientTabs({ client, completeness }: Props) {
           active={tab === "materialidad"}
           onClick={() => setTab("materialidad")}
           label="Materialidad"
-          badge="Próx."
-          muted
+          badge={materialityCount === null ? "…" : String(materialityCount)}
         />
       </div>
 
       {tab === "contexto" && <ClientForm mode="edit" initial={client} />}
       {tab === "servicios" && <ClientServicesTab clientId={client.id} />}
       {tab === "cuestionario" && <QuestionnaireTab clientId={client.id} />}
-      {tab === "materialidad" && <PlaceholderTab title="Matriz de Materialidad" />}
+      {tab === "materialidad" && <MaterialityTab clientId={client.id} />}
     </div>
   );
 }

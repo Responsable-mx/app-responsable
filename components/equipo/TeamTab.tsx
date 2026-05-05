@@ -176,14 +176,14 @@ export function TeamTab({
                     <td className="py-2 text-right">
                       <button
                         onClick={() => setEditTarget(c)}
-                        className="text-xs px-2 py-1 text-slate-700 hover:bg-slate-100 rounded"
+                        className="text-xs px-3 py-2 text-slate-700 hover:bg-slate-100 rounded min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
                         title="Cambiar seniority en este proyecto"
                       >
                         ✎
                       </button>
                       <button
                         onClick={() => setRemoveTarget(c)}
-                        className="text-xs px-2 py-1 text-red-700 hover:bg-red-50 rounded ml-1"
+                        className="text-xs px-3 py-2 text-red-700 hover:bg-red-50 rounded ml-1 min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
                         title="Remover del proyecto"
                       >
                         ⊗

@@ -658,13 +658,11 @@ export function ChatWindow({
 
         {/* Role chain */}
         <div
-          className="flex items-center gap-1 bg-slate-100 rounded p-0.5 w-fit"
+          className="flex items-center gap-1"
           data-tour="role-selector"
         >
           {ROLES.map((r, i) => {
             const isActive = role === r.id;
-            // "Visitado" = un mensaje del assistant en la conversación viene de este rol.
-            // Visualiza el progreso de la cadena de calidad sin requerir flujo forzado.
             const isVisited = !isActive && messages.some(
               (m) => m.role === "assistant" && m.roleId === r.id
             );
@@ -672,33 +670,37 @@ export function ChatWindow({
               <div key={r.id} className="flex items-center">
                 <button
                   onClick={() => handleRoleClick(r.id)}
-                  className={`px-2 py-1 text-xs font-semibold rounded transition-colors flex items-center gap-1.5 ${
+                  className={`px-3 py-2 rounded transition-all flex items-center gap-2 border ${
                     isActive
-                      ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+                      ? "bg-white text-slate-900 shadow-sm border-slate-200 ring-1 ring-brand-primary/20"
                       : isVisited
-                        ? "text-slate-800 hover:text-slate-900"
-                        : "text-slate-600 hover:text-slate-900"
+                        ? "bg-slate-50 text-slate-700 border-slate-200 hover:bg-white hover:shadow-sm"
+                        : "bg-transparent text-slate-500 border-transparent hover:bg-slate-50 hover:border-slate-200"
                   }`}
                   aria-pressed={isActive}
-                  title={isVisited ? `${r.name} · ${r.fn} · ya intervino` : `${r.name} · ${r.fn}`}
+                  title={isVisited ? `${r.name} · ya intervino` : r.fn}
                 >
                   <span
                     aria-hidden
-                    className={`w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-bold tracking-tight text-white relative ${
-                      isActive || isVisited ? r.color : "bg-slate-400"
+                    className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold text-white relative shrink-0 ${
+                      isActive || isVisited ? r.color : "bg-slate-300"
                     }`}
                   >
                     {r.mono}
                     {isVisited && (
                       <span
                         aria-hidden
-                        className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-1 ring-white"
+                        className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white"
                       />
                     )}
                   </span>
-                  <span>{r.name}</span>
-                  <span className="text-slate-500 font-normal text-[10px] uppercase tracking-wider">
-                    {r.fn}
+                  <span className="text-left hidden sm:block">
+                    <span className={`block text-xs font-semibold leading-tight ${isActive ? "text-slate-900" : "text-slate-600"}`}>
+                      {r.name}
+                    </span>
+                    <span className={`block text-[10px] uppercase tracking-wider font-medium leading-tight mt-0.5 ${isActive ? "text-brand-primary-dark" : "text-slate-400"}`}>
+                      {r.fn}
+                    </span>
                   </span>
                 </button>
                 {i < ROLES.length - 1 && (
@@ -797,9 +799,12 @@ export function ChatWindow({
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="text-left text-xs px-3 py-2.5 bg-white border border-slate-200 rounded hover:border-brand-primary hover:bg-brand-primary-light transition-colors text-slate-700"
+                    className="group text-left text-xs px-3 py-2.5 bg-white border border-slate-200 rounded hover:border-brand-primary hover:bg-brand-primary-light transition-colors text-slate-700 flex items-start justify-between gap-2"
                   >
-                    {s}
+                    <span className="font-medium">{s}</span>
+                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-slate-300 group-hover:text-brand-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </button>
                 ))}
               </div>

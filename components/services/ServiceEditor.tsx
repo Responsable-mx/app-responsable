@@ -103,7 +103,7 @@ export function ServiceEditor({
                   className={`px-3 py-2 border rounded-lg text-sm transition-colors ${
                     service === s.key
                       ? `${s.color} border-current font-medium`
-                      : "bg-white border-stone-300 text-slate-600 hover:bg-stone-50"
+                      : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
                   }`}
                 >
                   <span className="mr-1.5">{s.icon}</span>
@@ -114,7 +114,7 @@ export function ServiceEditor({
           </div>
         )}
 
-        <div className="border-t border-stone-100 pt-4 space-y-4">
+        <div className="border-t border-slate-100 pt-4 space-y-4">
           {schema.fields.map((field) => (
             <FieldRow
               key={field.key}
@@ -170,7 +170,7 @@ function FieldRenderer({
   onChange: (v: unknown) => void;
 }) {
   const cls =
-    "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
+    "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
 
   switch (type.kind) {
     case "text":

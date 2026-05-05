@@ -41,11 +41,11 @@ export function StructuredBlockEditor({
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+    <div className="bg-white border border-slate-200 rounded overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((s) => !s)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-stone-50 transition-colors"
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
       >
         <div className="text-left">
           <div className="font-semibold text-slate-900">{schema.title}</div>
@@ -57,7 +57,7 @@ export function StructuredBlockEditor({
           <span
             className={`px-2 py-0.5 rounded-full ${
               filled === 0
-                ? "bg-stone-100 text-slate-600"
+                ? "bg-slate-100 text-slate-600"
                 : filled === total
                 ? "bg-green-50 text-green-800"
                 : "bg-amber-50 text-amber-800"
@@ -70,7 +70,7 @@ export function StructuredBlockEditor({
       </button>
 
       {open && (
-        <div className="px-6 pb-6 pt-2 space-y-4 border-t border-stone-100">
+        <div className="px-6 pb-6 pt-2 space-y-4 border-t border-slate-100">
           {schema.fields.map((field) => (
             <FieldRow
               key={field.key}
@@ -121,7 +121,7 @@ function FieldRenderer({
   onChange: (v: unknown) => void;
 }) {
   const inputCls =
-    "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
+    "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
 
   switch (type.kind) {
     case "text":

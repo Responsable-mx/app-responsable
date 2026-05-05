@@ -45,7 +45,7 @@ export function ClientServicesTab({ clientId }: { clientId: string }) {
     return (
       <div className="space-y-2">
         {[1, 2].map((i) => (
-          <div key={i} className="skeleton h-20 rounded-xl" />
+          <div key={i} className="skeleton h-20 rounded" />
         ))}
       </div>
     );
@@ -73,7 +73,7 @@ export function ClientServicesTab({ clientId }: { clientId: string }) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="bg-white border border-stone-200 rounded-xl p-12 text-center">
+        <div className="bg-white border border-slate-200 rounded p-12 text-center">
           <div className="text-3xl mb-3">📋</div>
           <p className="text-sm text-slate-600 mb-1">Sin servicios aún</p>
           <p className="text-xs text-slate-600 mb-5 max-w-sm mx-auto">
@@ -95,7 +95,7 @@ export function ClientServicesTab({ clientId }: { clientId: string }) {
             return (
               <div
                 key={r.id}
-                className="bg-white border border-stone-200 rounded-xl p-4 hover:border-brand-primary transition-colors group"
+                className="bg-white border border-slate-200 rounded p-4 hover:border-brand-primary transition-colors group"
               >
                 <div className="flex items-start gap-3">
                   <div

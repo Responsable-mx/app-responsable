@@ -21,8 +21,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary:
     "bg-brand-primary hover:bg-brand-primary-hover text-white shadow-sm",
   secondary:
-    "bg-white hover:bg-stone-50 text-brand-primary-dark border border-stone-300",
-  ghost: "bg-transparent hover:bg-stone-100 text-brand-primary-dark",
+    "bg-white hover:bg-slate-50 text-brand-primary-dark border border-slate-300",
+  ghost: "bg-transparent hover:bg-slate-100 text-brand-primary-dark",
   destructive:
     "bg-brand-berry hover:bg-brand-berry-hover text-white shadow-sm",
 };

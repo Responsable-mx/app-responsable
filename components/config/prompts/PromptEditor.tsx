@@ -112,7 +112,7 @@ export function PromptEditor({
   const detail = data.data;
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-6">
+    <div className="bg-white border border-slate-200 rounded p-6">
       <div className="flex items-start justify-between mb-3 gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">
@@ -150,7 +150,7 @@ export function PromptEditor({
           setDraft(e.target.value);
           setDirty(e.target.value !== detail.content);
         }}
-        className="w-full h-[520px] px-4 py-3 border border-stone-300 rounded-lg font-mono text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+        className="w-full h-[520px] px-4 py-3 border border-slate-300 rounded-lg font-mono text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-brand-primary"
         spellCheck={false}
       />
       <div className="mt-1 text-[10px] text-slate-600">
@@ -173,7 +173,7 @@ export function PromptEditor({
         <button
           onClick={save}
           disabled={!dirty || saving || draft.trim().length < 10}
-          className="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-medium rounded-lg disabled:bg-stone-300 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-medium rounded-lg disabled:bg-slate-300 disabled:cursor-not-allowed"
         >
           {saving ? "Guardando…" : "Guardar cambios"}
         </button>

@@ -8,8 +8,8 @@ export default function ConfigLayout({
 }) {
   return (
     <ConfigSWRProvider>
-      <div className="flex flex-col h-screen bg-stone-50">
-        <header className="bg-white border-b border-stone-200 px-8 pt-6 pb-0">
+      <div className="flex flex-col h-screen bg-slate-50">
+        <header className="bg-white border-b border-slate-200 px-8 pt-6 pb-0">
           <div className="max-w-6xl mx-auto">
             <div className="text-[10px] text-slate-600 uppercase tracking-wide">
               Admin

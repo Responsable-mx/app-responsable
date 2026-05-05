@@ -104,7 +104,7 @@ export function ExtractSectorModal({
         </p>
         <div className="space-y-4">
           {/* Tabs de fuente */}
-          <div className="flex gap-1 bg-stone-100 p-1 rounded-lg w-fit">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
             {(["url", "text"] as Source[]).map((s) => (
               <button
                 key={s}
@@ -138,7 +138,7 @@ export function ExtractSectorModal({
                   reset();
                 }}
                 placeholder="https://www.heinekenmexico.com"
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
                 autoFocus
               />
               <p className="text-[10px] text-slate-600 mt-1">
@@ -158,7 +158,7 @@ export function ExtractSectorModal({
                 }}
                 rows={8}
                 placeholder="Pega aquí la transcripción de una conversación, descripción del cliente, nota de prensa…"
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-y"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-y"
                 autoFocus
               />
               <p className="text-[10px] text-slate-600 mt-1">
@@ -191,11 +191,11 @@ export function ExtractSectorModal({
 
           {/* Resultado */}
           {result && (
-            <div className="border-t border-stone-100 pt-4 space-y-3 animate-fade-in">
+            <div className="border-t border-slate-100 pt-4 space-y-3 animate-fade-in">
               <div className="flex items-center gap-2 text-xs font-medium text-slate-600 uppercase tracking-wide">
                 ✨ Resultado propuesto
                 {result.cached && (
-                  <span className="bg-stone-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] normal-case">
+                  <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] normal-case">
                     cache hit
                   </span>
                 )}
@@ -220,7 +220,7 @@ export function ExtractSectorModal({
                         {confidencePct}%
                       </span>
                     </div>
-                    <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${confidenceColor} transition-all`}
                         style={{ width: `${confidencePct}%` }}
@@ -239,7 +239,7 @@ export function ExtractSectorModal({
                       <div className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">
                         📄 Cita encontrada
                       </div>
-                      <blockquote className="border-l-2 border-brand-primary pl-3 text-xs text-slate-700 italic bg-stone-50 rounded-r py-2 pr-2">
+                      <blockquote className="border-l-2 border-brand-primary pl-3 text-xs text-slate-700 italic bg-slate-50 rounded-r py-2 pr-2">
                         &ldquo;{result.excerpt}&rdquo;
                       </blockquote>
                     </div>

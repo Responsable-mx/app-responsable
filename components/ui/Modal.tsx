@@ -99,10 +99,10 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col focus:outline-none"
+        className="bg-white rounded shadow-xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-base font-semibold text-brand-primary-dark">
             {title}
           </h2>
@@ -119,7 +119,7 @@ export function Modal({
           {children}
         </div>
         {footer && (
-          <div className="px-5 py-3 bg-stone-50 border-t border-stone-100 flex items-center justify-end gap-2">
+          <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
             {footer}
           </div>
         )}

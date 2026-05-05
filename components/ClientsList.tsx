@@ -2,7 +2,9 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import type { Client } from "@/lib/clients";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 // Saved views: filtros persistidos por usuario en localStorage. Pattern Salesforce
 // "List Views" / Linear "Saved searches". Permite al consultor tener "Mis activos",
@@ -51,14 +53,33 @@ type Row = Pick<
 
 type ViewMode = "cards" | "table";
 
-export function ClientsList({ clients }: { clients: Row[] }) {
+const fetcher = (url: string) =>
+  fetch(url).then((r) => r.json() as Promise<{ data: Row[] }>);
+
+export function ClientsList() {
   const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [newViewName, setNewViewName] = useState("");
+
+  // D-05: debounce 300ms antes de disparar fetch server-side.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const swrKey = debouncedQ
+    ? `/api/clients?q=${encodeURIComponent(debouncedQ)}&limit=200`
+    : "/api/clients?limit=500";
+  const { data: swrData, isLoading } = useSWR(swrKey, fetcher, {
+    revalidateOnFocus: false,
+    keepPreviousData: true,
+  });
+  const clients = swrData?.data ?? [];
 
   // Hidratar vistas guardadas en mount + restaurar última vista activa.
   useEffect(() => {
@@ -313,7 +334,15 @@ export function ClientsList({ clients }: { clients: Row[] }) {
           </select>
         )}
         <div className="text-xs text-slate-600 whitespace-nowrap tabular-nums">
-          {filtered.length} de {clients.length}
+          {isLoading ? (
+            <span className="text-slate-400">Cargando…</span>
+          ) : (
+            <>
+              {filtered.length !== clients.length
+                ? `${filtered.length} de ${clients.length}`
+                : `${clients.length} ${clients.length === 1 ? "cliente" : "clientes"}`}
+            </>
+          )}
         </div>
         <button
           type="button"
@@ -352,14 +381,16 @@ export function ClientsList({ clients }: { clients: Row[] }) {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading && clients.length === 0 ? (
+        <SkeletonList items={6} />
+      ) : filtered.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded p-10 text-center shadow-sm">
           <p className="text-sm text-slate-600">
-            {clients.length === 0
+            {clients.length === 0 && !debouncedQ
               ? "Aún no hay clientes registrados."
               : "Sin resultados para ese filtro."}
           </p>
-          {clients.length === 0 && (
+          {clients.length === 0 && !debouncedQ && (
             <Link
               href="/clientes/nuevo"
               className="inline-block mt-3 px-4 py-2 bg-brand-primary-hover text-white text-sm font-medium rounded hover:bg-brand-primary-dark"

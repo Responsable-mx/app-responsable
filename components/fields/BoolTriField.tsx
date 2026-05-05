@@ -9,7 +9,7 @@ export function BoolTriField({
 }) {
   const v = value === undefined ? null : value;
   return (
-    <div className="flex gap-1 bg-stone-100 rounded-lg p-0.5 text-xs w-fit">
+    <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5 text-xs w-fit">
       <button
         type="button"
         onClick={() => onChange(null)}

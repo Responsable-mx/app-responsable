@@ -73,7 +73,7 @@ export function HistoryPanel({
   const versions = data?.data ?? [];
 
   return (
-    <div className="mb-4 bg-stone-50 border border-stone-200 rounded-lg p-4 max-h-80 overflow-y-auto">
+    <div className="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-4 max-h-80 overflow-y-auto">
       <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2">
         Historial ({versions.length})
       </h3>
@@ -92,7 +92,7 @@ export function HistoryPanel({
           {versions.map((v) => (
             <li
               key={v.id}
-              className="text-xs bg-white rounded border border-stone-200 overflow-hidden"
+              className="text-xs bg-white rounded border border-slate-200 overflow-hidden"
             >
               <div className="flex items-center gap-2 px-2 py-1.5">
                 <span className="font-mono text-slate-600">
@@ -132,12 +132,12 @@ export function HistoryPanel({
                 </button>
               </div>
               {labeling === v.id && (
-                <div className="border-t border-stone-200 px-2 py-1.5 flex gap-2 bg-stone-50">
+                <div className="border-t border-slate-200 px-2 py-1.5 flex gap-2 bg-slate-50">
                   <input
                     value={labelDraft}
                     onChange={(e) => setLabelDraft(e.target.value)}
                     placeholder="Ej: pre-piloto CSRD"
-                    className="flex-1 px-2 py-1 border border-stone-300 rounded text-xs"
+                    className="flex-1 px-2 py-1 border border-slate-300 rounded text-xs"
                   />
                   <button
                     onClick={() => saveLabel(v.id)}
@@ -157,7 +157,7 @@ export function HistoryPanel({
                 </div>
               )}
               {expanded === v.id && (
-                <pre className="border-t border-stone-200 p-2 font-mono text-[10px] whitespace-pre-wrap max-h-60 overflow-y-auto bg-stone-50">
+                <pre className="border-t border-slate-200 p-2 font-mono text-[10px] whitespace-pre-wrap max-h-60 overflow-y-auto bg-slate-50">
                   {v.content}
                 </pre>
               )}

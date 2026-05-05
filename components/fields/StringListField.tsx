@@ -38,7 +38,7 @@ export function StringListField({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border border-stone-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-brand-primary">
+      <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border border-slate-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-brand-primary">
         {list.map((s, i) => (
           <span
             key={`${s}-${i}`}

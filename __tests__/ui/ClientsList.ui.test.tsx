@@ -1,15 +1,8 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ClientsList } from "@/components/ClientsList";
-
-// Cada test arranca con URL limpia para evitar que el useEffect de sincronización
-// de URL lea parámetros ?q= de pruebas anteriores y pre-llene el input.
-beforeEach(() => {
-  window.history.replaceState({}, "", "/");
-  localStorage.clear();
-});
 
 vi.mock("next/link", () => ({
   default: ({
@@ -19,19 +12,47 @@ vi.mock("next/link", () => ({
   }: {
     href: string;
     children: React.ReactNode;
+    [key: string]: unknown;
   }) => <a href={href} {...rest}>{children}</a>,
 }));
 
-const base = (
-  name: string,
-  extras: Partial<{
-    sector: string | null;
-    countries: string[] | null;
-    size: string | null;
-    frameworks: string[] | null;
-    certifications: string[] | null;
-  }> = {}
-) => ({
+// SWR mock: simula filtrado server-side basado en ?q= del key.
+// D-05: la búsqueda es server-side (debounce 300ms → SWR key → /api/clients?q=...).
+// El mock replicate la lógica ilike de Supabase para que los tests sean deterministas.
+type Row = {
+  id: string;
+  name: string;
+  sector: string | null;
+  countries: string[] | null;
+  size: string | null;
+  frameworks: string[] | null;
+  certifications: string[] | null;
+  updated_at: string;
+};
+
+let mockClients: Row[] = [];
+
+vi.mock("swr", () => ({
+  default: (key: string) => {
+    const url = typeof key === "string" ? key : "";
+    const qParam = new URLSearchParams(url.split("?")[1] ?? "").get("q") ?? "";
+    const filtered = qParam
+      ? mockClients.filter((c) => {
+          const q = qParam.toLowerCase();
+          return (
+            c.name.toLowerCase().includes(q) ||
+            (c.frameworks ?? []).some((f) => f.toLowerCase().includes(q)) ||
+            (c.certifications ?? []).some((cert) =>
+              cert.toLowerCase().includes(q)
+            )
+          );
+        })
+      : mockClients;
+    return { data: { data: filtered }, isLoading: false };
+  },
+}));
+
+const base = (name: string, extras: Partial<Row> = {}): Row => ({
   id: name.toLowerCase().replace(/\s/g, "-"),
   name,
   sector: extras.sector ?? null,
@@ -42,77 +63,81 @@ const base = (
   updated_at: "2026-04-01T00:00:00Z",
 });
 
+beforeEach(() => {
+  vi.useFakeTimers();
+  window.history.replaceState({}, "", "/");
+  localStorage.clear();
+  mockClients = [];
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("ClientsList", () => {
   it("renderiza empty state cuando no hay clientes", () => {
-    render(<ClientsList clients={[]} />);
+    mockClients = [];
+    render(<ClientsList />);
     expect(screen.getByText(/Aún no hay clientes/i)).toBeTruthy();
   });
 
-  it("renderiza lista y muestra contador", () => {
-    render(
-      <ClientsList
-        clients={[
-          base("Heineken", { sector: "Bebidas" }),
-          base("IKEA", { sector: "Retail" }),
-        ]}
-      />
-    );
+  it("renderiza lista con clientes y muestra contador total", () => {
+    mockClients = [
+      base("Heineken", { sector: "Bebidas" }),
+      base("IKEA", { sector: "Retail" }),
+    ];
+    render(<ClientsList />);
     expect(screen.getByText("Heineken")).toBeTruthy();
     expect(screen.getByText("IKEA")).toBeTruthy();
-    expect(screen.getByText(/2 de 2/)).toBeTruthy();
+    expect(screen.getByText(/2 clientes/)).toBeTruthy();
   });
 
-  it("filtra por nombre al escribir en el buscador", async () => {
-    const user = userEvent.setup();
-    render(
-      <ClientsList
-        clients={[base("Heineken"), base("IKEA"), base("Sanofi")]}
-      />
-    );
+  it("filtra por nombre (server-side debounce 300ms)", async () => {
+    mockClients = [base("Heineken"), base("IKEA"), base("Sanofi")];
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ClientsList />);
     const input = screen.getByPlaceholderText(/Buscar/i);
     await user.type(input, "ike");
+    // Avanzar debounce para que SWR key cambie a ?q=ike
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
     expect(screen.queryByText("Heineken")).toBeNull();
     expect(screen.getByText("IKEA")).toBeTruthy();
     expect(screen.queryByText("Sanofi")).toBeNull();
-    expect(screen.getByText(/1 de 3/)).toBeTruthy();
+    expect(screen.getByText(/1 cliente/)).toBeTruthy();
   });
 
   it("filtra por framework reportado", async () => {
-    const user = userEvent.setup();
-    render(
-      <ClientsList
-        clients={[
-          base("Heineken", { frameworks: ["gri", "sbti"] }),
-          base("IKEA", { frameworks: ["issb"] }),
-        ]}
-      />
-    );
+    mockClients = [
+      base("Heineken", { frameworks: ["gri", "sbti"] }),
+      base("IKEA", { frameworks: ["issb"] }),
+    ];
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ClientsList />);
     await user.type(screen.getByPlaceholderText(/Buscar/i), "sbti");
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
     expect(screen.getByText("Heineken")).toBeTruthy();
     expect(screen.queryByText("IKEA")).toBeNull();
   });
 
   it("muestra filtro por sector cuando hay >1 sector", () => {
-    render(
-      <ClientsList
-        clients={[
-          base("A", { sector: "Bebidas" }),
-          base("B", { sector: "Retail" }),
-        ]}
-      />
-    );
+    mockClients = [
+      base("A", { sector: "Bebidas" }),
+      base("B", { sector: "Retail" }),
+    ];
+    render(<ClientsList />);
     expect(screen.getByText(/Todos los sectores/i)).toBeTruthy();
   });
 
   it("no muestra filtro de sector cuando todos son el mismo", () => {
-    render(
-      <ClientsList
-        clients={[
-          base("A", { sector: "Bebidas" }),
-          base("B", { sector: "Bebidas" }),
-        ]}
-      />
-    );
+    mockClients = [
+      base("A", { sector: "Bebidas" }),
+      base("B", { sector: "Bebidas" }),
+    ];
+    render(<ClientsList />);
     expect(screen.queryByText(/Todos los sectores/i)).toBeNull();
   });
 });

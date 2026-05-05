@@ -99,7 +99,7 @@ export function ItemEditor({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           disabled={item?.is_system === true}
-          className="font-mono text-xs disabled:bg-stone-50"
+          className="font-mono text-xs disabled:bg-slate-50"
           placeholder="Se autogenera desde el label"
         />
         <Input
@@ -120,7 +120,7 @@ export function ItemEditor({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="rounded-lg border border-stone-300 px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
             placeholder="Ayuda al consultor a entender cuándo elegir este valor."
           />
         </div>

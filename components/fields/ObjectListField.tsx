@@ -48,7 +48,7 @@ export function ObjectListField({
       {list.map((item, idx) => (
         <div
           key={idx}
-          className="bg-stone-50 border border-stone-200 rounded-lg p-3 relative"
+          className="bg-slate-50 border border-slate-200 rounded-lg p-3 relative"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] uppercase tracking-wide text-slate-600">
@@ -90,7 +90,7 @@ export function ObjectListField({
         type="button"
         onClick={add}
         disabled={maxItems !== undefined && list.length >= maxItems}
-        className="text-xs px-3 py-1.5 border border-dashed border-stone-300 rounded-lg text-slate-600 hover:bg-stone-50 disabled:opacity-50"
+        className="text-xs px-3 py-1.5 border border-dashed border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50"
       >
         + Agregar {itemLabel}
       </button>
@@ -108,7 +108,7 @@ function SubFieldRenderer({
   onChange: (v: unknown) => void;
 }) {
   const inputCls =
-    "w-full px-2 py-1.5 border border-stone-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
+    "w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white";
 
   switch (type.kind) {
     case "text":

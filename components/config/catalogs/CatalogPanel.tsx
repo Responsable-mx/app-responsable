@@ -91,7 +91,7 @@ export function CatalogPanel({ category }: { category: Category }) {
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-6">
+    <div className="bg-white border border-slate-200 rounded p-6">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">
@@ -143,7 +143,7 @@ export function CatalogPanel({ category }: { category: Category }) {
             items={items.map((i) => i.id)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="divide-y divide-stone-100">
+            <div className="divide-y divide-slate-100">
               <div className="grid grid-cols-[24px_1fr_120px_100px_80px_80px] gap-3 items-center text-[10px] uppercase tracking-wide text-slate-600 pb-2">
                 <span></span>
                 <span>Label · valor</span>

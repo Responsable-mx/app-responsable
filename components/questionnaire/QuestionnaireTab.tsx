@@ -97,6 +97,9 @@ function WizardEditor({
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
+  // Ref que siempre espeja responses — permite que save() y el flush de unmount
+  // lean el valor más reciente sin depender del closure (D-38 stale closure bug).
+  const responsesRef = useRef<QuestionnaireResponseData>(responses);
   // Optimistic concurrency: trackeamos updated_at del último response server-side.
   // El PATCH lo manda como expectedUpdatedAt; si otro consultor escribió en el medio
   // el server retorna 409 y reload manual.
@@ -108,6 +111,12 @@ function WizardEditor({
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progress = useMemo(() => computeProgress(schema, responses), [schema, responses]);
+
+  // D-38: mantener ref siempre actualizado para que save() y el flush de unmount
+  // lean la versión más reciente sin depender del closure estale de useState.
+  useEffect(() => {
+    responsesRef.current = responses;
+  }, [responses]);
 
   if (!isWizard) {
     return (
@@ -175,9 +184,10 @@ function WizardEditor({
     dirty.current = false;
     setSaveState("saving");
     setErrorMsg(null);
-    // FIX bug AI fill: usar override si viene (responses fresco del setState batch).
-    // Sin esto, save() captura el closure viejo y guarda data sin los campos IA.
-    const responsesToSave = overrideResponses ?? responses;
+    // D-38: usar ref para evitar stale closure — responsesRef siempre tiene el valor
+    // más reciente aunque save() se llame desde un closure viejo (autosave timer,
+    // retry, o flush de unmount).
+    const responsesToSave = overrideResponses ?? responsesRef.current;
     const computedProgress = computeProgress(schema, responsesToSave);
     const completedSections = steps
       .filter((s) => (computedProgress.sectionProgress[s.key]?.pct === 100 && s.fields.length > 0))
@@ -352,7 +362,29 @@ function WizardEditor({
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       if (retryTimer.current) clearTimeout(retryTimer.current);
+      // D-38: flush inmediato al desmontar (ej. cambio de tab antes de que expire
+      // el debounce de 1.2s). keepalive=true permite que el fetch complete aunque
+      // el componente ya no esté montado.
+      if (dirty.current) {
+        const snap = responsesRef.current;
+        const prog = computeProgress(schema, snap);
+        const completedSections = steps
+          .filter((s) => prog.sectionProgress[s.key]?.pct === 100 && s.fields.length > 0)
+          .map((s) => s.key);
+        void fetch(`/api/clients/${clientId}/questionnaire`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            service: template.service_key,
+            responses: snap,
+            completedSections,
+            expectedUpdatedAt: lastServerUpdatedAt.current,
+          }),
+          keepalive: true,
+        });
+      }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-trigger bulk AI fill al montar (cuando viene de /clientes/nuevo con &autoFill=1)
@@ -711,7 +743,7 @@ function FieldRow({
   onOpenDrawer: () => void;
 }) {
   const chip = SOURCE_CHIP[sourceType];
-  const baseInput = "w-full border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary";
+  const baseInput = "font-sans w-full border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary";
 
   return (
     <div className="px-4 py-3 hover:bg-slate-50/50 transition-colors">
@@ -942,13 +974,13 @@ function SourceDrawer({
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Agregar fuente</p>
             <div className="space-y-2">
               <div>
-                <input type="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} className={`w-full border rounded px-2 py-1.5 text-xs ${url && !isValidUrl ? "border-rose-400 bg-rose-50" : "border-slate-300"}`} />
+                <input type="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} className={`font-sans w-full border rounded px-2 py-1.5 text-xs ${url && !isValidUrl ? "border-rose-400 bg-rose-50" : "border-slate-300"}`} />
                 {url && !isValidUrl && (
                   <p className="text-[10px] text-rose-600 mt-0.5">La URL debe iniciar con https:// o http://</p>
                 )}
               </div>
-              <input type="text" placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs" />
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs" />
+              <input type="text" placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} className="font-sans w-full border border-slate-300 rounded px-2 py-1.5 text-xs" />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="font-sans w-full border border-slate-300 rounded px-2 py-1.5 text-xs" />
               <Button variant="primary" size="sm" onClick={handleAdd} disabled={!url || !title || !isValidUrl}>+ Agregar</Button>
             </div>
           </div>

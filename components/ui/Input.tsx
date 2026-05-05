@@ -38,7 +38,7 @@ export function Input({
         id={autoId}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={describedBy}
-        className={`rounded-lg border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent ${error ? "border-brand-berry" : "border-stone-300"} ${className}`}
+        className={`rounded-lg border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent ${error ? "border-brand-berry" : "border-slate-300"} ${className}`}
         {...rest}
       />
       {error ? (

@@ -278,17 +278,31 @@ const DEV_SEED_CLIENTS: Client[] = [
   },
 ];
 
-export function listClients(): Promise<Client[]> {
+export function listClients(filter?: {
+  search?: string;
+  limit?: number;
+}): Promise<Client[]> {
   return withDevModeFallback<Client[]>({
     kind: "read",
     fallback: DEV_SEED_CLIENTS,
     async run() {
       const admin = createAdminClient();
-      const { data, error } = await admin
+      // Tipado: Supabase builder cambia tipo en cada encadenamiento — usamos any
+      // para evitar dance de genéricos complejos. La query sigue siendo segura
+      // porque los métodos son los mismos; solo varía el orden de .ilike().
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q: any = admin
         .from("clients")
         .select(ALL_COLUMNS)
         .order("updated_at", { ascending: false })
-        .limit(500);
+        .limit(filter?.limit ?? 500);
+      const term = filter?.search?.trim();
+      if (term) {
+        // ilike en Postgres: case-insensitive, sin índice full-text.
+        // Para <1000 clientes es suficiente; índice GIN si escala.
+        q = q.ilike("name", `%${term}%`);
+      }
+      const { data, error } = await q;
       if (error) throw new Error(`listClients: ${error.message}`);
       return (data ?? []) as unknown as Client[];
     },

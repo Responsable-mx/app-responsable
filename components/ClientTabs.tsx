@@ -128,7 +128,7 @@ export function ClientTabs({
   return (
     <div>
       {/* KPI cards en una sola línea: solo métricas reales (no inventar placeholders). */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
         <KpiCardLarge
           label="Cuestionario"
           value={pctCuestionario === null ? "—" : `${pctCuestionario}`}
@@ -288,6 +288,7 @@ export function ClientTabs({
                 },
               ]}
               initialClientId={client.id}
+              clientLocked
             />
           </div>
         </TabErrorBoundary>
@@ -358,33 +359,35 @@ function KpiCardLarge({
             ? "border-l-slate-300"
             : "border-l-slate-400";
   return (
-    <div className={`bg-white border border-slate-200 ${accentClass} border-l-4 rounded p-4 shadow-sm`}>
-      <div className="flex items-start justify-between mb-2">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+    <div className={`bg-white border border-slate-200 ${accentClass} border-l-4 rounded px-3 py-2.5 shadow-sm flex items-center justify-between gap-3`}>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
           {label}
         </p>
-        {rightBadge && (
-          <span
-            className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded-sm px-1.5 py-0.5 ${
-              rightBadge.tone === "success"
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-amber-50 text-amber-700"
-            }`}
-          >
-            {rightBadge.tone === "success" && (
-              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            {rightBadge.label}
+        <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+          <span className={`text-xl font-bold tabular-nums tracking-tight leading-none ${valueClass}`}>
+            {value}
           </span>
-        )}
+          {unit && <span className="text-xs font-medium text-slate-500">{unit}</span>}
+          {sub && <span className="text-[11px] text-slate-500">{sub}</span>}
+        </div>
       </div>
-      <p className={`text-[28px] font-bold tabular-nums tracking-tight leading-none ${valueClass}`}>
-        {value}
-        {unit && <span className="text-sm font-medium ml-1 text-slate-500">{unit}</span>}
-      </p>
-      {sub && <p className="text-[11px] text-slate-600 mt-1">{sub}</p>}
+      {rightBadge && (
+        <span
+          className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded-sm px-1.5 py-0.5 shrink-0 ${
+            rightBadge.tone === "success"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          {rightBadge.tone === "success" && (
+            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {rightBadge.label}
+        </span>
+      )}
     </div>
   );
 }

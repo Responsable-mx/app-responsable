@@ -39,17 +39,17 @@ export function HelpMenu() {
       <button
         onClick={() => setOpen((s) => !s)}
         aria-label="Ayuda"
-        className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-stone-50 hover:text-slate-900 transition-colors"
+        className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
       >
         <IconHelp className="w-[18px] h-[18px] text-slate-600 group-hover:text-slate-600" />
         <span>Ayuda</span>
       </button>
 
       {open && (
-        <div className="absolute left-full bottom-0 ml-2 w-72 bg-white rounded-xl shadow-lg border border-stone-200 py-1.5 z-50 animate-fade-in">
+        <div className="absolute left-full bottom-0 ml-2 w-72 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 animate-fade-in">
           <button
             onClick={runChatTour}
-            className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-stone-50 flex items-start gap-2.5"
+            className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-start gap-2.5"
           >
             <IconTarget className="w-4 h-4 mt-0.5 shrink-0 text-brand-primary-hover" />
             <div>
@@ -62,7 +62,7 @@ export function HelpMenu() {
           <a
             href="mailto:soporte@responsable.net?subject=App ResponSable — Problema"
             onClick={() => setOpen(false)}
-            className="block px-3 py-2.5 text-sm text-slate-700 hover:bg-stone-50 flex items-start gap-2.5"
+            className="block px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-start gap-2.5"
           >
             <IconMail className="w-4 h-4 mt-0.5 shrink-0 text-indigo-700" />
             <div>
@@ -72,7 +72,7 @@ export function HelpMenu() {
               </div>
             </div>
           </a>
-          <div className="px-3 pt-2 pb-1 text-[10px] text-slate-600 border-t border-stone-100 mt-1">
+          <div className="px-3 pt-2 pb-1 text-[10px] text-slate-600 border-t border-slate-100 mt-1">
             App ResponSable · Consultoría en sostenibilidad con IA
           </div>
         </div>

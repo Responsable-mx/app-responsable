@@ -383,7 +383,7 @@ export function ClientForm(props: Props) {
         <button
           type="submit"
           disabled={saving || !form.name.trim()}
-          className="px-5 py-2.5 bg-brand-primary-hover text-white rounded-lg text-sm font-medium hover:bg-brand-primary-dark disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
+          className="px-5 py-2.5 bg-brand-primary-hover text-white rounded-lg text-sm font-medium hover:bg-brand-primary-dark disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
         >
           {saving
             ? "Guardando..."
@@ -428,7 +428,7 @@ export function ClientForm(props: Props) {
 }
 
 const inputCls =
-  "w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
+  "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
 
 function Section({
   title,
@@ -438,7 +438,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-6 space-y-4">
+    <div className="bg-white border border-slate-200 rounded p-6 space-y-4">
       <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
         {title}
       </h2>
@@ -495,7 +495,7 @@ function BoolFieldInline({
             value={urlValue ?? ""}
             onChange={(e) => onUrlChange(e.target.value)}
             placeholder="https:// …  o liga al PDF"
-            className="w-full px-2 py-1.5 border border-stone-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary"
           />
         </div>
       )}

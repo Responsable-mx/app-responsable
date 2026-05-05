@@ -62,7 +62,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-50">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-full max-w-sm mx-4">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-primary-hover text-white font-bold text-2xl mb-3">
@@ -74,7 +74,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
+        <div className="bg-white rounded shadow-sm border border-slate-200 p-6">
           {step === "email" && (
             <form onSubmit={handleSendOtp}>
               <h2 className="text-lg font-semibold text-slate-900 mb-1">
@@ -136,7 +136,7 @@ export default function LoginPage() {
                 maxLength={6}
                 aria-invalid={error ? "true" : undefined}
                 aria-describedby={error ? "otp-error" : undefined}
-                className={`w-full px-3 py-2 border rounded-lg text-sm text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent ${error ? "border-brand-berry" : "border-stone-300"}`}
+                className={`w-full px-3 py-2 border rounded-lg text-sm text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent ${error ? "border-brand-berry" : "border-slate-300"}`}
               />
 
               {error && (

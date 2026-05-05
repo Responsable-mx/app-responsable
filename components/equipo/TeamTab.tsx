@@ -316,7 +316,7 @@ function AssignModal({
               id="assign-email-select"
               value={selectedEmail}
               onChange={(e) => setSelectedEmail(e.target.value)}
-              className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              className="font-sans rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
               autoFocus
             >
               <option value="">— Selecciona un consultor —</option>
@@ -336,7 +336,7 @@ function AssignModal({
             id="assign-seniority-select"
             value={seniorityLevel}
             onChange={(e) => setSeniorityLevel(e.target.value)}
-            className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="font-sans rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
           >
             <option value="">— Usar nivel global del consultor —</option>
             {seniorityItems.map((s) => (
@@ -428,7 +428,7 @@ function EditSeniorityModal({
             id="edit-seniority-select"
             value={seniorityLevel}
             onChange={(e) => setSeniorityLevel(e.target.value)}
-            className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="font-sans rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
             autoFocus
           >
             <option value="">— Usar nivel global del consultor —</option>

@@ -64,7 +64,7 @@ export function Row({
         className={`text-xs px-2 py-0.5 rounded-full w-fit ${
           item.is_active
             ? "bg-green-50 text-green-800"
-            : "bg-stone-100 text-slate-600"
+            : "bg-slate-100 text-slate-600"
         }`}
       >
         {item.is_active ? "Activo" : "Inactivo"}
@@ -84,7 +84,7 @@ export function Row({
       <div className="flex items-center justify-end gap-1">
         <button
           onClick={onEdit}
-          className="text-xs px-2 py-1 text-slate-700 hover:bg-stone-50 rounded"
+          className="text-xs px-2 py-1 text-slate-700 hover:bg-slate-50 rounded"
         >
           ✎ Editar
         </button>

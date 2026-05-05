@@ -5,19 +5,26 @@ import { ClientInputSchema } from "@/lib/validation";
 import { upsertQuestionnaireResponse } from "@/lib/questionnaires/queries";
 import type { FieldResponse, QuestionnaireResponseData, SourceItem } from "@/lib/questionnaires/types";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
+  const url = new URL(req.url);
+  const search = url.searchParams.get("q") ?? undefined;
+  const rawLimit = Number(url.searchParams.get("limit"));
+  const limit = rawLimit > 0 && rawLimit <= 1000 ? rawLimit : 500;
+
   try {
-    const data = await listClients();
+    const data = await listClients({ search, limit });
     return NextResponse.json(
       { data },
       {
         headers: {
-          // Lista cambia ocasionalmente; 60s con SWR de 5 min es suficiente
-          // para que el dropdown del chat no re-fetchee en cada turno.
-          "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+          // Búsqueda activa: no cachear para resultados frescos.
+          // Sin búsqueda: 60s con stale-while-revalidate para dropdown del chat.
+          "Cache-Control": search
+            ? "private, no-store"
+            : "private, max-age=60, stale-while-revalidate=300",
         },
       }
     );

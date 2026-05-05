@@ -29,7 +29,7 @@ export function PromptsManager() {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 bg-stone-100 p-1 rounded-lg mb-4">
+      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg mb-4">
         {PROMPT_KEYS.map((k) => {
           const m = meta.data?.data.find((x) => x.key === k);
           const isActive = active === k;

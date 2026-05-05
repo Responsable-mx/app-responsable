@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { listClients } from "@/lib/clients";
 import { ClientsList } from "@/components/ClientsList";
 
-export const dynamic = "force-dynamic";
-
-export default async function ClientesPage() {
-  const clients = await listClients().catch(() => []);
-
+// D-05: búsqueda server-side. La página ya no carga todos los clientes en el servidor;
+// ClientsList usa SWR con debounce 300ms → /api/clients?q=... para filtrar en Supabase.
+// Beneficios: tiempo de carga inicial < 200ms (no DB call), búsqueda escala sin límite.
+export default function ClientesPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-end justify-between mb-5 pb-4 border-b border-slate-200">
@@ -16,7 +14,6 @@ export default async function ClientesPage() {
           </p>
           <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
           <p className="text-sm text-slate-600 mt-0.5">
-            {clients.length} {clients.length === 1 ? "cliente" : "clientes"} ·
             Todos los consultores pueden ver y editar.
           </p>
         </div>
@@ -31,18 +28,7 @@ export default async function ClientesPage() {
         </Link>
       </div>
 
-      <ClientsList
-        clients={clients.map((c) => ({
-          id: c.id,
-          name: c.name,
-          sector: c.sector,
-          countries: c.countries,
-          size: c.size,
-          updated_at: c.updated_at,
-          frameworks: c.frameworks,
-          certifications: c.certifications,
-        }))}
-      />
+      <ClientsList />
     </div>
   );
 }

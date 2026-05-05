@@ -37,7 +37,13 @@ const SOURCE_CHIP: Record<SourceType, { dot: string; bg: string; text: string; l
   consultor_only: { dot: "bg-slate-400", bg: "bg-slate-50 border-slate-200", text: "text-slate-600", label: "solo consultor" },
 };
 
-export function QuestionnaireTab({ clientId }: { clientId: string }) {
+export function QuestionnaireTab({
+  clientId,
+  initialStepIndex = 0,
+}: {
+  clientId: string;
+  initialStepIndex?: number;
+}) {
   const { data, error, isLoading, mutate } = useSWR(
     `/api/clients/${clientId}/questionnaire`,
     fetcher
@@ -55,17 +61,19 @@ export function QuestionnaireTab({ clientId }: { clientId: string }) {
     );
   }
 
-  return <WizardEditor clientId={clientId} initial={data.data} mutate={() => mutate()} />;
+  return <WizardEditor clientId={clientId} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} />;
 }
 
 function WizardEditor({
   clientId,
   initial,
   mutate,
+  initialStepIndex = 0,
 }: {
   clientId: string;
   initial: QuestionnaireBundle;
   mutate: () => void;
+  initialStepIndex?: number;
 }) {
   const { template } = initial;
   const schema = template.schema;
@@ -75,7 +83,7 @@ function WizardEditor({
   const [responses, setResponses] = useState<QuestionnaireResponseData>(
     initial.response?.responses ?? {}
   );
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(Math.min(Math.max(0, initialStepIndex), steps.length - 1 || 0));
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [drawerField, setDrawerField] = useState<{ stepKey: string; fieldKey: string } | null>(null);

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser } from "@/lib/auth";
+import { getClient } from "@/lib/clients";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import {
+  getFieldValue,
+  isFieldResponse,
   isWizardSchema,
   type FieldResponse,
   type WizardStep,
@@ -40,25 +43,80 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     .map((f) => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ""}`)
     .join("\n");
 
-  const systemPrompt = `Eres un consultor experto de ResponSable que ayuda a llenar cuestionarios de Doble Materialidad para clientes corporativos en México.
+  const systemPrompt = `Eres un consultor de ResponSable llenando cuestionario de Doble Materialidad para cliente corporativo en México.
 
-Tu tarea: llenar los campos del paso "${step.title}" del cuestionario, usando información pública o interpretación basada en el contexto del cliente.
+REGLAS OPERATIVAS (Cuestionario_Contexto_Negocio.md):
 
-Para cada campo retorna:
-- value: el contenido que llena el campo (string, máximo 500 caracteres por campo)
-- source_type: "public" si es dato verificable público, "interpretation" si es inferencia/análisis tuyo, "consultor_only" si requiere input del consultor
-- sources: arreglo de {url, title, date (YYYY-MM-DD)} con fuentes públicas relevantes (puede ser vacío)
+1. **Llenar máximo posible** con datos públicos verificables. No autolimitarse.
+2. **No inventar datos.** Si no existe fuente pública verificable → value: null y source_type: "consultor_only" con nota "Pendiente — requiere input del asesor / cliente".
+3. **No interpretar en campos verdes (público).** Solo hechos verificables, no opiniones, juicios ni síntesis.
+4. **Citar fuente con URL completa en cada dato verde.** Sin URL, el dato no se queda. Filtro contra alucinaciones.
+5. **Interpretaciones (amarillo) con disclaimer.** Iniciar value con "Basado en información pública disponible — sujeto a validación del asesor." y citar fuentes que sustentan el juicio.
+6. **Campos rojos (solo asesor/cliente)**: NO rellenar. value: null, source_type: "consultor_only".
+7. **Fuente >2 años**: agregar al final del value "(Fuente con más de 2 años — verificar vigencia con el cliente.)"
+8. **Diferenciar reportado vs real**: si es dato de informe público, indicar "Reportado en informe público — el asesor confirma datos internos no reportados."
 
-Si no tienes información suficiente para un campo, marca value como null y source_type como "consultor_only".
+FUENTES PERMITIDAS (públicas verificables):
+- Sitio corporativo del cliente
+- LinkedIn de la empresa
+- Informes de sostenibilidad públicos
+- Registros regulatorios (SEMARNAT, PROFEPA, INAI, CONDUSEF, COFECE, BMV, SAT)
+- Prensa profesional (Reforma, Expansión, El Economista, Bloomberg LATAM)
+- Asociaciones sectoriales (CANACAR, CANAINTRA, CONCAMIN)
+- Bases ESG (CDP, GRI Database)
 
-Retorna SOLO un JSON válido con la estructura: { "campo_key": { "value": "...", "source_type": "...", "sources": [...] }, ... }`;
+PARA CADA CAMPO retorna:
+- value: contenido (string máx 500 chars) o null
+- source_type: "public" | "interpretation" | "consultor_only"
+- sources: [{url, title, date (YYYY-MM-DD)}] — vacío si consultor_only
 
-  const userPrompt = `Cliente con ID ${id}.
+Retorna SOLO JSON válido sin texto extra:
+{ "campo_key": { "value": "...", "source_type": "...", "sources": [{"url":"...","title":"...","date":"YYYY-MM-DD"}] }, ... }`;
 
-Campos a llenar (paso "${step.title}" — ${step.subtitle}):
+  // Contexto del cliente desde DB + pasos previos llenos
+  const client = await getClient(id).catch(() => null);
+  const contextLines: string[] = [];
+  if (client) {
+    contextLines.push(`Nombre: ${client.name}`);
+    if (client.sector) contextLines.push(`Sector: ${client.sector}`);
+    if (client.subsector) contextLines.push(`Subsector: ${client.subsector}`);
+    if (client.countries?.length) contextLines.push(`Países: ${client.countries.join(", ")}`);
+    if (client.size) contextLines.push(`Tamaño: ${client.size}`);
+  }
+  // Respuestas previas llenas (para no duplicar trabajo)
+  const previousResponses = bundle.response?.responses ?? {};
+  const previousLines: string[] = [];
+  if (isWizardSchema(bundle.template.schema)) {
+    for (const prevStep of bundle.template.schema.steps) {
+      if (prevStep.key === stepKey) break;
+      const stepResp = (previousResponses[prevStep.key] as Record<string, unknown> | undefined) ?? {};
+      const filledFields: string[] = [];
+      for (const field of prevStep.fields) {
+        const raw = stepResp[field.key];
+        if (isFieldResponse(raw) && raw.value !== null) {
+          const v = String(getFieldValue(raw)).slice(0, 200);
+          filledFields.push(`  ${field.label}: ${v}`);
+        }
+      }
+      if (filledFields.length > 0) {
+        previousLines.push(`\n[Paso previo: ${prevStep.title}]`);
+        previousLines.push(...filledFields);
+      }
+    }
+  }
+
+  const userPrompt = `Cliente: ${client?.name ?? id}
+
+CONTEXTO YA CAPTURADO:
+${contextLines.length ? contextLines.join("\n") : "(sin datos básicos)"}
+${previousLines.join("\n")}
+
+PASO ACTUAL: ${step.title} — ${step.subtitle}
+
+Campos a llenar:
 ${fieldsList}
 
-Retorna el JSON.`;
+Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"} y retorna el JSON con los campos llenos siguiendo las 8 reglas operativas. No inventes URLs.`;
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
 import { QuestionnaireTab } from "@/components/questionnaire/QuestionnaireTab";
@@ -30,7 +31,20 @@ const materialityFetcher = (url: string) =>
   });
 
 export function ClientTabs({ client, completeness }: Props) {
-  const [tab, setTab] = useState<Tab>("resumen");
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
+  const [tab, setTab] = useState<Tab>(
+    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad"
+      ? initialTab
+      : "resumen"
+  );
+
+  useEffect(() => {
+    const t = searchParams?.get("tab");
+    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad") {
+      setTab(t);
+    }
+  }, [searchParams]);
   const { data: questionnaireResp } = useSWR(
     `/api/clients/${client.id}/questionnaire`,
     questionnaireFetcher
@@ -166,7 +180,16 @@ export function ClientTabs({ client, completeness }: Props) {
           onJumpToCuestionario={() => setTab("cuestionario")}
         />
       )}
-      {tab === "cuestionario" && <QuestionnaireTab clientId={client.id} />}
+      {tab === "cuestionario" && (
+        <QuestionnaireTab
+          clientId={client.id}
+          initialStepIndex={(() => {
+            const s = searchParams?.get("step");
+            const n = s ? parseInt(s, 10) - 1 : 0;
+            return isNaN(n) || n < 0 ? 0 : n;
+          })()}
+        />
+      )}
       {tab === "materialidad" && <MaterialityTab clientId={client.id} />}
       {tab === "chat" && (
         <div className="border border-slate-200 rounded shadow-sm overflow-hidden bg-white" style={{ height: "min(75vh, 720px)" }}>

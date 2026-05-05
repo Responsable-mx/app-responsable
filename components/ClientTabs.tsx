@@ -3,8 +3,6 @@
 import { useState } from "react";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
-import { ClientForm } from "@/components/ClientForm";
-import { ClientServicesTab } from "@/components/services/ClientServicesTab";
 import { QuestionnaireTab } from "@/components/questionnaire/QuestionnaireTab";
 import { MaterialityTab } from "@/components/materiality/MaterialityTab";
 import { ClientResumen } from "@/components/ClientResumen";
@@ -12,18 +10,12 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 import type { MaterialityTopic } from "@/lib/materiality/types";
 
-type Tab = "resumen" | "contexto" | "servicios" | "cuestionario" | "materialidad" | "chat";
+type Tab = "resumen" | "cuestionario" | "chat" | "materialidad";
 
 type Props = {
   client: Client;
   completeness: { filled: number; total: number };
 };
-
-const servicesFetcher = (url: string) =>
-  fetch(url).then((r) => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<{ data: unknown[] }>;
-  });
 
 const questionnaireFetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -39,10 +31,6 @@ const materialityFetcher = (url: string) =>
 
 export function ClientTabs({ client, completeness }: Props) {
   const [tab, setTab] = useState<Tab>("resumen");
-  const { data: servicesResp } = useSWR(
-    `/api/clients/${client.id}/services`,
-    servicesFetcher
-  );
   const { data: questionnaireResp } = useSWR(
     `/api/clients/${client.id}/questionnaire`,
     questionnaireFetcher
@@ -51,49 +39,26 @@ export function ClientTabs({ client, completeness }: Props) {
     `/api/clients/${client.id}/materiality`,
     materialityFetcher
   );
-  const servicesCount = servicesResp?.data?.length ?? null;
-  const pctContexto = Math.round((completeness.filled / completeness.total) * 100);
-  const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
-  const materialityCount = materialityResp?.data?.length ?? null;
 
-  // Para Chat IA inline: usa completeness ya pasado como prop
-  const ctxCompleteness = completeness;
+  const pctCuestionario = questionnaireResp?.data.progress.pct ?? null;
+  const totalSections = questionnaireResp?.data.template.schema.sections.length ?? 0;
+  const completedSections = questionnaireResp?.data.response?.completed_sections.length ?? 0;
+  const materialityCount = materialityResp?.data?.length ?? null;
+  const materialityValidated = materialityCount; // placeholder: en futuro será # validados
+  const isQuestionnaireComplete = pctCuestionario === 100;
 
   return (
     <div>
-      {/* KPI cards corporate */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <KpiCard
-          label="Contexto"
-          value={`${pctContexto}%`}
-          sub={`${completeness.filled}/${completeness.total} campos`}
-          tone={pctContexto === 100 ? "success" : pctContexto >= 50 ? "primary" : "warn"}
-        />
-        <KpiCard
-          label="Servicios"
-          value={servicesCount === null ? "—" : String(servicesCount)}
-          sub={
-            servicesCount === null
-              ? "Cargando…"
-              : servicesCount === 0
-                ? "Sin servicios"
-                : servicesCount === 1
-                  ? "1 contratado"
-                  : `${servicesCount} contratados`
-          }
-          tone="neutral"
-        />
-        <KpiCard
+      {/* KPI cards: 3 columnas según mockup */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
+        <KpiCardLarge
           label="Cuestionario"
-          value={pctCuestionario === null ? "—" : `${pctCuestionario}%`}
+          value={pctCuestionario === null ? "—" : `${pctCuestionario}`}
+          unit={pctCuestionario === null ? "" : "%"}
           sub={
-            pctCuestionario === null
-              ? "Cargando…"
-              : pctCuestionario === 100
-                ? "Completo"
-                : pctCuestionario === 0
-                  ? "Sin iniciar"
-                  : "En progreso"
+            questionnaireResp?.data
+              ? `${questionnaireResp.data.progress.filledFields}/${questionnaireResp.data.progress.totalFields} campos · ${totalSections} secciones`
+              : "Cargando…"
           }
           tone={
             pctCuestionario === null
@@ -107,80 +72,95 @@ export function ClientTabs({ client, completeness }: Props) {
                     : "neutral"
           }
         />
-        <KpiCard
-          label="Materialidad"
+        <KpiCardLarge
+          label="Matrices materialidad"
           value={materialityCount === null ? "—" : String(materialityCount)}
-          sub={
-            materialityCount === null
-              ? "Cargando…"
-              : materialityCount === 0
-                ? "Sin iniciar"
-                : `${materialityCount} temas`
+          unit={materialityCount === null ? "" : "/20"}
+          sub={null}
+          rightBadge={
+            materialityCount !== null && materialityValidated !== null && materialityValidated > 0
+              ? { label: "Todas validadas", tone: "success" }
+              : null
           }
           tone={
             materialityCount === null
               ? "neutral"
-              : materialityCount === 0
-                ? "neutral"
-                : materialityCount >= 15
-                  ? "success"
-                  : "primary"
+              : materialityCount >= 20
+                ? "success"
+                : materialityCount > 0
+                  ? "primary"
+                  : "neutral"
           }
+        />
+        <KpiCardLarge
+          label="Metodología ResponSable"
+          value="Por definir"
+          unit=""
+          sub="Los pasos de la metodología se definirán con el equipo."
+          rightBadge={{ label: "Placeholder", tone: "warn" }}
+          tone="placeholder"
         />
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-200 mb-5 overflow-x-auto">
+      {/* Tabs: 4 según mockup */}
+      <div className="flex items-center gap-2 border-b border-slate-200 mb-5 overflow-x-auto">
         <TabButton
           active={tab === "resumen"}
           onClick={() => setTab("resumen")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          }
           label="Resumen"
-          badge={null}
-        />
-        <TabButton
-          active={tab === "contexto"}
-          onClick={() => setTab("contexto")}
-          label="Contexto"
-          badge={`${pctContexto}%`}
-        />
-        <TabButton
-          active={tab === "servicios"}
-          onClick={() => setTab("servicios")}
-          label="Servicios"
-          badge={servicesCount === null ? null : String(servicesCount)}
+          badge={
+            questionnaireResp?.data
+              ? `${completedSections}/${totalSections}`
+              : null
+          }
         />
         <TabButton
           active={tab === "cuestionario"}
           onClick={() => setTab("cuestionario")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+          }
           label="Cuestionario"
           badge={pctCuestionario === null ? "…" : `${pctCuestionario}%`}
         />
         <TabButton
-          active={tab === "materialidad"}
-          onClick={() => setTab("materialidad")}
-          label="Materialidad"
-          badge={materialityCount === null ? "…" : String(materialityCount)}
-        />
-        <TabButton
           active={tab === "chat"}
           onClick={() => setTab("chat")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          }
           label="Chat IA"
           badge={null}
+        />
+        <TabButton
+          active={tab === "materialidad"}
+          onClick={() => setTab("materialidad")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+            </svg>
+          }
+          label="Materialidad"
+          badge={materialityCount === null ? "…" : `${materialityCount}/20`}
         />
       </div>
 
       {tab === "resumen" && (
         <ClientResumen
-          client={client}
-          completeness={completeness}
           questionnaire={questionnaireResp?.data ?? null}
-          materialityTopics={materialityResp?.data ?? []}
-          servicesCount={servicesCount}
-          onJumpToTab={(t) => setTab(t)}
+          onJumpToCuestionario={() => setTab("cuestionario")}
         />
       )}
-      {tab === "contexto" && <ClientForm mode="edit" initial={client} />}
-      {tab === "servicios" && <ClientServicesTab clientId={client.id} />}
       {tab === "cuestionario" && <QuestionnaireTab clientId={client.id} />}
       {tab === "materialidad" && <MaterialityTab clientId={client.id} />}
       {tab === "chat" && (
@@ -192,27 +172,44 @@ export function ClientTabs({ client, completeness }: Props) {
                 id: client.id,
                 name: client.name,
                 sector: client.sector,
-                completeness: ctxCompleteness,
+                completeness,
               },
             ]}
             initialClientId={client.id}
           />
         </div>
       )}
+
+      {/* Acceso secundario a Contexto/Servicios */}
+      {tab === "resumen" && (
+        <div className="mt-6 pt-4 border-t border-slate-200 flex items-center gap-3 text-xs text-slate-500">
+          <span className="uppercase tracking-widest font-bold text-[10px] text-slate-400">Avanzado:</span>
+          <a href={`/clientes/${client.id}?legacy=context`} className="hover:text-brand-primary hover:underline">
+            Editar atributos legacy del cliente →
+          </a>
+          <a href={`/clientes/${client.id}?legacy=services`} className="hover:text-brand-primary hover:underline">
+            Servicios contratados →
+          </a>
+        </div>
+      )}
     </div>
   );
 }
 
-function KpiCard({
+function KpiCardLarge({
   label,
   value,
+  unit,
   sub,
   tone,
+  rightBadge,
 }: {
   label: string;
   value: string;
-  sub: string;
+  unit: string;
+  sub: string | null;
   tone: "success" | "primary" | "warn" | "neutral" | "placeholder";
+  rightBadge?: { label: string; tone: "success" | "warn" } | null;
 }) {
   const valueClass =
     tone === "success"
@@ -222,17 +219,46 @@ function KpiCard({
         : tone === "warn"
           ? "text-amber-700"
           : tone === "placeholder"
-            ? "text-slate-300"
+            ? "text-slate-400"
             : "text-slate-900";
-  const borderClass =
-    tone === "placeholder" ? "border-slate-100 bg-slate-50/50" : "border-slate-200 bg-white";
+  const accentClass =
+    tone === "success"
+      ? "border-l-emerald-500"
+      : tone === "primary"
+        ? "border-l-brand-primary"
+        : tone === "warn"
+          ? "border-l-amber-500"
+          : tone === "placeholder"
+            ? "border-l-slate-300"
+            : "border-l-slate-400";
   return (
-    <div className={`border ${borderClass} rounded p-3 shadow-sm`}>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-        {label}
+    <div className={`bg-white border border-slate-200 ${accentClass} border-l-4 rounded p-4 shadow-sm`}>
+      <div className="flex items-start justify-between mb-2">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          {label}
+        </p>
+        {rightBadge && (
+          <span
+            className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded-sm px-1.5 py-0.5 ${
+              rightBadge.tone === "success"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-amber-50 text-amber-700"
+            }`}
+          >
+            {rightBadge.tone === "success" && (
+              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            {rightBadge.label}
+          </span>
+        )}
+      </div>
+      <p className={`text-3xl font-bold tabular-nums ${valueClass}`}>
+        {value}
+        {unit && <span className="text-base font-medium ml-1">{unit}</span>}
       </p>
-      <p className={`text-2xl font-bold mt-1 tabular-nums ${valueClass}`}>{value}</p>
-      <p className="text-[11px] text-slate-600 mt-0.5">{sub}</p>
+      {sub && <p className="text-[11px] text-slate-600 mt-1">{sub}</p>}
     </div>
   );
 }
@@ -240,23 +266,26 @@ function KpiCard({
 function TabButton({
   active,
   onClick,
+  icon,
   label,
   badge,
 }: {
   active: boolean;
   onClick: () => void;
+  icon: React.ReactNode;
   label: string;
   badge: string | null;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-2 text-xs font-bold uppercase tracking-wider border-b-2 -mb-px transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+      className={`px-3 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 -mb-px transition-colors flex items-center gap-1.5 whitespace-nowrap ${
         active
           ? "border-brand-primary text-brand-primary-dark"
           : "border-transparent text-slate-500 hover:text-slate-900"
       }`}
     >
+      <span className={active ? "text-brand-primary-dark" : "text-slate-400"}>{icon}</span>
       {label}
       {badge !== null && (
         <span

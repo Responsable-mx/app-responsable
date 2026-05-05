@@ -95,6 +95,8 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 | `catalog_items` (seniority_levels, frameworks, etc.) | Casi nunca | `revalidate: 86400` (ISR diario) |
 | `client_consultors` (asignaciones consultor↔cliente) | Poco — meses | `revalidate: 3600` |
 | `authorized_users` (lista usuarios + seniority default) | Poco — meses | `revalidate: 3600` |
+| `service_templates` (plantillas etapas/actividades/duraciones) | Poco — días | `revalidate: 3600` (SWR) |
+| Estatus proyectos en vista global Equipo (real vs plan) | Todo el tiempo | sin caché — SWR sin revalidateOnFocus delay |
 
 ### Aplicar migraciones
 - Helper: `node scripts/apply-sql.mjs` (modo paranoico, 17 patrones bloqueados)

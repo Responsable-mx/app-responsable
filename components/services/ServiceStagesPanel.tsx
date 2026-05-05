@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { ActivityEditorModal } from "./ActivityEditorModal";
+import { TemplateActions } from "./TemplateActions";
 import type { ActivityStatus, ServiceStage, StageActivity } from "@/lib/stages";
 
 type ApiResp = { data: ServiceStage[] };
@@ -129,12 +130,19 @@ export function ServiceStagesPanel({
 
   return (
     <div className="border-t border-slate-100 mt-3 pt-3 space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
           Etapas y actividades
         </h4>
         {stages.length === 0 && !isAdmin && (
           <span className="text-[11px] text-slate-500 italic">Sin etapas definidas</span>
+        )}
+        {isAdmin && (
+          <TemplateActions
+            clientServiceId={clientServiceId}
+            hasStages={stages.length > 0}
+            onApplied={() => mutate()}
+          />
         )}
       </div>
 

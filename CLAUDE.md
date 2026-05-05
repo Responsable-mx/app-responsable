@@ -68,6 +68,45 @@ Reglas para `lib/ai/roles.ts buildClientContext`:
 - En UI: pasar el `value` interno solo para queries/filters; mostrar `humanize()` para render visible.
 - Si agregas un campo nuevo de catálogo: agregar humanización en `buildClientContext` y test en `__tests__/lib/roles.test.ts`.
 
+## Design system corporativo B2B — decisiones (may-2026)
+
+Aprobado en sesión de diseño. Clientes son empresas corporativas → UX nivel McKinsey/Salesforce/SAP Fiori.
+
+- **Paleta**: `slate-*` (fría, técnica). Nunca `stone-*` en UI de clientes.
+- **Radio**: `rounded` (4px) para cards y tabs. `rounded-sm` para badges/chips. Nunca `rounded-xl` en contenedores de datos.
+- **Iconos**: SVG monocromo inline. Cero emoji en componentes de UI (excepción: flujo textual del LLM).
+- **Labels**: `uppercase tracking-widest text-[10px] font-bold text-slate-400` — patrón SAP Fiori.
+- **Progress bars**: `h-1` plano, sin `rounded-*` — estilo Salesforce.
+- **Fichas de sección**: left border accent de color (4px) como indicador de status, no fondo pastel.
+- **Tabs**: fondo `slate-50`, tab activo `bg-white + border-brand-primary`, labels uppercase.
+- **Badges en tabs**: progreso visible inline `[100%]` `[5/5]` `[20/20]`.
+- **Shadow**: `shadow-sm` en cards (no `shadow-md`/`shadow-lg`).
+
+## Matriz de Doble Materialidad — patrón BCG/McKinsey
+
+Implementado en `app/dev/app-preview/AppShell.tsx` como referencia canónica.
+
+- **20 temas** posicionados en plano X/Y (materialidad financiera × impacto)
+- **Shape encoding**: ● rose=Doble material, ◆ amber=Material por impacto, ■ teal=Material financiero, ▲ slate=En seguimiento — accesible para daltónicos
+- **Narrative chip**: síntesis automática encima del chart (N temas doble material, riesgo principal)
+- **Filtro por cuadrante**: pills que diman dots no activos (15% opacity) + filtran índice lateral
+- **Índice numerado**: panel derecho con símbolo + nombre truncado, clickable
+- **Popover al click**: nombre, cuadrante, sección → CTA "Ver en Cuestionario" / "Iniciar Chat IA"
+- **Ejes 0–10** con grid lines, dashed midpoint dividers. Sin fondos pastel.
+- **Esc** cierra popover. Touch targets 40×40px.
+
+## Metodología ResponSable — PENDIENTE
+
+El stepper de 5 pasos ("Comprender/Diseñar/Optimizar/Utilizar/Medir") fue **inventado** para el mockup. **No usar** hasta que el equipo defina los pasos reales. Actualmente muestra "Por definir · Placeholder" en la KPI card.
+
+## Chat IA — mejores prácticas (paridad S-Peak App)
+
+Funciones requeridas en el chat de mensajes IA (mismo patrón que S-Peak):
+- **Copiar respuesta**: botón `Copy` en cada mensaje IA (clipboard API)
+- **Calificar**: thumbs up / thumbs down por mensaje (log sin backend en mockup)
+- **Exportar conversación**: download `.txt` o `.md` de la sesión
+- **Retry/Regenerar**: reenviar el último mensaje con el mismo rol
+
 ## Primitives canónicos — `components/ui/`
 
 | Archivo | Propósito |

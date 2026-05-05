@@ -21,7 +21,7 @@ const ROLES: Record<ChatRole, { name: string; dot: string; ring: string; bg: str
 
 const ROLE_ORDER: ChatRole[] = ["aurora", "rebeca", "elena", "valeria"];
 
-type ChatMsg = { from: "user" | "ai" | "system"; role?: ChatRole; text: string; streaming?: boolean };
+type ChatMsg = { from: "user" | "ai" | "system"; role?: ChatRole; text: string; streaming?: boolean; rating?: "up" | "down" };
 
 const INITIAL_MSGS: ChatMsg[] = [
   {
@@ -197,6 +197,45 @@ function ChatSection() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
+  function exportConversation() {
+    const lines: string[] = [`# Conversación — Distribuidora Altamira S.A. de C.V.\n`];
+    msgs.forEach((m) => {
+      if (m.from === "system") lines.push(`> _${m.text}_\n`);
+      else if (m.from === "user") lines.push(`**Consultor:** ${m.text}\n`);
+      else if (m.from === "ai") lines.push(`**${ROLES[m.role ?? "aurora"].name}:** ${m.text}\n`);
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "conversacion-altamira.md"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function retryLastMsg() {
+    if (loading) return;
+    const lastUserIdx = msgs.map((m, i) => (m.from === "user" ? i : -1)).filter((i) => i >= 0).at(-1);
+    if (lastUserIdx === undefined) return;
+    const text = msgs[lastUserIdx].text;
+    setMsgs((m) => m.slice(0, lastUserIdx + 1));
+    setLoading(true);
+    const fullText = `[Regenerado] Basándome en el contexto de Altamira y tu pregunta sobre "${text.slice(0, 40)}…", esta es una respuesta regenerada de ${ROLES[activeRole].name}. En producción, el modelo ${ROLES[activeRole].model} volvería a procesar los 84 campos del cuestionario para darte un análisis actualizado con evidencia trazable.`;
+    setTimeout(() => {
+      setLoading(false);
+      setMsgs((m) => [...m, { from: "ai", role: activeRole, text: "", streaming: true }]);
+      let idx = 0;
+      const tick = Math.max(2, Math.ceil(fullText.length / 40));
+      const iv = setInterval(() => {
+        idx += tick;
+        if (idx >= fullText.length) {
+          clearInterval(iv);
+          setMsgs((m) => m.map((msg, i) => i === m.length - 1 ? { ...msg, text: fullText, streaming: false } : msg));
+        } else {
+          setMsgs((m) => m.map((msg, i) => i === m.length - 1 ? { ...msg, text: fullText.slice(0, idx) } : msg));
+        }
+      }, 22);
+    }, 120);
+  }
+
   const totalTokens = Math.round(
     msgs.filter((m) => m.from === "ai" && !m.streaming).reduce((s, m) => s + m.text.length, 0) / 4
   );
@@ -339,23 +378,58 @@ function ChatSection() {
                 <div className="flex items-center justify-between mb-1">
                   <p className={`text-[11px] font-semibold ${r.text}`}>{r.name}</p>
                   {!msg.streaming && msg.text && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(msg.text);
-                        setCopiedIdx(i);
-                        setTimeout(() => setCopiedIdx((c) => (c === i ? null : c)), 2000);
-                      }}
-                      className="text-slate-300 hover:text-slate-500 transition-colors p-0.5 ml-2"
-                      title="Copiar respuesta"
-                    >
-                      {copiedIdx === i ? (
-                        <span className="text-[10px] text-emerald-600 font-medium">✓ Copiado</span>
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    <div className="flex items-center gap-1">
+                      {/* Thumbs up */}
+                      <button
+                        onClick={() => setMsgs((m) => m.map((x, j) => j === i ? { ...x, rating: x.rating === "up" ? undefined : "up" } : x))}
+                        className={`p-1 rounded transition-colors ${msg.rating === "up" ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}
+                        title="Útil"
+                      >
+                        <svg className="w-3.5 h-3.5" fill={msg.rating === "up" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
                         </svg>
+                      </button>
+                      {/* Thumbs down */}
+                      <button
+                        onClick={() => setMsgs((m) => m.map((x, j) => j === i ? { ...x, rating: x.rating === "down" ? undefined : "down" } : x))}
+                        className={`p-1 rounded transition-colors ${msg.rating === "down" ? "text-rose-500" : "text-slate-300 hover:text-slate-500"}`}
+                        title="No útil"
+                      >
+                        <svg className="w-3.5 h-3.5" fill={msg.rating === "down" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                        </svg>
+                      </button>
+                      {/* Copy */}
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.text);
+                          setCopiedIdx(i);
+                          setTimeout(() => setCopiedIdx((c) => (c === i ? null : c)), 2000);
+                        }}
+                        className="p-1 rounded text-slate-300 hover:text-slate-500 transition-colors"
+                        title="Copiar respuesta"
+                      >
+                        {copiedIdx === i ? (
+                          <span className="text-[10px] text-emerald-600 font-medium">✓</span>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                      {/* Retry — solo en el último mensaje IA */}
+                      {i === msgs.map((x, k) => (x.from === "ai" ? k : -1)).filter((k) => k >= 0).at(-1) && (
+                        <button
+                          onClick={retryLastMsg}
+                          className="p-1 rounded text-slate-300 hover:text-brand-primary transition-colors"
+                          title="Regenerar respuesta"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </button>
                       )}
-                    </button>
+                    </div>
                   )}
                 </div>
                 <div className={`rounded-2xl rounded-tl-sm px-4 py-3 border ${r.bg}`}>
@@ -418,11 +492,25 @@ function ChatSection() {
             <span className={`inline-block w-1.5 h-1.5 rounded-full ${role.dot} mr-1 align-middle`} />
             {role.name} · {role.desc} · ↵ para enviar
           </p>
-          {totalTokens > 0 && (
-            <p className="text-[11px] text-slate-400 tabular-nums">
-              {`~$${totalCost < 0.01 ? totalCost.toFixed(4) : totalCost.toFixed(3)} · ${totalTokens.toLocaleString()} tokens`}
-            </p>
-          )}
+          <div className="flex items-center gap-3">
+            {totalTokens > 0 && (
+              <p className="text-[11px] text-slate-400 tabular-nums">
+                {`~$${totalCost < 0.01 ? totalCost.toFixed(4) : totalCost.toFixed(3)} · ${totalTokens.toLocaleString()} tokens`}
+              </p>
+            )}
+            {msgs.some((m) => m.from === "ai") && (
+              <button
+                onClick={exportConversation}
+                className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-brand-primary transition-colors"
+                title="Exportar conversación como .md"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Exportar
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

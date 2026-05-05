@@ -53,6 +53,13 @@ export function ClientCronogramaTab({
     `/api/clients/${clientId}/consultors`,
     fetcher
   );
+  const { data: catalogServices } = useSWR<{ data: { value: string; label: string }[] }>(
+    "/api/catalogs?category=services",
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
+  );
+  const serviceLabel = (key: string) =>
+    catalogServices?.data.find((c) => c.value === key)?.label ?? key;
 
   // En modo Gantt necesitamos las stages aplanadas. Reutiliza el mismo endpoint
   // que ServiceStagesPanel — SWR comparte cache, sin doble fetch.
@@ -120,7 +127,7 @@ export function ClientCronogramaTab({
         services.map((s) => (
           <div key={s.id} className="bg-white border border-slate-200 rounded p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-900">{s.service}</h3>
+              <h3 className="text-sm font-semibold text-slate-900">{serviceLabel(s.service)}</h3>
               <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
                 Servicio
               </span>
@@ -140,7 +147,7 @@ export function ClientCronogramaTab({
           return (
             <div key={s.id} className="space-y-2">
               <div className="flex items-center justify-between gap-2 px-1">
-                <h3 className="text-sm font-semibold text-slate-900">{s.service}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{serviceLabel(s.service)}</h3>
                 <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
                   Servicio
                 </span>

@@ -6,10 +6,10 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import Link from "next/link";
 import { ServiceStagesPanel } from "./ServiceStagesPanel";
 import { ServiceGantt } from "./ServiceGantt";
 import { ActivityEditorModal } from "./ActivityEditorModal";
+import { ServiceEditor } from "./ServiceEditor";
 import type { ServiceStage, StageActivity } from "@/lib/stages";
 
 type ServiceRow = {
@@ -44,8 +44,10 @@ export function ClientCronogramaTab({
     stageId: string;
     activity?: StageActivity;
   } | null>(null);
+  const [creatingService, setCreatingService] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceRow | null>(null);
 
-  const { data: servicesData, isLoading: loadingServices, error: servicesError } = useSWR<{ data: ServiceRow[] }>(
+  const { data: servicesData, isLoading: loadingServices, error: servicesError, mutate: mutateServices } = useSWR<{ data: ServiceRow[] }>(
     `/api/clients/${clientId}/services`,
     fetcher
   );
@@ -93,21 +95,34 @@ export function ClientCronogramaTab({
 
   if (services.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded p-12 text-center">
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">
-          Sin servicios contratados
-        </h2>
-        <p className="text-xs text-slate-600 max-w-md mx-auto">
-          El cronograma se construye sobre los servicios contratados del cliente.
-          Primero agrega servicios desde la edición del cliente.
-        </p>
-        <Link
-          href={`/clientes/${clientId}/editar`}
-          className="inline-block mt-4 text-xs text-brand-primary-dark hover:underline"
-        >
-          Ir a editar cliente →
-        </Link>
-      </div>
+      <>
+        <div className="bg-white border border-slate-200 rounded p-12 text-center">
+          <h2 className="text-sm font-semibold text-slate-900 mb-2">
+            Sin servicios contratados
+          </h2>
+          <p className="text-xs text-slate-600 max-w-md mx-auto">
+            El cronograma se construye sobre los servicios contratados.
+            {isAdmin
+              ? " Agrega el primer servicio para comenzar."
+              : " El admin debe agregar servicios antes de crear el cronograma."}
+          </p>
+          {isAdmin && (
+            <button
+              onClick={() => setCreatingService(true)}
+              className="inline-block mt-4 text-xs font-semibold text-brand-primary-dark hover:underline"
+            >
+              + Nuevo servicio
+            </button>
+          )}
+        </div>
+        {creatingService && (
+          <ServiceEditor
+            mode={{ kind: "create", clientId }}
+            onClose={() => setCreatingService(false)}
+            onSaved={() => { setCreatingService(false); void mutateServices(); }}
+          />
+        )}
+      </>
     );
   }
 
@@ -123,6 +138,18 @@ export function ClientCronogramaTab({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => setCreatingService(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-slate-200 bg-white text-slate-700 hover:border-brand-primary hover:text-brand-primary-dark transition-colors"
+              title="Agregar servicio contratado"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
+              </svg>
+              Servicio
+            </button>
+          )}
           <a
             href={`/api/clients/${clientId}/export-cronograma-pdf`}
             target="_blank"
@@ -151,9 +178,20 @@ export function ClientCronogramaTab({
           <div key={s.id} className="bg-white border border-slate-200 rounded p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-slate-900">{serviceLabel(s.service)}</h3>
-              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                Servicio
-              </span>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => setEditingService(s)}
+                    className="text-[10px] text-slate-400 hover:text-brand-primary-dark transition-colors"
+                    title="Editar servicio"
+                  >
+                    Editar
+                  </button>
+                )}
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                  Servicio
+                </span>
+              </div>
             </div>
             <ServiceStagesPanel
               clientId={clientId}
@@ -202,6 +240,22 @@ export function ClientCronogramaTab({
             setEditingActivity(null);
             mutateStages();
           }}
+        />
+      )}
+
+      {creatingService && (
+        <ServiceEditor
+          mode={{ kind: "create", clientId }}
+          onClose={() => setCreatingService(false)}
+          onSaved={() => { setCreatingService(false); void mutateServices(); }}
+        />
+      )}
+
+      {editingService && (
+        <ServiceEditor
+          mode={{ kind: "edit", serviceId: editingService.id, initialService: editingService.service as import("@/lib/services/service-schemas").ServiceKey, initialData: editingService.data }}
+          onClose={() => setEditingService(null)}
+          onSaved={() => { setEditingService(null); void mutateServices(); }}
         />
       )}
     </div>

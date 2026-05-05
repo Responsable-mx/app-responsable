@@ -55,7 +55,7 @@ Flujo: secuencial sugerido (Aurora -> Rebeca -> Elena -> Valeria), no obligatori
 - **Feedback async:** `useToast()` + `<ConfirmModal>` de `components/ui/`. NUNCA `window.confirm`, `setTimeout` banners, ni silent catches.
 - **prefers-reduced-motion:** automático vía `globals.css` — neutraliza animaciones globalmente.
 - **aria-live:** chat stream, SWR refetch, loading states con `role="log"` o `role="status"` `aria-live="polite"`.
-- **Spanish convention:** copy UI en español de México (tú, no vos). Sin anglicismos.
+- **Spanish convention:** ver `~/.claude/STACK_BASE.md` § "Convención de idioma".
 - **Dev preview pattern:** `app/dev/<feature>-preview/page.tsx` con mocks + middleware bypass non-prod. Ejemplo canónico: `app/dev/primitives-preview/page.tsx`.
 - **Tablas (8 principios STARTER_UX §7):** `min-w-full w-max` (no `w-full`), `overflow-x-auto` wrapper, sticky header, zebra, hover, `tabular-nums`, signal-over-noise + banner jerárquico §7.1.
 

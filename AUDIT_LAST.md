@@ -1,86 +1,156 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-04-27 (segundo pase post-design critique)
-**Modo:** /calibrar — limpieza total + critique follow-up
-**Calificación:** 9.7/10 (cero deuda activa, design system completo, modales unificados)
+**Fecha:** 2026-05-05
+**Modo:** /audit completo (post-feature sprint may-2026)
+**Calificación:** 6.2 / 10 (nueva deuda por sprint rápido de features)
 
-## Estado del proyecto
+---
 
-MVP en `app.responsable.net` con **cero deuda activa** tras dos pases coordinados. El design system cubre el 100% del chrome y mutaciones admin. Login + chat + clientes + configuración usan exclusivamente primitives canónicos y tokens brand-*. Cero `teal-N` hardcoded, cero `ConfirmDialog` legacy, cero modales ad-hoc.
+## Contexto
 
-## Pase 2 (post-design critique) — cambios aplicados
+Sprint intensivo may-2026 agregó: chat sessions persistentes, cuestionario funcional,
+materialidad funcional, command palette, saved views, sparklines, logos, tab error
+boundary, stream types, SWR config. La sesión anterior (2026-04-27) cerraba con 9.7/10
+y cero deuda activa. El sprint añadió 22 hallazgos nuevos (4 críticos, 11 importantes, 7 menores).
 
-### Critique anterior (3 priorities)
-- **Priority 1**: `<Button loading>` ahora mantiene opacity 1.0 (vs `<Button disabled>` con 0.5). Spinner visible con contraste pleno. Verificado en preview: `data-loading=true` → opacity 1.0; `disabled` → opacity 0.5.
-- **Priority 2**: SkipLink demo en preview reemplazado por descripción del patrón + instrucciones (no se renderiza expuesto).
-- **Priority 3** (Sidebar tokens): cubierto por DRSP-9 batch.
+D-01 y D-02 de DEUDA.md ahora resueltos (cuestionario + materialidad implementados).
 
-### DRSP-9 — Migración masiva teal-N → brand-*
-- 56 ocurrencias en 21 archivos (Sidebar, ChatWindow, ClientForm, ClientsList, login, configuración, fields, services, extract, etc.) → tokens brand-*.
-- Script Python idempotente con mapeo: `teal-50/100/200/300/400/500` → `brand-primary-light`/`brand-primary`, `teal-600` → `brand-primary`, `teal-700` → `brand-primary-hover`, `teal-800/900` → `brand-primary-dark`.
-- 86 reemplazos totales. Cero residuales `teal-N`.
+---
 
-### DRSP-10 — Login con primitives
-- `app/(auth)/login/page.tsx` reescrito: `<Input>` para email/OTP wrap, `<Button loading>` para submit, ghost variant para "Cambiar correo". Step "loading" eliminado (manejo con `submitting` boolean).
-- Borde error en `border-brand-berry`. OTP input con `inputMode="numeric"`, `aria-invalid`, `aria-describedby`.
+## Hallazgos nuevos (no en DEUDA.md anterior)
 
-### DRSP-11 — 4 modales ad-hoc → Modal primitive
-- `components/extract/ExtractSectorModal.tsx`
-- `components/services/ServiceEditor.tsx`
-- `components/config/UsersManager.tsx UserEditor`
-- `components/config/catalogs/ItemEditor.tsx` (recién creado en R1)
-- Todos heredan focus trap + ESC + restore focus + click overlay + busy state. Buttons internos a `<Button>` primitive.
+### 🔴 Críticos
 
-### DRSP-12 — ConfirmDialog → ConfirmModal + delete legacy
-- Migrados 6 consumidores: `catalogs/CatalogPanel.tsx`, `prompts/PromptEditor.tsx`, `chat/ChatWindow.tsx`, `ClientForm.tsx`, `services/ClientServicesTab.tsx`, `config/PreferencesPanel.tsx`.
-- Mapeo: `variant="destructive"` → `tone="destructive"`, `variant="default"` → `tone="primary"`.
-- Deleted `components/ConfirmDialog.tsx` + `__tests__/ui/ConfirmDialog.ui.test.tsx`. Cero consumidores residuales.
+**D-11 · SEC** — `chat_sessions` RLS decorativa: backend usa `service_role`, bypassa RLS.
+- `lib/chat-sessions.ts:37` usa `createAdminClient()`. Políticas RLS en migración 0028
+  solo aplican a clientes anon/authenticated, no a service role. La separación real
+  depende únicamente del filtro `.eq("user_email", userEmail)` en código, no en DB.
+- Fix: comentar explícitamente en migración que isolation es server-side, o migrar a
+  user-authenticated Supabase client.
 
-## Métricas finales (acumulado dos pases)
+**D-12 · SEC** — `materiality-topics` PATCH/DELETE sin check de ownership.
+- `PATCH /api/materiality-topics/[topicId]` y `DELETE` autentican vía `requireUser()` pero
+  nunca verifican que `topicId` pertenezca a un cliente del usuario. Cualquier consultor
+  puede sobreescribir temas de otro cliente conociendo el UUID.
+- Fix: fetch topic primero, verificar `topic.client_id` antes de patch/delete.
 
-| Métrica | Pase 1 cierre | Pase 2 cierre |
-|---|---|---|
-| Tests | 202 | 198 (-5 por delete legacy ConfirmDialog tests) |
-| Test files | 21 | 20 |
-| Coverage stmts | 90.3% | 86%+ (sin cambios estructurales) |
-| `teal-N` residuales | 56 | **0** |
-| `ConfirmDialog` consumidores | 6 | **0** (legacy eliminado) |
-| Modales ad-hoc | 4 | **0** |
-| Primitives en `components/ui/` | 7 | 7 (sin cambios) |
-| Login usando primitives | no | **sí** |
-| Loading vs disabled distinción visual | confuso | **claro** (opacity 1.0 vs 0.5) |
-| Deuda Importante | 0 | **0** |
-| Deuda Menor | 0 | **0** |
+**D-13 · SEC/IA** — `ai-fill` `stepKey` sin sanitizar; sin scope de servicio.
+- El param de URL `stepKey` no se valida contra allowlist antes de las llamadas DB.
+  Con servicios múltiples futuros, un `stepKey` de servicio A puede enviarse contra
+  cliente de servicio B. Comparte superficie con D-14 (sin rate limit).
 
-## Deuda residual
+**D-14 · COST/PERF** — AI fill sin rate limiting: 9 calls Anthropic por click de "Refrescar todo".
+- `aiFillAll()` usa `BATCH_SIZE=3` concurrente; wizard de 9 pasos = 3 lotes. Cada call
+  usa `max_tokens: 4096` + herramienta `web_search` (billable). Sin límite por usuario/hora.
+- Fix: rate limit server-side (token bucket en Supabase o Redis), o al mínimo contador
+  in-memory con cooldown.
 
-Solo 2 ítems no-código (sin cambios desde pase 1):
-- **D008** cross-repo: `leads/` y `s-peak-dashboard/` aún usan `middleware.ts`.
-- **OP1** operativo: rotación de keys.
+---
 
-## Riesgo de escalado (8 → 50 consultores)
+### 🟡 Importantes
 
-Tras los dos pases, ningún bottleneck técnico activo. El design system es ahora el contrato visual de toda la app. Un futuro rebrand modificará solo los tokens en `globals.css` y el cambio se propaga a 100% del chrome — ya verificado por la migración de `teal-N`.
+**D-15 · REL** — Autosave cuestionario: retry loop infinito en falla de red.
+- `retryAttempt.current` incrementa sin tope; backoff toca 8s y queda ahí forever.
+  Tab abierto de noche = cientos de POSTs fallidos silenciosos.
+- Fix: límite de 5 reintentos, luego CTA "Guardar manualmente".
 
-## Cobertura del design system
+**D-16 · REL** — `aiFillAll` stale closure: `merged` usa `responses` de inicio del batch.
+- `save(merged)` calcula `{ ...responses, ...accum }` donde `responses` es la captura
+  al momento del call, no el acumulado progresivo. Si un fill individual concurrente
+  modifica estado en medio del bulk, se sobreescribe.
 
-| Área | Pase 1 | Pase 2 | Estado |
-|---|---|---|---|
-| Tokens brand en globals.css | ✓ | ✓ | Completo |
-| Primitives en components/ui | ✓ (7) | ✓ (7) | Completo |
-| `app/(dashboard)` chrome usa tokens | ⚠ teal-N residual | ✓ | Completo |
-| Login | ⚠ ad-hoc | ✓ primitives | Completo |
-| Chat | ⚠ teal-N | ✓ | Completo |
-| Clientes (lista + form) | ⚠ teal-N | ✓ | Completo |
-| Configuración (catalogs + prompts + users + preferencias + uso-ia) | parcial | ✓ | Completo |
-| Modales | 4 ad-hoc | ✓ todos primitives | Completo |
-| ConfirmModal/Dialog | dual (legacy + nuevo) | ✓ solo nuevo | Completo |
+**D-17 · REL** — Demo Altamira dispara session persist real en DB.
+- La simulación de demo activa `streaming=false` → debounce de 800ms → POST a
+  `/api/chat-sessions` con mensajes falsos + `clientId=ALTAMIRA_ID`.
+- Fix: flag `isDemoSession`, skip persist si activo.
 
-## Próximo /predev debe verificar
+**D-18 · REL** — Archive en `ChatSessionsPanel` limpia chat ANTES de confirmar DELETE.
+- `onArchive(id)` llama `resetChat()` inmediatamente; el `fetch DELETE` se silencia
+  con `.catch(() => {})`. Si el DELETE falla, sesión reaparece en panel pero el chat
+  ya fue vaciado.
+- Fix: invertir orden — DELETE primero, `onArchive` solo en éxito; toast en error.
 
-- Antes de feature nueva con UI → primitive de `components/ui/` ya cubre.
-- Antes de tocar prompt IA → verificar humanización de codes nuevos.
-- Antes de agregar mutación admin → integrar `logChange()`.
-- Antes de agregar modal nuevo → usar `<Modal>` primitive (NO ad-hoc role="dialog").
-- Antes de agregar confirmación → usar `<ConfirmModal>` (NO crear wrapper nuevo).
-- Antes de hardcodear color → verificar token en `@theme inline` (NO `teal-N`/`red-N` directos).
+**D-19 · REL** — `loadSession` no valida shape de `messages` desde API.
+- `setMessages(s.messages ?? [])` sin runtime validation. JSONB corrupto en DB
+  (insert directo, seed, bug previo) crashea `ReactMarkdown` downstream sin guard.
+
+**D-20 · REL** — `extractJsonObject` regex trunca JSON anidado en code blocks.
+- Regex `/```(?:json)?\s*(\{[\s\S]*?\})\s*```/` usa `*?` non-greedy que para en
+  el primer `}`, truncando objetos anidados. El balanced-brace fallback es correcto
+  pero solo aplica cuando no hay code block. Resultado: JSON parcialmente parseado,
+  campos `null` escritos a DB cuando el LLM sí respondió.
+
+**D-21 · ARCH** — `isChatStreamEvent` guard no valida tipo de `text`: potencial `"...undefined"` en UI.
+- Guard solo checa `type === "delta"`, no que `text` sea string.
+  Si Anthropic cambia formato, `last.content + undefined` → `"...undefined"` visible.
+
+**D-22 · ARCH** — `TEMPLATE_TOPICS` contiene 20 temas específicos de distribución en frío.
+- Plantilla se inicializa para CUALQUIER cliente sin importar sector.
+  Cliente de servicios financieros recibe temas de "Refrigerantes HFC" y "Bienestar animal".
+
+**D-23 · SEC** — `users.ts` fallback silencioso a cuentas hardcodeadas si tabla vacía en producción.
+- Si `authorized_users` devuelve cero filas (migración mala, wipe accidental),
+  `listUsers()` retorna 3 cuentas hardcodeadas sin log ni alerta. Seguridad opaca.
+
+**D-24 · SEC/UX** — `ClientAvatar` renderiza `<img src={logoUrl}>` sin validar URL.
+- `logo_url` aceptado como cualquier string vía PATCH. Sin `https://` check.
+  Sin `onError` fallback: URL rota = broken image en vez de monogram.
+
+**D-25 · PERF** — `chat_sessions.messages` JSONB sin cap: conversaciones largas = payloads 200KB+.
+- No hay `CHECK` constraint en DB ni truncado en `upsertChatSession`. Cada autosave
+  (debounce 800ms) envía array completo de mensajes.
+
+**D-26 · SEC/UX** — `SourceDrawer` acepta `javascript:` URLs en campo de fuentes.
+- `handleAdd()` solo verifica string no vacío. URL se persiste y renderiza como
+  `<a href={src.url} target="_blank">` en la lista — XSS potencial.
+
+---
+
+### 🟢 Menores
+
+**D-27** — `ChatWindow` tiene dos funciones export (`exportConversationMd` + `exportConversation`)
+  con comportamiento diferente. El botón del footer usa la versión inferior.
+
+**D-28** — `TabErrorBoundary` expone `error.message` raw en `<details>` visible a todos los usuarios.
+  En producción puede filtrar stack traces o mensajes de Anthropic API.
+
+**D-29** — `CommandPalette` fetcha lista completa de clientes sin paginación.
+  Riesgo arquitectónico si se implementa scoping por rol en el futuro.
+
+**D-30** — Botón "Cargar plantilla" en MaterialityTab no tiene `disabled={busyInit}`;
+  solo el botón de confirmación dentro del modal muestra el estado `busy`.
+
+**D-31** — `uso-ia/page.tsx` usa `stone-*` tokens (`divide-stone-100`, `border-stone-200`)
+  en código nuevo, violando el mandato `slate-*` de CLAUDE.md.
+
+**D-32** — Migración 0028 incluye política RLS `DELETE` en `chat_sessions`.
+  La app solo hace soft-archive (PATCH `archived_at`). Hard-delete vía Supabase client
+  directo bypassa el patrón y elimina el audit trail.
+
+---
+
+## Score
+
+| Dimensión | Antes (abr-2026) | Ahora (may-2026) |
+|-----------|-----------------|-----------------|
+| Seguridad | 9.5 | 4.5 |
+| Confiabilidad | 9.5 | 5.5 |
+| UX | 9.5 | 7.0 |
+| Arquitectura | 9.5 | 6.5 |
+| Rendimiento | 9.0 | 6.0 |
+| Calidad de código | 9.5 | 7.5 |
+| Observabilidad | 9.0 | 7.0 |
+| Deuda técnica | 10.0 | 5.0 |
+| **Promedio** | **9.7** | **6.2** |
+
+La baja es esperada y normal para un sprint de features rápido.
+Prioridad 1: resolver D-12 y D-26 (OWASP crítico). D-14 (costo Anthropic).
+
+---
+
+## Próximos /predev deben verificar
+
+- Antes de cualquier PATCH/DELETE de recurso → check ownership explícito (client_id match)
+- Antes de nuevo campo URL en UI → validar `https://` en handleAdd + en API PATCH
+- Antes de nueva call Anthropic → evaluar si necesita rate limit server-side
+- Antes de nueva feature chat → verificar que no persiste sesiones de demo/seed

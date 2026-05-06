@@ -154,6 +154,11 @@ export function ServiceGantt({
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerTimelineInnerRef = useRef<HTMLDivElement>(null);
   const [now] = useState(() => Date.now());
+  // Drag-to-pan: refs (no state) para evitar re-renders en cada mousemove.
+  const isPanning = useRef(false);
+  const panStartX = useRef(0);
+  const panStartScrollLeft = useRef(0);
+  const didPan = useRef(false); // suprimir click si hubo movimiento real
 
   const allActivities = useMemo(() => stages.flatMap((s) => s.activities), [stages]);
   const atRisk = useMemo(() => findAtRisk(allActivities), [allActivities]);
@@ -224,6 +229,90 @@ export function ServiceGantt({
       el.scrollLeft = Math.max(0, px - (el.clientWidth - LABEL_W) / 2);
     } else {
       el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+
+  // ─── Navegación teclado ───────────────────────────────────────────────────────
+  // ← → : pan 120px · Shift+← → : pan 400px · Home/End : inicio/fin · +/- : zoom
+  const ZOOM_ORDER: Zoom[] = ["fit", "mes", "quarter", "semana", "dia"];
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const el = scrollRef.current;
+    if (!el) return;
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        el.scrollLeft -= e.shiftKey ? 400 : 120;
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        el.scrollLeft += e.shiftKey ? 400 : 120;
+        break;
+      case "Home":
+        e.preventDefault();
+        el.scrollLeft = 0;
+        break;
+      case "End":
+        e.preventDefault();
+        el.scrollLeft = el.scrollWidth;
+        break;
+      case "+":
+      case "=": {
+        e.preventDefault();
+        const idx = ZOOM_ORDER.indexOf(zoom);
+        if (idx < ZOOM_ORDER.length - 1) setZoom(ZOOM_ORDER[idx + 1]);
+        break;
+      }
+      case "-": {
+        e.preventDefault();
+        const idx = ZOOM_ORDER.indexOf(zoom);
+        if (idx > 0) setZoom(ZOOM_ORDER[idx - 1]);
+        break;
+      }
+    }
+  }
+
+  // ─── Drag-to-pan (mouse) ──────────────────────────────────────────────────────
+  // Solo activo cuando hay scroll horizontal (timelineWidth != null).
+  // Si el mousedown cae sobre un <button> (barra o milestone) → no paneamos
+  // para que el click abra el popover normalmente.
+  // Si el usuario mueve >4px antes de soltar → didPan=true → onClickCapture
+  // absorbe el click para que el popover no se abra por error.
+
+  function onPanStart(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.button !== 0 || !timelineWidth) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    isPanning.current = true;
+    didPan.current = false;
+    panStartX.current = e.clientX;
+    panStartScrollLeft.current = el.scrollLeft;
+    el.style.cursor = "grabbing";
+    e.preventDefault(); // evita selección de texto durante drag
+  }
+
+  function onPanMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (!isPanning.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const dx = e.clientX - panStartX.current;
+    if (Math.abs(dx) > 4) didPan.current = true;
+    el.scrollLeft = panStartScrollLeft.current - dx;
+  }
+
+  function onPanEnd() {
+    if (!isPanning.current) return;
+    isPanning.current = false;
+    const el = scrollRef.current;
+    if (el && timelineWidth) el.style.cursor = "grab";
+  }
+
+  // Captura en fase de captura: si hubo pan real, cancela el click en barras.
+  function onClickCapture(e: React.MouseEvent) {
+    if (didPan.current) {
+      e.stopPropagation();
+      didPan.current = false;
     }
   }
 
@@ -321,6 +410,14 @@ export function ServiceGantt({
                 </button>
               ))}
             </div>
+            {timelineWidth && (
+              <span
+                className="text-[9px] text-slate-300 select-none font-mono"
+                title="Navegar: ← → (pan) · Shift+← → (salto) · +/− (zoom) · Home/End · Arrastra el timeline con el mouse"
+              >
+                ← → · drag
+              </span>
+            )}
             <div className="flex items-center gap-1.5 ml-auto">
               {todayInRange && (
                 <button onClick={scrollToToday} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-brand-primary-dark transition-colors">
@@ -409,14 +506,21 @@ export function ServiceGantt({
             ve la altura total y puede scrollear verticalmente. */}
         <div
           ref={scrollRef}
-          className={timelineWidth ? "overflow-x-auto" : "overflow-hidden"}
-          style={timelineWidth ? { overflowY: "clip" } : undefined}
+          className={`${timelineWidth ? "overflow-x-auto" : "overflow-hidden"} focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 focus-visible:ring-inset`}
+          style={timelineWidth ? { overflowY: "clip", cursor: "grab" } : undefined}
+          tabIndex={timelineWidth ? 0 : undefined}
           onScroll={(e) => {
             // Sync header timeline via transform (sin re-render React)
             if (headerTimelineInnerRef.current) {
               headerTimelineInnerRef.current.style.transform = `translateX(-${e.currentTarget.scrollLeft}px)`;
             }
           }}
+          onKeyDown={onKeyDown}
+          onMouseDown={onPanStart}
+          onMouseMove={onPanMove}
+          onMouseUp={onPanEnd}
+          onMouseLeave={onPanEnd}
+          onClickCapture={onClickCapture}
         >
           <div style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
             {/* ─── Filas ─── */}

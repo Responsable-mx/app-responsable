@@ -66,7 +66,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   await logChange({
     actorEmail: admin,
-    entityType: "client",
+    entityType: "clients",
     entityId: clientId,
     action: "update",
     after: { baseline_frozen: true, count: toFreeze.length, force },

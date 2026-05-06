@@ -501,7 +501,10 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
             {rowData.map(({ key, acts, rag, delayed, active, rowH }) => {
               const isUnassigned = key === "__unassigned__";
               const display = isUnassigned ? "Sin asignar" : key.split("@")[0];
-              const subtitle = isUnassigned ? `${acts.length} sin owner` : key;
+              const uniqueClients = new Set(acts.map((a) => a.client_id)).size;
+              const subtitle = isUnassigned
+                ? `${acts.length} sin owner`
+                : `${acts.length} ${acts.length === 1 ? "actividad" : "actividades"} · ${uniqueClients} ${uniqueClients === 1 ? "cliente" : "clientes"}`;
               const RAG_DOT = { red: "bg-rose-500", amber: "bg-amber-400", green: "bg-emerald-500" } as const;
               const RAG_TEXT = { red: "text-rose-700 font-bold", amber: "text-amber-700 font-semibold", green: "text-slate-500" } as const;
               const RAG_LABEL = {

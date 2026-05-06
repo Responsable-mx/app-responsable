@@ -142,8 +142,9 @@ export function ClientTabs({
 
   return (
     <div>
-      {/* Tabs */}
-      <div role="tablist" aria-label="Secciones del cliente" className="flex items-center gap-2 border-b border-slate-200 mb-5 overflow-x-auto">
+      {/* Tabs — border-b full-width, botones alineados con max-w-6xl del header */}
+      <div className="border-b border-slate-200 mb-5">
+      <div role="tablist" aria-label="Secciones del cliente" className="max-w-6xl mx-auto flex items-center gap-2 overflow-x-auto">
         <TabButton
           active={tab === "resumen"}
           tabId="resumen"
@@ -222,7 +223,10 @@ export function ClientTabs({
           badge={null}
         />
       </div>
+      </div>{/* /border-b wrapper */}
 
+      {/* Panels: cronograma sin max-w (gantt full-width), resto con max-w-6xl */}
+      <div className={tab === "cronograma" ? "" : "max-w-6xl mx-auto"}>
       {tab === "resumen" && (
         <div role="tabpanel" id="panel-resumen" tabIndex={0} aria-labelledby="tab-resumen">
           <TabErrorBoundary tabName="Resumen">
@@ -298,6 +302,7 @@ export function ClientTabs({
           </TabErrorBoundary>
         </div>
       )}
+      </div>{/* /panels wrapper */}
     </div>
   );
 }

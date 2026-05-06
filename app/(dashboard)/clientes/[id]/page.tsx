@@ -58,7 +58,8 @@ export default async function EditarClientePage({ params }: Props) {
         : "bg-slate-100 text-slate-600 border-slate-200";
 
   return (
-    <div className="px-6 py-4 max-w-6xl mx-auto">
+    <>
+    <div className="px-6 py-4 pb-0 max-w-6xl mx-auto">
       <ClientNavShortcuts prevId={prev?.id ?? null} nextId={next?.id ?? null} />
       {/* Breadcrumb compacto */}
       <div className="flex items-center justify-between gap-3 mb-4 text-xs">
@@ -156,6 +157,8 @@ export default async function EditarClientePage({ params }: Props) {
       </div>
       </div>
 
+    </div>
+    <div className="px-6 pt-4 pb-6">
       <ClientTabs
         client={client}
         completeness={completeness}
@@ -164,5 +167,6 @@ export default async function EditarClientePage({ params }: Props) {
         initialMateriality={materialityTopics}
       />
     </div>
+    </>
   );
 }

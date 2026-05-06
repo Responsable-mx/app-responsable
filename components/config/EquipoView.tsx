@@ -141,11 +141,6 @@ export function EquipoView() {
       </div>
       <p className="text-sm text-slate-600 max-w-2xl -mt-2">{INTRO[view]}</p>
 
-      {/* Intro solo cuando no hay datos aún — evita ruido cuando la vista ya muestra contenido */}
-      {!teamData && !projData && (
-        <p className="text-sm text-slate-600 max-w-2xl -mt-2">{INTRO[view]}</p>
-      )}
-
       <FiltersBar
         value={filters}
         onChange={setFilters}

@@ -147,7 +147,7 @@ export function CatalogPanel({ category }: { category: Category }) {
             <div className="divide-y divide-slate-100">
               <div className="grid grid-cols-[24px_1fr_120px_100px_80px_80px] gap-3 items-center text-[10px] uppercase tracking-wide text-slate-600 pb-2">
                 <span></span>
-                <span>Label · valor</span>
+                <span>Label</span>
                 <span>Grupo</span>
                 <span>Estado</span>
                 <span>Tipo</span>

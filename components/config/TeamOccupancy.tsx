@@ -88,6 +88,8 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
     );
 
   const rawMembers = data?.data ?? [];
+  // Columna Seniority: solo mostrar si al menos un consultor tiene nivel definido.
+  const hasSeniority = rawMembers.some((m) => m.seniority_level !== null);
   const members = rawMembers
     .filter((m) => !filters?.consultorEmail || m.email === filters.consultorEmail)
     .map((m) => {
@@ -153,9 +155,11 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest w-60">
                   Consultor
                 </th>
+                {hasSeniority && (
                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest w-32">
                   Seniority
                 </th>
+                )}
                 <th
                   className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest w-24"
                   title="Actividades en curso o retrasadas (assignee = consultor)"
@@ -212,22 +216,28 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
                         </div>
                       </td>
 
-                      {/* Seniority */}
+                      {/* Seniority — columna condicional */}
+                      {hasSeniority && (
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                           {humanizeSeniority(m.seniority_level)}
                         </span>
                       </td>
+                      )}
 
                       {/* Carga */}
                       <td className="px-4 py-3 text-center">
-                        <span
-                          title={lvl.label}
-                          className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-sm text-xs font-bold tabular-nums ${lvl.css}`}
-                        >
-                          <span aria-hidden>{lvl.icon}</span>
-                          {m.active_count}
-                        </span>
+                        {m.active_count === 0 && m.delayed_count === 0 ? (
+                          <span className="text-[11px] text-slate-400 tabular-nums">0</span>
+                        ) : (
+                          <span
+                            title={lvl.label}
+                            className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-sm text-xs font-bold tabular-nums ${lvl.css}`}
+                          >
+                            <span aria-hidden>{lvl.icon}</span>
+                            {m.active_count}
+                          </span>
+                        )}
                       </td>
 
                       {/* Atrasadas */}

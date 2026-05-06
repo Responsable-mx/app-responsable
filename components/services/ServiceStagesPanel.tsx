@@ -38,11 +38,13 @@ export function ServiceStagesPanel({
   clientServiceId,
   isAdmin,
   consultorEmails,
+  consultorNames,
 }: {
   clientId: string;
   clientServiceId: string;
   isAdmin: boolean;
   consultorEmails: string[];
+  consultorNames?: Map<string, string>;
 }) {
   const { data, mutate, isLoading, error } = useSWR(
     `/api/clients/${clientId}/stages`,
@@ -369,7 +371,7 @@ function StageRow({
                       </span>
                       {a.assignee_email && (
                         <span className="truncate max-w-[140px]" title={a.assignee_email}>
-                          @ {a.assignee_email.split("@")[0]}
+                          @ {consultorNames?.get(a.assignee_email) ?? a.assignee_email.split("@")[0]}
                         </span>
                       )}
                     </div>

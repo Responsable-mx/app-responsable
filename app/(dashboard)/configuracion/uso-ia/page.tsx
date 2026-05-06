@@ -9,6 +9,7 @@ const numFmt = new Intl.NumberFormat("es-MX");
 const usdFmt = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "USD",
+  currencyDisplay: "narrowSymbol",
   minimumFractionDigits: 3,
 });
 
@@ -173,7 +174,7 @@ export default async function UsoIaPage() {
                           })}
                         </td>
                         <td className="py-1.5 pr-3 font-medium text-slate-800">
-                          {r.role}
+                          {r.role.charAt(0).toUpperCase() + r.role.slice(1)}
                         </td>
                         <td className="py-1.5 pr-3 text-right">
                           {numFmt.format(r.calls)}

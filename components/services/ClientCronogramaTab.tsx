@@ -87,6 +87,12 @@ export function ClientCronogramaTab({
 
   const services = servicesData?.data ?? [];
   const consultorEmails = (consultorsData?.data ?? []).map((c) => c.user_email);
+  // Mapa email → nombre completo para mostrar en filas de actividades
+  const consultorNames = new Map<string, string>(
+    (consultorsData?.data ?? [])
+      .filter((c) => c.full_name)
+      .map((c) => [c.user_email, c.full_name as string])
+  );
   const allStages = stagesData?.data ?? [];
 
   async function handleQuickAction(activityId: string, patch: QuickPatch) {
@@ -210,27 +216,28 @@ export function ClientCronogramaTab({
         services.map((s) => (
           <div key={s.id} className="bg-white border border-slate-200 rounded p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-900">{serviceLabel(s.service)}</h3>
               <div className="flex items-center gap-2">
-                {isAdmin && (
-                  <button
-                    onClick={() => setEditingService(s)}
-                    className="text-[10px] text-slate-400 hover:text-brand-primary-dark transition-colors"
-                    title="Editar servicio"
-                  >
-                    Editar
-                  </button>
-                )}
                 <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
                   Servicio
                 </span>
+                <h3 className="text-sm font-semibold text-slate-900">{serviceLabel(s.service)}</h3>
               </div>
+              {isAdmin && (
+                <button
+                  onClick={() => setEditingService(s)}
+                  className="text-[10px] text-slate-400 hover:text-brand-primary-dark transition-colors"
+                  title="Editar servicio"
+                >
+                  Editar
+                </button>
+              )}
             </div>
             <ServiceStagesPanel
               clientId={clientId}
               clientServiceId={s.id}
               isAdmin={isAdmin}
               consultorEmails={consultorEmails}
+              consultorNames={consultorNames}
             />
           </div>
         ))}

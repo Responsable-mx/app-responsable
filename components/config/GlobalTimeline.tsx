@@ -22,7 +22,7 @@ const fetcher = (url: string) =>
 const STATUS_BAR: Record<ActivityStatus, string> = {
   pending: "bg-slate-300 hover:bg-slate-400",
   in_progress: "bg-brand-primary hover:bg-brand-primary-dark",
-  completed: "bg-emerald-500 hover:bg-emerald-600",
+  completed: "bg-teal-600 hover:bg-teal-700",
   delayed: "bg-rose-500 hover:bg-rose-600",
 };
 
@@ -623,7 +623,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
             [
               { color: "bg-slate-300", label: "Pendiente" },
               { color: "bg-brand-primary", label: "En curso" },
-              { color: "bg-emerald-500", label: "Completada" },
+              { color: "bg-teal-600", label: "Completada" },
               { color: "bg-rose-500", label: "Retrasada" },
             ] as const
           ).map(({ color, label }) => (

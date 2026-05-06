@@ -7,6 +7,7 @@
 //  - consultor solo actual_start/actual_end
 //  - lockStructure=true: incluso admin solo edita actual_*+assignee (cliente cronograma view)
 //    porque la estructura se define en /configuracion/plantillas, no en el cliente.
+// Sesión 10: slider progress null-aware + aria + SelectField para dependencia.
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -93,6 +94,14 @@ export function ActivityEditorModal({
 
   const canSubmit = isEditing ? true : name.trim().length > 0;
 
+  // Opciones para el selector de dependencia
+  const dependencyOptions = siblingActivities
+    .filter((s) => !activity || s.id !== activity.id)
+    .map((s) => ({
+      value: s.id,
+      label: s.stage_name ? `${s.stage_name} → ${s.name}` : s.name,
+    }));
+
   return (
     <Modal
       open
@@ -169,7 +178,7 @@ export function ActivityEditorModal({
 
         <fieldset className="border border-slate-200 rounded p-2.5">
           <legend className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">
-            Fechas reales (lo que pasó)
+            Fechas reales
           </legend>
           <div className="grid grid-cols-2 gap-2 mt-1">
             <Input
@@ -185,35 +194,52 @@ export function ActivityEditorModal({
               onChange={(e) => setActualEnd(e.target.value)}
             />
           </div>
+
+          {/* Progreso: oculto cuando null para no confundir "0% registrado" con "sin dato" */}
           <div className="mt-2.5">
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-slate-700">% Progreso</label>
-              <span className="text-xs font-bold tabular-nums text-slate-700 w-10 text-right">
-                {progress != null ? `${progress}%` : "—"}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={progress ?? 0}
-              onChange={(e) => setProgress(Number(e.target.value))}
-              className="w-full accent-brand-primary"
-            />
-            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-            {progress == null && (
-              <button
+            <label className="block text-xs font-medium text-slate-700 mb-1">% Progreso</label>
+            {progress == null ? (
+              <Button
+                variant="ghost"
+                size="sm"
                 type="button"
                 onClick={() => setProgress(0)}
-                className="mt-1 text-[10px] text-brand-primary-dark hover:underline"
               >
                 + Registrar progreso
-              </button>
+              </Button>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-slate-500">Arrastra para ajustar</span>
+                  <span className="text-xs font-bold tabular-nums text-slate-700 w-10 text-right">
+                    {progress}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={progress}
+                  onChange={(e) => setProgress(Number(e.target.value))}
+                  className="w-full accent-brand-primary"
+                  aria-label="Porcentaje de progreso"
+                  aria-valuenow={progress}
+                  aria-valuetext={`${progress}%`}
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProgress(null)}
+                  className="mt-1 text-[10px] text-slate-400 hover:text-slate-600 hover:underline"
+                >
+                  × Sin registrar
+                </button>
+              </>
             )}
           </div>
         </fieldset>
@@ -232,7 +258,7 @@ export function ActivityEditorModal({
           </div>
         )}
 
-        {(isAdmin || !isEditing) && siblingActivities.length > 0 && (
+        {(isAdmin || !isEditing) && dependencyOptions.length > 0 && (
           <div>
             <label
               className="block text-xs font-medium text-slate-700 mb-1"
@@ -240,21 +266,12 @@ export function ActivityEditorModal({
             >
               Depende de
             </label>
-            <select
+            <SelectField
               value={dependsOn}
-              onChange={(e) => setDependsOn(e.target.value)}
-              className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-            >
-              <option value="">Sin dependencia</option>
-              {siblingActivities
-                .filter((s) => !activity || s.id !== activity.id)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.stage_name ? `${s.stage_name} → ` : ""}
-                    {s.name}
-                  </option>
-                ))}
-            </select>
+              onChange={setDependsOn}
+              options={dependencyOptions}
+              placeholder="Sin dependencia"
+            />
           </div>
         )}
       </div>

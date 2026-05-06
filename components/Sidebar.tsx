@@ -182,12 +182,14 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Mis proyectos: visible solo para consultores/admins con asignaciones */}
-      {!collapsed && !isClient && projects.length > 0 && (
-        <div className="px-2 py-2 border-t border-slate-200">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1.5">
-            Mis proyectos
-          </p>
+      {/* Mis proyectos: lista completa expandida, iconos en modo colapsado */}
+      {!isClient && projects.length > 0 && (
+        <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200`}>
+          {!collapsed && (
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1.5">
+              Mis proyectos
+            </p>
+          )}
           <div className="space-y-0.5">
             {projects.map((p) => {
               const isOverride = p.override_seniority !== null;
@@ -195,7 +197,21 @@ export function Sidebar({
               const active =
                 pathname === `/clientes/${p.client_id}` ||
                 pathname.startsWith(`/clientes/${p.client_id}/`);
-              return (
+              return collapsed ? (
+                // Modo colapsado: inicial del cliente como icono con tooltip
+                <Link
+                  key={p.client_id}
+                  href={`/clientes/${p.client_id}`}
+                  title={p.client_name ?? "Cliente"}
+                  className={`flex items-center justify-center w-9 h-9 mx-auto rounded text-xs font-bold transition-colors ${
+                    active
+                      ? "bg-brand-primary-light text-brand-primary-dark"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  {(p.client_name ?? "?").charAt(0).toUpperCase()}
+                </Link>
+              ) : (
                 <Link
                   key={p.client_id}
                   href={`/clientes/${p.client_id}`}
@@ -241,7 +257,7 @@ export function Sidebar({
         {/* Avatar usuario */}
         <div className={`mt-2 pt-2 border-t border-slate-100 flex items-center ${collapsed ? "justify-center" : "gap-2 px-2"}`}>
           <div
-            className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-white font-bold flex items-center justify-center text-xs shrink-0"
+            className="w-8 h-8 rounded-full bg-slate-700 text-white font-bold flex items-center justify-center text-xs shrink-0"
             title={userEmail ?? ""}
           >
             {initial}

@@ -1,8 +1,12 @@
 "use client";
 
+// Sesión 10: Button primitives, rounded (no rounded-lg), focus:ring-brand-primary/40,
+// resize-y textarea, copy fixes para tecnicismos internos.
+
 import { useState } from "react";
 import useSWR from "swr";
 import { SkeletonDetail } from "@/components/ui/Skeleton";
+import { Button } from "@/components/ui/Button";
 import { PROMPT_LABELS } from "@/lib/ai/prompts-public";
 import type { PromptKey } from "@/lib/ai/prompts-public";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -69,7 +73,7 @@ export function PromptEditor({
       if (!res.ok) {
         setError(json.error ?? "Error al guardar");
       } else {
-        setInfo("Guardado. Se creó un snapshot de la versión anterior.");
+        setInfo("Guardado. Versión anterior guardada en historial.");
         setDirty(false);
         mutate();
         onSaved();
@@ -94,7 +98,7 @@ export function PromptEditor({
       if (!res.ok) {
         setError(json.error ?? "Error");
       } else {
-        setInfo("Regresado al default del código.");
+        setInfo("Prompt original del sistema restaurado.");
         mutate();
         onSaved();
       }
@@ -136,7 +140,7 @@ export function PromptEditor({
                   : ""}
               </>
             ) : (
-              <>Usando default del código (sin override en DB)</>
+              <>Prompt original del sistema (sin ediciones)</>
             )}
           </p>
         </div>
@@ -152,13 +156,14 @@ export function PromptEditor({
         <HistoryPanel promptKey={promptKey} onRestored={() => mutate()} />
       )}
 
+      {/* resize-y + min-h: corto no deja espacio muerto, largo no fuerza scroll interno */}
       <textarea
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
           setDirty(e.target.value !== detail.content);
         }}
-        className="w-full h-[520px] px-4 py-3 border border-slate-300 rounded-lg font-mono text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+        className="w-full min-h-[200px] max-h-[70vh] resize-y px-4 py-3 border border-slate-300 rounded font-mono text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
         spellCheck={false}
       />
       <div className="mt-1 text-[10px] text-slate-600">
@@ -167,40 +172,42 @@ export function PromptEditor({
       </div>
 
       {error && (
-        <div className="mt-3 bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-2">
+        <div className="mt-3 bg-red-50 border border-red-200 text-red-800 text-sm rounded p-2">
           {error}
         </div>
       )}
       {info && (
-        <div className="mt-3 bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg p-2">
+        <div className="mt-3 bg-green-50 border border-green-200 text-green-800 text-sm rounded p-2">
           {info}
         </div>
       )}
 
       <div className="flex items-center justify-between mt-4">
-        <button
+        <Button
           onClick={save}
           disabled={!dirty || saving || draft.trim().length < 10}
-          className="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-medium rounded-lg disabled:bg-slate-300 disabled:cursor-not-allowed"
+          loading={saving}
         >
-          {saving ? "Guardando…" : "Guardar cambios"}
-        </button>
+          Guardar cambios
+        </Button>
 
         {detail.has_override && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setConfirmReset(true)}
-            className="text-xs text-slate-600 hover:text-red-700"
+            disabled={saving}
           >
-            Restaurar default del código
-          </button>
+            Restaurar versión original
+          </Button>
         )}
       </div>
 
       <ConfirmModal
         open={confirmReset}
-        title="Restaurar default"
-        description="Se elimina el override y el prompt vuelve al contenido hardcoded en el código. El historial de versiones editadas se conserva (puedes restaurar cualquier versión pasada)."
-        confirmLabel="Restaurar default"
+        title="Restaurar versión original"
+        description="Se elimina el override y el prompt vuelve al contenido original del sistema. El historial de ediciones se conserva — puedes restaurar cualquier versión pasada."
+        confirmLabel="Restaurar"
         cancelLabel="Cancelar"
         tone="destructive"
         onConfirm={resetToDefault}

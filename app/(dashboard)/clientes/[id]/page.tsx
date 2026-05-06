@@ -119,9 +119,19 @@ export default async function EditarClientePage({ params }: Props) {
         {client.services && client.services.length > 0 && (
           <>
             <span className="text-slate-300">·</span>
-            <span className="text-xs font-semibold text-brand-primary-dark">
-              {client.services.join(", ")}
-            </span>
+            {client.services.slice(0, 2).map((s) => (
+              <span
+                key={s}
+                className="inline-flex items-center text-[10px] font-medium bg-brand-primary-light text-brand-primary-dark rounded-sm px-2 py-0.5"
+              >
+                {s}
+              </span>
+            ))}
+            {client.services.length > 2 && (
+              <span className="text-[10px] text-slate-500">
+                +{client.services.length - 2} más
+              </span>
+            )}
           </>
         )}
         <span className="text-slate-300">·</span>

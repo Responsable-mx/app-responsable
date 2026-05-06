@@ -375,8 +375,9 @@ export function ChatWindow({
       if (!sessionId && json.data?.id) {
         setSessionId(json.data.id);
       }
-    } catch {
-      // Silent fail — UX local intacta.
+    } catch (e) {
+      // Fail-open — UX local intacta, pero logueamos para debug en prod.
+      console.error("[chat] persistSession error:", e);
     }
   }
 

@@ -36,7 +36,9 @@ export const MODEL_CONFIG: Record<RoleId, ModelConfig> = {
     description: "Rebeca — Revisor. Detecta fallas, omisiones, riesgos.",
   },
   elena: {
-    model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-20250514",
+    // Opus: insights no evidentes + trade-offs estratégicos requieren razonamiento
+    // cruzado que Opus supera a Sonnet. Para 8 usuarios piloto costo adicional <$0.50/mes.
+    model: process.env.ANTHROPIC_MODEL_OPUS || "claude-opus-4-7",
     maxTokens: 2000,
     useCache: true,
     description: "Elena — Elevador. Insights, trade-offs, narrativa.",

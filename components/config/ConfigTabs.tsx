@@ -11,16 +11,13 @@ import {
   IconTarget,
   IconGrid,
   IconShield,
-  IconCalendar,
 } from "@/components/ui/Icons";
 
-// Orden por flujo de trabajo admin: quién tiene acceso → qué pueden → plantillas → ocupación equipo → prompts IA → observabilidad → ajustes globales.
 const TABS = [
   { href: "/configuracion/usuarios", label: "Usuarios", Icon: IconUsers },
   { href: "/configuracion/permisos", label: "Permisos", Icon: IconShield },
   { href: "/configuracion/catalogos", label: "Catálogos", Icon: IconBookOpen },
   { href: "/configuracion/plantillas", label: "Plantillas", Icon: IconGrid },
-  { href: "/configuracion/equipo", label: "Equipo", Icon: IconCalendar },
   { href: "/configuracion/prompts", label: "Prompts IA", Icon: IconBrain },
   { href: "/configuracion/uso-ia", label: "Uso IA", Icon: IconTarget },
   { href: "/configuracion/preferencias", label: "Preferencias", Icon: IconSliders },

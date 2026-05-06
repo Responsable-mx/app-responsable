@@ -91,6 +91,17 @@ export function ClientCronogramaTab({
     await mutateStages();
   }
 
+  async function handleFreezeBaseline() {
+    const res = await fetch(`/api/clients/${clientId}/freeze-baseline`, { method: "POST" });
+    if (!res.ok) {
+      pushToast("error", "Error al congelar baseline");
+      return;
+    }
+    const { frozen } = (await res.json()) as { frozen: number };
+    pushToast("success", `Baseline congelado: ${frozen} actividad${frozen !== 1 ? "es" : ""}`);
+    await mutateStages();
+  }
+
   if (loadingServices) {
     return (
       <div className="space-y-2">
@@ -241,6 +252,8 @@ export function ClientCronogramaTab({
                     setEditingActivity({ stageId, activity })
                   }
                   onQuickAction={handleQuickAction}
+                  onFreezeBaseline={isAdmin ? handleFreezeBaseline : undefined}
+                  isAdmin={isAdmin}
                 />
               )}
             </div>

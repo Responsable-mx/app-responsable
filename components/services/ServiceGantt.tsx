@@ -137,6 +137,7 @@ export function ServiceGantt({
   const [freezing, setFreezing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [now] = useState(() => Date.now());
 
   const allActivities = useMemo(() => stages.flatMap((s) => s.activities), [stages]);
@@ -351,7 +352,7 @@ export function ServiceGantt({
           </div>
         </div>
 
-        <div style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
+        <div ref={ganttRef} style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
           {/* ─── Header meses ─── */}
           <div className="flex border-b border-slate-200 bg-slate-50">
             <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-50 px-3 py-2 border-r border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-400`}>

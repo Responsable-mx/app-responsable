@@ -1,6 +1,50 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-05 (sesión 13 — auditoría IA + cierre D-73→D-78)
+**Fecha:** 2026-05-06 (sesión 14 — design critique UX completo, todas las pantallas)
+**Calificación UX:** 6.5 / 10 — base corporativa sólida, 3 fricciones bloqueantes en primer día de uso
+
+---
+
+## Hallazgos críticos pendientes (de esta auditoría)
+
+| ID | Descripción | Prioridad |
+|----|-------------|-----------|
+| D-89 | Configuración abre en blanco sin contenido default | 🔴 5min |
+| D-90 | ACCESO RÁPIDO sidebar no navega al hacer clic | 🔴 30min |
+| D-91 | Roles Chat IA sin descripción permanente — opaco para usuarios nuevos | 🔴 20min |
+| D-92 | Aurora no tiene indicador visual de "activo" en stepper | 🟡 45min |
+| D-93 | Cronograma toolbar mezcla acciones y vistas | 🟡 1h |
+| D-94 | Equipo: 4 filtros siempre visibles sin progressive disclosure | 🟡 1.5h |
+| D-95 | Badge "✓ validado" en todos los campos de secciones 100% completas | 🟡 45min |
+| D-96 | "Quitar validación" visible con 0 temas validados | 🟡 5min |
+| D-97 | Cuentas Demo mezcladas con consultores reales en Equipo | 🟡 2h |
+| D-98 | Tablas Equipo y Consultores sin zebra stripe | 🟢 10min |
+
+## Pendientes de sesiones previas (no cerrados)
+
+| ID | Descripción |
+|----|-------------|
+| D-81 | Roles chat IA: hover state + tooltip mejorado en avatares |
+| D-82 | Configuración: sidebar nav vertical (3 niveles → 2) |
+| D-84 | Sugerencias chat contextuales al cliente seleccionado |
+| D-85 | ACCESO RÁPIDO: convertir a pin en lista vs sección sidebar |
+| D-86 | Cronograma: eliminar h2 redundante |
+| D-87 | Copy "7 pasos" vs "9 pasos" en banner cuestionario |
+| D-88 | Eliminar label ADMIN en headers Equipo y Configuración |
+
+## Lo que funciona bien (no tocar)
+
+- Border-left semántico en cards de Resumen (4 colores)
+- Skeleton loading — aparece inmediato, sin layout shift
+- Narrative chip en Materialidad ("Riesgo principal: Emisiones GHG…")
+- Paginación entre clientes (2/8 ← →)
+- Progress badges en tabs [85/87] [4/5]
+- Shape encoding ●◆■▲ en scatter plot — accesible daltónicos
+- ConfirmModal en "Quitar validación" (implementado esta sesión)
+
+---
+
+## Auditoría anterior: 2026-05-05 (sesión 13 — auditoría IA)
 **Calificación:** 10 / 10
 
 ---

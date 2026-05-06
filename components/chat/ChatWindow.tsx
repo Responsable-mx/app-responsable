@@ -631,6 +631,9 @@ export function ChatWindow({
                     <span className={`block text-[10px] uppercase tracking-wider font-medium leading-tight mt-0.5 ${isActive ? "text-brand-primary-dark" : "text-slate-400"}`}>
                       {r.fn}
                     </span>
+                    <span className={`block text-[9px] leading-tight mt-0.5 ${isActive ? "text-slate-500" : "text-slate-400"}`}>
+                      {r.desc}
+                    </span>
                   </span>
                 </button>
                 {i < ROLES.length - 1 && (

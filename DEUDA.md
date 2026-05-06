@@ -14,11 +14,67 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ## Deuda activa
 
-### 🔴 D-80 — Home = Chat IA vacío, flujo mental invertido
-- **Descripción**: La app abre en `/chat` con un selector de cliente y un chat vacío. El consultor real empieza por el cliente, no por la herramienta. Un usuario nuevo no sabe por dónde iniciar.
-- **Impacto**: Fricción inmediata en primer uso. Mayor tiempo hasta primera acción útil.
-- **Fix**: Cambiar la ruta raíz `/` para que redirija a `/clientes`. "Chat IA" en nav se convierte en "Chat general" (metodología sin cliente). El flujo queda: Clientes → cliente → Chat IA (tab) — natural y consistente con herramientas McKinsey/Salesforce.
-- **Esfuerzo**: 30min — cambiar redirect en `middleware.ts` + re-label nav item
+---
+
+### Bloque D-89–D-98 — Hallazgos design critique may-2026 (sesión 2)
+
+### 🔴 D-89 — Configuración abre en blanco sin contenido default
+- **Descripción**: `/configuracion` muestra lista de sub-secciones izquierda (~180px) con área derecha 100% vacía. No hay auto-selección de primera sección.
+- **Impacto**: Dead end inmediato — el usuario no sabe qué hacer, la pantalla no tiene CTAs ni contenido.
+- **Fix**: Redirect `GET /configuracion` → `/configuracion/usuarios`. O render `<UsersManager>` por default en el layout.
+- **Esfuerzo**: 5min — 1 línea en `configuracion/page.tsx`
+
+### 🔴 D-90 — ACCESO RÁPIDO del sidebar no navega al hacer clic
+- **Descripción**: Los items de "ACCESO RÁPIDO" (Distribuidora Altamira + EPH) aparecen como links con badge de seniority pero no hacen nada al hacer clic. La acción más visible del sidebar es no-funcional.
+- **Impacto**: El acceso directo más eficiente de toda la app (1 clic al proyecto activo) es un dead end.
+- **Fix**: Envolver item en `<Link href="/clientes/[id]">` con el ID real del cliente. Agregar `title={fullClientName}` para nombre completo en hover.
+- **Esfuerzo**: 30min — requiere pasar client IDs al sidebar component
+
+### 🔴 D-91 — Roles del Chat IA sin descripción permanente
+- **Descripción**: El stepper Aurora→Rebeca→Elena→Valeria solo muestra nombre + label de rol (AUTOR/REVISOR/ELEVADOR/VALIDADOR). No hay descripción de qué hace cada rol. Solo hover title. Para un consultor nuevo, el feature central de la app es opaco.
+- **Impacto**: Fricción bloqueante en primer día de uso. El flujo de cadena de calidad, que es el principal diferenciador de la app, queda oculto.
+- **Fix**: Agregar 1 línea de descripción siempre visible debajo del label en cada avatar del stepper: "Genera borrador inicial" / "Detecta fallas y riesgos" / "Eleva narrativa estratégica" / "Valida Definition of Done"
+- **Esfuerzo**: 20min — 4 strings en `ChatRolePipeline` component
+
+### 🟡 D-92 — Chat IA requiere elegir rol antes de escribir — sin default explícito
+- **Descripción**: El input del chat dice "Escribe a Aurora..." lo que implica que Aurora está activa, pero no hay indicador visual claro de que Aurora es la activa (dot ●, fondo, borde). El usuario debe inferir el estado activo.
+- **Fix**: Dot ● verde o fondo ligeramente marcado en el avatar activo. Aurora activa por default desde el inicio. Pipeline avanza automáticamente después de enviar (sugerencia al usuario: "¿Continuar con Rebeca?").
+- **Esfuerzo**: 45min
+
+### 🟡 D-93 — Cronograma toolbar mezcla acciones y vistas sin separación
+- **Descripción**: La toolbar del tab Cronograma muestra "+ SERVICIO · GANTT PDF · LISTA · GANTT" — 4 botones al mismo nivel visual mezclando acciones destructivas/creativas (+ SERVICIO, GANTT PDF) con controles de vista (LISTA, GANTT). El usuario no distingue qué cambia el estado vs qué cambia la visualización.
+- **Fix**: Separar con divider vertical: acciones a la izquierda (`+ Servicio` | `↓ PDF`), vistas como segmented control a la derecha (`[Lista | Gantt]` con estado activo marcado).
+- **Esfuerzo**: 1h
+
+### 🟡 D-94 — Equipo: 4 filtros siempre visibles sin progressive disclosure
+- **Descripción**: Chips de STATUS (Pendientes/En curso/Completadas/Retrasadas) + 3 dropdowns (CONSULTOR, PROYECTO, RANGO) ocupan ~80px siempre visibles. Los dropdowns rara vez se usan simultáneamente.
+- **Fix**: Mantener chips STATUS visibles (más usados). Colapsar 3 dropdowns en botón "Filtrar ▼" con badge de filtros activos (ej: "Filtrar · 2").
+- **Esfuerzo**: 1.5h
+
+### 🟡 D-95 — Cuestionario: badge "✓ validado" en todos los campos de secciones completas
+- **Descripción**: Cuando una sección está al 100%, cada campo muestra badge "✓ validado". En una sección con 14/14 campos, esto es 14 badges redundantes — la validación deja de comunicar excepciones y se convierte en ruido.
+- **Fix**: Solo mostrar badge en campos con fuente externa explícita o validación manual individual. Ocultar por default cuando toda la sección está validada (el progress bar 100% ya comunica el estado).
+- **Esfuerzo**: 45min
+
+### 🟡 D-96 — "Quitar validación" visible aunque stats.validated === 0
+- **Descripción**: El botón "Quitar validación" en Materialidad es visible aunque no haya temas validados, lo cual no tiene sentido semántico.
+- **Fix**: `hidden` o `disabled` + `opacity-50 cursor-not-allowed` cuando `stats.validated === 0`
+- **Esfuerzo**: 5min
+
+### 🟡 D-97 — Cuentas Demo mezcladas con consultores reales en Equipo
+- **Descripción**: "Demo Altamira (Elian)", "Demo Altamira (Gwenaelle)", "Demo Altamira (Nicolás)" aparecen en la tabla de Equipo global mezclados con consultores reales. Generan confusión y distorsionan métricas de carga.
+- **Fix**: Agregar columna `is_test_account boolean default false` en `authorized_users` o filtrar por dominio de email. Badge "TEST" visible + excluir de métricas de carga por default con toggle "Mostrar cuentas de prueba".
+- **Esfuerzo**: 2h (migración + UI)
+
+### 🟢 D-98 — Tablas Equipo y Consultores sin zebra stripe
+- **Descripción**: Las tablas en /equipo (POR CONSULTOR) y en el tab CONSULTORES del cliente no tienen zebra stripe — dificulta el seguimiento horizontal de filas en tablas de 5+ columnas.
+- **Fix**: `even:bg-slate-50` en `<tr>` de ambas tablas.
+- **Esfuerzo**: 10min
+
+---
+
+### ~~🔴 D-80 — Home = Chat IA vacío, flujo mental invertido~~ ✅ RESUELTO
+- Redirect middleware a `/clientes` aplicado. "Chat IA" en nav actualizado.
 
 ### 🔴 D-81 — Roles del chat IA (Rebeca/Elena/Valeria) sin affordance de interactividad
 - **Descripción**: Los avatares de Rebeca, Elena y Valeria están greyed-out. No hay hover state, cursor, ni tooltip que indique que son clickeables para cambiar de rol. Parecen disabled.
@@ -32,11 +88,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Fix**: Convertir el nivel superior a sidebar nav izquierdo (patrón SAP Fiori, Notion Settings). Conservar sub-tabs + pills internos (2 niveles máximo visibles).
 - **Esfuerzo**: 2-3h
 
-### 🟡 D-83 — "Equipo" en nav global vs tab de cliente — mismo label, scope opuesto
-- **Descripción**: Nav global "Equipo" = todos los consultores de la firma. Tab "Equipo" en cliente = consultores de ese proyecto. Mismo label, contexto radicalmente diferente.
-- **Impacto**: Un consultor junior no distingue cuándo está viendo el equipo global vs el del proyecto.
-- **Fix**: Renombrar tab de cliente a "Consultores del proyecto" o "Equipo del proyecto".
-- **Esfuerzo**: 5min
+### ~~🟡 D-83 — "Equipo" en nav global vs tab de cliente — mismo label, scope opuesto~~ ✅ RESUELTO
+- Tab del cliente renombrado a "CONSULTORES". Nav global sigue siendo "Equipo".
 
 ### 🟡 D-84 — Sugerencias de chat genéricas cuando hay cliente seleccionado
 - **Descripción**: Los 4 prompts de sugerencia en el chat (tanto en `/chat` como en el tab del cliente) son siempre los mismos prompts genéricos. No cambian con el contexto del cliente.
@@ -215,4 +268,4 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 ---
 
-*Última auditoría: may-2026 (sprint features + limpieza D-11/D-32). Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+*Última auditoría: may-2026 — design critique sesión 2 (D-89–D-98 agregados). D-80 y D-83 cerrados. Próxima revisión: ver tareas programadas en `MEMORY.md`.*

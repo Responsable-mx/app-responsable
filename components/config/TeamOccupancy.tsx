@@ -191,7 +191,7 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
                   <Fragment key={m.email}>
                     <tr
                       onClick={() => setExpandedEmail(isExpanded ? null : m.email)}
-                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      className="even:bg-slate-50/40 hover:bg-brand-primary-light/20 transition-colors cursor-pointer"
                     >
                       {/* Consultor */}
                       <td className="px-4 py-3">

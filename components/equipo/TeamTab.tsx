@@ -153,7 +153,7 @@ export function TeamTab({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {consultors.map((c) => (
-                <tr key={c.user_email} className="hover:bg-slate-50">
+                <tr key={c.user_email} className="even:bg-slate-50/60 hover:bg-brand-primary-light/30 transition-colors">
                   <td className="py-2 pr-6 font-medium text-slate-900">
                     {c.full_name ?? <span className="text-slate-400 font-normal">—</span>}
                   </td>

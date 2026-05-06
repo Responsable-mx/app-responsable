@@ -338,7 +338,7 @@ export function ClientsList() {
         </div>
         <button
           type="button"
-          onClick={() => { exportClientsCsv(filtered); pushToast("ok", `Exportado: ${filtered.length} clientes`); }}
+          onClick={() => { exportClientsCsv(filtered); pushToast("success", `Exportado: ${filtered.length} clientes`); }}
           className="inline-flex items-center gap-1.5 ml-auto px-2.5 py-1.5 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50"
           title="Descargar lista filtrada como CSV (Excel)"
         >

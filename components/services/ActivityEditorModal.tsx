@@ -44,6 +44,7 @@ export function ActivityEditorModal({
   const [actualEnd, setActualEnd] = useState(activity?.actual_end ?? "");
   const [assigneeEmail, setAssigneeEmail] = useState(activity?.assignee_email ?? "");
   const [dependsOn, setDependsOn] = useState(activity?.depends_on_activity_id ?? "");
+  const [progress, setProgress] = useState<number | null>(activity?.actual_progress ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { push } = useToast();
@@ -66,6 +67,7 @@ export function ActivityEditorModal({
       }
       body.actual_start = actualStart || null;
       body.actual_end = actualEnd || null;
+      body.actual_progress = progress;
 
       const url = isEditing
         ? `/api/activities/${activity!.id}`
@@ -182,6 +184,37 @@ export function ActivityEditorModal({
               value={actualEnd}
               onChange={(e) => setActualEnd(e.target.value)}
             />
+          </div>
+          <div className="mt-2.5">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-slate-700">% Progreso</label>
+              <span className="text-xs font-bold tabular-nums text-slate-700 w-10 text-right">
+                {progress != null ? `${progress}%` : "—"}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={progress ?? 0}
+              onChange={(e) => setProgress(Number(e.target.value))}
+              className="w-full accent-brand-primary"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
+            {progress == null && (
+              <button
+                type="button"
+                onClick={() => setProgress(0)}
+                className="mt-1 text-[10px] text-brand-primary-dark hover:underline"
+              >
+                + Registrar progreso
+              </button>
+            )}
           </div>
         </fieldset>
 

@@ -8,7 +8,9 @@ import Link from "next/link";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
 import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { ServiceGantt } from "@/components/services/ServiceGantt";
+import { useToast } from "@/components/ui/Toast";
 import { SkeletonTable } from "@/components/ui/Skeleton";
+import type { QuickPatch } from "@/components/services/QuickActionPopover";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -22,7 +24,22 @@ const catalogFetcher = (url: string) =>
     .then((j) => (j.data ?? []) as { value: string; label: string }[]);
 
 export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) {
-  const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
+  const { data, error, isLoading, mutate } = useSWR("/api/projects/overview", fetcher);
+  const { push: pushToast } = useToast();
+
+  async function handleQuickAction(activityId: string, patch: QuickPatch) {
+    const res = await fetch(`/api/activities/${activityId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      pushToast("error", (err as { error?: string }).error ?? "Error al actualizar actividad");
+      throw new Error("patch failed");
+    }
+    await mutate();
+  }
   const { data: serviceCat = [] } = useSWR<{ value: string; label: string }[]>(
     "/api/catalogs?category=services",
     catalogFetcher,
@@ -125,6 +142,7 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
                   onEditActivity={() => {
                     window.location.href = `/clientes/${p.client_id}?tab=cronograma`;
                   }}
+                  onQuickAction={handleQuickAction}
                 />
               </div>
             );

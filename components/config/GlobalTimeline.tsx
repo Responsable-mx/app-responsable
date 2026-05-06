@@ -154,7 +154,14 @@ function computeMilestones(acts: FlatActivity[]): Milestone[] {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
+export function GlobalTimeline({
+  filters,
+  consultorNames,
+}: {
+  filters?: EquipoFilters;
+  /** email → nombre completo, para mostrar en columna de label */
+  consultorNames?: Map<string, string>;
+} = {}) {
   const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
   const [now] = useState(() => Date.now());
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
@@ -500,7 +507,9 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
             {/* Filas de consultor */}
             {rowData.map(({ key, acts, rag, delayed, active, rowH }) => {
               const isUnassigned = key === "__unassigned__";
-              const display = isUnassigned ? "Sin asignar" : key.split("@")[0];
+              const display = isUnassigned
+                ? "Sin asignar"
+                : (consultorNames?.get(key) ?? key.split("@")[0]);
               const uniqueClients = new Set(acts.map((a) => a.client_id)).size;
               const subtitle = isUnassigned
                 ? `${acts.length} sin owner`
@@ -680,7 +689,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
                           <span className="text-[8px] shrink-0 leading-none">⚡</span>
                         )}
                         <span className="text-[9px] text-white font-semibold truncate leading-none">
-                          {a.client_name} · {a.name}
+                          {a.name}
                         </span>
                       </Link>
                     );

@@ -52,6 +52,16 @@ export function EquipoView() {
       })),
     [teamData]
   );
+
+  const consultorNames = useMemo(
+    () =>
+      new Map(
+        (teamData?.data ?? [])
+          .filter((m) => m.full_name)
+          .map((m) => [m.email, m.full_name as string])
+      ),
+    [teamData]
+  );
   const projects = useMemo(
     () =>
       (projData?.data ?? []).map((p) => ({ id: p.client_id, name: p.client_name })),
@@ -147,7 +157,7 @@ export function EquipoView() {
       )}
       {view === "timeline" && (
         <TabErrorBoundary tabName="Timeline">
-          <GlobalTimeline filters={filters} />
+          <GlobalTimeline filters={filters} consultorNames={consultorNames} />
         </TabErrorBoundary>
       )}
       {(view === "consultor" || view === "proyecto") && (

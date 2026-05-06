@@ -142,6 +142,23 @@ export async function upsertChatSession(opts: {
   return data as ChatSession;
 }
 
+export async function renameChatSession(
+  id: string,
+  userEmail: string,
+  title: string
+): Promise<void> {
+  if (isDevMode()) return;
+  const trimmed = title.trim().slice(0, 120);
+  if (!trimmed) throw new Error("El título no puede estar vacío.");
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("chat_sessions")
+    .update({ title: trimmed })
+    .eq("id", id)
+    .eq("user_email", userEmail);
+  if (error) throw new Error(`renameChatSession: ${error.message}`);
+}
+
 export async function archiveChatSession(
   id: string,
   userEmail: string

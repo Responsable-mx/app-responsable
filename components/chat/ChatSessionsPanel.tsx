@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 
@@ -49,8 +50,34 @@ export function ChatSessionsPanel({
   const sessions = data?.data ?? [];
 
   const toast = useToast();
+  // Estado de rename inline: id de la sesión en edición + valor del input.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
+
+  function startRename(s: SessionItem) {
+    setRenamingId(s.id);
+    setRenameValue(s.title);
+    // Foco en siguiente tick (después de que el input renderice).
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }
+
+  async function commitRename(id: string) {
+    const title = renameValue.trim();
+    if (!title) { setRenamingId(null); return; }
+    const res = await fetch(`/api/chat-sessions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    setRenamingId(null);
+    if (!res.ok) {
+      toast.push("error", "No se pudo renombrar la conversación.");
+    }
+    void mutate();
+  }
 
   async function handleArchive(id: string) {
     // D-18: DELETE primero, onArchive solo si el server confirma.
@@ -115,31 +142,73 @@ export function ChatSessionsPanel({
                     key={s.id}
                     className={`group relative ${active ? "bg-brand-primary-light" : "hover:bg-slate-50"}`}
                   >
-                    <button
-                      onClick={() => onSelect(s.id)}
-                      className="w-full text-left px-4 py-3 pr-10"
-                    >
-                      <p className="text-sm font-medium text-slate-900 line-clamp-2 leading-snug">
-                        {s.title}
-                      </p>
-                      <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-2">
-                        <span>{ROLE_LABELS[s.role]}</span>
-                        <span className="text-slate-300">·</span>
-                        <span>{s.message_count} msg</span>
-                        <span className="text-slate-300">·</span>
-                        <span>{stamp}</span>
-                      </p>
-                    </button>
-                    <button
-                      onClick={() => handleArchive(s.id)}
-                      title="Archivar conversación"
-                      aria-label="Archivar"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-slate-400 opacity-0 group-hover:opacity-100 hover:text-rose-600 hover:bg-rose-50 transition-opacity"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-                      </svg>
-                    </button>
+                    {renamingId === s.id ? (
+                      // Modo edición inline — Esc cancela, Enter confirma.
+                      <div className="px-4 py-2.5 pr-10">
+                        <input
+                          ref={renameInputRef}
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onBlur={() => void commitRename(s.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); void commitRename(s.id); }
+                            if (e.key === "Escape") setRenamingId(null);
+                          }}
+                          maxLength={120}
+                          className="w-full text-sm font-medium text-slate-900 bg-white border border-brand-primary rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                          aria-label="Renombrar conversación"
+                        />
+                        <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-2 px-1">
+                          <span>Enter guardar</span>
+                          <span className="text-slate-300">·</span>
+                          <span>Esc cancelar</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onSelect(s.id)}
+                        onDoubleClick={() => startRename(s)}
+                        className="w-full text-left px-4 py-3 pr-20"
+                        title="Click para abrir · Doble click para renombrar"
+                      >
+                        <p className="text-sm font-medium text-slate-900 line-clamp-2 leading-snug">
+                          {s.title}
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-2">
+                          <span>{ROLE_LABELS[s.role]}</span>
+                          <span className="text-slate-300">·</span>
+                          <span>{s.message_count} msg</span>
+                          <span className="text-slate-300">·</span>
+                          <span>{stamp}</span>
+                        </p>
+                      </button>
+                    )}
+                    {renamingId !== s.id && (
+                      <>
+                        {/* Botón lápiz — rename */}
+                        <button
+                          onClick={() => startRename(s)}
+                          title="Renombrar"
+                          aria-label="Renombrar"
+                          className="absolute right-8 top-1/2 -translate-y-1/2 p-1.5 rounded text-slate-400 opacity-0 group-hover:opacity-100 hover:text-brand-primary hover:bg-brand-primary-light transition-opacity"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        {/* Botón papelera — archive */}
+                        <button
+                          onClick={() => handleArchive(s.id)}
+                          title="Archivar conversación"
+                          aria-label="Archivar"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-slate-400 opacity-0 group-hover:opacity-100 hover:text-rose-600 hover:bg-rose-50 transition-opacity"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
                   </li>
                 );
               })}

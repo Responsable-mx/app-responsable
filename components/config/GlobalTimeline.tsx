@@ -351,6 +351,43 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
   const todayPx = ((now - range.min) / totalMs) * chartW;
   const todayInRange = todayPx >= 0 && todayPx <= chartW;
 
+  // Granularidad: px por día determina qué mostrar
+  const pxPerDay = chartW / (totalMs / MS_DAY);
+  const showWeekSub = pxPerDay >= 5;   // sub-fila de semanas
+  const showDaySub  = pxPerDay >= 18;  // sub-fila de días
+  const headerH     = showWeekSub ? 54 : 36;
+
+  // Lunes de cada semana en el rango
+  const weekStarts: { px: number; label: string }[] = (() => {
+    const out: { px: number; label: string }[] = [];
+    const dow = new Date(range.min).getDay(); // 0=Dom
+    const offsetToMon = dow === 0 ? 1 : dow === 1 ? 0 : 8 - dow;
+    let cur = range.min + offsetToMon * MS_DAY;
+    while (cur < range.max) {
+      out.push({
+        px: ((cur - range.min) / totalMs) * chartW,
+        label: new Date(cur).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }),
+      });
+      cur += 7 * MS_DAY;
+    }
+    return out;
+  })();
+
+  // Días individuales (solo zoom alto)
+  const dayLines: { px: number; label: string }[] = (() => {
+    if (!showDaySub) return [];
+    const out: { px: number; label: string }[] = [];
+    let cur = range.min;
+    while (cur < range.max) {
+      out.push({
+        px: ((cur - range.min) / totalMs) * chartW,
+        label: String(new Date(cur).getDate()),
+      });
+      cur += MS_DAY;
+    }
+    return out;
+  })();
+
   function pxOf(s: string | null): number | null {
     const d = parseDate(s);
     if (!d) return null;
@@ -449,8 +486,8 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
 
           {/* Columna label — ancho fijo, no scrollea */}
           <div className="shrink-0 border-r border-slate-200 bg-white" style={{ width: LABEL_W }}>
-            {/* Header */}
-            <div className="h-9 border-b border-slate-200 bg-slate-50 px-3 flex items-center">
+            {/* Header — altura dinámica según granularidad */}
+            <div className="border-b border-slate-200 bg-slate-50 px-3 flex items-start pt-2" style={{ height: headerH }}>
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Consultor</span>
             </div>
             {/* Filas de consultor */}
@@ -495,8 +532,9 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
             {/* Inner a ancho fijo en px */}
             <div style={{ width: chartW }} className="relative">
 
-              {/* Header meses */}
-              <div className="h-9 border-b border-slate-200 bg-slate-50 relative overflow-hidden">
+              {/* Header: fila meses + fila semanas/días */}
+              <div className="border-b border-slate-200 bg-slate-50 relative overflow-hidden" style={{ height: headerH }}>
+                {/* Fila de meses — siempre */}
                 {range.months.map((m, i) => {
                   const leftPx = ((m.getTime() - range.min) / totalMs) * chartW;
                   const nextMs = i + 1 < range.months.length
@@ -506,13 +544,40 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
                   return (
                     <div
                       key={i}
-                      className="absolute top-0 bottom-0 border-r border-slate-200 px-1.5 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 overflow-hidden"
-                      style={{ left: leftPx, width: widthPx }}
+                      className="absolute border-r border-slate-300 px-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-600 overflow-hidden flex items-center"
+                      style={{ left: leftPx, width: widthPx, top: 0, height: showWeekSub ? 27 : headerH }}
                     >
                       {fmtMonth(m)}
                     </div>
                   );
                 })}
+
+                {/* Separador entre filas */}
+                {showWeekSub && (
+                  <div className="absolute left-0 right-0 border-t border-slate-200" style={{ top: 27 }} />
+                )}
+
+                {/* Fila de semanas (zoom moderado) */}
+                {showWeekSub && !showDaySub && weekStarts.map(({ px, label }, i) => (
+                  <div
+                    key={i}
+                    className="absolute border-r border-slate-200/60 px-1 text-[9px] font-medium text-slate-500 overflow-hidden flex items-center"
+                    style={{ left: px, top: 27, height: 27, minWidth: 2 }}
+                  >
+                    {label}
+                  </div>
+                ))}
+
+                {/* Fila de días (zoom alto) */}
+                {showDaySub && dayLines.map(({ px, label }, i) => (
+                  <div
+                    key={i}
+                    className="absolute border-r border-slate-200/40 text-[8px] text-slate-400 overflow-hidden flex items-center justify-center"
+                    style={{ left: px, top: 27, height: 27, width: Math.max(pxPerDay, 1) }}
+                  >
+                    {pxPerDay >= 22 ? label : ""}
+                  </div>
+                ))}
               </div>
 
               {/* Filas de actividades */}
@@ -523,8 +588,26 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
                   {range.months.map((m, i) => (
                     <div
                       key={i}
-                      className="absolute top-0 bottom-0 border-r border-slate-100 pointer-events-none"
+                      className="absolute top-0 bottom-0 border-r border-slate-200/80 pointer-events-none"
                       style={{ left: ((m.getTime() - range.min) / totalMs) * chartW, width: 0 }}
+                    />
+                  ))}
+
+                  {/* Líneas de semana */}
+                  {weekStarts.map(({ px }, i) => (
+                    <div
+                      key={i}
+                      className="absolute top-0 bottom-0 border-r border-slate-100 pointer-events-none"
+                      style={{ left: px, width: 0 }}
+                    />
+                  ))}
+
+                  {/* Líneas de día (zoom alto) */}
+                  {showDaySub && dayLines.map(({ px }, i) => (
+                    <div
+                      key={i}
+                      className="absolute top-0 bottom-0 pointer-events-none"
+                      style={{ left: px, width: 0, borderRight: "1px dashed rgba(203,213,225,0.35)" }}
                     />
                   ))}
 

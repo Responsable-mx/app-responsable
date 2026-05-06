@@ -58,7 +58,7 @@ const AiFieldSchema = z.object({
 const AiResponseSchema = z.record(z.string(), AiFieldSchema);
 
 export async function POST(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   if (!process.env.ANTHROPIC_API_KEY) {

@@ -10,14 +10,17 @@ import { Input } from "@/components/ui/Input";
 
 type User = {
   email: string;
-  role: "admin" | "consultor";
+  role: "admin" | "consultor" | "cliente";
   full_name: string | null;
   active: boolean;
   invited_by: string | null;
   last_login: string | null;
   seniority_level: string | null;
+  client_id: string | null;
   created_at: string;
 };
+
+type ClientOption = { id: string; name: string };
 
 type SeniorityItem = { value: string; label: string };
 
@@ -119,6 +122,8 @@ export function UsersManager() {
                       className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm ${
                         u.role === "admin"
                           ? "bg-indigo-50 text-indigo-800"
+                          : u.role === "cliente"
+                          ? "bg-teal-50 text-teal-800"
                           : "bg-slate-100 text-slate-700"
                       }`}
                     >
@@ -216,23 +221,36 @@ function UserEditor({
 }) {
   const [email, setEmail] = useState(user?.email ?? "");
   const [fullName, setFullName] = useState(user?.full_name ?? "");
-  const [role, setRole] = useState<"admin" | "consultor">(user?.role ?? "consultor");
+  const [role, setRole] = useState<"admin" | "consultor" | "cliente">(user?.role ?? "consultor");
   const [active, setActive] = useState(user?.active ?? true);
   const [seniorityLevel, setSeniorityLevel] = useState(user?.seniority_level ?? "");
+  const [clientId, setClientId] = useState(user?.client_id ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const { data: clientsData } = useSWR<{ data: ClientOption[] }>(
+    role === "cliente" ? "/api/clients?limit=500" : null,
+    (url: string) => fetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false }
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSaving(true);
     try {
+      if (role === "cliente" && !clientId) {
+        setError("Rol cliente requiere seleccionar una empresa.");
+        setSaving(false);
+        return;
+      }
       const payload = user
         ? {
             role,
             active,
             full_name: fullName.trim() || null,
             seniority_level: seniorityLevel || null,
+            client_id: role === "cliente" ? clientId : null,
           }
         : {
             email,
@@ -240,6 +258,7 @@ function UserEditor({
             active,
             full_name: fullName.trim() || null,
             seniority_level: seniorityLevel || null,
+            client_id: role === "cliente" ? clientId : null,
           };
       const url = user
         ? `/api/users/${encodeURIComponent(user.email)}`
@@ -311,10 +330,36 @@ function UserEditor({
             onChange={(e) => setRole(e.target.value as "admin" | "consultor")}
             className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
           >
-            <option value="consultor">Consultor · solo chat y clientes</option>
+            <option value="consultor">Consultor · chat IA y clientes</option>
             <option value="admin">Admin · además gestiona configuración</option>
+            <option value="cliente">Cliente · solo ve su propia empresa</option>
           </select>
         </div>
+
+        {role === "cliente" && (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="user-client-select" className="text-sm font-medium text-slate-700">
+              Empresa <span className="text-brand-berry">*</span>
+            </label>
+            <select
+              id="user-client-select"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              required
+            >
+              <option value="">— Seleccionar empresa —</option>
+              {(clientsData?.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500">
+              El usuario solo verá datos de esta empresa.
+            </p>
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <label htmlFor="user-seniority-select" className="text-sm font-medium text-slate-700">
             Nivel de seniority (default)

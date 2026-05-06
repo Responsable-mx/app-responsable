@@ -9,6 +9,7 @@ import Link from "next/link";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
 import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { ServiceGantt } from "@/components/services/ServiceGantt";
+import { WorkloadHeatmap } from "./WorkloadHeatmap";
 import { useToast } from "@/components/ui/Toast";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import type { QuickPatch } from "@/components/services/QuickActionPopover";
@@ -42,6 +43,123 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
     }
     await mutate();
   }
+  function generateDigest(projects: ProjectOverview[]) {
+    const today = new Date().toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const totalP = projects.length;
+    const atRiskP = projects.filter((p) => p.delayed_count > 0).length;
+
+    // Actividades retrasadas
+    type DelayRow = { client: string; stage: string; activity: string; assignee: string; planned_end: string; days_over: number };
+    const delayed: DelayRow[] = [];
+    for (const p of projects) {
+      for (const sv of p.services) {
+        for (const st of sv.stages) {
+          for (const a of st.activities) {
+            if (a.status === "delayed" && a.planned_end) {
+              const daysOver = Math.round((Date.now() - new Date(a.planned_end + "T00:00:00").getTime()) / 86_400_000);
+              delayed.push({ client: p.client_name, stage: st.name, activity: a.name, assignee: a.assignee_email?.split("@")[0] ?? "—", planned_end: a.planned_end, days_over: daysOver });
+            }
+          }
+        }
+      }
+    }
+    delayed.sort((a, b) => b.days_over - a.days_over);
+
+    // Carga por consultor
+    const loadMap: Record<string, { active: number; delayed: number }> = {};
+    for (const p of projects) {
+      for (const sv of p.services) {
+        for (const st of sv.stages) {
+          for (const a of st.activities) {
+            if (!a.assignee_email) continue;
+            if (!loadMap[a.assignee_email]) loadMap[a.assignee_email] = { active: 0, delayed: 0 };
+            if (a.status === "in_progress") loadMap[a.assignee_email].active++;
+            if (a.status === "delayed") loadMap[a.assignee_email].delayed++;
+          }
+        }
+      }
+    }
+    const consultorRows = Object.entries(loadMap)
+      .filter(([, v]) => v.active + v.delayed > 0)
+      .sort((a, b) => b[1].delayed - a[1].delayed || b[1].active - a[1].active);
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Digest ejecutivo — ${today}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; color: #1e293b; margin: 0; padding: 24px; }
+  h1 { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 4px; }
+  .subtitle { font-size: 11px; color: #64748b; margin-bottom: 20px; }
+  h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin: 20px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  .kpi-row { display: flex; gap: 16px; margin-bottom: 16px; }
+  .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px 16px; min-width: 80px; }
+  .kpi-n { font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1; }
+  .kpi-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-top: 2px; }
+  .kpi.risk .kpi-n { color: #e11d48; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  th { text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; padding: 4px 8px; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; font-size: 11px; vertical-align: middle; }
+  tr:hover td { background: #f8fafc; }
+  .badge-rose { background: #fff1f2; color: #e11d48; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
+  .badge-amber { background: #fffbeb; color: #b45309; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
+  .badge-emerald { background: #f0fdf4; color: #15803d; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
+  .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+<h1>Digest ejecutivo de portafolio</h1>
+<p class="subtitle">${today} · Generado desde App ResponSable</p>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-n">${totalP}</div><div class="kpi-l">Proyectos</div></div>
+  <div class="kpi ${atRiskP > 0 ? "risk" : ""}"><div class="kpi-n">${atRiskP}</div><div class="kpi-l">En riesgo</div></div>
+  <div class="kpi"><div class="kpi-n">${delayed.length}</div><div class="kpi-l">Act. retrasadas</div></div>
+  <div class="kpi"><div class="kpi-n">${consultorRows.length}</div><div class="kpi-l">Consultores activos</div></div>
+</div>
+
+<h2>Actividades retrasadas (${delayed.length})</h2>
+${delayed.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>Sin retrasos activos. ✓</p>" : `
+<table>
+  <thead><tr><th>Cliente</th><th>Etapa</th><th>Actividad</th><th>Asignado</th><th>Fecha plan</th><th>Días vencido</th></tr></thead>
+  <tbody>
+    ${delayed.map((r) => `<tr>
+      <td>${r.client}</td>
+      <td style="color:#64748b">${r.stage}</td>
+      <td><strong>${r.activity}</strong></td>
+      <td>${r.assignee}</td>
+      <td>${r.planned_end}</td>
+      <td><span class="badge-rose">+${r.days_over}d</span></td>
+    </tr>`).join("")}
+  </tbody>
+</table>`}
+
+<h2>Carga por consultor</h2>
+<table>
+  <thead><tr><th>Consultor</th><th>En curso</th><th>Retrasadas</th><th>Estado</th></tr></thead>
+  <tbody>
+    ${consultorRows.map(([email, v]) => `<tr>
+      <td>${email.split("@")[0]}</td>
+      <td><span class="badge-amber">${v.active}</span></td>
+      <td>${v.delayed > 0 ? `<span class="badge-rose">${v.delayed}</span>` : "<span style='color:#94a3b8'>0</span>"}</td>
+      <td>${v.delayed >= 2 ? '<span class="badge-rose">Sobrecargado</span>' : v.active >= 4 ? '<span class="badge-amber">Alta carga</span>' : '<span class="badge-emerald">Normal</span>'}</td>
+    </tr>`).join("")}
+  </tbody>
+</table>
+
+<div class="footer">Digest generado el ${today} · App ResponSable · Solo para uso interno</div>
+</body>
+</html>`;
+
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+    }
+  }
+
   const { data: serviceCat = [] } = useSWR<{ value: string; label: string }[]>(
     "/api/catalogs?category=services",
     catalogFetcher,
@@ -113,6 +231,9 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
 
   return (
     <div className="space-y-6">
+      {/* Heatmap carga semanal */}
+      <WorkloadHeatmap />
+
       {/* Portfolio health summary */}
       <div className="flex items-center justify-between gap-3 px-3 py-2 bg-white border border-slate-200 rounded">
         <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
@@ -136,16 +257,29 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
             </span>
           )}
         </div>
-        <button
-          onClick={() => setSortByRisk((v) => !v)}
-          className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm transition-colors ${
-            sortByRisk
-              ? "bg-rose-100 text-rose-700"
-              : "text-slate-400 hover:text-slate-700"
-          }`}
-        >
-          {sortByRisk ? "Ordenado por riesgo" : "Ordenar por riesgo"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSortByRisk((v) => !v)}
+            className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm transition-colors ${
+              sortByRisk
+                ? "bg-rose-100 text-rose-700"
+                : "text-slate-400 hover:text-slate-700"
+            }`}
+          >
+            {sortByRisk ? "Ordenado por riesgo" : "Ordenar por riesgo"}
+          </button>
+          <div className="w-px h-4 bg-slate-200" aria-hidden />
+          <button
+            onClick={() => generateDigest(rawProjects)}
+            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm text-slate-400 hover:text-brand-primary-dark transition-colors"
+            title="Digest ejecutivo: retrasos + carga + estado portafolio"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Reporte
+          </button>
+        </div>
       </div>
 
       {displayProjects.map((p) => (

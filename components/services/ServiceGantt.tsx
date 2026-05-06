@@ -5,7 +5,7 @@
 // Zoom: Ajustar | Mes (200px/mes) | Trim (440px/mes) — ambos con marcadores de semana.
 // Baseline freeze · export PNG (html2canvas dyn-import).
 
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useId } from "react";
 import type { ActivityStatus, ServiceStage, StageActivity } from "@/lib/stages";
 import { QuickActionPopover, type QuickPatch } from "./QuickActionPopover";
 
@@ -159,6 +159,8 @@ export function ServiceGantt({
   const [freezing, setFreezing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showFloat, setShowFloat] = useState(false);
+  const [showDeps, setShowDeps] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerTimelineInnerRef = useRef<HTMLDivElement>(null);
@@ -172,6 +174,46 @@ export function ServiceGantt({
   const allActivities = useMemo(() => stages.flatMap((s) => s.activities), [stages]);
   const atRisk = useMemo(() => findAtRisk(allActivities), [allActivities]);
   const hasBaseline = useMemo(() => allActivities.some((a) => a.baseline_start), [allActivities]);
+  const uid = useId().replace(/:/g, "");
+
+  // Float/holgura: días libres entre fin plan y el inicio del dependiente más temprano (o fin de etapa)
+  const floatMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of stages) {
+      const maxEnd = s.activities
+        .filter((a) => a.planned_end)
+        .reduce<number>((mx, a) => Math.max(mx, parseDate(a.planned_end)!.getTime()), 0);
+      for (const a of s.activities) {
+        if (!a.planned_end) continue;
+        const aEnd = parseDate(a.planned_end)!.getTime();
+        const deps = allActivities.filter((d) => d.depends_on_activity_id === a.id && d.planned_start);
+        const floatEnd = deps.length > 0
+          ? Math.min(...deps.map((d) => parseDate(d.planned_start)!.getTime()))
+          : maxEnd;
+        const f = Math.round((floatEnd - aEnd) / MS_DAY);
+        if (f > 0) map.set(a.id, f);
+      }
+    }
+    return map;
+  }, [stages, allActivities]);
+
+  // Posición Y de cada actividad en el área de filas (para flechas de dependencia)
+  const rowY = useMemo(() => {
+    if (!showDeps) return new Map<string, number>();
+    const map = new Map<string, number>();
+    let y = 0;
+    for (const s of stages) {
+      const hasMetricsLine = s.activities.some((a) => a.planned_start && a.planned_end);
+      y += hasMetricsLine ? 48 : 30; // aprox altura header etapa: 1 línea vs 2 líneas
+      if (!collapsed.has(s.id)) {
+        for (const a of s.activities) {
+          map.set(a.id, y + ROW_H / 2);
+          y += ROW_H;
+        }
+      }
+    }
+    return map;
+  }, [stages, collapsed, showDeps]);
 
   const range = useMemo(() => {
     const dates: number[] = [];
@@ -469,6 +511,21 @@ export function ServiceGantt({
                 ← → · drag
               </span>
             )}
+            <div className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden />
+            <button
+              onClick={() => setShowFloat((v) => !v)}
+              className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showFloat ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
+              title="Holgura: días de buffer disponible por actividad"
+            >
+              Float
+            </button>
+            <button
+              onClick={() => setShowDeps((v) => !v)}
+              className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showDeps ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
+              title="Flechas de dependencia entre actividades"
+            >
+              Deps
+            </button>
             <div className="flex items-center gap-1.5 ml-auto">
               {todayInRange && (
                 <button onClick={scrollToToday} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-brand-primary-dark transition-colors">
@@ -607,7 +664,61 @@ export function ServiceGantt({
         >
           <div style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
             {/* ─── Filas ─── */}
-            <div className="divide-y divide-slate-200">
+            <div className="divide-y divide-slate-200 relative">
+              {/* Flechas de dependencia (SVG sobre área timeline, pointer-events:none) */}
+              {showDeps && timelineWidth && (() => {
+                const arrows: React.ReactNode[] = [];
+                let totalH = 0;
+                for (const s of stages) {
+                  const hm = s.activities.some((a) => a.planned_start && a.planned_end);
+                  totalH += hm ? 48 : 30;
+                  if (!collapsed.has(s.id)) totalH += s.activities.length * ROW_H;
+                }
+                for (const a of allActivities) {
+                  if (!a.depends_on_activity_id) continue;
+                  const dep = allActivities.find((x) => x.id === a.depends_on_activity_id);
+                  if (!dep || !dep.planned_end || !a.planned_start) continue;
+                  const y1 = rowY.get(dep.id);
+                  const y2 = rowY.get(a.id);
+                  const x1pct = pct(dep.planned_end);
+                  const x2pct = pct(a.planned_start);
+                  if (y1 == null || y2 == null || x1pct == null || x2pct == null) continue;
+                  const x1 = (x1pct / 100) * timelineWidth;
+                  const x2 = (x2pct / 100) * timelineWidth;
+                  const mx = (x1 + x2) / 2;
+                  const isConflict = a.planned_start < dep.planned_end;
+                  const arrowId = isConflict ? `arrowhead-rose-${uid}` : `arrowhead-gray-${uid}`;
+                  arrows.push(
+                    <polyline
+                      key={`${dep.id}-${a.id}`}
+                      points={`${x1.toFixed(1)},${y1.toFixed(1)} ${mx.toFixed(1)},${y1.toFixed(1)} ${mx.toFixed(1)},${y2.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`}
+                      fill="none"
+                      stroke={isConflict ? "#f43f5e" : "#94a3b8"}
+                      strokeWidth={1.5}
+                      strokeDasharray={isConflict ? undefined : "4 2"}
+                      markerEnd={`url(#${arrowId})`}
+                      opacity={0.75}
+                    />
+                  );
+                }
+                if (arrows.length === 0) return null;
+                return (
+                  <svg
+                    className="absolute pointer-events-none z-30"
+                    style={{ left: LABEL_W, top: 0, width: timelineWidth, height: totalH, overflow: "visible" }}
+                  >
+                    <defs>
+                      <marker id={`arrowhead-gray-${uid}`} markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                        <polygon points="0 0, 6 2, 0 4" fill="#94a3b8" />
+                      </marker>
+                      <marker id={`arrowhead-rose-${uid}`} markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                        <polygon points="0 0, 6 2, 0 4" fill="#f43f5e" />
+                      </marker>
+                    </defs>
+                    {arrows}
+                  </svg>
+                );
+              })()}
               {stages.map((s) => {
                 const isCollapsed = collapsed.has(s.id);
                 const stageDone = s.activities.filter((a) => a.status === "completed").length;
@@ -657,50 +768,51 @@ export function ServiceGantt({
 
                 return (
                   <div key={s.id}>
-                    {/* Etapa header */}
+                    {/* Etapa header — columna sticky siempre visible en scroll horizontal */}
                     <div className="flex bg-slate-100/70 border-t border-slate-200">
-                      <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-100/70 px-3 py-1.5 border-r border-slate-200 flex items-center gap-1.5 min-w-0`}>
-                        <button onClick={() => toggleCollapse(s.id)} className="shrink-0 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-700">
-                          <svg className={`w-3 h-3 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        <span
-                          className={`shrink-0 w-1.5 h-1.5 rounded-full ${stageRag === "red" ? "bg-rose-500" : stageRag === "amber" ? "bg-amber-400" : "bg-emerald-400"}`}
-                          title={stageRag === "red" ? "Retrasada" : stageRag === "amber" ? "En progreso" : "Al día"}
-                        />
-                        <span className="text-xs font-bold text-slate-700 truncate">{s.name}</span>
-                        <span className={`shrink-0 ml-auto text-[10px] font-bold tabular-nums ${stagePct === 100 ? "text-emerald-600" : "text-slate-400"}`}>
-                          {stagePct}%
-                        </span>
-                      </div>
-                      {/* Métricas etapa en lado timeline */}
-                      {(plannedDays !== null || stageSpi !== null) && (
-                        <div className="flex items-center gap-3 px-3 shrink-0">
-                          {plannedDays !== null && (
-                            <span
-                              className={`text-[9px] tabular-nums font-bold whitespace-nowrap ${
-                                daysOver ? "text-rose-600" : actualDays !== null ? "text-emerald-600" : "text-slate-400"
-                              }`}
-                              title={`Duración etapa — Planeado: ${plannedDays} días${actualDays !== null ? ` / Real: ${actualDays} días` : ""}`}
-                            >
-                              {plannedDays}d{actualDays !== null ? ` / ${actualDays}d` : ""}
-                            </span>
-                          )}
-                          {stageSpi !== null && (
-                            <span
-                              className={`text-[9px] tabular-nums font-bold whitespace-nowrap px-1 rounded-sm ${
-                                stageSpi >= 1.0 ? "text-emerald-700 bg-emerald-50" :
-                                stageSpi >= 0.8 ? "text-amber-700 bg-amber-50" :
-                                "text-rose-600 bg-rose-50"
-                              }`}
-                              title={`SPI ${stageSpi.toFixed(2)} — ${stageSpi >= 1 ? "Adelantado o en tiempo" : stageSpi >= 0.8 ? "Leve retraso" : "Riesgo alto de retraso"}${stageForecastEnd ? ` · Est. fin: ${stageForecastEnd.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}` : ""}`}
-                            >
-                              SPI {stageSpi.toFixed(1)}
-                            </span>
-                          )}
+                      <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-100/70 border-r border-slate-200 min-w-0`}>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5">
+                          <button onClick={() => toggleCollapse(s.id)} className="shrink-0 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-700">
+                            <svg className={`w-3 h-3 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          <span
+                            className={`shrink-0 w-1.5 h-1.5 rounded-full ${stageRag === "red" ? "bg-rose-500" : stageRag === "amber" ? "bg-amber-400" : "bg-emerald-400"}`}
+                            title={stageRag === "red" ? "Retrasada" : stageRag === "amber" ? "En progreso" : "Al día"}
+                          />
+                          <span className="text-xs font-bold text-slate-700 truncate">{s.name}</span>
+                          <span className={`shrink-0 ml-auto text-[10px] font-bold tabular-nums ${stagePct === 100 ? "text-emerald-600" : "text-slate-400"}`}>
+                            {stagePct}%
+                          </span>
                         </div>
-                      )}
+                        {(plannedDays !== null || stageSpi !== null) && (
+                          <div className="flex items-center gap-2 px-3 pb-1.5 pl-7">
+                            {plannedDays !== null && (
+                              <span
+                                className={`text-[9px] tabular-nums font-bold whitespace-nowrap ${
+                                  daysOver ? "text-rose-600" : actualDays !== null ? "text-emerald-600" : "text-slate-400"
+                                }`}
+                                title={`Duración etapa — Planeado: ${plannedDays} días${actualDays !== null ? ` / Real: ${actualDays} días` : ""}`}
+                              >
+                                {plannedDays}d{actualDays !== null ? ` / ${actualDays}d` : ""}
+                              </span>
+                            )}
+                            {stageSpi !== null && (
+                              <span
+                                className={`text-[9px] tabular-nums font-bold whitespace-nowrap px-1 rounded-sm ${
+                                  stageSpi >= 1.0 ? "text-emerald-700 bg-emerald-50" :
+                                  stageSpi >= 0.8 ? "text-amber-700 bg-amber-50" :
+                                  "text-rose-600 bg-rose-50"
+                                }`}
+                                title={`SPI ${stageSpi.toFixed(2)} — ${stageSpi >= 1 ? "Adelantado o en tiempo" : stageSpi >= 0.8 ? "Leve retraso" : "Riesgo alto de retraso"}${stageForecastEnd ? ` · Est. fin: ${stageForecastEnd.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}` : ""}`}
+                              >
+                                SPI {stageSpi.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0" />
                     </div>
 
@@ -799,6 +911,24 @@ export function ServiceGantt({
                             {planStyle && (
                               <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-4 rounded border-2 bg-white/80 hover:opacity-80 transition-all z-10 ${isOnRisk ? "border-rose-400" : "border-slate-400 hover:border-brand-primary"}`} style={{ ...planStyle, top: 10 }} title={`Plan: ${fmtShort(a.planned_start)} → ${fmtShort(a.planned_end)}`} />
                             )}
+                            {showFloat && (() => {
+                              const floatDays = floatMap.get(a.id);
+                              if (!floatDays || !a.planned_end) return null;
+                              const floatEnd = new Date(parseDate(a.planned_end)!.getTime() + floatDays * MS_DAY);
+                              const floatStyle = barStyle(a.planned_end, floatEnd.toISOString().slice(0, 10));
+                              if (!floatStyle) return null;
+                              return (
+                                <div
+                                  className="absolute h-1.5 pointer-events-none z-[9]"
+                                  style={{
+                                    ...floatStyle,
+                                    top: 17,
+                                    background: "repeating-linear-gradient(90deg,rgba(148,163,184,0.5) 0,rgba(148,163,184,0.5) 3px,transparent 3px,transparent 6px)",
+                                  }}
+                                  title={`Holgura: ${floatDays}d`}
+                                />
+                              );
+                            })()}
                             {realStyle ? (
                               <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-3 rounded overflow-hidden ${barColor} hover:opacity-90 z-20`} style={{ ...realStyle, top: 13 }} title={`Real: ${fmtShort(a.actual_start)} → ${fmtShort(a.actual_end)} · ${STATUS_LABEL[a.status]}${a.actual_progress != null ? ` · ${a.actual_progress}%` : ""}`}>
                                 {a.actual_progress != null && a.actual_progress < 100 && (
@@ -836,6 +966,18 @@ export function ServiceGantt({
                 Ruta crítica
               </span>
               {todayInRange && <span className="inline-flex items-center gap-1.5"><span className="w-px h-3 bg-rose-400/60" />Hoy</span>}
+              {showFloat && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-4 h-1.5 inline-block" style={{ background: "repeating-linear-gradient(90deg,rgba(148,163,184,0.5) 0,rgba(148,163,184,0.5) 3px,transparent 3px,transparent 6px)" }} />
+                  Holgura
+                </span>
+              )}
+              {showDeps && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-4 h-0 inline-block border-b border-dashed border-slate-400" />
+                  Dependencia
+                </span>
+              )}
             </div>
           </div>
         </div>{/* /scrollRef */}

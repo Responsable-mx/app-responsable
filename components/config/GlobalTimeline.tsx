@@ -27,7 +27,7 @@ const STATUS_BAR: Record<ActivityStatus, string> = {
 };
 
 const MS_DAY = 86_400_000;
-const LABEL_W = 210;
+const LABEL_W = 220;
 const CHART_BASE = 1200; // px de ancho del chart a zoom 1×
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
 const ZOOM_DEFAULT = 2; // índice → 1×
@@ -514,38 +514,48 @@ export function GlobalTimeline({
               const subtitle = isUnassigned
                 ? `${acts.length} sin owner`
                 : `${acts.length} ${acts.length === 1 ? "actividad" : "actividades"} · ${uniqueClients} ${uniqueClients === 1 ? "cliente" : "clientes"}`;
-              const RAG_DOT = { red: "bg-rose-500", amber: "bg-amber-400", green: "bg-emerald-500" } as const;
-              const RAG_TEXT = { red: "text-rose-700 font-bold", amber: "text-amber-700 font-semibold", green: "text-slate-500" } as const;
+              const RAG_BORDER = { red: "border-l-rose-500", amber: "border-l-amber-400", green: "border-l-emerald-400" } as const;
+              const RAG_AVATAR = { red: "bg-rose-100 text-rose-700", amber: "bg-amber-100 text-amber-700", green: "bg-emerald-100 text-emerald-700" } as const;
+              const RAG_TEXT = { red: "text-rose-700 font-semibold", amber: "text-amber-700 font-semibold", green: "text-slate-500" } as const;
               const RAG_LABEL = {
                 red: `${delayed} retrasada${delayed !== 1 ? "s" : ""}`,
                 amber: `${active} en curso`,
-                green: "Sin carga activa",
+                green: "Al día",
               } as const;
+              const initials = isUnassigned
+                ? "?"
+                : display.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
               return (
                 <div
                   key={key}
-                  className="border-b border-slate-100 px-3 py-2.5 flex flex-col justify-start gap-0.5"
+                  className={`border-b border-slate-100 border-l-4 px-2.5 py-2 flex flex-col justify-center gap-0.5 ${RAG_BORDER[rag]}`}
                   style={{ height: rowH }}
                 >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`shrink-0 w-2 h-2 rounded-full ${RAG_DOT[rag]}`} aria-label={RAG_LABEL[rag]} />
-                    <p className={`text-xs font-semibold truncate ${isUnassigned ? "text-slate-500 italic" : "text-slate-900"}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold leading-none ${isUnassigned ? "bg-slate-100 text-slate-500" : RAG_AVATAR[rag]}`}>
+                      {initials}
+                    </span>
+                    <p className={`text-xs font-bold truncate ${isUnassigned ? "text-slate-500 italic" : "text-slate-800"}`}>
                       {display}
                     </p>
                   </div>
-                  <p className="text-[10px] text-slate-500 truncate pl-3.5" title={subtitle}>{subtitle}</p>
+                  <p className="text-[10px] text-slate-500 truncate pl-8" title={subtitle}>{subtitle}</p>
                   {!isUnassigned && (
-                    <p className={`text-[10px] tabular-nums pl-3.5 ${RAG_TEXT[rag]}`}>{RAG_LABEL[rag]}</p>
+                    <p className={`text-[10px] tabular-nums pl-8 ${RAG_TEXT[rag]}`}>{RAG_LABEL[rag]}</p>
                   )}
                 </div>
               );
             })}
           </div>
 
-          {/* Zona chart — scroll horizontal */}
+          {/* Zona chart — scroll horizontal.
+              overflow-y:clip: evita que overflow-x:auto acople overflow-y:auto
+              (CSS coupling rule). clip no crea scroll container → <main> ve
+              altura total y puede scrollear verticalmente. */}
           <div
             ref={scrollRef}
             className="overflow-x-auto flex-1 min-w-0"
+            style={{ overflowY: "clip" }}
             onWheel={handleWheel}
           >
             {/* Inner a ancho fijo en px */}

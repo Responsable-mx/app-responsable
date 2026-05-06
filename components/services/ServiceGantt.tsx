@@ -403,9 +403,14 @@ export function ServiceGantt({
         </div>{/* /sticky */}
 
         {/* ─── Filas scrollables ─── */}
+        {/* overflow-y:clip (no overflow-y:auto) → evita que el scrollRef atrape
+            scroll vertical. overflow-x:auto (CSS) fuerza overflow-y:auto si no
+            se sobreescribe; clip clips sin crear scroll container, así <main>
+            ve la altura total y puede scrollear verticalmente. */}
         <div
           ref={scrollRef}
           className={timelineWidth ? "overflow-x-auto" : "overflow-hidden"}
+          style={timelineWidth ? { overflowY: "clip" } : undefined}
           onScroll={(e) => {
             // Sync header timeline via transform (sin re-render React)
             if (headerTimelineInnerRef.current) {

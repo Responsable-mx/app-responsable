@@ -9,6 +9,7 @@ import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 import { StructuredBlockEditor } from "@/components/StructuredBlockEditor";
 import { BoolTriField } from "@/components/fields/BoolTriField";
 import { ExtractSectorModal } from "@/components/extract/ExtractSectorModal";
+import { ReportIaButton } from "@/components/clients/ReportIaButton";
 import {
   NARRATIVE_SCHEMAS,
   type NarrativeBlockKey,
@@ -409,13 +410,23 @@ export function ClientForm(props: Props) {
             />
           )}
           {form.has_sustainability_report === true && (
-            <p className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded px-3 py-2">
-              URL del reporte →{" "}
-              <strong className="text-slate-700">
-                Bloque 5 · Reportes publicados
-              </strong>{" "}
-              para registrar múltiples años y marcos.
-            </p>
+            <div className="space-y-1">
+              <UrlField
+                label="URL del informe de sustentabilidad"
+                value={form.sustainability_report_url}
+                onChange={(v) => update("sustainability_report_url", v)}
+              />
+              <ReportIaButton
+                clientId={props.initial?.id}
+                kind="sustainability_report"
+                currentUrl={form.sustainability_report_url}
+                onUrlChange={(v) => update("sustainability_report_url", v)}
+              />
+              <p className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded px-3 py-2 mt-2">
+                Multi-año + marcos: usa{" "}
+                <strong className="text-slate-700">Bloque 5 · Reportes publicados</strong>.
+              </p>
+            </div>
           )}
           {form.has_double_materiality === true && (
             <UrlField
@@ -437,6 +448,12 @@ export function ClientForm(props: Props) {
             onChange={(e) => update("financial_report_url", e.target.value)}
             className={inputCls}
             placeholder="https:// … reporte anual o 10-K"
+          />
+          <ReportIaButton
+            clientId={props.initial?.id}
+            kind="financial_report"
+            currentUrl={form.financial_report_url}
+            onUrlChange={(v) => update("financial_report_url", v)}
           />
           <p className="text-[10px] text-slate-400 mt-1">
             Usado por los roles IA para cruzar datos financieros con métricas de sostenibilidad.

@@ -13,8 +13,9 @@ import type { MaterialityTopic } from "@/lib/materiality/types";
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 import { TeamTab } from "@/components/equipo/TeamTab";
 import { ClientCronogramaTab } from "@/components/services/ClientCronogramaTab";
+import { DocumentsTab } from "@/components/documents/DocumentsTab";
 
-type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "cronograma" | "equipo";
+type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "cronograma" | "equipo" | "documentos";
 
 type Props = {
   client: Client;
@@ -49,14 +50,14 @@ export function ClientTabs({
   const router = useRouter();
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(
-    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad" || initialTab === "cronograma" || initialTab === "equipo"
+    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad" || initialTab === "cronograma" || initialTab === "equipo" || initialTab === "documentos"
       ? initialTab
       : "resumen"
   );
 
   useEffect(() => {
     const t = searchParams?.get("tab");
-    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad" || t === "cronograma" || t === "equipo") {
+    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad" || t === "cronograma" || t === "equipo" || t === "documentos") {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync de URL → state, no loop
       setTab(t);
     }
@@ -174,18 +175,6 @@ export function ClientTabs({
           badge={questionnaireProgress === null ? null : `${questionnaireProgress.filled}/${questionnaireProgress.total}`}
         />
         <TabButton
-          active={tab === "chat"}
-          tabId="chat"
-          onClick={() => goToTab("chat")}
-          icon={
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-          }
-          label="Chat IA"
-          badge={null}
-        />
-        <TabButton
           active={tab === "materialidad"}
           tabId="materialidad"
           onClick={() => goToTab("materialidad")}
@@ -196,7 +185,20 @@ export function ClientTabs({
             </svg>
           }
           label="Materialidad"
-          badge={materialityCount === null ? null : `${materialityCount} temas`}
+          badge={materialityCount === null ? null : `${materialityCount}`}
+          badgeTitle={materialityCount !== null ? `${materialityCount} temas de materialidad` : undefined}
+        />
+        <TabButton
+          active={tab === "chat"}
+          tabId="chat"
+          onClick={() => goToTab("chat")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          }
+          label="Chat IA"
+          badge={null}
         />
         <TabButton
           active={tab === "cronograma"}
@@ -220,6 +222,18 @@ export function ClientTabs({
             </svg>
           }
           label="Consultores"
+          badge={null}
+        />
+        <TabButton
+          active={tab === "documentos"}
+          tabId="documentos"
+          onClick={() => goToTab("documentos")}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          }
+          label="Documentos"
           badge={null}
         />
       </div>
@@ -307,6 +321,13 @@ export function ClientTabs({
           </TabErrorBoundary>
         </div>
       )}
+      {tab === "documentos" && (
+        <div role="tabpanel" id="panel-documentos" tabIndex={0} aria-labelledby="tab-documentos">
+          <TabErrorBoundary tabName="Documentos">
+            <DocumentsTab clientId={client.id} isAdmin={isAdmin} />
+          </TabErrorBoundary>
+        </div>
+      )}
       </div>{/* /panels wrapper */}
     </div>
   );
@@ -318,6 +339,7 @@ function TabButton({
   icon,
   label,
   badge,
+  badgeTitle,
   tabId,
 }: {
   active: boolean;
@@ -325,6 +347,7 @@ function TabButton({
   icon: React.ReactNode;
   label: string;
   badge: string | null;
+  badgeTitle?: string;
   tabId: string;
 }) {
   return (
@@ -334,7 +357,7 @@ function TabButton({
       aria-selected={active}
       aria-controls={`panel-${tabId}`}
       onClick={onClick}
-      className={`px-3 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 -mb-px transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+      className={`px-3 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 -mb-px transition-colors flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 focus-visible:ring-inset ${
         active
           ? "border-brand-primary text-brand-primary-dark"
           : "border-transparent text-slate-500 hover:text-slate-900"
@@ -344,6 +367,7 @@ function TabButton({
       {label}
       {badge !== null && (
         <span
+          title={badgeTitle}
           className={`text-[10px] font-semibold rounded-sm px-1.5 py-0.5 tabular-nums ${
             active
               ? "bg-brand-primary-light text-brand-primary-dark"

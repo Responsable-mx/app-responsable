@@ -71,8 +71,11 @@ export function ImportModal({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset al cerrar; open viene de prop, sin loop
       setPasteText("");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset al cerrar
       setSelectedDocIds(new Set());
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset al cerrar
       setTab("paste");
     }
   }, [open]);

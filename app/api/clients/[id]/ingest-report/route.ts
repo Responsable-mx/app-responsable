@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { uploadAndParseDocument } from "@/lib/documents/queries";
+import { isPublicHttpUrl } from "@/lib/documents/ssrf";
 import { logChange } from "@/lib/audit-log";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -28,29 +29,6 @@ const ALLOWED_CONTENT_TYPES = new Set([
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB
 
 type Ctx = { params: Promise<{ id: string }> };
-
-// SSRF guard: bloquea localhost, IPs privadas, file://, etc.
-function isPublicHttpUrl(u: string): { ok: boolean; reason?: string } {
-  let parsed: URL;
-  try {
-    parsed = new URL(u);
-  } catch {
-    return { ok: false, reason: "URL inválida" };
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    return { ok: false, reason: "Protocolo no permitido" };
-  }
-  const host = parsed.hostname.toLowerCase();
-  if (host === "localhost" || host === "0.0.0.0") return { ok: false, reason: "Host privado" };
-  // Bloquea IPs privadas comunes
-  if (/^127\./.test(host)) return { ok: false, reason: "IP privada" };
-  if (/^10\./.test(host)) return { ok: false, reason: "IP privada" };
-  if (/^192\.168\./.test(host)) return { ok: false, reason: "IP privada" };
-  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return { ok: false, reason: "IP privada" };
-  if (/^169\.254\./.test(host)) return { ok: false, reason: "Link-local" };
-  if (host === "::1" || host.startsWith("fc") || host.startsWith("fd")) return { ok: false, reason: "IP privada IPv6" };
-  return { ok: true };
-}
 
 function fileNameFromUrl(u: string, contentType: string): string {
   const url = new URL(u);

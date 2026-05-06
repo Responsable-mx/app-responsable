@@ -32,7 +32,7 @@ const NAV_BASE: NavItem[] = [
     tour: "nav-clientes",
     icon: IconBuilding,
   },
-  { href: "/chat", label: "Chat general", tour: "nav-chat", icon: IconChat },
+  { href: "/chat", label: "Chat IA", tour: "nav-chat", icon: IconChat },
 ];
 
 const NAV_ADMIN: NavItem[] = [

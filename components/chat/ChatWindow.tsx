@@ -498,10 +498,10 @@ export function ChatWindow({
                         ? "bg-brand-primary-light text-brand-primary-dark border-brand-primary/20"
                         : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}
-                  title={`Perfil del cliente: ${selectedClient.completeness.filled} de ${selectedClient.completeness.total} atributos completos (sector, frameworks, certificaciones, riesgos, etc). Más campos = mejor calidad de respuestas IA.`}
+                  title={`Perfil del cliente: ${selectedClient.completeness.filled} de ${selectedClient.completeness.total} campos completos (sector, frameworks, certificaciones, riesgos, etc). Más contexto = mejor calidad de respuestas IA.`}
                 >
                   <span>Perfil</span>
-                  <span>{selectedClient.completeness.filled}/{selectedClient.completeness.total} campos</span>
+                  <span className="tabular-nums">{ctxPct}%</span>
                 </span>
                 {!clientLocked && (
                   <a
@@ -609,7 +609,7 @@ export function ChatWindow({
         </div>
       </header>
 
-      {selectedClient && selectedClient.completeness.filled < 6 && (
+      {ctxPct !== null && ctxPct < 50 && (
         <div
           role="status"
           className="bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-6 py-2 flex items-center gap-2"
@@ -618,11 +618,10 @@ export function ChatWindow({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           </svg>
           <span>
-            El contexto de <strong>{selectedClient.name}</strong> tiene{" "}
-            {selectedClient.completeness.filled}/6 bloques llenos. Los roles
-            responden mejor cuando está completo.{" "}
+            El perfil de <strong>{selectedClient!.name}</strong> está{" "}
+            {ctxPct}% completo. Los roles responden mejor con más contexto.{" "}
             <a
-              href={`/clientes/${selectedClient.id}?tab=cuestionario`}
+              href={`/clientes/${selectedClient!.id}?tab=cuestionario`}
               className="underline hover:text-amber-700 font-medium"
             >
               Completar ahora

@@ -27,7 +27,9 @@
 
 - [B] Knowledge Base con sync desde OneDrive (pgvector + Microsoft Graph API)
 - [B] Web Research con citas y protección de KB (Brave Search API)
-- [B] 🔄 Documentos por cliente con extracción automática — **MVP text-paste implementado** (`/wizard/[stepKey]/doc-fill`, modal "Importar" en QuestionnaireTab). Pendiente: parsers xlsx/docx/pdf + file upload UI.
+- [B] 🔄 Documentos por cliente con extracción automática — **MVP text-paste implementado** (`/wizard/[stepKey]/doc-fill`, modal "Importar" en QuestionnaireTab). Pendiente (Sprint B): parsers xlsx/docx/pdf + file upload UI + campo informe sustentabilidad/financiero + IA busca URL.
+- [B] ✅ UX cuestionario Sprint A — confirm modal editar campo validado, toast al validar, fuente directa (1 fuente=link, N>1=drawer), fecha actualización por campo, text→AutoResizeTextarea, banner Doble materialidad IA — may-2026
+- [B] ✅ Servicio "Doble materialidad por IA" — catálogo `doble_materialidad_ia` (`seeds.ts`), migración `0040`, seleccionable en ficha cliente, banner en cuestionario — may-2026
 - [B] Control de acceso RBAC (admin gestiona prompts/KB/logs, consultor solo usa)
 - [B] ✅ Export PDF de reporte de cliente — `@react-pdf/renderer`, endpoint `/api/clients/[id]/export-pdf`, botón `ExportPdfButton`, may-2026
 - [B] ✅ Logo del cliente via URL — campo `logo_url` en `ClientForm`, preview live en `ClientAvatar`, may-2026

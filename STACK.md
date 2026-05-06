@@ -100,6 +100,8 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 | `authorized_users` (lista usuarios + seniority default) | Poco — meses | `revalidate: 3600` |
 | `service_templates` (plantillas etapas/actividades/duraciones) | Poco — días | `revalidate: 3600` (SWR) |
 | Estatus proyectos en vista global Equipo (real vs plan) | Todo el tiempo | sin caché — SWR sin revalidateOnFocus delay |
+| Informe sustentabilidad/financiero (URL + metadata, IA investiga) | Casi nunca — max 2×/año | `revalidate: 86400` (ISR diario, en Sprint B) |
+| Documentos cliente convertidos a Markdown (PDFs subidos) | Casi nunca — max 2×/año | `revalidate: 86400` (ISR diario, en Sprint B) |
 
 ### Aplicar migraciones
 - Helper: `node scripts/apply-sql.mjs` (modo paranoico, 17 patrones bloqueados)

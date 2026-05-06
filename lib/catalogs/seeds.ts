@@ -196,6 +196,7 @@ export const CATALOG_SEEDS: CatalogSeedItem[] = [
 
   // services — portafolio ResponSable (orden sugerido por uso, no alfabético)
   { category: "services", value: "doble_materialidad",    label: "Doble materialidad",       sort_order: 10 },
+  { category: "services", value: "doble_materialidad_ia", label: "Doble materialidad por IA",sort_order: 11 },
   { category: "services", value: "esr",                   label: "ESR",                      sort_order: 20 },
   { category: "services", value: "informe_sostenibilidad",label: "Informe de sostenibilidad",sort_order: 30 },
 

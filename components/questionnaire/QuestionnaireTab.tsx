@@ -18,6 +18,7 @@ import {
   type WizardStep,
 } from "@/lib/questionnaires/types";
 import { Button } from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
 import { SelectField } from "@/components/ui/SelectField";
 import { SkeletonCard } from "@/components/ui/Skeleton";
@@ -42,10 +43,12 @@ const SOURCE_CHIP: Record<SourceType, { dot: string; bg: string; text: string; l
 
 export function QuestionnaireTab({
   clientId,
+  clientServices = [],
   initialStepIndex = 0,
   autoFillOnMount = false,
 }: {
   clientId: string;
+  clientServices?: string[];
   initialStepIndex?: number;
   autoFillOnMount?: boolean;
 }) {
@@ -66,17 +69,19 @@ export function QuestionnaireTab({
     );
   }
 
-  return <WizardEditor clientId={clientId} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} />;
+  return <WizardEditor clientId={clientId} clientServices={clientServices} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} />;
 }
 
 function WizardEditor({
   clientId,
+  clientServices = [],
   initial,
   mutate,
   initialStepIndex = 0,
   autoFillOnMount = false,
 }: {
   clientId: string;
+  clientServices?: string[];
   initial: QuestionnaireBundle;
   mutate: () => void;
   initialStepIndex?: number;
@@ -206,13 +211,18 @@ function WizardEditor({
   }
 
   function toggleValidated(stepKey: string, fieldKey: string) {
+    const stepObj = (responses[stepKey] as Record<string, FieldResponse>) ?? {};
+    const wasValidated = (stepObj[fieldKey] as FieldResponse | undefined)?.validated ?? false;
     setResponses((prev) => {
-      const stepObj = (prev[stepKey] as Record<string, FieldResponse>) ?? {};
-      const existing = stepObj[fieldKey];
+      const prevStepObj = (prev[stepKey] as Record<string, FieldResponse>) ?? {};
+      const existing = prevStepObj[fieldKey];
       if (!existing) return prev;
       const next: FieldResponse = { ...existing, validated: !existing.validated, updated_at: new Date().toISOString() };
-      return { ...prev, [stepKey]: { ...stepObj, [fieldKey]: next } };
+      return { ...prev, [stepKey]: { ...prevStepObj, [fieldKey]: next } };
     });
+    if (!wasValidated) {
+      toast.push("success", "Campo marcado como validado ✓");
+    }
     dirty.current = true;
     scheduleSave();
   }
@@ -442,8 +452,20 @@ function WizardEditor({
     (v) => typeof v === "object" && v !== null && Object.keys(v as object).length > 0
   );
 
+  const hasIaService = clientServices.includes("doble_materialidad_ia");
+
   return (
     <div>
+      {/* Banner servicio Doble materialidad por IA */}
+      {hasIaService && (
+        <div className="mb-4 flex items-center gap-2 border border-brand-primary/30 bg-brand-primary/5 rounded px-4 py-2.5">
+          <svg className="w-4 h-4 shrink-0 text-brand-primary-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span className="text-xs font-semibold text-brand-primary-dark">Doble materialidad por IA</span>
+          <span className="text-xs text-slate-600">— todos los pasos habilitados con llenado automático IA.</span>
+        </div>
+      )}
       {/* Banner global AI fill */}
       <AiBulkBanner
         aiCapableCount={aiCapableCount}
@@ -612,11 +634,12 @@ function WizardEditor({
                   field={field}
                   value={value}
                   sourceType={sourceType}
-                  sourcesCount={sources.length}
+                  sources={sources}
                   validated={validated}
                   filled={filled}
                   stale={stale}
                   hint={field.hint}
+                  updatedAt={resp?.updated_at}
                   onChange={(v) => setFieldValue(step.key, field.key, v)}
                   onToggleValidated={() => toggleValidated(step.key, field.key)}
                   onOpenDrawer={() => setDrawerField({ stepKey: step.key, fieldKey: field.key })}
@@ -775,11 +798,12 @@ function FieldRow({
   field,
   value,
   sourceType,
-  sourcesCount,
+  sources,
   validated,
   filled,
   stale,
   hint,
+  updatedAt,
   onChange,
   onToggleValidated,
   onOpenDrawer,
@@ -787,17 +811,27 @@ function FieldRow({
   field: WizardField;
   value: FieldValue;
   sourceType: SourceType;
-  sourcesCount: number;
+  sources: SourceItem[];
   validated: boolean;
   filled: boolean;
   stale: boolean;
   hint?: string;
+  updatedAt?: string;
   onChange: (v: FieldValue) => void;
   onToggleValidated: () => void;
   onOpenDrawer: () => void;
 }) {
+  const [pendingEdit, setPendingEdit] = useState<{ v: FieldValue } | null>(null);
   const chip = SOURCE_CHIP[sourceType];
   const baseInput = "font-sans w-full border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary";
+
+  function handleChange(newValue: FieldValue) {
+    if (validated) {
+      setPendingEdit({ v: newValue });
+      return;
+    }
+    onChange(newValue);
+  }
 
   return (
     <div className="px-4 py-3 hover:bg-slate-50/50 transition-colors">
@@ -807,21 +841,37 @@ function FieldRow({
           {field.required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Chip de origen: solo cuando es excepcional (público/interpretación) o hay fuentes */}
-          {(sourceType !== "consultor_only" || sourcesCount > 0) && (
-            <button
-              type="button"
-              onClick={onOpenDrawer}
-              className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text}`}
-              title="Ver fuentes"
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
-              {chip.label}
-              {sourcesCount > 0 && <span className="opacity-70">· {sourcesCount}</span>}
-            </button>
+          {/* Chip de origen: si hay exactamente 1 fuente → link directo; >1 → drawer */}
+          {(sourceType !== "consultor_only" || sources.length > 0) && (
+            sources.length === 1 ? (
+              <a
+                href={sources[0].url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text} hover:underline`}
+                title={sources[0].title}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
+                {chip.label}
+                <svg className="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenDrawer}
+                className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text}`}
+                title="Ver fuentes"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
+                {chip.label}
+                {sources.length > 0 && <span className="opacity-70">· {sources.length}</span>}
+              </button>
+            )
           )}
           {/* Fuentes vacías: botón minimal para abrir drawer */}
-          {sourceType === "consultor_only" && sourcesCount === 0 && (
+          {sourceType === "consultor_only" && sources.length === 0 && (
             <button
               type="button"
               onClick={onOpenDrawer}
@@ -865,14 +915,14 @@ function FieldRow({
           className={`${baseInput} px-3 py-2 min-h-[40px] resize-none overflow-hidden`}
           value={typeof value === "string" ? value : ""}
           placeholder={field.placeholder}
-          onChange={(v) => onChange(v)}
+          onChange={(v) => handleChange(v)}
         />
       ) : field.type === "number" ? (
         <input
           type="number"
           className={`${baseInput} px-3 py-2 tabular-nums`}
           value={typeof value === "number" ? value : ""}
-          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+          onChange={(e) => handleChange(e.target.value === "" ? null : Number(e.target.value))}
         />
       ) : field.type === "boolean" ? (
         <div className="flex gap-2">
@@ -880,7 +930,7 @@ function FieldRow({
             <button
               key={String(opt.v)}
               type="button"
-              onClick={() => onChange(value === opt.v ? null : opt.v)}
+              onClick={() => handleChange(value === opt.v ? null : opt.v)}
               className={`px-3 py-1.5 text-xs font-medium rounded border transition-colors ${
                 value === opt.v
                   ? "bg-brand-primary-light border-brand-primary text-brand-primary-dark"
@@ -894,7 +944,7 @@ function FieldRow({
       ) : field.type === "select" ? (
         <SelectField
           value={typeof value === "string" ? value : ""}
-          onChange={(v) => onChange(v || null)}
+          onChange={(v) => handleChange(v || null)}
           options={
             Array.isArray(field.options)
               ? field.options.map((opt) => {
@@ -917,7 +967,7 @@ function FieldRow({
               <button
                 key={`${v}-${i}`}
                 type="button"
-                onClick={() => onChange(active ? arr.filter((x) => x !== v) : [...arr, v])}
+                onClick={() => handleChange(active ? arr.filter((x) => x !== v) : [...arr, v])}
                 className={`px-2.5 py-1 text-xs rounded-sm border transition-colors ${
                   active
                     ? "bg-brand-primary-light border-brand-primary text-brand-primary-dark"
@@ -930,16 +980,36 @@ function FieldRow({
           })}
         </div>
       ) : (
-        <input
-          type="text"
-          className={`${baseInput} px-3 py-2`}
+        <AutoResizeTextarea
+          className={`${baseInput} px-3 py-2 min-h-[36px] resize-none overflow-hidden`}
           value={typeof value === "string" ? value : ""}
           placeholder={field.placeholder}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => handleChange(v)}
         />
       )}
 
       {hint && <p className="text-[11px] text-slate-500 italic mt-1">{hint}</p>}
+      {updatedAt && (
+        <p className="text-[10px] text-slate-400 mt-1 tabular-nums">
+          Actualizado {new Date(updatedAt).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
+        </p>
+      )}
+
+      {pendingEdit && (
+        <ConfirmModal
+          open
+          title="Editar campo validado"
+          description="Este campo ya fue validado. Si lo editas, perderá la marca de validado. ¿Continuar?"
+          tone="primary"
+          confirmLabel="Editar igual"
+          onConfirm={async () => {
+            onChange(pendingEdit.v);
+            onToggleValidated();
+            setPendingEdit(null);
+          }}
+          onCancel={() => setPendingEdit(null)}
+        />
+      )}
     </div>
   );
 }

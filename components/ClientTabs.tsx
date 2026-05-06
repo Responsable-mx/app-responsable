@@ -249,6 +249,7 @@ export function ClientTabs({
             <QuestionnaireTab
               key={`q-${jumpToStep ?? "default"}`}
               clientId={client.id}
+              clientServices={client.services ?? []}
               initialStepIndex={(() => {
                 if (jumpToStep !== null) return jumpToStep;
                 const s = searchParams?.get("step");

@@ -165,6 +165,8 @@ export function GlobalTimeline({
   const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
   const [now] = useState(() => Date.now());
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
+  // Filtro interno "solo retrasadas" — quick toggle para el gerente
+  const [delayedOnly, setDelayedOnly] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Drag-to-pan: refs (no state) para evitar re-renders en cada mousemove
   const isPanning = useRef(false);
@@ -225,26 +227,56 @@ export function GlobalTimeline({
         }
       }
     }
+    // Override interno: mostrar solo retrasadas cuando el gerente lo solicita
+    if (delayedOnly) return out.filter((a) => a.status === "delayed");
+    return out;
+  }, [data, filters, delayedOnly]);
+
+  // KPIs globales — calculados sobre el universo completo (sin delayedOnly) para no perder contexto
+  const allActivities = useMemo<FlatActivity[]>(() => {
+    const out: FlatActivity[] = [];
+    for (const p of data?.data ?? []) {
+      if (filters?.clientId && p.client_id !== filters.clientId) continue;
+      for (const sv of p.services) {
+        for (const st of sv.stages) {
+          for (const a of st.activities) {
+            if (filters?.statuses && filters.statuses.size > 0 && !filters.statuses.has(a.status)) continue;
+            if (filters?.consultorEmail && a.assignee_email !== filters.consultorEmail) continue;
+            if (filters?.dateRange && filters.dateRange !== "all") {
+              if (filters.dateRange === "overdue") { if (a.status !== "delayed") continue; }
+              else if (!activityInDateRange(filters.dateRange, a.planned_start, a.planned_end)) continue;
+            }
+            out.push({
+              id: a.id, name: a.name, client_id: p.client_id, client_name: p.client_name,
+              stage_name: st.name, service: sv.service, assignee_email: a.assignee_email,
+              planned_start: a.planned_start, planned_end: a.planned_end,
+              actual_start: a.actual_start, actual_end: a.actual_end,
+              status: a.status, depends_on_activity_id: a.depends_on_activity_id,
+            });
+          }
+        }
+      }
+    }
     return out;
   }, [data, filters]);
 
-  // KPIs globales
   const globalStats = useMemo(() => {
-    const consultores = new Set(
-      activities.map((a) => a.assignee_email).filter(Boolean)
+    const consultores = new Set(allActivities.map((a) => a.assignee_email).filter(Boolean)).size;
+    const activas = allActivities.filter((a) => a.status === "in_progress" || a.status === "delayed").length;
+    const retrasadas = allActivities.filter((a) => a.status === "delayed").length;
+    const completadas = allActivities.filter((a) => a.status === "completed").length;
+    const pctComplete = allActivities.length > 0 ? Math.round((completadas / allActivities.length) * 100) : 0;
+    const clientesConRetraso = new Set(
+      allActivities.filter((a) => a.status === "delayed").map((a) => a.client_id)
     ).size;
-    const activas = activities.filter(
-      (a) => a.status === "in_progress" || a.status === "delayed"
-    ).length;
-    const retrasadas = activities.filter((a) => a.status === "delayed").length;
     const horizon = now + 30 * MS_DAY;
-    const proximas = activities.filter((a) => {
+    const proximas = allActivities.filter((a) => {
       if (a.status !== "pending" || !a.planned_start) return false;
       const ts = parseDate(a.planned_start)?.getTime() ?? 0;
       return ts >= now && ts <= horizon;
     }).length;
-    return { consultores, activas, retrasadas, proximas };
-  }, [activities, now]);
+    return { consultores, activas, retrasadas, completadas, pctComplete, clientesConRetraso, proximas };
+  }, [allActivities, now]);
 
   // IDs con dependientes — cascade alert
   const activitiesWithDependents = useMemo(() => {
@@ -507,14 +539,39 @@ export function GlobalTimeline({
 
   return (
     <div className="space-y-3">
+      {/* ── Alert banner: solo cuando hay retrasadas — llama la atención del gerente ── */}
+      {globalStats.retrasadas > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-rose-50 border border-rose-200 rounded">
+          <svg className="w-4 h-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <p className="flex-1 text-sm font-semibold text-rose-700">
+            {globalStats.retrasadas} {globalStats.retrasadas === 1 ? "actividad retrasada" : "actividades retrasadas"}
+            {" "}en{" "}
+            {globalStats.clientesConRetraso} {globalStats.clientesConRetraso === 1 ? "proyecto" : "proyectos"}
+          </p>
+          <button
+            onClick={() => setDelayedOnly((v) => !v)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+              delayedOnly
+                ? "bg-rose-600 text-white border-rose-600 hover:bg-rose-700"
+                : "bg-white text-rose-700 border-rose-300 hover:bg-rose-50"
+            }`}
+          >
+            {delayedOnly ? "× Ver todas" : "Ver solo retrasadas →"}
+          </button>
+        </div>
+      )}
+
       {/* ── KPIs ── */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {(
           [
             { label: "Consultores", value: globalStats.consultores, tone: "neutral" as const, hint: "con actividades visibles" },
             { label: "En curso", value: globalStats.activas, tone: "primary" as const, hint: "activas o retrasadas" },
-            { label: "Retrasadas", value: globalStats.retrasadas, tone: "red" as const, hint: "requieren atención" },
+            { label: "Retrasadas", value: globalStats.retrasadas, tone: "red" as const, hint: `${globalStats.clientesConRetraso} proyecto${globalStats.clientesConRetraso !== 1 ? "s" : ""} afectado${globalStats.clientesConRetraso !== 1 ? "s" : ""}` },
             { label: "Próximas 30d", value: globalStats.proximas, tone: "amber" as const, hint: "inician pronto" },
+            { label: "Completado", value: `${globalStats.pctComplete}%`, tone: "green" as const, hint: `${globalStats.completadas} de ${allActivities.length} actividades` },
           ] as const
         ).map(({ label, value, tone, hint }) => (
           <div key={label} className="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm">
@@ -523,6 +580,7 @@ export function GlobalTimeline({
               tone === "red" ? "text-rose-600"
               : tone === "amber" ? "text-amber-600"
               : tone === "primary" ? "text-brand-primary-dark"
+              : tone === "green" ? "text-emerald-600"
               : "text-slate-900"
             }`}>{value}</p>
             <p className="text-[10px] text-slate-500 mt-0.5">{hint}</p>
@@ -767,8 +825,17 @@ export function GlobalTimeline({
                     const sp = stageProgress.get(stageKey);
                     const spLabel = sp ? `${sp.completed}/${sp.total} completas` : "";
 
+                    // Días de retraso — clave para priorizar atención gerencial
+                    const daysOverdue = (() => {
+                      if (a.status !== "delayed" || !a.planned_end) return null;
+                      const endMs = parseDate(a.planned_end)?.getTime();
+                      if (!endMs || now < endMs) return null;
+                      return Math.floor((now - endMs) / MS_DAY);
+                    })();
+
                     const tooltip = [
                       isCascade ? "⚡ RIESGO CASCADA — dependientes afectados" : null,
+                      daysOverdue !== null ? `⏰ ${daysOverdue} días de retraso` : null,
                       `Cliente: ${a.client_name}`,
                       `Etapa: ${a.stage_name}${spLabel ? ` · ${spLabel}` : ""}`,
                       `Actividad: ${a.name}`,

@@ -37,11 +37,13 @@ type ViewMode = "list" | "gantt";
 export function ClientCronogramaTab({
   clientId,
   isAdmin,
+  initialView = "list",
 }: {
   clientId: string;
   isAdmin: boolean;
+  initialView?: ViewMode;
 }) {
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>(initialView);
   const [filterAssignee, setFilterAssignee] = useState<string | null>(null);
   const { push: pushToast } = useToast();
   const [editingActivity, setEditingActivity] = useState<{

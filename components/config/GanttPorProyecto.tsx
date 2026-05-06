@@ -106,7 +106,7 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
             <div>
               <h3 className="text-sm font-semibold text-slate-900">
                 <Link
-                  href={`/clientes/${p.client_id}?tab=cronograma`}
+                  href={`/clientes/${p.client_id}?tab=cronograma&view=gantt`}
                   className="hover:text-brand-primary-dark hover:underline"
                 >
                   {p.client_name}
@@ -183,7 +183,7 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
                 <ServiceGantt
                   stages={stagesWithActs}
                   onEditActivity={() => {
-                    window.location.href = `/clientes/${p.client_id}?tab=cronograma`;
+                    window.location.href = `/clientes/${p.client_id}?tab=cronograma&view=gantt`;
                   }}
                   onQuickAction={handleQuickAction}
                 />

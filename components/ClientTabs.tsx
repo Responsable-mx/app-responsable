@@ -291,7 +291,11 @@ export function ClientTabs({
       {tab === "cronograma" && (
         <div role="tabpanel" id="panel-cronograma" tabIndex={0} aria-labelledby="tab-cronograma">
           <TabErrorBoundary tabName="Cronograma">
-            <ClientCronogramaTab clientId={client.id} isAdmin={isAdmin} />
+            <ClientCronogramaTab
+              clientId={client.id}
+              isAdmin={isAdmin}
+              initialView={searchParams?.get("view") === "gantt" ? "gantt" : "list"}
+            />
           </TabErrorBoundary>
         </div>
       )}

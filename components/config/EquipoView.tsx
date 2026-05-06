@@ -139,12 +139,18 @@ export function EquipoView() {
       />
       </div>{/* fin controles */}
 
-      {/* Contenido: Gantt usa todo el ancho, resto acotado */}
-      {view === "gantt" ? (
+      {/* Contenido: Gantt y Timeline usan todo el ancho; Por consultor/proyecto acotados */}
+      {view === "gantt" && (
         <TabErrorBoundary tabName="Gantt">
           <GanttPorProyecto filters={filters} />
         </TabErrorBoundary>
-      ) : (
+      )}
+      {view === "timeline" && (
+        <TabErrorBoundary tabName="Timeline">
+          <GlobalTimeline filters={filters} />
+        </TabErrorBoundary>
+      )}
+      {(view === "consultor" || view === "proyecto") && (
         <div className="max-w-6xl mx-auto">
           {view === "consultor" && (
             <TabErrorBoundary tabName="Por consultor">
@@ -154,11 +160,6 @@ export function EquipoView() {
           {view === "proyecto" && (
             <TabErrorBoundary tabName="Por proyecto">
               <ProjectsOverview filters={filters} />
-            </TabErrorBoundary>
-          )}
-          {view === "timeline" && (
-            <TabErrorBoundary tabName="Timeline">
-              <GlobalTimeline filters={filters} />
             </TabErrorBoundary>
           )}
         </div>

@@ -28,7 +28,7 @@ const STATUS_BAR: Record<ActivityStatus, string> = {
 
 const MS_DAY = 86_400_000;
 const LABEL_W = 210;
-const CHART_BASE = 900; // px de ancho del chart a zoom 1×
+const CHART_BASE = 1200; // px de ancho del chart a zoom 1×
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
 const ZOOM_DEFAULT = 2; // índice → 1×
 

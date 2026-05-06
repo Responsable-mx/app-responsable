@@ -30,7 +30,6 @@ type FormState = {
 
   // Atributos estructurados
   business_segments: string[];
-  services: string[];
   frameworks: string[];
   applicable_regulations: string[];
   policies_in_place: string[];
@@ -45,6 +44,7 @@ type FormState = {
   logo_url: string;
 
   // URLs de documentos
+  // sustainability_report_url: pasivo — preserva dato existente; sin UI (usar Bloque 5 → Reportes publicados)
   sustainability_strategy_url: string;
   sustainability_report_url: string;
   financial_report_url: string;
@@ -65,8 +65,7 @@ function initialBlocks(
     info_general: (initial?.info_general_json as BlockValue) ?? {},
     business_model: (initial?.business_model_json as BlockValue) ?? {},
     impacts: (initial?.impacts_json as BlockValue) ?? {},
-    regulatory_context:
-      (initial?.regulatory_context_json as BlockValue) ?? {},
+    regulatory_context: (initial?.regulatory_context_json as BlockValue) ?? {},
     sustainability_strategy:
       (initial?.sustainability_strategy_json as BlockValue) ?? {},
     stakeholders: (initial?.stakeholders_json as BlockValue) ?? {},
@@ -87,7 +86,6 @@ export function ClientForm(props: Props) {
     countries: props.initial?.countries ?? [],
     size: props.initial?.size ?? "",
     business_segments: props.initial?.business_segments ?? [],
-    services: props.initial?.services ?? [],
     frameworks: props.initial?.frameworks ?? [],
     applicable_regulations: props.initial?.applicable_regulations ?? [],
     policies_in_place: props.initial?.policies_in_place ?? [],
@@ -95,19 +93,12 @@ export function ClientForm(props: Props) {
     material_topics: props.initial?.material_topics ?? [],
     maturity_level: props.initial?.maturity_level ?? "",
     has_double_materiality: toBool(props.initial?.has_double_materiality),
-    has_sustainability_report: toBool(
-      props.initial?.has_sustainability_report
-    ),
-    has_sustainability_strategy: toBool(
-      props.initial?.has_sustainability_strategy
-    ),
+    has_sustainability_report: toBool(props.initial?.has_sustainability_report),
+    has_sustainability_strategy: toBool(props.initial?.has_sustainability_strategy),
     logo_url: props.initial?.logo_url ?? "",
-    sustainability_strategy_url:
-      props.initial?.sustainability_strategy_url ?? "",
-    sustainability_report_url:
-      props.initial?.sustainability_report_url ?? "",
-    financial_report_url:
-      props.initial?.financial_report_url ?? "",
+    sustainability_strategy_url: props.initial?.sustainability_strategy_url ?? "",
+    sustainability_report_url: props.initial?.sustainability_report_url ?? "",
+    financial_report_url: props.initial?.financial_report_url ?? "",
     double_materiality_url: props.initial?.double_materiality_url ?? "",
     blocks: initialBlocks(props.initial),
   });
@@ -135,7 +126,6 @@ export function ClientForm(props: Props) {
         countries: form.countries,
         size: form.size || null,
         business_segments: form.business_segments,
-        services: form.services,
         frameworks: form.frameworks,
         applicable_regulations: form.applicable_regulations,
         policies_in_place: form.policies_in_place,
@@ -146,12 +136,9 @@ export function ClientForm(props: Props) {
         has_sustainability_report: form.has_sustainability_report,
         has_sustainability_strategy: form.has_sustainability_strategy,
         logo_url: form.logo_url.trim() || null,
-        sustainability_strategy_url:
-          form.sustainability_strategy_url.trim() || null,
-        sustainability_report_url:
-          form.sustainability_report_url.trim() || null,
-        financial_report_url:
-          form.financial_report_url.trim() || null,
+        sustainability_strategy_url: form.sustainability_strategy_url.trim() || null,
+        sustainability_report_url: form.sustainability_report_url.trim() || null,
+        financial_report_url: form.financial_report_url.trim() || null,
         double_materiality_url: form.double_materiality_url.trim() || null,
         info_general_json: form.blocks.info_general,
         business_model_json: form.blocks.business_model,
@@ -202,7 +189,7 @@ export function ClientForm(props: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 pb-24">
       {/* ═══ Identificación ══════════════════════════════════ */}
       <Section title="Identificación">
         <div className="grid grid-cols-2 gap-4">
@@ -275,7 +262,6 @@ export function ClientForm(props: Props) {
             URL del logo
           </label>
           <div className="flex items-center gap-3">
-            {/* Preview avatar */}
             <ClientAvatar
               name={form.name || "?"}
               logoUrl={form.logo_url.trim() || null}
@@ -297,8 +283,18 @@ export function ClientForm(props: Props) {
                   title="Limpiar logo"
                   aria-label="Limpiar logo"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               )}
@@ -310,16 +306,15 @@ export function ClientForm(props: Props) {
         </div>
       </Section>
 
-      {/* ═══ Atributos estructurados ═════════════════════════ */}
+      {/* ═══ Atributos de sostenibilidad ═════════════════════ */}
       <Section title="Atributos de sostenibilidad">
         <div className="grid grid-cols-2 gap-4">
           <MultiSelectCombobox
             category="business_segments"
             label="Segmentos de negocio"
+            hint="B2B / B2C / mixto. Divisiones internas → Bloque 1 · Divisiones y líneas."
             value={form.business_segments}
-            onChange={(v) =>
-              update("business_segments", (v as string[]) ?? [])
-            }
+            onChange={(v) => update("business_segments", (v as string[]) ?? [])}
           />
           <MultiSelectCombobox
             category="maturity_levels"
@@ -333,7 +328,7 @@ export function ClientForm(props: Props) {
         <MultiSelectCombobox
           category="frameworks"
           label="Marcos de sostenibilidad reportados"
-          hint="Marcos que el cliente ya usa para reportar (GRI, ISSB, CSRD…)."
+          hint="Frameworks activos (GRI, ISSB, CSRD…). Historial de reportes por año → Bloque 5."
           value={form.frameworks}
           onChange={(v) => update("frameworks", (v as string[]) ?? [])}
           hasGroups
@@ -353,9 +348,7 @@ export function ClientForm(props: Props) {
           category="policies"
           label="Políticas formalizadas"
           value={form.policies_in_place}
-          onChange={(v) =>
-            update("policies_in_place", (v as string[]) ?? [])
-          }
+          onChange={(v) => update("policies_in_place", (v as string[]) ?? [])}
         />
 
         <MultiSelectCombobox
@@ -369,49 +362,86 @@ export function ClientForm(props: Props) {
         <MultiSelectCombobox
           category="material_topics"
           label="Temas materiales priorizados"
-          hint="Si ya hay estudio de materialidad, marca los temas resultantes."
+          hint="Temas resultantes del estudio de materialidad, incluyendo biodiversidad si aplica."
           value={form.material_topics}
           onChange={(v) => update("material_topics", (v as string[]) ?? [])}
           hasGroups
         />
 
-        <div className="grid grid-cols-3 gap-4 pt-1">
-          <BoolFieldInline
-            label="Tiene estrategia de sostenibilidad"
-            value={form.has_sustainability_strategy}
-            onChange={(v) => update("has_sustainability_strategy", v)}
-            urlLabel="URL de la estrategia"
-            urlValue={form.sustainability_strategy_url}
-            onUrlChange={(v) => update("sustainability_strategy_url", v)}
-          />
-          <BoolFieldInline
-            label="Publica reporte de sostenibilidad"
-            value={form.has_sustainability_report}
-            onChange={(v) => update("has_sustainability_report", v)}
-            urlLabel="URL del último reporte"
-            urlValue={form.sustainability_report_url}
-            onUrlChange={(v) => update("sustainability_report_url", v)}
-          />
-          <BoolFieldInline
-            label="Tiene estudio de doble materialidad"
-            value={form.has_double_materiality}
-            onChange={(v) => update("has_double_materiality", v)}
-            urlLabel="URL del estudio"
-            urlValue={form.double_materiality_url}
-            onUrlChange={(v) => update("double_materiality_url", v)}
-          />
+        {/* Booleanos: toggles en grid, URLs debajo para no desbalancear columnas */}
+        <div className="space-y-3 pt-1">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs font-medium text-slate-700 mb-1.5">
+                Tiene estrategia de sostenibilidad
+              </div>
+              <BoolTriField
+                value={form.has_sustainability_strategy}
+                onChange={(v) => update("has_sustainability_strategy", v)}
+              />
+            </div>
+            <div>
+              <div className="text-xs font-medium text-slate-700 mb-1.5">
+                Publica reporte de sostenibilidad
+              </div>
+              <BoolTriField
+                value={form.has_sustainability_report}
+                onChange={(v) => update("has_sustainability_report", v)}
+              />
+            </div>
+            <div>
+              <div className="text-xs font-medium text-slate-700 mb-1.5">
+                Tiene estudio de doble materialidad
+              </div>
+              <BoolTriField
+                value={form.has_double_materiality}
+                onChange={(v) => update("has_double_materiality", v)}
+              />
+            </div>
+          </div>
+
+          {/* URLs condicionales — ancho completo para evitar desbalanceo del grid */}
+          {form.has_sustainability_strategy === true && (
+            <UrlField
+              label="URL de la estrategia de sostenibilidad"
+              value={form.sustainability_strategy_url}
+              onChange={(v) => update("sustainability_strategy_url", v)}
+            />
+          )}
+          {form.has_sustainability_report === true && (
+            <p className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded px-3 py-2">
+              URL del reporte →{" "}
+              <strong className="text-slate-700">
+                Bloque 5 · Reportes publicados
+              </strong>{" "}
+              para registrar múltiples años y marcos.
+            </p>
+          )}
+          {form.has_double_materiality === true && (
+            <UrlField
+              label="URL del estudio de doble materialidad"
+              value={form.double_materiality_url}
+              onChange={(v) => update("double_materiality_url", v)}
+            />
+          )}
         </div>
 
-        {/* Sección informes públicos para IA — Sprint B2 */}
-        {props.initial?.id && (
-          <ReportSearchFields
-            clientId={props.initial.id}
-            sustainabilityUrl={form.sustainability_report_url}
-            financialUrl={form.financial_report_url}
-            onSustainabilityChange={(v) => update("sustainability_report_url", v)}
-            onFinancialChange={(v) => update("financial_report_url", v)}
+        {/* Reporte financiero anual */}
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">
+            URL del reporte financiero anual
+          </label>
+          <input
+            type="url"
+            value={form.financial_report_url}
+            onChange={(e) => update("financial_report_url", e.target.value)}
+            className={inputCls}
+            placeholder="https:// … reporte anual o 10-K"
           />
-        )}
+          <p className="text-[10px] text-slate-400 mt-1">
+            Usado por los roles IA para cruzar datos financieros con métricas de sostenibilidad.
+          </p>
+        </div>
       </Section>
 
       {/* ═══ Narrativa (6 bloques con sub-campos) ═══════════ */}
@@ -421,8 +451,8 @@ export function ClientForm(props: Props) {
             Narrativa detallada
           </h2>
           <p className="text-xs text-slate-600 mt-0.5">
-            6 bloques con preguntas específicas. Cada respuesta se guarda
-            por separado para que los roles IA la usen directamente.
+            6 bloques con preguntas específicas. Cada respuesta se guarda por
+            separado para que los roles IA la usen directamente.
           </p>
         </div>
         {NARRATIVE_SCHEMAS.map((schema) => (
@@ -441,28 +471,31 @@ export function ClientForm(props: Props) {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <button
-          type="submit"
-          disabled={saving || !form.name.trim()}
-          className="px-5 py-2.5 bg-brand-primary-hover text-white rounded text-sm font-medium hover:bg-brand-primary-dark disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
-        >
-          {saving
-            ? "Guardando..."
-            : props.mode === "create"
-            ? "Crear cliente"
-            : "Guardar cambios"}
-        </button>
-
-        {props.mode === "edit" && (
+      {/* ═══ Footer sticky ══════════════════════════════════ */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-slate-200">
+        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
           <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded"
+            type="submit"
+            disabled={saving || !form.name.trim()}
+            className="px-5 py-2.5 bg-brand-primary-hover text-white rounded text-sm font-medium hover:bg-brand-primary-dark disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
           >
-            Eliminar
+            {saving
+              ? "Guardando..."
+              : props.mode === "create"
+              ? "Crear cliente"
+              : "Guardar cambios"}
           </button>
-        )}
+
+          {props.mode === "edit" && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded transition-colors"
+            >
+              Eliminar
+            </button>
+          )}
+        </div>
       </div>
 
       <ExtractSectorModal
@@ -475,9 +508,7 @@ export function ClientForm(props: Props) {
         <ConfirmModal
           open={confirmDelete}
           title={`Eliminar ${props.initial.name}`}
-          description={
-            "Esta acción no se puede deshacer. El cliente y su contexto quedarán borrados para todo el equipo."
-          }
+          description="Esta acción no se puede deshacer. El cliente y su contexto quedarán borrados para todo el equipo."
           confirmLabel="Eliminar"
           cancelLabel="Cancelar"
           tone="destructive"
@@ -491,6 +522,9 @@ export function ClientForm(props: Props) {
 
 const inputCls =
   "w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
+
+const urlInputCls =
+  "w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
 
 function Section({
   title,
@@ -526,205 +560,27 @@ function Field({
   );
 }
 
-function BoolFieldInline({
+function UrlField({
   label,
   value,
   onChange,
-  urlLabel,
-  urlValue,
-  onUrlChange,
 }: {
-  label: string;
-  value: boolean | null;
-  onChange: (v: boolean | null) => void;
-  urlLabel?: string;
-  urlValue?: string;
-  onUrlChange?: (v: string) => void;
-}) {
-  return (
-    <div>
-      <div className="block text-xs font-medium text-slate-700 mb-1">
-        {label}
-      </div>
-      <BoolTriField value={value} onChange={onChange} />
-      {value === true && urlLabel && onUrlChange && (
-        <div className="mt-2">
-          <label className="block text-[10px] font-medium text-slate-600 mb-0.5">
-            {urlLabel}
-          </label>
-          <input
-            type="url"
-            value={urlValue ?? ""}
-            onChange={(e) => onUrlChange(e.target.value)}
-            placeholder="https:// …  o liga al PDF"
-            className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// ═══════════════════════════════════════════════════════════════
-// Sprint B2 — Búsqueda IA de informes públicos (sustentabilidad + financiero)
-// ═══════════════════════════════════════════════════════════════
-type Candidate = { url: string; title: string; year?: number | string | null };
-
-function ReportSearchFields(props: {
-  clientId: string;
-  sustainabilityUrl: string;
-  financialUrl: string;
-  onSustainabilityChange: (v: string) => void;
-  onFinancialChange: (v: string) => void;
-}) {
-  return (
-    <div className="mt-5 pt-4 border-t border-slate-200">
-      <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-        Informes públicos · fuente IA
-      </h3>
-      <p className="text-[11px] text-slate-500 mb-3">
-        La IA busca el informe en línea, lo descarga, convierte a Markdown y lo guarda como referencia. Los campos del cuestionario podrán usar este contenido al llenarse con IA.
-      </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ReportField
-          clientId={props.clientId}
-          kind="sustainability_report"
-          label="Informe de sustentabilidad"
-          value={props.sustainabilityUrl}
-          onChange={props.onSustainabilityChange}
-        />
-        <ReportField
-          clientId={props.clientId}
-          kind="financial_report"
-          label="Informe financiero / anual"
-          value={props.financialUrl}
-          onChange={props.onFinancialChange}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ReportField(props: {
-  clientId: string;
-  kind: "sustainability_report" | "financial_report";
   label: string;
   value: string;
   onChange: (v: string) => void;
 }) {
-  const [searching, setSearching] = useState(false);
-  const [ingesting, setIngesting] = useState(false);
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
-
-  async function research() {
-    setSearching(true);
-    setError(null);
-    setOk(null);
-    try {
-      const res = await fetch(`/api/clients/${props.clientId}/research-reports`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: props.kind }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
-      setCandidates(j.data.candidates as Candidate[]);
-      if (j.data.candidates.length === 0) setError("La IA no encontró candidatos públicos.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error de búsqueda");
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  async function ingest(url: string) {
-    setIngesting(true);
-    setError(null);
-    setOk(null);
-    try {
-      const res = await fetch(`/api/clients/${props.clientId}/ingest-report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: props.kind, url }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
-      props.onChange(url);
-      setCandidates(null);
-      const status = j.data.parse_status === "ok" ? "guardado y convertido" : "guardado (parse falló)";
-      setOk(`Informe ${status}: ${j.data.file_name}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al ingerir");
-    } finally {
-      setIngesting(false);
-    }
-  }
-
   return (
-    <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
-      <label className="block text-xs font-semibold text-slate-700 mb-1">{props.label}</label>
-      <div className="flex gap-2">
-        <input
-          type="url"
-          value={props.value}
-          onChange={(e) => props.onChange(e.target.value)}
-          placeholder="https://… (manual o vía IA)"
-          className="flex-1 px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary"
-        />
-        <button
-          type="button"
-          onClick={research}
-          disabled={searching || ingesting}
-          className="text-[11px] font-semibold text-brand-primary-dark border border-brand-primary/40 rounded px-2 py-1.5 hover:bg-brand-primary/5 disabled:opacity-50"
-          title="La IA busca el informe en línea"
-        >
-          {searching ? "Buscando…" : "Buscar con IA"}
-        </button>
-      </div>
-      {props.value && (
-        <a
-          href={props.value}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] text-brand-primary-dark hover:underline inline-block mt-1"
-        >
-          Abrir informe ↗
-        </a>
-      )}
-      {error && (
-        <p className="text-[10px] text-rose-600 mt-1">{error}</p>
-      )}
-      {ok && (
-        <p className="text-[10px] text-emerald-700 mt-1">✓ {ok}</p>
-      )}
-      {candidates && candidates.length > 0 && (
-        <div className="mt-2 space-y-1.5 border-t border-slate-200 pt-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-            Candidatos encontrados · click para descargar y guardar
-          </p>
-          {candidates.map((c, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => void ingest(c.url)}
-              disabled={ingesting}
-              className="block w-full text-left text-[11px] border border-slate-300 rounded px-2 py-1.5 hover:bg-white hover:border-brand-primary disabled:opacity-50"
-            >
-              <span className="font-semibold text-slate-800 line-clamp-1">{c.title}</span>
-              <span className="block text-slate-500 text-[10px] truncate">
-                {c.url}
-                {c.year ? ` · ${c.year}` : ""}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      {ingesting && (
-        <p className="text-[10px] text-slate-500 mt-1">Descargando y convirtiendo a Markdown…</p>
-      )}
+    <div>
+      <label className="block text-[10px] font-medium text-slate-600 mb-0.5">
+        {label}
+      </label>
+      <input
+        type="url"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https:// … o liga al PDF"
+        className={urlInputCls}
+      />
     </div>
   );
 }

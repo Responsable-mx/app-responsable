@@ -136,7 +136,6 @@ export function ServiceGantt({
   const [confirmFreeze, setConfirmFreeze] = useState(false);
   const [freezing, setFreezing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
   const [now] = useState(() => Date.now());
 
@@ -194,7 +193,7 @@ export function ServiceGantt({
   }
 
   function scrollToToday() {
-    const el = scrollRef.current;
+    const el = ganttRef.current;
     if (!el) return;
     if (timelineWidth && todayInRange) {
       const px = (todayPct / 100) * timelineWidth;
@@ -267,7 +266,7 @@ export function ServiceGantt({
 
   return (
     <>
-      <div ref={ganttRef} className={`bg-white border border-slate-200 rounded ${timelineWidth ? "overflow-x-auto" : "overflow-hidden"}`} ref={scrollRef}>
+      <div ref={scrollRef} className={`bg-white border border-slate-200 rounded ${timelineWidth ? "overflow-x-auto" : "overflow-hidden"}`}>
         {/* ─── Toolbar ─── */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 bg-slate-50/80 flex-wrap">
           {/* Zoom */}

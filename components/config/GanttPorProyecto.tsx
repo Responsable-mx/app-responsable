@@ -129,14 +129,57 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
               )}
             </div>
           </div>
+          {(() => {
+            // Overload alert: consultores con ≥3 actividades in_progress+delayed en este proyecto
+            const assigneeLoad: Record<string, number> = {};
+            for (const sv of p.services) {
+              for (const st of sv.stages) {
+                for (const a of st.activities) {
+                  if ((a.status === "in_progress" || a.status === "delayed") && a.assignee_email) {
+                    assigneeLoad[a.assignee_email] = (assigneeLoad[a.assignee_email] ?? 0) + 1;
+                  }
+                }
+              }
+            }
+            const overloaded = Object.entries(assigneeLoad).filter(([, n]) => n >= 3);
+            if (overloaded.length === 0) return null;
+            return (
+              <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800">
+                <svg className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+                <span>
+                  <span className="font-bold">Sobrecarga:</span>{" "}
+                  {overloaded.map(([email, n]) => `${email.split("@")[0]} (${n} activas)`).join(", ")}
+                </span>
+              </div>
+            );
+          })()}
+
           {p.services.map((sv) => {
             const stagesWithActs = sv.stages.filter((st) => st.activities.length > 0);
             if (stagesWithActs.length === 0) return null;
+            // Progreso del servicio
+            const allActs = sv.stages.flatMap((st) => st.activities);
+            const totalActs = allActs.length;
+            const doneActs = allActs.filter((a) => a.status === "completed").length;
+            const svcPct = totalActs > 0 ? Math.round((doneActs / totalActs) * 100) : 0;
             return (
               <div key={sv.client_service_id} className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">
-                  {serviceLabel(sv.service)}
-                </p>
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    {serviceLabel(sv.service)}
+                  </p>
+                  <span className={`text-[10px] font-bold tabular-nums ${svcPct === 100 ? "text-emerald-600" : "text-slate-400"}`}>
+                    {svcPct}%
+                  </span>
+                </div>
+                <div className="h-1 bg-slate-100 overflow-hidden mx-1">
+                  <div
+                    className={`h-full transition-all ${svcPct === 100 ? "bg-emerald-400" : "bg-brand-primary"}`}
+                    style={{ width: `${svcPct}%` }}
+                  />
+                </div>
                 <ServiceGantt
                   stages={stagesWithActs}
                   onEditActivity={() => {

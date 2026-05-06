@@ -690,6 +690,15 @@ export function GlobalTimeline({
                     {pxPerDay >= 22 ? label : ""}
                   </div>
                 ))}
+                {/* Línea + label de hoy en el header */}
+                {todayInRange && (
+                  <div className="absolute top-0 bottom-0 pointer-events-none z-10" style={{ left: todayPx }}>
+                    <div className="absolute top-0 bottom-0 border-l border-rose-400/60" />
+                    <div className="absolute -translate-x-1/2 px-1 rounded-sm bg-rose-50 border border-rose-200 text-[9px] font-bold text-rose-600 whitespace-nowrap leading-4" style={{ top: 3 }}>
+                      {new Date(now).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Filas de actividades */}

@@ -42,6 +42,7 @@ export function ClientCronogramaTab({
   isAdmin: boolean;
 }) {
   const [view, setView] = useState<ViewMode>("list");
+  const [filterAssignee, setFilterAssignee] = useState<string | null>(null);
   const { push: pushToast } = useToast();
   const [editingActivity, setEditingActivity] = useState<{
     stageId: string;
@@ -230,9 +231,46 @@ export function ClientCronogramaTab({
           </div>
         ))}
 
+      {view === "gantt" && consultorEmails.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filtrar:</span>
+          <button
+            onClick={() => setFilterAssignee(null)}
+            className={`px-2 py-0.5 rounded-sm text-[10px] font-bold transition-colors ${
+              filterAssignee === null
+                ? "bg-brand-primary text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Todos
+          </button>
+          {consultorEmails.map((email) => (
+            <button
+              key={email}
+              onClick={() => setFilterAssignee(filterAssignee === email ? null : email)}
+              className={`px-2 py-0.5 rounded-sm text-[10px] font-bold transition-colors ${
+                filterAssignee === email
+                  ? "bg-brand-primary text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {(consultorsData?.data ?? []).find((c) => c.user_email === email)?.full_name ?? email.split("@")[0]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {view === "gantt" &&
         services.map((s) => {
-          const stagesForService = allStages.filter((st) => st.client_service_id === s.id);
+          const rawStages = allStages.filter((st) => st.client_service_id === s.id);
+          const stagesForService = filterAssignee
+            ? rawStages
+                .map((st) => ({
+                  ...st,
+                  activities: st.activities.filter((a) => a.assignee_email === filterAssignee),
+                }))
+                .filter((st) => st.activities.length > 0)
+            : rawStages;
           return (
             <div key={s.id} className="space-y-2">
               <div className="flex items-center justify-between gap-2 px-1">
@@ -243,7 +281,9 @@ export function ClientCronogramaTab({
               </div>
               {stagesForService.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded p-6 text-center text-xs text-slate-500">
-                  Sin etapas. Cambia a vista Lista para crear la primera.
+                  {filterAssignee
+                    ? "Sin actividades asignadas a este consultor en este servicio."
+                    : "Sin etapas. Cambia a vista Lista para crear la primera."}
                 </div>
               ) : (
                 <ServiceGantt

@@ -370,6 +370,45 @@ export function ServiceGantt({
     setOverlay((prev) => (prev?.kind === "tooltip" ? null : prev));
   }
 
+  // Desvío: días entre real/plan (positivo=tarde, negativo=adelantado)
+  function devDays(a: StageActivity): number | null {
+    const plan = parseDate(a.planned_end);
+    if (!plan) return null;
+    const ref = a.actual_end
+      ? parseDate(a.actual_end)
+      : a.status === "delayed"
+      ? new Date(now)
+      : null;
+    if (!ref) return null;
+    return Math.round((ref.getTime() - plan.getTime()) / MS_DAY);
+  }
+
+  function exportCsv() {
+    const rows: string[][] = [
+      ["Etapa", "Actividad", "Asignado", "Status", "Plan Inicio", "Plan Fin", "Real Inicio", "Real Fin", "Desvío (días)"],
+    ];
+    for (const s of stages) {
+      for (const a of s.activities) {
+        const dev = devDays(a);
+        rows.push([
+          s.name, a.name, a.assignee_email ?? "", a.status,
+          a.planned_start ?? "", a.planned_end ?? "",
+          a.actual_start ?? "", a.actual_end ?? "",
+          dev !== null ? String(dev) : "",
+        ]);
+      }
+    }
+    const bom = "﻿";
+    const csv = bom + rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = `gantt-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   const tStyle = timelineWidth
     ? { width: timelineWidth, flexShrink: 0 as const }
     : { flex: 1, minWidth: 0 };
@@ -430,6 +469,12 @@ export function ServiceGantt({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
                 </svg>
                 {exporting ? "..." : "PNG"}
+              </button>
+              <button onClick={exportCsv} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors" title="Exportar como CSV (Excel)">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                CSV
               </button>
               {isAdmin && onFreezeBaseline && !confirmFreeze && (
                 <button onClick={() => setConfirmFreeze(true)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-amber-700 transition-colors" title={hasBaseline ? "Ya existe baseline. Usar ?force=1 para sobrescribir." : "Congelar fechas plan como baseline de referencia"}>
@@ -492,7 +537,14 @@ export function ServiceGantt({
                     </div>
                   );
                 })}
-                {todayInRange && <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%` }} />}
+                {todayInRange && (
+                  <div className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${todayPct}%` }}>
+                    <div className="absolute top-0 bottom-0 border-l border-rose-400/60" />
+                    <div className="absolute -translate-x-1/2 px-1 rounded-sm bg-rose-50 border border-rose-200 text-[9px] font-bold text-rose-600 whitespace-nowrap z-10 leading-4" style={{ top: 3 }}>
+                      {new Date(now).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -523,6 +575,13 @@ export function ServiceGantt({
             <div className="divide-y divide-slate-200">
               {stages.map((s) => {
                 const isCollapsed = collapsed.has(s.id);
+                const stageDone = s.activities.filter((a) => a.status === "completed").length;
+                const stageDelayed = s.activities.filter((a) => a.status === "delayed").length;
+                const stageActive = s.activities.filter((a) => a.status === "in_progress").length;
+                const stageTotal = s.activities.length;
+                const stagePct = stageTotal > 0 ? Math.round((stageDone / stageTotal) * 100) : 0;
+                const stageRag: "red" | "amber" | "green" =
+                  stageDelayed > 0 ? "red" : stageActive > 0 ? "amber" : "green";
                 return (
                   <div key={s.id}>
                     {/* Etapa header */}
@@ -533,8 +592,14 @@ export function ServiceGantt({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </button>
+                        <span
+                          className={`shrink-0 w-1.5 h-1.5 rounded-full ${stageRag === "red" ? "bg-rose-500" : stageRag === "amber" ? "bg-amber-400" : "bg-emerald-400"}`}
+                          title={stageRag === "red" ? "Retrasada" : stageRag === "amber" ? "En progreso" : "Al día"}
+                        />
                         <span className="text-xs font-bold text-slate-700 truncate">{s.name}</span>
-                        <span className="shrink-0 ml-auto text-[10px] text-slate-400">{s.activities.length}</span>
+                        <span className={`shrink-0 ml-auto text-[10px] font-bold tabular-nums ${stagePct === 100 ? "text-emerald-600" : "text-slate-400"}`}>
+                          {stagePct}%
+                        </span>
                       </div>
                       <div className="flex-1 min-w-0" />
                     </div>
@@ -550,6 +615,7 @@ export function ServiceGantt({
                       const noFechas = !a.planned_start && !a.planned_end;
                       const dep = a.depends_on_activity_id ? allActivities.find((x) => x.id === a.depends_on_activity_id) : null;
                       const conflict = !!(dep && a.planned_start && dep.planned_end && a.planned_start < dep.planned_end);
+                      const dev = devDays(a);
 
                       return (
                         <div key={a.id} className={`flex hover:bg-slate-50/80 transition-colors${isOnRisk ? " bg-rose-50/30" : ""}`}>
@@ -572,6 +638,11 @@ export function ServiceGantt({
                                 </svg>
                               )}
                               <p className="text-xs font-medium text-slate-900 truncate">{a.name}</p>
+                              {dev !== null && dev !== 0 && (
+                                <span className={`shrink-0 text-[9px] font-bold tabular-nums px-0.5 rounded-sm ${dev > 0 ? "text-rose-600 bg-rose-50" : "text-emerald-700 bg-emerald-50"}`}>
+                                  {dev > 0 ? `+${dev}d` : `${dev}d`}
+                                </span>
+                              )}
                             </div>
                             {a.assignee_email && (
                               <p className="text-[10px] text-slate-500 truncate pl-4" title={a.assignee_email}>

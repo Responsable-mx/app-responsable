@@ -716,7 +716,7 @@ export function ServiceGantt({
               </div>
               {/* Pronóstico cierre */}
               {evmMetrics.forecastEnd && (
-                <div className="shrink-0">
+                <div className="shrink-0" title="Est. Cierre — fecha proyectada de terminación basada en el ritmo actual de avance. Si el SPI < 1 (retraso), la fecha se desplaza hacia adelante. Compara contra 'plan' para ver cuánto se ha extendido el proyecto.">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Est. cierre</p>
                   <p className="text-xs font-bold text-slate-700 tabular-nums leading-snug">
                     {evmMetrics.forecastEnd.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
@@ -728,7 +728,7 @@ export function ServiceGantt({
               )}
               {/* Varianza días */}
               {evmMetrics.varianceDays !== null && (
-                <div className="shrink-0 text-center">
+                <div className="shrink-0 text-center" title="Varianza — diferencia en días entre la fecha estimada de cierre y la fecha plan original. Valor negativo = retraso (ej: -23d = llegarás 23 días tarde). Valor positivo = adelanto. Útil para estimar impacto de penalizaciones o ventanas de entrega.">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Varianza</p>
                   <p className={`text-base font-bold tabular-nums leading-none ${evmMetrics.varianceDays >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                     {evmMetrics.varianceDays > 0 ? `+${evmMetrics.varianceDays}` : evmMetrics.varianceDays}d

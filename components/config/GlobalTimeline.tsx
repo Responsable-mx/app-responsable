@@ -314,14 +314,21 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     });
   }, [byConsultor, range, chartW]);
 
-  // Scroll automático hacia "Hoy" al montar o cambiar zoom
+  // Scroll automático hacia "Hoy" cuando carga datos (solo al montar, no en cada zoom)
+  // setTimeout(0) espera a que el DOM se layoutee y clientWidth sea > 0
+  const scrolledRef = useRef(false);
   useEffect(() => {
-    if (!scrollRef.current || !range) return;
+    if (scrolledRef.current || !range) return;
     const ms = range.max - range.min;
     const todayX = ((now - range.min) / ms) * chartW;
     if (todayX < 0 || todayX > chartW) return;
-    const cW = scrollRef.current.clientWidth;
-    scrollRef.current.scrollLeft = Math.max(0, todayX - cW / 3);
+    const timer = setTimeout(() => {
+      if (!scrollRef.current) return;
+      const cW = scrollRef.current.clientWidth;
+      scrollRef.current.scrollLeft = Math.max(0, todayX - cW / 3);
+      scrolledRef.current = true;
+    }, 0);
+    return () => clearTimeout(timer);
   }, [range, chartW, now]);
 
   // ── Early returns ─────────────────────────────────────────────────────────

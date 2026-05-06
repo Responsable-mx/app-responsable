@@ -55,6 +55,7 @@ export type Client = {
   // URLs de documentos clave (opcionales)
   sustainability_strategy_url: string | null;
   sustainability_report_url: string | null;
+  financial_report_url: string | null;
   double_materiality_url: string | null;
 
   // Narrativa legacy (text, se conserva)
@@ -115,7 +116,7 @@ const ALL_COLUMNS = [
   "business_segments,frameworks,applicable_regulations,policies_in_place",
   "certifications,material_topics,maturity_level",
   "has_double_materiality,has_sustainability_report,has_sustainability_strategy",
-  "sustainability_strategy_url,sustainability_report_url,double_materiality_url",
+  "sustainability_strategy_url,sustainability_report_url,financial_report_url,double_materiality_url",
   "info_general,business_model,impacts,regulatory_context,sustainability_strategy,stakeholders",
   "info_general_json,business_model_json,impacts_json",
   "regulatory_context_json,sustainability_strategy_json,stakeholders_json",
@@ -144,6 +145,7 @@ const DEV_SEED_CLIENTS: Client[] = [
     has_sustainability_strategy: true,
     sustainability_strategy_url: "https://www.heinekenmexico.com/brew-a-better-world",
     sustainability_report_url: "https://www.heinekenmexico.com/reporte-2023.pdf",
+    financial_report_url: null,
     double_materiality_url: null,
     info_general: null,
     business_model: null,
@@ -248,6 +250,7 @@ const DEV_SEED_CLIENTS: Client[] = [
     has_sustainability_strategy: true,
     sustainability_strategy_url: null,
     sustainability_report_url: null,
+    financial_report_url: null,
     double_materiality_url: null,
     info_general: null,
     business_model: null,
@@ -343,6 +346,7 @@ function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
     "has_sustainability_strategy",
     "sustainability_strategy_url",
     "sustainability_report_url",
+    "financial_report_url",
     "double_materiality_url",
     ...NARRATIVE_BLOCKS,
     ...JSON_BLOCKS,

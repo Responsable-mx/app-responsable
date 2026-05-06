@@ -59,8 +59,8 @@ const INFO_GENERAL: BlockSchema = {
   fields: [
     {
       key: "unidades_negocio",
-      label: "Unidades de negocio",
-      hint: "Divisiones o líneas principales del cliente.",
+      label: "Divisiones y líneas de producto",
+      hint: "Divisiones organizacionales principales (≠ segmentos B2B/B2C que van en Atributos).",
       type: { kind: "string_list", placeholder: "Ej: Cervezas MX, Refrescos MX" },
     },
     {
@@ -152,11 +152,6 @@ const BUSINESS_MODEL: BlockSchema = {
         placeholder: "Ej: Agua del acuífero Tecate",
         maxItems: 15,
       },
-    },
-    {
-      key: "notas",
-      label: "Notas adicionales",
-      type: { kind: "text", multiline: true },
     },
   ],
 };
@@ -252,11 +247,6 @@ const IMPACTS: BlockSchema = {
       },
     },
     {
-      key: "biodiversidad_relevante",
-      label: "¿Biodiversidad es tema material?",
-      type: { kind: "bool_tri" },
-    },
-    {
       key: "rotacion_personal_pct",
       label: "Rotación anual de personal",
       type: { kind: "number", unit: "%", min: 0, max: 100 },
@@ -335,11 +325,6 @@ const REGULATORY_CONTEXT: BlockSchema = {
         ],
       },
     },
-    {
-      key: "notas",
-      label: "Notas adicionales",
-      type: { kind: "text", multiline: true },
-    },
   ],
 };
 
@@ -392,7 +377,7 @@ const SUSTAINABILITY_STRATEGY: BlockSchema = {
     {
       key: "kpis",
       label: "KPIs activos",
-      hint: "Indicadores que el cliente ya mide y publica.",
+      hint: "Indicadores que el cliente ya mide y publica. No repetir emisiones/agua/residuos — ya se capturan en Bloque 3.",
       type: {
         kind: "object_list",
         itemLabel: "KPI",
@@ -519,11 +504,6 @@ const STAKEHOLDERS: BlockSchema = {
     {
       key: "conflictos_activos",
       label: "Conflictos o tensiones activas",
-      type: { kind: "text", multiline: true },
-    },
-    {
-      key: "notas",
-      label: "Notas adicionales",
       type: { kind: "text", multiline: true },
     },
   ],

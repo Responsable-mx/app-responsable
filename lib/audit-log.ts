@@ -20,7 +20,8 @@ export type AuditEntityType =
   | "client_consultors"
   | "service_stage"
   | "stage_activity"
-  | "stage_template";
+  | "stage_template"
+  | "client_document";
 
 export type AuditAction = "create" | "update" | "delete" | "restore";
 

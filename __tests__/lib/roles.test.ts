@@ -22,6 +22,7 @@ const FULL_CLIENT = {
   has_sustainability_strategy: true,
   sustainability_strategy_url: null,
   sustainability_report_url: null,
+  financial_report_url: null,
   double_materiality_url: null,
   info_general: "3 plantas en MX, ingresos 2025 ~80B MXN",
   business_model: "Retail + HORECA, B2B2C",

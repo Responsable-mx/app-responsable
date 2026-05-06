@@ -590,28 +590,28 @@ export function ServiceGantt({
               <button
                 onClick={() => setShowFloat((v) => !v)}
                 className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showFloat ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
-                title="Holgura: días de buffer disponible por actividad"
+                title="Holgura (Float) — días libres que tiene cada actividad antes de impactar al siguiente paso. Holgura=0 → está en la ruta crítica: cualquier retraso aquí retrasa todo el proyecto."
               >
                 Holgura
               </button>
               <button
                 onClick={() => setShowDeps((v) => !v)}
                 className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showDeps ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
-                title="Flechas de dependencia entre actividades"
+                title="Dependencias — flechas que muestran qué actividades deben terminar antes de que otra pueda iniciar. Un retraso puede bloquear actividades en cascada."
               >
                 Dep.
               </button>
               <button
                 onClick={() => setShowCriticalPath((v) => !v)}
                 className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showCriticalPath ? "bg-amber-100 text-amber-700" : "text-slate-400 hover:text-slate-700"}`}
-                title="Ruta crítica: cadena de actividades que determina la duración total del proyecto"
+                title="Ruta Crítica — secuencia de actividades sin holgura que define la duración mínima del proyecto (resaltadas en ámbar). Un retraso en cualquiera = retraso garantizado en entrega final."
               >
                 Ruta
               </button>
               <button
                 onClick={() => setShowEvm((v) => !v)}
                 className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showEvm ? "bg-brand-primary/10 text-brand-primary-dark" : "text-slate-400 hover:text-slate-700"}`}
-                title="EVM: índice de desempeño de cronograma y pronóstico de cierre"
+                title="EVM (Earned Value Management) — métricas de rendimiento del proyecto. Compara avance real vs tiempo transcurrido para proyectar cuándo terminará y si va en riesgo."
               >
                 EVM
               </button>
@@ -704,7 +704,7 @@ export function ServiceGantt({
                 </div>
               </div>
               {/* SPI */}
-              <div className="shrink-0 text-center">
+              <div className="shrink-0 text-center" title="SPI (Schedule Performance Index) — índice de eficiencia de tiempo. SPI = avance real ÷ avance esperado. SPI ≥ 1.0 = adelantado o en tiempo · 0.8–0.99 = leve retraso · <0.8 = riesgo alto de no entregar a tiempo.">
                 <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">SPI</p>
                 <p className={`text-base font-bold tabular-nums leading-none ${
                   evmMetrics.spi >= 1 ? "text-emerald-600" :

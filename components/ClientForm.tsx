@@ -47,6 +47,7 @@ type FormState = {
   // URLs de documentos
   sustainability_strategy_url: string;
   sustainability_report_url: string;
+  financial_report_url: string;
   double_materiality_url: string;
 
   // Narrativa JSONB (6 bloques)
@@ -105,6 +106,8 @@ export function ClientForm(props: Props) {
       props.initial?.sustainability_strategy_url ?? "",
     sustainability_report_url:
       props.initial?.sustainability_report_url ?? "",
+    financial_report_url:
+      props.initial?.financial_report_url ?? "",
     double_materiality_url: props.initial?.double_materiality_url ?? "",
     blocks: initialBlocks(props.initial),
   });
@@ -147,6 +150,8 @@ export function ClientForm(props: Props) {
           form.sustainability_strategy_url.trim() || null,
         sustainability_report_url:
           form.sustainability_report_url.trim() || null,
+        financial_report_url:
+          form.financial_report_url.trim() || null,
         double_materiality_url: form.double_materiality_url.trim() || null,
         info_general_json: form.blocks.info_general,
         business_model_json: form.blocks.business_model,
@@ -396,6 +401,17 @@ export function ClientForm(props: Props) {
             onUrlChange={(v) => update("double_materiality_url", v)}
           />
         </div>
+
+        {/* Sección informes públicos para IA — Sprint B2 */}
+        {props.initial?.id && (
+          <ReportSearchFields
+            clientId={props.initial.id}
+            sustainabilityUrl={form.sustainability_report_url}
+            financialUrl={form.financial_report_url}
+            onSustainabilityChange={(v) => update("sustainability_report_url", v)}
+            onFinancialChange={(v) => update("financial_report_url", v)}
+          />
+        )}
       </Section>
 
       {/* ═══ Narrativa (6 bloques con sub-campos) ═══════════ */}
@@ -544,6 +560,170 @@ function BoolFieldInline({
             className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary"
           />
         </div>
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// Sprint B2 — Búsqueda IA de informes públicos (sustentabilidad + financiero)
+// ═══════════════════════════════════════════════════════════════
+type Candidate = { url: string; title: string; year?: number | string | null };
+
+function ReportSearchFields(props: {
+  clientId: string;
+  sustainabilityUrl: string;
+  financialUrl: string;
+  onSustainabilityChange: (v: string) => void;
+  onFinancialChange: (v: string) => void;
+}) {
+  return (
+    <div className="mt-5 pt-4 border-t border-slate-200">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+        Informes públicos · fuente IA
+      </h3>
+      <p className="text-[11px] text-slate-500 mb-3">
+        La IA busca el informe en línea, lo descarga, convierte a Markdown y lo guarda como referencia. Los campos del cuestionario podrán usar este contenido al llenarse con IA.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ReportField
+          clientId={props.clientId}
+          kind="sustainability_report"
+          label="Informe de sustentabilidad"
+          value={props.sustainabilityUrl}
+          onChange={props.onSustainabilityChange}
+        />
+        <ReportField
+          clientId={props.clientId}
+          kind="financial_report"
+          label="Informe financiero / anual"
+          value={props.financialUrl}
+          onChange={props.onFinancialChange}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ReportField(props: {
+  clientId: string;
+  kind: "sustainability_report" | "financial_report";
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [searching, setSearching] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+
+  async function research() {
+    setSearching(true);
+    setError(null);
+    setOk(null);
+    try {
+      const res = await fetch(`/api/clients/${props.clientId}/research-reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: props.kind }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      setCandidates(j.data.candidates as Candidate[]);
+      if (j.data.candidates.length === 0) setError("La IA no encontró candidatos públicos.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error de búsqueda");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function ingest(url: string) {
+    setIngesting(true);
+    setError(null);
+    setOk(null);
+    try {
+      const res = await fetch(`/api/clients/${props.clientId}/ingest-report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: props.kind, url }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      props.onChange(url);
+      setCandidates(null);
+      const status = j.data.parse_status === "ok" ? "guardado y convertido" : "guardado (parse falló)";
+      setOk(`Informe ${status}: ${j.data.file_name}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al ingerir");
+    } finally {
+      setIngesting(false);
+    }
+  }
+
+  return (
+    <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+      <label className="block text-xs font-semibold text-slate-700 mb-1">{props.label}</label>
+      <div className="flex gap-2">
+        <input
+          type="url"
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          placeholder="https://… (manual o vía IA)"
+          className="flex-1 px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary"
+        />
+        <button
+          type="button"
+          onClick={research}
+          disabled={searching || ingesting}
+          className="text-[11px] font-semibold text-brand-primary-dark border border-brand-primary/40 rounded px-2 py-1.5 hover:bg-brand-primary/5 disabled:opacity-50"
+          title="La IA busca el informe en línea"
+        >
+          {searching ? "Buscando…" : "Buscar con IA"}
+        </button>
+      </div>
+      {props.value && (
+        <a
+          href={props.value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-brand-primary-dark hover:underline inline-block mt-1"
+        >
+          Abrir informe ↗
+        </a>
+      )}
+      {error && (
+        <p className="text-[10px] text-rose-600 mt-1">{error}</p>
+      )}
+      {ok && (
+        <p className="text-[10px] text-emerald-700 mt-1">✓ {ok}</p>
+      )}
+      {candidates && candidates.length > 0 && (
+        <div className="mt-2 space-y-1.5 border-t border-slate-200 pt-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            Candidatos encontrados · click para descargar y guardar
+          </p>
+          {candidates.map((c, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => void ingest(c.url)}
+              disabled={ingesting}
+              className="block w-full text-left text-[11px] border border-slate-300 rounded px-2 py-1.5 hover:bg-white hover:border-brand-primary disabled:opacity-50"
+            >
+              <span className="font-semibold text-slate-800 line-clamp-1">{c.title}</span>
+              <span className="block text-slate-500 text-[10px] truncate">
+                {c.url}
+                {c.year ? ` · ${c.year}` : ""}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {ingesting && (
+        <p className="text-[10px] text-slate-500 mt-1">Descargando y convirtiendo a Markdown…</p>
       )}
     </div>
   );

@@ -1,0 +1,166 @@
+import "server-only";
+
+export type FileType = "pdf" | "docx" | "pptx" | "xlsx" | "txt" | "md";
+
+export type ParseResult = {
+  markdown: string;
+  fileType: FileType;
+};
+
+const MIME_TO_TYPE: Record<string, FileType> = {
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/msword": "docx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/vnd.ms-powerpoint": "pptx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-excel": "xlsx",
+  "text/plain": "txt",
+  "text/markdown": "md",
+};
+
+export function detectFileType(mimeType: string, fileName: string): FileType | null {
+  if (MIME_TO_TYPE[mimeType]) return MIME_TO_TYPE[mimeType];
+  const ext = fileName.toLowerCase().split(".").pop();
+  if (ext === "pdf") return "pdf";
+  if (ext === "docx" || ext === "doc") return "docx";
+  if (ext === "pptx" || ext === "ppt") return "pptx";
+  if (ext === "xlsx" || ext === "xls") return "xlsx";
+  if (ext === "txt") return "txt";
+  if (ext === "md") return "md";
+  return null;
+}
+
+export async function parseToMarkdown(buffer: Buffer, fileType: FileType): Promise<string> {
+  switch (fileType) {
+    case "pdf":
+      return parsePdf(buffer);
+    case "docx":
+      return parseDocx(buffer);
+    case "xlsx":
+      return parseXlsx(buffer);
+    case "pptx":
+      return parsePptx(buffer);
+    case "txt":
+    case "md":
+      return buffer.toString("utf-8");
+  }
+}
+
+async function parsePdf(buffer: Buffer): Promise<string> {
+  // pdf-parse v1: export por defecto es función directa
+  const pdfParse = (await import("pdf-parse")).default;
+  const result = await pdfParse(buffer);
+  return cleanText(result.text);
+}
+
+async function parseDocx(buffer: Buffer): Promise<string> {
+  const mammoth = await import("mammoth");
+  // Mammoth no tiene markdown nativo — convertimos a HTML y luego strip básico
+  const result = await mammoth.convertToHtml({ buffer: buffer as unknown as Buffer });
+  return cleanText(htmlToMarkdownLite(result.value));
+}
+
+async function parseXlsx(buffer: Buffer): Promise<string> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+  const out: string[] = [];
+  wb.eachSheet((sheet) => {
+    out.push(`## Hoja: ${sheet.name}\n`);
+    const rows: string[][] = [];
+    sheet.eachRow({ includeEmpty: false }, (row) => {
+      const values = (row.values as unknown[]).slice(1).map((v) => {
+        if (v == null) return "";
+        if (typeof v === "object" && v !== null && "text" in v) return String((v as { text: unknown }).text ?? "");
+        if (typeof v === "object" && v !== null && "result" in v) return String((v as { result: unknown }).result ?? "");
+        return String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
+      });
+      rows.push(values);
+    });
+    if (rows.length === 0) return;
+    const cols = Math.max(...rows.map((r) => r.length));
+    const header = rows[0];
+    const headerRow = Array.from({ length: cols }, (_, i) => header[i] ?? `Col${i + 1}`);
+    out.push("| " + headerRow.join(" | ") + " |");
+    out.push("| " + headerRow.map(() => "---").join(" | ") + " |");
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const padded = Array.from({ length: cols }, (_, j) => r[j] ?? "");
+      out.push("| " + padded.join(" | ") + " |");
+    }
+    out.push("");
+  });
+  return cleanText(out.join("\n"));
+}
+
+async function parsePptx(buffer: Buffer): Promise<string> {
+  // PPTX = ZIP con ppt/slides/slideN.xml. Extraemos texto de cada slide.
+  // Usamos JSZip que ya viene como dep transitiva de mammoth/exceljs.
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(buffer);
+  const slides: { idx: number; text: string }[] = [];
+  const slidePaths = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/i.test(p));
+  slidePaths.sort((a, b) => {
+    const na = parseInt(a.match(/slide(\d+)\.xml$/i)?.[1] ?? "0", 10);
+    const nb = parseInt(b.match(/slide(\d+)\.xml$/i)?.[1] ?? "0", 10);
+    return na - nb;
+  });
+  for (const path of slidePaths) {
+    const xml = await zip.files[path].async("string");
+    const idx = parseInt(path.match(/slide(\d+)\.xml$/i)?.[1] ?? "0", 10);
+    // Match texto entre <a:t>...</a:t>
+    const matches = xml.match(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g) ?? [];
+    const text = matches
+      .map((m) => m.replace(/<a:t[^>]*>([\s\S]*?)<\/a:t>/, "$1"))
+      .map(decodeXmlEntities)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text) slides.push({ idx, text });
+  }
+  const md = slides.map((s) => `## Slide ${s.idx}\n\n${s.text}\n`).join("\n");
+  return cleanText(md);
+}
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function cleanText(s: string): string {
+  // Normaliza saltos múltiples y trim
+  return s.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Conversión HTML→Markdown ligera: solo headings/listas/párrafos/links/bold/italic
+function htmlToMarkdownLite(html: string): string {
+  let s = html;
+  s = s.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "\n# $1\n");
+  s = s.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "\n## $1\n");
+  s = s.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "\n### $1\n");
+  s = s.replace(/<h4[^>]*>(.*?)<\/h4>/gi, "\n#### $1\n");
+  s = s.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
+  s = s.replace(/<br\s*\/?>/gi, "\n");
+  s = s.replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**");
+  s = s.replace(/<b[^>]*>(.*?)<\/b>/gi, "**$1**");
+  s = s.replace(/<em[^>]*>(.*?)<\/em>/gi, "*$1*");
+  s = s.replace(/<i[^>]*>(.*?)<\/i>/gi, "*$1*");
+  s = s.replace(/<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gi, "[$2]($1)");
+  s = s.replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n");
+  s = s.replace(/<\/?(ul|ol)[^>]*>/gi, "\n");
+  s = s.replace(/<[^>]+>/g, ""); // strip resto
+  s = s.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+  return s;
+}
+
+const MAX_MARKDOWN_CHARS = 200_000; // ~50k tokens — tope para no inflar prompts
+
+export function truncateMarkdown(md: string): string {
+  if (md.length <= MAX_MARKDOWN_CHARS) return md;
+  return md.slice(0, MAX_MARKDOWN_CHARS) + "\n\n[…contenido truncado a 200k caracteres]";
+}

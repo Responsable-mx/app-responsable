@@ -163,6 +163,27 @@ No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
     if (client.countries?.length) contextLines.push(`Países: ${client.countries.join(", ")}`);
     if (client.size) contextLines.push(`Tamaño: ${client.size}`);
   }
+
+  // Sprint B2: incluir contenido de informes públicos (sustentabilidad/financiero)
+  // como fuente primaria. Cita la URL real al usar datos de estos docs.
+  const reportsContext: string[] = [];
+  try {
+    const { listDocumentsByClient } = await import("@/lib/documents/queries");
+    const reports = await listDocumentsByClient(id);
+    for (const doc of reports) {
+      if (doc.kind === "general") continue;
+      if (!doc.markdown_content || doc.parse_status !== "ok") continue;
+      const label = doc.kind === "sustainability_report" ? "INFORME DE SUSTENTABILIDAD" : "INFORME FINANCIERO";
+      const sourceUrl = doc.source_url ?? "doc-cliente";
+      // Tope conservador por doc para no inflar prompt: 30k chars c/u
+      const slice = doc.markdown_content.slice(0, 30_000);
+      reportsContext.push(
+        `\n[${label} — ${doc.file_name}]\nFuente: ${sourceUrl}\n\n${slice}\n`
+      );
+    }
+  } catch (e) {
+    console.error("[ai-fill] reports context failed:", e);
+  }
   // Respuestas previas llenas (para no duplicar trabajo)
   const previousResponses = bundle.response?.responses ?? {};
   const previousLines: string[] = [];
@@ -190,13 +211,13 @@ No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
 CONTEXTO YA CAPTURADO:
 ${contextLines.length ? contextLines.join("\n") : "(sin datos básicos)"}
 ${previousLines.join("\n")}
-
+${reportsContext.length > 0 ? `\n\nINFORMES PÚBLICOS DEL CLIENTE (FUENTE PRIMARIA — usa estos antes de web_search):\n${reportsContext.join("\n---\n")}\n` : ""}
 PASO ACTUAL: ${step.title} — ${step.subtitle}
 
 Campos a llenar:
 ${fieldsList}
 
-Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"} y retorna el JSON con los campos llenos siguiendo las 8 reglas operativas. No inventes URLs.`;
+${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como fuente principal. Cita la URL real del informe en sources.url. Si el dato no está en los informes, complementa con web_search." : ""}Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"} y retorna el JSON con los campos llenos siguiendo las 8 reglas operativas. No inventes URLs.`;
 
   // Modelo desde config centralizada (Aurora = autor, mismo rol que llena cuestionarios).
   const modelCfg = getModelConfig("aurora");

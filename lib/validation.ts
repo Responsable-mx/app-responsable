@@ -129,6 +129,13 @@ export const ClientInputSchema = z.object({
     .max(600)
     .optional()
     .nullable(),
+  financial_report_url: z
+    .string()
+    .trim()
+    .url("URL inválida")
+    .max(600)
+    .optional()
+    .nullable(),
   double_materiality_url: z
     .string()
     .trim()

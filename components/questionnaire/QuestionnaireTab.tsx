@@ -19,12 +19,12 @@ import {
 } from "@/lib/questionnaires/types";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { Modal } from "@/components/ui/Modal";
 import { SelectField } from "@/components/ui/SelectField";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { WizardStepNav } from "@/components/questionnaire/WizardStepNav";
 import { AiBulkBanner } from "@/components/questionnaire/AiBulkBanner";
+import { ImportModal } from "@/components/questionnaire/ImportModal";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -101,10 +101,8 @@ function WizardEditor({
   const [drawerField, setDrawerField] = useState<{ stepKey: string; fieldKey: string } | null>(null);
   const [aiFilling, setAiFilling] = useState<string | null>(null); // step.key
   const [aiBulkProgress, setAiBulkProgress] = useState<{ current: number; total: number; stepTitle: string } | null>(null);
-  // Estado del modal "Importar texto" para doc-fill.
+  // Estado del modal "Importar" (tabs: pegar texto / subir archivo / mis docs).
   const [docFillOpen, setDocFillOpen] = useState(false);
-  const [docFillText, setDocFillText] = useState("");
-  const [docFilling, setDocFilling] = useState(false);
   const toast = useToast();
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -341,16 +339,15 @@ function WizardEditor({
     }
   }
 
-  // Llena el paso activo extrayendo datos del texto pegado por el consultor.
-  // Reutiliza el mismo merge/save que aiFill — misma respuesta {data: Record<string, FieldResponse>}.
-  async function docFill(stepKey: string) {
-    if (!docFillText.trim()) return;
-    setDocFilling(true);
+  // Llena el paso activo con texto/markdown extraído (de paste o de docs subidos).
+  // Reutiliza merge/save de aiFill — misma respuesta {data: Record<string, FieldResponse>}.
+  async function docFill(stepKey: string, text: string) {
+    if (!text.trim()) return;
     try {
       const res = await fetch(`/api/clients/${clientId}/wizard/${stepKey}/doc-fill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: docFillText }),
+        body: JSON.stringify({ text }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
@@ -361,14 +358,11 @@ function WizardEditor({
       setResponses(merged);
       dirty.current = true;
       await save(merged);
-      toast.push("success", "Texto importado — campos del paso actualizados");
+      toast.push("success", "Documento procesado — campos del paso actualizados");
       setDocFillOpen(false);
-      setDocFillText("");
       mutate();
     } catch (e) {
-      toast.push("error", e instanceof Error ? e.message : "Error al importar el documento");
-    } finally {
-      setDocFilling(false);
+      toast.push("error", e instanceof Error ? e.message : "Error al importar");
     }
   }
 
@@ -576,13 +570,13 @@ function WizardEditor({
           <div className="flex flex-col items-end gap-2 shrink-0">
             <SaveIndicator state={saveState} errorMsg={errorMsg} />
             <div className="flex items-center gap-2">
-              {/* Botón "Importar" — abre modal para pegar transcripción/notas */}
+              {/* Botón "Importar" — abre modal con tabs (pegar / subir / mis docs) */}
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => setDocFillOpen(true)}
                 disabled={!!aiBulkProgress || !!aiFilling}
-                title="Pegar transcripción, notas de entrevista o datos de Excel/Word para que Aurora extraiga los campos"
+                title="Pegar texto, subir PDF/Word/Excel/PPT o reusar documentos del cliente"
               >
                 <svg className="w-3.5 h-3.5 mr-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -718,54 +712,13 @@ function WizardEditor({
         );
       })()}
 
-      {/* Modal "Importar texto" — pegar transcripción/notas/datos para doc-fill */}
-      <Modal
+      <ImportModal
         open={docFillOpen}
-        onClose={() => { setDocFillOpen(false); setDocFillText(""); }}
-        title={`Importar texto para "${step.title}"`}
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-slate-600">
-            Pega una transcripción de entrevista, notas de reunión, datos de un Excel copiado
-            o cualquier texto del cliente. Aurora extraerá solo los datos relevantes para
-            este paso y los llenará como borrador para que los valides.
-          </p>
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
-              Texto / transcripción
-            </label>
-            <textarea
-              className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-y min-h-[180px] max-h-[400px]"
-              placeholder="Pega aquí la transcripción, notas de la entrevista, datos del Excel u otro documento del cliente…"
-              value={docFillText}
-              onChange={(e) => setDocFillText(e.target.value)}
-              disabled={docFilling}
-            />
-            <p className="text-[10px] text-slate-400 mt-1 tabular-nums">
-              {docFillText.length.toLocaleString()} / 50,000 chars
-            </p>
-          </div>
-          <div className="flex items-center justify-between gap-3 pt-1">
-            <button
-              type="button"
-              onClick={() => { setDocFillOpen(false); setDocFillText(""); }}
-              className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
-              disabled={docFilling}
-            >
-              Cancelar
-            </button>
-            <Button
-              variant="primary"
-              size="md"
-              loading={docFilling}
-              disabled={docFillText.trim().length < 10 || docFillText.length > 50_000}
-              onClick={() => void docFill(step.key)}
-            >
-              Extraer y llenar campos
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onClose={() => setDocFillOpen(false)}
+        clientId={clientId}
+        stepTitle={step.title}
+        onExtract={(text) => docFill(step.key, text)}
+      />
     </div>
     </div>
   );

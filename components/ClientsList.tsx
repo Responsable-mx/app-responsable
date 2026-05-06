@@ -7,6 +7,7 @@ import type { Client } from "@/lib/clients";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/ui/Modal";
 import { SelectField } from "@/components/ui/SelectField";
+import { useToast } from "@/components/ui/Toast";
 
 // Saved views: filtros persistidos por usuario en localStorage. Pattern Salesforce
 // "List Views" / Linear "Saved searches". Permite al consultor tener "Mis activos",
@@ -59,10 +60,11 @@ const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ data: Row[] }>);
 
 export function ClientsList() {
+  const { push: pushToast } = useToast();
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
-  const [view, setView] = useState<ViewMode>("table");
+  const [view, setView] = useState<ViewMode>("cards");
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -297,6 +299,7 @@ export function ClientsList() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar clientes"
             placeholder="Buscar por nombre, sector, país, marco, certificación…"
             className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
           />
@@ -335,7 +338,7 @@ export function ClientsList() {
         </div>
         <button
           type="button"
-          onClick={() => exportClientsCsv(filtered)}
+          onClick={() => { exportClientsCsv(filtered); pushToast("ok", `Exportado: ${filtered.length} clientes`); }}
           className="inline-flex items-center gap-1.5 ml-auto px-2.5 py-1.5 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50"
           title="Descargar lista filtrada como CSV (Excel)"
         >
@@ -386,6 +389,14 @@ export function ClientsList() {
             >
               Agregar el primero
             </Link>
+          )}
+          {(clients.length > 0 || debouncedQ) && hasFilters && (
+            <button
+              onClick={clearView}
+              className="mt-3 text-sm text-brand-primary-dark hover:underline"
+            >
+              Limpiar filtros
+            </button>
           )}
         </div>
       ) : view === "cards" ? (
@@ -445,7 +456,7 @@ export function ClientsList() {
                         <Link
                           href={`/clientes/${c.id}?tab=chat`}
                           title="Chat IA"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/20 rounded px-2 py-1 hover:bg-brand-primary/20"
+                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/20 rounded px-2 py-1 hover:bg-brand-primary/20"
                         >
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -524,13 +535,13 @@ function ClientCard({ client }: { client: Row }) {
     daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
 
   return (
-    <div className="group relative bg-white border border-slate-200 rounded shadow-sm hover:shadow-md hover:border-brand-primary/40 transition-all">
+    <div className="group relative bg-white border border-slate-200 rounded shadow-sm hover:border-brand-primary/30 transition-all">
       <Link
         href={`/clientes/${client.id}`}
         className="block p-4"
       >
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-10 h-10 rounded bg-gradient-to-br from-brand-primary to-brand-primary-dark text-white font-bold flex items-center justify-center text-sm shrink-0 ring-1 ring-brand-primary-dark/10">
+          <div className="w-10 h-10 rounded bg-brand-primary-dark text-white font-bold flex items-center justify-center text-sm shrink-0">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
@@ -538,7 +549,7 @@ function ClientCard({ client }: { client: Row }) {
               {client.name}
             </h3>
             <p className="text-[11px] text-slate-500 truncate mt-0.5">
-              {client.sector ?? "Sin sector"}
+              {client.sector ?? "—"}
               {client.size ? ` · ${client.size}` : ""}
             </p>
           </div>
@@ -566,19 +577,17 @@ function ClientCard({ client }: { client: Row }) {
           <div className="mb-3" />
         )}
 
-        {daysAgo > 0 && (
-          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-100">
-            <span className="uppercase tracking-widest font-bold">Actualizado</span>
-            <span className="tabular-nums text-slate-600">{updatedLabel}</span>
-          </div>
-        )}
+        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+          <span className="uppercase tracking-widest font-bold">Actualizado</span>
+          <span className="tabular-nums text-slate-600">{updatedLabel}</span>
+        </div>
       </Link>
 
       {/* Acceso rápido a Chat IA — aparece en hover, no interrumpe el link principal */}
       <Link
         href={`/clientes/${client.id}?tab=chat`}
         title="Abrir Chat IA para este cliente"
-        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/20 rounded px-2 py-1 hover:bg-brand-primary/20"
+        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/20 rounded px-2 py-1 hover:bg-brand-primary/20"
         onClick={(e) => e.stopPropagation()}
       >
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

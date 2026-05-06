@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import { UsersManager } from "@/components/config/UsersManager";
 
+export const metadata: Metadata = { title: "Usuarios · Configuración · App ResponSable" };
 export const dynamic = "force-dynamic";
 
 export default function UsuariosPage() {

@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { Sparkline } from "@/components/Sparkline";
 
+export const metadata: Metadata = { title: "Uso IA · Configuración · App ResponSable" };
 export const dynamic = "force-dynamic";
 
 const numFmt = new Intl.NumberFormat("es-MX");

@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { PreferencesPanel } from "@/components/config/PreferencesPanel";
 import { getSetting } from "@/lib/settings";
+
+export const metadata: Metadata = { title: "Preferencias · Configuración · App ResponSable" };
 
 export const dynamic = "force-dynamic";
 

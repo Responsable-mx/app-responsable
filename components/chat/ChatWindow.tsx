@@ -69,11 +69,12 @@ const ROLES: Array<{
   fn: string;
   color: string;
   mono: string;
+  borderColor: string;
 }> = [
-  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-brand-primary-dark", mono: "A" },
-  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-slate-700", mono: "R" },
-  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-indigo-800", mono: "E" },
-  { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-emerald-800", mono: "V" },
+  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-brand-primary-dark", mono: "A", borderColor: "border-l-brand-primary-dark" },
+  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-slate-700", mono: "R", borderColor: "border-l-slate-500" },
+  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-slate-800", mono: "E", borderColor: "border-l-amber-600" },
+  { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-slate-600", mono: "V", borderColor: "border-l-emerald-700" },
 ];
 
 /**
@@ -717,7 +718,7 @@ export function ChatWindow({
             {selectedClient.completeness.filled}/6 bloques llenos. Los roles
             responden mejor cuando está completo.{" "}
             <a
-              href={`/clientes/${selectedClient.id}`}
+              href={`/clientes/${selectedClient.id}?tab=cuestionario`}
               className="underline hover:text-amber-700 font-medium"
             >
               Completar ahora
@@ -726,7 +727,7 @@ export function ChatWindow({
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
+      <div ref={scrollRef} role="log" aria-live="polite" aria-label="Conversación" className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-3xl mx-auto space-y-4">
           {/* System message: contexto cargado (estilo mockup) */}
           {selectedClient && (
@@ -738,8 +739,13 @@ export function ChatWindow({
                 <span className="font-medium text-slate-700">Contexto cargado</span>
                 <span className="text-slate-300">·</span>
                 <span className="font-semibold text-slate-900 truncate max-w-[260px]">{selectedClient.name}</span>
-                <span className="text-slate-300">·</span>
-                <span className="tabular-nums text-slate-600">Perfil {selectedClient.completeness.filled}/{selectedClient.completeness.total}</span>
+                {/* Ocultar cifra de perfil cuando el banner amber ya lo muestra */}
+                {selectedClient.completeness.filled >= 6 && (
+                  <>
+                    <span className="text-slate-300">·</span>
+                    <span className="tabular-nums text-slate-600">Perfil {selectedClient.completeness.filled}/{selectedClient.completeness.total}</span>
+                  </>
+                )}
                 {selectedClient.sector && (
                   <>
                     <span className="text-slate-300">·</span>
@@ -778,13 +784,6 @@ export function ChatWindow({
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                       Recientes
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowSessionsPanel(true)}
-                      className="text-[10px] text-slate-400 hover:text-brand-primary transition-colors"
-                    >
-                      Ver todo
-                    </button>
                   </div>
                   <ul className="space-y-0.5">
                     {(() => {
@@ -834,102 +833,113 @@ export function ChatWindow({
           )}
 
           {messages.map((m, i) => {
+            const isUser = m.role === "user";
             const isLastAssistant =
-              m.role === "assistant" &&
+              !isUser &&
               i === messages.map((mm, k) => (mm.role === "assistant" ? k : -1)).filter((k) => k >= 0).at(-1);
-            const showActions = m.role === "assistant" && !!m.content && !streaming;
+            const showActions = !isUser && !!m.content && !streaming;
             const tsLabel = m.ts
               ? new Date(m.ts).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
               : null;
             // Atribución por mensaje. roleId se persiste al enviar; si falta (mensajes
             // legacy o demo precargada) cae al rol activo actual.
-            const msgRole = m.role === "assistant"
+            const msgRole = !isUser
               ? ROLES.find((r) => r.id === m.roleId) ?? currentRole
               : null;
-            return (
-              <div key={i} className="animate-fade-in">
-                <div className="flex items-start gap-3">
-                  <div
-                    aria-hidden
-                    className={`w-7 h-7 rounded shrink-0 flex items-center justify-center text-[11px] font-bold text-white ${
-                      m.role === "user" ? "bg-slate-700" : (msgRole?.color ?? currentRole.color)
-                    }`}
-                  >
-                    {m.role === "user" ? "Tú" : (msgRole?.mono ?? currentRole.mono)}
+
+            if (isUser) {
+              return (
+                <div key={i} className="animate-fade-in flex justify-end">
+                  <div className="max-w-[75%]">
+                    <div className="flex items-baseline gap-2 mb-1 justify-end">
+                      <span className="text-xs font-semibold text-slate-700 leading-none">Consultor</span>
+                      {tsLabel && <span className="text-[10px] text-slate-400 tabular-nums">{tsLabel}</span>}
+                    </div>
+                    <div className="bg-slate-100 rounded px-4 py-2.5 text-sm text-slate-800 whitespace-pre-wrap">
+                      {m.content}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <p className="text-xs font-semibold text-slate-900 leading-none">
-                        {m.role === "user" ? "Consultor" : (msgRole?.name ?? currentRole.name)}
-                      </p>
-                      {m.role === "assistant" && (
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-400">
-                          {msgRole?.fn ?? currentRole.fn}
-                        </span>
-                      )}
-                      {tsLabel && (
-                        <span className="text-[10px] text-slate-400 tabular-nums">{tsLabel}</span>
+                </div>
+              );
+            }
+
+            return (
+              <div key={i} className="animate-fade-in flex items-start gap-3">
+                <div
+                  aria-hidden
+                  className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold text-white mt-1 ${msgRole?.color ?? currentRole.color}`}
+                >
+                  {msgRole?.mono ?? currentRole.mono}
+                </div>
+                <div className="min-w-0 max-w-[85%]">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <p className="text-xs font-semibold text-slate-900 leading-none">
+                      {msgRole?.name ?? currentRole.name}
+                    </p>
+                    <span
+                      className="text-[10px] uppercase tracking-widest font-semibold text-slate-400"
+                      title={`Rol: ${msgRole?.fn ?? currentRole.fn}`}
+                    >
+                      {msgRole?.fn ?? currentRole.fn}
+                    </span>
+                    {tsLabel && <span className="text-[10px] text-slate-400 tabular-nums">{tsLabel}</span>}
+                  </div>
+                  <div className={`bg-white border border-slate-200 rounded border-l-4 px-4 py-3 ${msgRole?.borderColor ?? currentRole.borderColor}`}>
+                    <div className="prose prose-sm max-w-none prose-headings:mt-2 prose-headings:mb-1 prose-h1:text-sm prose-h1:font-semibold prose-h2:text-sm prose-h2:font-semibold prose-h3:text-xs prose-h3:font-semibold text-slate-800">
+                      {m.content ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {m.content}
+                        </ReactMarkdown>
+                      ) : (
+                        <span className="inline-block w-2 h-4 bg-slate-400 animate-pulse" />
                       )}
                     </div>
-                    {m.role === "assistant" ? (
-                      <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1 text-slate-800">
-                        {m.content ? (
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {m.content}
-                          </ReactMarkdown>
-                        ) : (
-                          <span className="inline-block w-2 h-4 bg-slate-400 animate-pulse" />
-                        )}
-                      </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap text-sm text-slate-800">{m.content}</p>
-                    )}
-                  {showActions && (
-                    <div className="flex items-center mt-1 px-1">
-                      <button
-                        onClick={() => rateMessage(i, "up")}
-                        className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "up" ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}
-                        title="Útil"
-                      >
-                        <svg className="w-3.5 h-3.5" fill={m.rating === "up" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => rateMessage(i, "down")}
-                        className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "down" ? "text-rose-500" : "text-slate-300 hover:text-slate-500"}`}
-                        title="No útil"
-                      >
-                        <svg className="w-3.5 h-3.5" fill={m.rating === "down" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => copyMessage(i, m.content)}
-                        className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-slate-500 transition-colors"
-                        title="Copiar"
-                      >
-                        {copiedIdx === i ? (
-                          <span className="text-[10px] text-emerald-600 font-medium">✓</span>
-                        ) : (
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </button>
-                      {isLastAssistant && (
+                    {showActions && (
+                      <div className="flex items-center mt-2 -mx-1">
                         <button
-                          onClick={retryLast}
-                          className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-brand-primary transition-colors"
-                          title="Regenerar respuesta"
+                          onClick={() => rateMessage(i, "up")}
+                          className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "up" ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}
+                          title="Útil"
                         >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          <svg className="w-3.5 h-3.5" fill={m.rating === "up" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
                           </svg>
                         </button>
-                      )}
-                    </div>
-                  )}
+                        <button
+                          onClick={() => rateMessage(i, "down")}
+                          className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "down" ? "text-rose-500" : "text-slate-300 hover:text-slate-500"}`}
+                          title="No útil"
+                        >
+                          <svg className="w-3.5 h-3.5" fill={m.rating === "down" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => copyMessage(i, m.content)}
+                          className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-slate-500 transition-colors"
+                          title="Copiar"
+                        >
+                          {copiedIdx === i ? (
+                            <span className="text-[10px] text-emerald-600 font-medium">✓</span>
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                        </button>
+                        {isLastAssistant && (
+                          <button
+                            onClick={retryLast}
+                            className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-brand-primary transition-colors"
+                            title="Regenerar respuesta"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -992,7 +1002,7 @@ export function ChatWindow({
               placeholder={`Escribe a ${currentRole.name}...`}
               aria-label={`Escribe a ${currentRole.name}`}
               rows={1}
-              className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none max-h-40"
+              className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 resize-none max-h-40"
               disabled={streaming}
             />
             {streaming ? (
@@ -1001,12 +1011,13 @@ export function ChatWindow({
                 onClick={stop}
                 className="px-4 py-2 bg-slate-700 text-white rounded text-sm font-medium hover:bg-slate-800"
               >
-                Detener
+                Cancelar
               </button>
             ) : (
               <button
                 type="submit"
                 disabled={!input.trim()}
+                title={`Enviar · Modelo: ${MODEL_PER_ROLE[role]} · Los modelos IA pueden cometer errores, verifica antes de entregar al cliente`}
                 className="px-4 py-2 bg-brand-primary-hover text-white rounded text-sm font-medium hover:bg-brand-primary-dark disabled:bg-slate-300 disabled:cursor-not-allowed"
               >
                 Enviar
@@ -1044,9 +1055,6 @@ export function ChatWindow({
               )}
             </div>
           </div>
-          <p className="text-[10px] text-slate-300 text-center mt-1 select-none" title="Los modelos IA pueden cometer errores. Verifica antes de entregar al cliente.">
-            IA · verifica antes de entregar
-          </p>
         </div>
       </footer>
 
@@ -1054,7 +1062,7 @@ export function ChatWindow({
         open={pendingRoleChange !== null}
         title="Cambiar de rol borra el chat actual"
         description={
-          "Esta conversación se va a perder si cambias a otro rol. Cada rol mantiene su propio contexto para no mezclar metodologías."
+          "Esta conversación queda guardada en tu historial. El chat del nuevo rol comienza limpio para no mezclar metodologías."
         }
         confirmLabel="Cambiar de rol"
         cancelLabel="Quedarme aquí"

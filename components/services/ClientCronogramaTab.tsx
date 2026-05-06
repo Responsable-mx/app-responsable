@@ -10,7 +10,9 @@ import { ServiceStagesPanel } from "./ServiceStagesPanel";
 import { ServiceGantt } from "./ServiceGantt";
 import { ActivityEditorModal } from "./ActivityEditorModal";
 import { ServiceEditor } from "./ServiceEditor";
+import { useToast } from "@/components/ui/Toast";
 import type { ServiceStage, StageActivity } from "@/lib/stages";
+import type { QuickPatch } from "./QuickActionPopover";
 
 type ServiceRow = {
   id: string;
@@ -40,6 +42,7 @@ export function ClientCronogramaTab({
   isAdmin: boolean;
 }) {
   const [view, setView] = useState<ViewMode>("list");
+  const { push: pushToast } = useToast();
   const [editingActivity, setEditingActivity] = useState<{
     stageId: string;
     activity?: StageActivity;
@@ -73,6 +76,20 @@ export function ClientCronogramaTab({
   const services = servicesData?.data ?? [];
   const consultorEmails = (consultorsData?.data ?? []).map((c) => c.user_email);
   const allStages = stagesData?.data ?? [];
+
+  async function handleQuickAction(activityId: string, patch: QuickPatch) {
+    const res = await fetch(`/api/activities/${activityId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      pushToast("error", (err as { error?: string }).error ?? "Error al actualizar actividad");
+      throw new Error("patch failed");
+    }
+    await mutateStages();
+  }
 
   if (loadingServices) {
     return (
@@ -223,6 +240,7 @@ export function ClientCronogramaTab({
                   onEditActivity={(stageId, activity) =>
                     setEditingActivity({ stageId, activity })
                   }
+                  onQuickAction={handleQuickAction}
                 />
               )}
             </div>

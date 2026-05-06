@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { CATALOG_CATEGORIES } from "@/lib/catalogs/seeds";
 import { CatalogsManager } from "@/components/config/CatalogsManager";
 
+export const metadata: Metadata = { title: "Catálogos · Configuración · App ResponSable" };
 export const dynamic = "force-dynamic";
 
 export default function CatalogosPage() {

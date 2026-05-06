@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { TemplatesManager } from "@/components/config/TemplatesManager";
+
+export const metadata: Metadata = { title: "Plantillas · Configuración · App ResponSable" };
 
 export const dynamic = "force-dynamic";
 

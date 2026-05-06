@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import { PromptsManager } from "@/components/config/PromptsManager";
 
+export const metadata: Metadata = { title: "Prompts IA · Configuración · App ResponSable" };
 export const dynamic = "force-dynamic";
 
 export default function PromptsPage() {

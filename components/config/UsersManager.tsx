@@ -73,12 +73,9 @@ export function UsersManager() {
             {isLoading ? "—" : users.length} {isLoading ? "usuarios" : users.length === 1 ? "usuario" : "usuarios"}
           </h2>
         </div>
-        <button
-          onClick={() => setInviting(true)}
-          className="px-3 py-1.5 bg-brand-primary text-white text-sm font-medium rounded hover:bg-brand-primary-hover"
-        >
+        <Button variant="primary" size="sm" onClick={() => setInviting(true)}>
           + Invitar usuario
-        </button>
+        </Button>
       </div>
 
       {feedback && (

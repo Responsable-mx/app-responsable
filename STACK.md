@@ -93,6 +93,8 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 | Dato | Frecuencia cambio | Estrategia |
 |------|------------------|------------|
 | `catalog_items` (seniority_levels, frameworks, etc.) | Casi nunca | `revalidate: 86400` (ISR diario) |
+| `role_permissions` (matriz derechos admin/consultor/cliente) | Casi nunca | `revalidate: 86400` (ISR diario) |
+| Datos propios del cliente (su ficha, cuestionario, materialidad) | Todo el tiempo | sin caché — SWR siempre fresco |
 | `client_consultors` (asignaciones consultor↔cliente) | Poco — meses | `revalidate: 3600` |
 | `authorized_users` (lista usuarios + seniority default) | Poco — meses | `revalidate: 3600` |
 | `service_templates` (plantillas etapas/actividades/duraciones) | Poco — días | `revalidate: 3600` (SWR) |

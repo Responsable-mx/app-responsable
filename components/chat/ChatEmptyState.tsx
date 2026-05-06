@@ -8,6 +8,9 @@ import {
   STARTERS,
 } from "@/components/chat/chat-types";
 
+// Evaluado una vez al cargar el módulo — no es una llamada impura en render.
+const MODULE_NOW = Date.now();
+
 export type ChatEmptyStateProps = {
   role: RoleId;
   clientId: string;
@@ -32,7 +35,6 @@ export function ChatEmptyState({
   onSend,
   onLoadSession,
 }: ChatEmptyStateProps) {
-  const nowTs = Date.now();
 
   return (
     <div className="py-10 max-w-2xl mx-auto" data-tour="empty-state">
@@ -66,7 +68,7 @@ export function ChatEmptyState({
           <ul className="space-y-0.5">
             {recentSessions.map((s) => {
               const daysAgo = Math.floor(
-                (nowTs - new Date(s.updated_at).getTime()) / 86400000
+                (MODULE_NOW - new Date(s.updated_at).getTime()) / 86400000
               );
               const stamp =
                 daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;

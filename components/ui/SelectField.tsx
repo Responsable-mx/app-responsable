@@ -35,11 +35,15 @@ export function SelectField({
   // Todas las opciones incluyendo placeholder como índice 0
   const allOptions: SelectOption[] = [{ value: "", label: placeholder }, ...options];
 
-  // Click fuera → cerrar
+  // Click fuera → cerrar. No llamamos setFocusedIdx en el cuerpo del efecto
+  // para evitar react-hooks/set-state-in-effect; el reset se hace dentro del callback.
   useEffect(() => {
-    if (!open) { setFocusedIdx(-1); return; }
+    if (!open) return;
     function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setFocusedIdx(-1);
+      }
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -64,9 +68,9 @@ export function SelectField({
       } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         if (focusedIdx >= 0) onChange(allOptions[focusedIdx].value);
-        setOpen(false);
+        setOpen(false); setFocusedIdx(-1);
       } else if (e.key === "Escape" || e.key === "Tab") {
-        setOpen(false);
+        setOpen(false); setFocusedIdx(-1);
       }
     }
   }
@@ -113,7 +117,7 @@ export function SelectField({
               id={`${externalId ?? uid}-opt-${i}`}
               role="option"
               aria-selected={value === o.value}
-              onClick={() => { onChange(o.value); setOpen(false); }}
+              onClick={() => { onChange(o.value); setOpen(false); setFocusedIdx(-1); }}
               className={`text-xs px-3 py-1.5 cursor-pointer transition-colors ${
                 i === focusedIdx || value === o.value
                   ? "bg-brand-primary-light text-brand-primary-dark font-medium"

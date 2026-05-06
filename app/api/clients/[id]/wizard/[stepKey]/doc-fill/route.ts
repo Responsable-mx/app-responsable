@@ -6,7 +6,6 @@ import { getClient } from "@/lib/clients";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import {
   isWizardSchema,
-  isFieldResponse,
   type FieldResponse,
   type WizardStep,
 } from "@/lib/questionnaires/types";

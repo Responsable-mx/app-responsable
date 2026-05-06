@@ -231,7 +231,6 @@ export function ChatWindow({
   async function send(prompt: string) {
     if (!prompt.trim() || streaming) return;
     setError("");
-    // eslint-disable-next-line react-hooks/purity -- Date.now() en handler de envío (no es render)
     const now = Date.now();
     const userMsg: ChatMessage = { role: "user", content: prompt, ts: now };
     const history = [...messages, userMsg];

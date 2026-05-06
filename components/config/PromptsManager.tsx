@@ -32,7 +32,7 @@ export function PromptsManager() {
       {/* D-73: error state SWR — meta.error silenciado anteriormente */}
       {meta.error && !meta.data && (
         <p className="text-xs text-rose-700 mb-2">
-          Error al cargar estado de prompts. Los badges "Custom" no son visibles.{" "}
+          Error al cargar estado de prompts. Los badges &ldquo;Custom&rdquo; no son visibles.{" "}
           <button onClick={() => void meta.mutate()} className="underline">Reintentar</button>
         </p>
       )}

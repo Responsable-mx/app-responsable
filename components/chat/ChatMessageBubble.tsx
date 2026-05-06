@@ -5,7 +5,6 @@ import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import {
   type ChatMessage,
-  type RoleId,
   ROLES,
 } from "@/components/chat/chat-types";
 

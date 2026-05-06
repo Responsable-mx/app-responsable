@@ -65,6 +65,24 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
     }
     delayed.sort((a, b) => b.days_over - a.days_over);
 
+    // Actividades sin iniciar atrasadas
+    type LateRow = { client: string; stage: string; activity: string; assignee: string; planned_start: string; days_late: number };
+    const lateRows: LateRow[] = [];
+    const todayIso = new Date().toISOString().slice(0, 10);
+    for (const p of projects) {
+      for (const sv of p.services) {
+        for (const st of sv.stages) {
+          for (const a of st.activities) {
+            if (!a.actual_start && !a.actual_end && a.planned_start && a.planned_start < todayIso && a.status !== "completed") {
+              const daysLate = Math.round((Date.now() - new Date(a.planned_start + "T00:00:00").getTime()) / 86_400_000);
+              lateRows.push({ client: p.client_name, stage: st.name, activity: a.name, assignee: a.assignee_email?.split("@")[0] ?? "—", planned_start: a.planned_start, days_late: daysLate });
+            }
+          }
+        }
+      }
+    }
+    lateRows.sort((a, b) => b.days_late - a.days_late);
+
     // Carga por consultor
     const loadMap: Record<string, { active: number; delayed: number }> = {};
     for (const p of projects) {
@@ -116,7 +134,8 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
 <div class="kpi-row">
   <div class="kpi"><div class="kpi-n">${totalP}</div><div class="kpi-l">Proyectos</div></div>
   <div class="kpi ${atRiskP > 0 ? "risk" : ""}"><div class="kpi-n">${atRiskP}</div><div class="kpi-l">En riesgo</div></div>
-  <div class="kpi"><div class="kpi-n">${delayed.length}</div><div class="kpi-l">Act. retrasadas</div></div>
+  <div class="kpi"><div class="kpi-n">${delayed.length}</div><div class="kpi-l">Retrasadas</div></div>
+  <div class="kpi ${lateRows.length > 0 ? "risk" : ""}"><div class="kpi-n">${lateRows.length}</div><div class="kpi-l">Sin iniciar</div></div>
   <div class="kpi"><div class="kpi-n">${consultorRows.length}</div><div class="kpi-l">Consultores activos</div></div>
 </div>
 
@@ -132,6 +151,22 @@ ${delayed.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>
       <td>${r.assignee}</td>
       <td>${r.planned_end}</td>
       <td><span class="badge-rose">+${r.days_over}d</span></td>
+    </tr>`).join("")}
+  </tbody>
+</table>`}
+
+<h2>Sin iniciar — vencidas (${lateRows.length})</h2>
+${lateRows.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>Sin actividades pendientes de iniciar. ✓</p>" : `
+<table>
+  <thead><tr><th>Cliente</th><th>Etapa</th><th>Actividad</th><th>Asignado</th><th>Debió iniciar</th><th>Días vencida</th></tr></thead>
+  <tbody>
+    ${lateRows.map((r) => `<tr>
+      <td>${r.client}</td>
+      <td style="color:#64748b">${r.stage}</td>
+      <td><strong>${r.activity}</strong></td>
+      <td>${r.assignee}</td>
+      <td>${r.planned_start}</td>
+      <td><span class="badge-amber">+${r.days_late}d</span></td>
     </tr>`).join("")}
   </tbody>
 </table>`}
@@ -216,6 +251,17 @@ ${delayed.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>
   const onTrackProjects = rawProjects.filter((p) => p.active_count > 0 && p.delayed_count === 0).length;
   const quietProjects = rawProjects.filter((p) => p.active_count === 0 && p.delayed_count === 0).length;
 
+  // Sprint L: actividades sin iniciar atrasadas
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const lateStartCount = rawProjects.reduce((n, p) => {
+    for (const sv of p.services)
+      for (const st of sv.stages)
+        for (const a of st.activities)
+          if (!a.actual_start && !a.actual_end && a.planned_start && a.planned_start < todayStr && a.status !== "completed")
+            n++;
+    return n;
+  }, 0);
+
   // Portfolio completion %
   const { totalActs, doneActs } = rawProjects.reduce(
     (acc, p) => {
@@ -275,6 +321,11 @@ ${delayed.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>
             <span className="flex items-center gap-1 text-emerald-700">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
               {quietProjects} al día
+            </span>
+          )}
+          {lateStartCount > 0 && (
+            <span className="flex items-center gap-1 text-rose-600 border-l border-slate-200 pl-4 ml-1" title="Actividades que debieron iniciar y no tienen fecha real de inicio">
+              ⏰ {lateStartCount} sin iniciar
             </span>
           )}
           {portfolioPct !== null && (

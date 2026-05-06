@@ -10,6 +10,9 @@ export type QuickPatch = {
   planned_end?: string;
   status?: "pending" | "in_progress" | "completed" | "delayed";
   actual_progress?: number;
+  is_milestone?: boolean;
+  estimated_days?: number | null;
+  blocker_note?: string | null;
 };
 
 type Props = {
@@ -38,6 +41,9 @@ export function QuickActionPopover({
   const [planStart, setPlanStart] = useState(activity.planned_start ?? "");
   const [planEnd, setPlanEnd] = useState(activity.planned_end ?? "");
   const [progress, setProgress] = useState(activity.actual_progress != null ? String(activity.actual_progress) : "");
+  const [isMilestone, setIsMilestone] = useState(activity.is_milestone ?? false);
+  const [estimatedDays, setEstimatedDays] = useState(activity.estimated_days != null ? String(activity.estimated_days) : "");
+  const [blockerNote, setBlockerNote] = useState(activity.blocker_note ?? "");
   const [savingDates, setSavingDates] = useState(false);
 
   const x = Math.min(anchor.x, window.innerWidth - 256);
@@ -65,6 +71,13 @@ export function QuickActionPopover({
       const pv = Math.min(100, Math.max(0, parseInt(progress, 10)));
       if (!isNaN(pv) && pv !== activity.actual_progress) patch.actual_progress = pv;
     }
+    if (isAdmin && isMilestone !== (activity.is_milestone ?? false)) patch.is_milestone = isMilestone;
+    if (isAdmin && estimatedDays !== (activity.estimated_days != null ? String(activity.estimated_days) : "")) {
+      const ed = estimatedDays === "" ? null : Math.max(1, parseInt(estimatedDays, 10));
+      if (!isNaN(ed as number) || ed === null) patch.estimated_days = ed;
+    }
+    const currentBlocker = activity.blocker_note ?? "";
+    if (blockerNote !== currentBlocker) patch.blocker_note = blockerNote || null;
     if (Object.keys(patch).length === 0) { onClose(); return; }
     setSavingDates(true);
     try {
@@ -155,6 +168,70 @@ export function QuickActionPopover({
                     style={{ width: `${Math.min(100, Math.max(0, parseInt(progress, 10)))}%` }}
                   />
                 </div>
+              )}
+            </div>
+            {/* Sprint J: Hito contractual */}
+            {isAdmin && (
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <label className="text-[10px] text-slate-600 cursor-pointer flex items-center gap-1.5">
+                  <span className="w-3 h-3 rotate-45 bg-amber-400 border-2 border-amber-600 shrink-0 inline-block" />
+                  Marcar como hito
+                </label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isMilestone}
+                  onClick={() => setIsMilestone((v) => !v)}
+                  className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isMilestone ? "bg-amber-400" : "bg-slate-200"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${isMilestone ? "translate-x-4" : ""}`} />
+                </button>
+              </div>
+            )}
+            {/* Sprint O: Días estimados */}
+            {isAdmin && (
+              <div className="space-y-1">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Días estimados</p>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[10px] text-slate-500 w-10 shrink-0">Días</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={3650}
+                    value={estimatedDays}
+                    onChange={(e) => setEstimatedDays(e.target.value)}
+                    placeholder="ej. 5"
+                    className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 font-sans text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary"
+                  />
+                  <span className="text-[9px] text-slate-400 shrink-0">d</span>
+                </div>
+                {estimatedDays !== "" && activity.planned_start && activity.planned_end && (() => {
+                  const planDays = Math.round((new Date(activity.planned_end + "T00:00:00").getTime() - new Date(activity.planned_start + "T00:00:00").getTime()) / 86400000) + 1;
+                  const est = parseInt(estimatedDays, 10);
+                  if (isNaN(est)) return null;
+                  const diff = planDays - est;
+                  return (
+                    <p className={`text-[9px] ${diff < 0 ? "text-rose-600" : diff > 0 ? "text-emerald-600" : "text-slate-400"}`}>
+                      Plan: {planDays}d · Est: {est}d {diff > 0 ? `(+${diff}d margen)` : diff < 0 ? `(${diff}d insuficiente)` : "(ajustado)"}
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
+            {/* Sprint P: Nota de bloqueo */}
+            <div className="space-y-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                {blockerNote ? "🚫 Bloqueo activo" : "Nota de bloqueo (opcional)"}
+              </p>
+              <textarea
+                value={blockerNote}
+                onChange={(e) => setBlockerNote(e.target.value.slice(0, 500))}
+                placeholder="Describe el impedimento para que el equipo lo vea en el Gantt..."
+                rows={2}
+                className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-1 font-sans text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary resize-none"
+              />
+              {blockerNote.length > 400 && (
+                <p className="text-[9px] text-slate-400 text-right">{blockerNote.length}/500</p>
               )}
             </div>
             {isAdmin && (planStart !== (activity.planned_start ?? "") || planEnd !== (activity.planned_end ?? "")) && (

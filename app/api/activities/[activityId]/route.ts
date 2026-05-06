@@ -50,6 +50,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     "planned_start",
     "planned_end",
     "assignee_email",
+    "is_milestone",
+    "estimated_days",
   ] as const;
   const touchesAdminField = adminOnlyFields.some((k) => parsed.data[k] !== undefined);
   const adminEmail = await requireAdmin();

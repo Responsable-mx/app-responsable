@@ -11,10 +11,11 @@ import { TeamOccupancy } from "./TeamOccupancy";
 import { ProjectsOverview } from "./ProjectsOverview";
 import { GlobalTimeline } from "./GlobalTimeline";
 import { GanttPorProyecto } from "./GanttPorProyecto";
+import { ConsultorSwimlane } from "./ConsultorSwimlane";
 import { FiltersBar, emptyFilters, type EquipoFilters } from "./EquipoFilters";
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 
-type View = "consultor" | "proyecto" | "timeline" | "gantt";
+type View = "consultor" | "proyecto" | "timeline" | "gantt" | "swimlane";
 
 const INTRO: Record<View, string> = {
   consultor:
@@ -24,6 +25,8 @@ const INTRO: Record<View, string> = {
     "Timeline cross-project: 1 fila por consultor, todas sus actividades en una línea.",
   gantt:
     "Gantt por proyecto: cada cliente con su cronograma plan vs real. Clic en barra → ficha del cliente.",
+  swimlane:
+    "Swimlane por consultor: todas las actividades de cada consultor en una línea, coloreadas por proyecto.",
 };
 
 const fetcher = (url: string) =>
@@ -137,6 +140,16 @@ export function EquipoView() {
               </svg>
             }
           />
+          <ToggleButton
+            active={view === "swimlane"}
+            onClick={() => setView("swimlane")}
+            label="Swimlane"
+            icon={
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+            }
+          />
         </div>
       </div>
       <p className="text-sm text-slate-600 max-w-2xl -mt-2">{INTRO[view]}</p>
@@ -153,6 +166,11 @@ export function EquipoView() {
       {view === "gantt" && (
         <TabErrorBoundary tabName="Gantt">
           <GanttPorProyecto filters={filters} />
+        </TabErrorBoundary>
+      )}
+      {view === "swimlane" && (
+        <TabErrorBoundary tabName="Swimlane">
+          <ConsultorSwimlane filters={filters} />
         </TabErrorBoundary>
       )}
       {view === "timeline" && (

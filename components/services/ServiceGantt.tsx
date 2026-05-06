@@ -163,6 +163,13 @@ export function ServiceGantt({
   const [showDeps, setShowDeps] = useState(false);
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [showEvm, setShowEvm] = useState(false);
+  // Sprint I: mostrar/ocultar barra de baseline
+  const [showBaseline, setShowBaseline] = useState(true);
+  // Sprint N: vista cliente (solo hitos + spans de etapa)
+  const [clientView, setClientView] = useState(false);
+  // Sprint Q: rango de fechas personalizado
+  const [customMinDate, setCustomMinDate] = useState("");
+  const [customMaxDate, setCustomMaxDate] = useState("");
   const ganttRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerTimelineInnerRef = useRef<HTMLDivElement>(null);
@@ -306,14 +313,25 @@ export function ServiceGantt({
     return <div className="text-xs text-slate-500 italic px-2 py-3">Sin fechas. Edita actividades para ver el Gantt.</div>;
   }
 
-  const totalMs = range.max - range.min;
-  const todayPct = ((now - range.min) / totalMs) * 100;
+  // Sprint Q: rango efectivo (custom override o auto)
+  const effectiveMin = customMinDate ? new Date(customMinDate + "T00:00:00").getTime() : range.min;
+  const effectiveMax = customMaxDate ? new Date(customMaxDate + "T00:00:00").getTime() : range.max;
+  const visibleMonths = (customMinDate || customMaxDate)
+    ? (() => {
+        const months: Date[] = [];
+        let cur = startOfMonth(new Date(effectiveMin));
+        while (cur.getTime() < effectiveMax) { months.push(new Date(cur)); cur = addMonths(cur, 1); }
+        return months;
+      })()
+    : range.months;
+  const totalMs = effectiveMax - effectiveMin;
+  const todayPct = ((now - effectiveMin) / totalMs) * 100;
   const todayInRange = todayPct >= 0 && todayPct <= 100;
 
   const monthPx = MONTH_PX[zoom];
-  const timelineWidth = monthPx ? range.months.length * monthPx : null;
-  const weeks = (zoom === "quarter" || zoom === "semana") ? weekBoundaries(range.min, range.max) : [];
-  const days = (zoom === "semana" || zoom === "dia") ? dayBoundaries(range.min, range.max) : [];
+  const timelineWidth = monthPx ? visibleMonths.length * monthPx : null;
+  const weeks = (zoom === "quarter" || zoom === "semana") ? weekBoundaries(effectiveMin, effectiveMax) : [];
+  const days = (zoom === "semana" || zoom === "dia") ? dayBoundaries(effectiveMin, effectiveMax) : [];
   const hasSubRow = zoom !== "fit" && zoom !== "mes";
   const headerH = hasSubRow ? 52 : 36;
   const monthRowH = hasSubRow ? 28 : 36;
@@ -321,7 +339,7 @@ export function ServiceGantt({
   function pct(dateStr: string | null): number | null {
     const d = parseDate(dateStr);
     if (!d) return null;
-    return ((d.getTime() - range!.min) / totalMs) * 100;
+    return ((d.getTime() - effectiveMin) / totalMs) * 100;
   }
 
   function barStyle(start: string | null, end: string | null) {
@@ -593,7 +611,16 @@ export function ServiceGantt({
             {/* Separador */}
             <div className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden />
             {/* Grupo 2: Capas de visualización */}
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-0.5 flex-wrap">
+              {hasBaseline && (
+                <button
+                  onClick={() => setShowBaseline((v) => !v)}
+                  className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showBaseline ? "bg-orange-100 text-orange-700" : "text-slate-400 hover:text-slate-700"}`}
+                  title="Baseline — muestra/oculta la barra de línea base congelada (naranja punteada). Permite ver cuánto se ha desviado el plan real vs el plan original."
+                >
+                  Baseline
+                </button>
+              )}
               <button
                 onClick={() => setShowFloat((v) => !v)}
                 className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showFloat ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
@@ -622,9 +649,43 @@ export function ServiceGantt({
               >
                 EVM
               </button>
+              <button
+                onClick={() => setClientView((v) => !v)}
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${clientView ? "bg-brand-primary/10 text-brand-primary-dark" : "text-slate-400 hover:text-slate-700"}`}
+                title="Vista cliente — oculta actividades individuales; muestra solo hitos contractuales. Ideal para presentaciones al cliente."
+              >
+                Cliente
+              </button>
             </div>
             {/* Grupo 3: Acciones — ml-auto */}
-            <div className="flex items-center gap-1.5 ml-auto">
+            <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+              {/* Sprint Q: rango personalizado */}
+              <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                <span className="font-bold uppercase tracking-widest hidden sm:inline">Rango</span>
+                <input
+                  type="date"
+                  value={customMinDate}
+                  onChange={(e) => setCustomMinDate(e.target.value)}
+                  title="Inicio del rango visible (vacío = auto)"
+                  className="text-[10px] border border-slate-200 rounded px-1 py-0.5 font-sans text-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 w-28"
+                />
+                <span>—</span>
+                <input
+                  type="date"
+                  value={customMaxDate}
+                  onChange={(e) => setCustomMaxDate(e.target.value)}
+                  title="Fin del rango visible (vacío = auto)"
+                  className="text-[10px] border border-slate-200 rounded px-1 py-0.5 font-sans text-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 w-28"
+                />
+                {(customMinDate || customMaxDate) && (
+                  <button
+                    onClick={() => { setCustomMinDate(""); setCustomMaxDate(""); }}
+                    className="text-[9px] text-rose-500 hover:text-rose-700 font-bold"
+                    title="Restablecer rango automático"
+                  >✕</button>
+                )}
+              </div>
+              <div className="w-px h-4 bg-slate-200" aria-hidden />
               {todayInRange && (
                 <button onClick={scrollToToday} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-brand-primary-dark transition-colors">
                   <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="4" /></svg>
@@ -763,9 +824,9 @@ export function ServiceGantt({
             <div style={{ flex: 1, overflow: "hidden", height: headerH }}>
               <div ref={headerTimelineInnerRef} className="relative h-full" style={{ width: timelineWidth ?? "100%" }}>
                 {/* Fila 1: meses */}
-                {range.months.map((m, i) => {
-                  const left = ((m.getTime() - range.min) / totalMs) * 100;
-                  const next = i + 1 < range.months.length ? range.months[i + 1] : new Date(range.max);
+                {visibleMonths.map((m, i) => {
+                  const left = ((m.getTime() - effectiveMin) / totalMs) * 100;
+                  const next = i + 1 < visibleMonths.length ? visibleMonths[i + 1] : new Date(effectiveMax);
                   const width = ((next.getTime() - m.getTime()) / totalMs) * 100;
                   return (
                     <div key={i} className="absolute border-r border-slate-200 px-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate flex items-center" style={{ left: `${left}%`, width: `${width}%`, top: 0, height: monthRowH }}>
@@ -1017,7 +1078,16 @@ export function ServiceGantt({
 
                     {/* Actividades */}
                     {!isCollapsed && s.activities.map((a) => {
-                      const isMilestone = !!a.planned_start && !!a.planned_end && a.planned_start === a.planned_end;
+                      // Sprint J: campo DB + fallback heurístico (planned_start === planned_end)
+                      const isMilestone = (a.is_milestone ?? false) ||
+                        (!!a.planned_start && !!a.planned_end && a.planned_start === a.planned_end);
+                      // Sprint N: vista cliente — ocultar actividades que no son hito
+                      if (clientView && !isMilestone) return null;
+                      // Sprint L: actividad atrasada sin iniciar
+                      const todayStr = new Date(now).toISOString().slice(0, 10);
+                      const lateStart = !a.actual_start && !a.actual_end &&
+                        !!a.planned_start && a.planned_start < todayStr &&
+                        a.status !== "completed";
                       const planStyle = isMilestone ? null : barStyle(a.planned_start, a.planned_end);
                       const realStyle = barStyle(a.actual_start, a.actual_end);
                       const baselineStyle = barStyle(a.baseline_start, a.baseline_end);
@@ -1065,6 +1135,18 @@ export function ServiceGantt({
                                 Sin plan
                               </span>
                             )}
+                            {/* Sprint L: sin iniciar atrasada */}
+                            {lateStart && (
+                              <span className="inline-flex items-center gap-0.5 mt-0.5 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-sm bg-rose-50 text-rose-700 border border-rose-200" title={`Debió iniciar el ${a.planned_start} y aún no tiene fecha real de inicio`}>
+                                ⏰ Sin iniciar
+                              </span>
+                            )}
+                            {/* Sprint P: bloqueo activo */}
+                            {a.blocker_note && (
+                              <span className="inline-flex items-center gap-0.5 mt-0.5 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-sm bg-rose-100 text-rose-800 border border-rose-300" title={`Bloqueo: ${a.blocker_note}`}>
+                                🚫 Bloqueada
+                              </span>
+                            )}
                             {dep && (
                               <p className={`text-[10px] pl-4 flex items-center gap-0.5 ${conflict ? "text-rose-700 font-bold" : "text-slate-400"}`}>
                                 {conflict ? (
@@ -1081,8 +1163,8 @@ export function ServiceGantt({
 
                           {/* Timeline */}
                           <div className="relative" style={{ ...tStyle, height: ROW_H }}>
-                            {range.months.map((m, i) => (
-                              <div key={i} className="absolute top-0 bottom-0 border-r border-slate-100" style={{ left: `${((m.getTime() - range.min) / totalMs) * 100}%`, width: 0 }} />
+                            {visibleMonths.map((m, i) => (
+                              <div key={i} className="absolute top-0 bottom-0 border-r border-slate-100" style={{ left: `${((m.getTime() - effectiveMin) / totalMs) * 100}%`, width: 0 }} />
                             ))}
                             {weeks.map((wt, i) => (
                               <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${((wt - range.min) / totalMs) * 100}%`, width: 0, borderLeft: "1px dashed rgba(148,163,184,0.35)" }} />
@@ -1105,7 +1187,7 @@ export function ServiceGantt({
                               <div
                                 className="absolute top-0 bottom-0 pointer-events-none"
                                 style={{
-                                  left: `${((todayWeekStart - range.min) / totalMs) * 100}%`,
+                                  left: `${((todayWeekStart - effectiveMin) / totalMs) * 100}%`,
                                   width: `${(7 * MS_DAY / totalMs) * 100}%`,
                                   background: "rgba(251,113,133,0.04)",
                                 }}
@@ -1132,7 +1214,7 @@ export function ServiceGantt({
                                 </button>
                               );
                             })()}
-                            {baselineStyle && (
+                            {showBaseline && baselineStyle && (
                               <div className="absolute h-1.5 rounded pointer-events-none z-[5]" style={{ ...baselineStyle, top: 6, background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)", opacity: 0.7 }} title={`Baseline: ${fmtShort(a.baseline_start)} → ${fmtShort(a.baseline_end)}`} />
                             )}
                             {planStyle && (
@@ -1192,7 +1274,7 @@ export function ServiceGantt({
 
             {/* ─── Leyenda ─── */}
             <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-600">
-              {hasBaseline && (
+              {hasBaseline && showBaseline && (
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-4 h-1.5 rounded" style={{ background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)" }} />
                   Baseline
@@ -1276,6 +1358,11 @@ function RichTooltip({ activity: a, anchor }: { activity: StageActivity; anchor:
         <span className={`font-bold ${STATUS_TEXT[a.status]}`}>{STATUS_LABEL[a.status]}</span>
       </div>
       {a.assignee_email && <div className="mt-1 pt-1 border-t border-slate-100 text-[10px] text-slate-500 truncate">@ {a.assignee_email}</div>}
+      {a.blocker_note && (
+        <div className="mt-1.5 pt-1.5 border-t border-rose-100 text-[10px] text-rose-700 leading-snug">
+          <span className="font-bold">🚫 Bloqueo:</span> {a.blocker_note}
+        </div>
+      )}
     </div>
   );
 }

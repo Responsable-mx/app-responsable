@@ -20,6 +20,9 @@ export type StageActivity = {
   actual_progress: number | null;
   baseline_start: string | null;
   baseline_end: string | null;
+  is_milestone: boolean;
+  estimated_days: number | null;
+  blocker_note: string | null;
   status: ActivityStatus;
   created_at: string;
   updated_at: string;
@@ -94,6 +97,9 @@ export const ActivityInputSchema = z.object({
   actual_progress: z.number().int().min(0).max(100).nullable().optional(),
   baseline_start: dateOrNull,
   baseline_end: dateOrNull,
+  is_milestone: z.boolean().optional(),
+  estimated_days: z.number().int().min(1).max(3650).nullable().optional(),
+  blocker_note: z.string().max(500).nullable().optional(),
 });
 export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 
@@ -258,6 +264,9 @@ export async function createActivity(
       actual_progress: input.actual_progress ?? null,
       baseline_start: input.baseline_start ?? null,
       baseline_end: input.baseline_end ?? null,
+      is_milestone: input.is_milestone ?? false,
+      estimated_days: input.estimated_days ?? null,
+      blocker_note: input.blocker_note ?? null,
       status: computeStatus(input as Parameters<typeof computeStatus>[0]),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -321,6 +330,12 @@ export async function updateActivity(
     "actual_end",
     "assignee_email",
     "depends_on_activity_id",
+    "actual_progress",
+    "baseline_start",
+    "baseline_end",
+    "is_milestone",
+    "estimated_days",
+    "blocker_note",
   ] as const) {
     if (patch[k] !== undefined) update[k] = patch[k];
   }

@@ -215,7 +215,7 @@ export function Sidebar({
       )}
 
       <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200 space-y-0.5`}>
-        {!collapsed && <HelpMenu />}
+        <HelpMenu iconOnly={collapsed} />
         <button
           onClick={handleLogout}
           title={collapsed ? "Cerrar sesión" : undefined}

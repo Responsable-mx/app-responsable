@@ -592,7 +592,7 @@ export function ChatWindow({
                     className="text-[11px] text-slate-500 hover:text-brand-primary transition-colors hidden md:inline"
                     title="Ver ficha del cliente"
                   >
-                    Ver ficha →
+                    Ver ficha
                   </a>
                 )}
               </>
@@ -611,27 +611,14 @@ export function ChatWindow({
               Historial
             </button>
             {messages.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => exportConversationMd(messages, selectedClient?.name, currentRole.name)}
-                  className="text-[11px] text-slate-500 hover:text-brand-primary-dark transition-colors inline-flex items-center gap-1"
-                  title="Descargar conversación como archivo Markdown"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                  </svg>
-                  Exportar
-                </button>
-                <button
-                  type="button"
-                  onClick={resetChat}
-                  className="text-[11px] text-slate-500 hover:text-rose-600 transition-colors"
-                  title="Nueva conversación (la actual queda guardada en historial)"
-                >
-                  Nueva
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={resetChat}
+                className="text-[11px] text-slate-500 hover:text-rose-600 transition-colors"
+                title="Nueva conversación (la actual queda guardada en historial)"
+              >
+                Nueva
+              </button>
             )}
           </div>
         </div>
@@ -733,7 +720,7 @@ export function ChatWindow({
               href={`/clientes/${selectedClient.id}`}
               className="underline hover:text-amber-700 font-medium"
             >
-              Completar ahora →
+              Completar ahora
             </a>
           </span>
         </div>
@@ -796,7 +783,7 @@ export function ChatWindow({
                       onClick={() => setShowSessionsPanel(true)}
                       className="text-[10px] text-slate-400 hover:text-brand-primary transition-colors"
                     >
-                      Ver todo →
+                      Ver todo
                     </button>
                   </div>
                   <ul className="space-y-0.5">
@@ -1003,6 +990,7 @@ export function ChatWindow({
                 }
               }}
               placeholder={`Escribe a ${currentRole.name}...`}
+              aria-label={`Escribe a ${currentRole.name}`}
               rows={1}
               className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none max-h-40"
               disabled={streaming}

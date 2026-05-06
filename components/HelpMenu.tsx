@@ -10,7 +10,7 @@ import { IconHelp, IconTarget, IconMail } from "@/components/ui/Icons";
  * - Ver tour del chat (limpia localStorage + navega a /chat)
  * - Reportar un problema (mailto)
  */
-export function HelpMenu() {
+export function HelpMenu({ iconOnly = false }: { iconOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -39,10 +39,11 @@ export function HelpMenu() {
       <button
         onClick={() => setOpen((s) => !s)}
         aria-label="Ayuda"
-        className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+        className={`group w-full flex items-center py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors ${iconOnly ? "justify-center px-2" : "gap-2.5 px-3"}`}
+        title={iconOnly ? "Ayuda" : undefined}
       >
-        <IconHelp className="w-[18px] h-[18px] text-slate-600 group-hover:text-slate-600" />
-        <span>Ayuda</span>
+        <IconHelp className="w-[18px] h-[18px] text-slate-600 group-hover:text-slate-600 shrink-0" />
+        {!iconOnly && <span>Ayuda</span>}
       </button>
 
       {open && (

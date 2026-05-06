@@ -115,23 +115,17 @@ export default async function EditarClientePage({ params }: Props) {
         >
           {status.label}
         </span>
-        {meta && <span className="text-slate-300">|</span>}
+        {meta && <span className="text-slate-300">·</span>}
         {meta && <span className="text-xs text-slate-600">{meta}</span>}
         {client.services && client.services.length > 0 && (
           <>
-            <span className="text-slate-300">|</span>
+            <span className="text-slate-300">·</span>
             <span className="text-xs font-semibold text-brand-primary-dark">
               {client.services.join(", ")}
             </span>
           </>
         )}
-        {client.created_by && !isSystemAccount(client.created_by) && (
-          <>
-            <span className="text-slate-300">|</span>
-            <span className="text-xs text-slate-600">{client.created_by.split("@")[0]}</span>
-          </>
-        )}
-        <span className="text-slate-300">|</span>
+        <span className="text-slate-300">·</span>
         <span className="text-xs text-slate-500">
           Actualizado {new Date(client.updated_at).toLocaleDateString("es-MX")}
         </span>

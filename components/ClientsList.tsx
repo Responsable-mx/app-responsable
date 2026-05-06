@@ -5,6 +5,8 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
 import { SkeletonTable } from "@/components/ui/Skeleton";
+import { Modal } from "@/components/ui/Modal";
+import { SelectField } from "@/components/ui/SelectField";
 
 // Saved views: filtros persistidos por usuario en localStorage. Pattern Salesforce
 // "List Views" / Linear "Saved searches". Permite al consultor tener "Mis activos",
@@ -251,53 +253,43 @@ export function ClientsList() {
         </div>
       )}
 
-      {/* Modal guardar vista */}
-      {showSaveDialog && (
-        <div
-          className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center px-4"
-          onClick={() => setShowSaveDialog(false)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl border border-slate-200 p-5 w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
-            <h3 className="text-sm font-bold text-slate-900 mb-1">Guardar vista</h3>
-            <p className="text-xs text-slate-600 mb-3">
-              Conserva los filtros actuales para aplicarlos con un click. Solo visible
-              en este dispositivo.
-            </p>
-            <input
-              type="text"
-              value={newViewName}
-              onChange={(e) => setNewViewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && saveCurrentView()}
-              autoFocus
-              placeholder="Ej: Mis activos · Cierres este mes"
-              className="w-full px-3 py-2 border border-slate-300 rounded text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowSaveDialog(false);
-                  setNewViewName("");
-                }}
-                className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={saveCurrentView}
-                disabled={!newViewName.trim()}
-                className="px-3 py-1.5 text-xs font-semibold bg-brand-primary-hover text-white rounded hover:bg-brand-primary-dark disabled:opacity-40"
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal guardar vista — usa primitivo Modal para focus trap + ESC */}
+      <Modal
+        open={showSaveDialog}
+        onClose={() => { setShowSaveDialog(false); setNewViewName(""); }}
+        title="Guardar vista"
+        footer={
+          <>
+            <button
+              onClick={() => { setShowSaveDialog(false); setNewViewName(""); }}
+              className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={saveCurrentView}
+              disabled={!newViewName.trim()}
+              className="px-3 py-1.5 text-xs font-semibold bg-brand-primary-hover text-white rounded hover:bg-brand-primary-dark disabled:opacity-40"
+            >
+              Guardar
+            </button>
+          </>
+        }
+      >
+        <p className="text-xs text-slate-600 mb-3">
+          Conserva los filtros actuales para aplicarlos con un click. Solo visible
+          en este dispositivo.
+        </p>
+        <input
+          type="text"
+          value={newViewName}
+          onChange={(e) => setNewViewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && saveCurrentView()}
+          autoFocus
+          placeholder="Ej: Mis activos · Cierres este mes"
+          className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+        />
+      </Modal>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative flex-1 min-w-[260px]">
@@ -322,18 +314,13 @@ export function ClientsList() {
           </svg>
         </div>
         {sectors.length > 1 && (
-          <select
+          <SelectField
             value={sectorFilter}
-            onChange={(e) => setSectorFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          >
-            <option value="">Todos los sectores</option>
-            {sectors.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setSectorFilter(v)}
+            options={sectors.map((s) => ({ value: s, label: s }))}
+            placeholder="Todos los sectores"
+            className="min-w-[160px]"
+          />
         )}
         <div className="text-xs text-slate-600 whitespace-nowrap tabular-nums">
           {isLoading ? (

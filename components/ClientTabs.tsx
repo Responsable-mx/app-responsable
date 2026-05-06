@@ -144,7 +144,7 @@ export function ClientTabs({
             </svg>
           }
           label="Cuestionario"
-          badge={questionnaireProgress === null ? "…" : `${questionnaireProgress.filled}/${questionnaireProgress.total}`}
+          badge={questionnaireProgress === null ? null : `${questionnaireProgress.filled}/${questionnaireProgress.total}`}
         />
         <TabButton
           active={tab === "chat"}
@@ -229,7 +229,7 @@ export function ClientTabs({
       )}
       {tab === "chat" && (
         <TabErrorBoundary tabName="Chat IA">
-          <div className="border border-slate-200 rounded shadow-sm overflow-hidden bg-white" style={{ height: "min(75vh, 720px)" }}>
+          <div className="border border-slate-200 rounded shadow-sm overflow-hidden bg-white h-[min(75vh,720px)]">
             <ChatWindow
               key={client.id}
               clients={[

@@ -12,9 +12,6 @@ export default function ClientesPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-end justify-between mb-5 pb-4 border-b border-slate-200">
         <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Clientes
-          </p>
           <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
         </div>
         <Link

@@ -101,6 +101,16 @@ Schema pendiente: tabla `materiality_topics(client_id, topic_key, label, x_pos, 
 
 El equipo aún no ha definido los pasos reales de la metodología. **No inventar** placeholders. Cuando se defina, agregar como 5to KPI card en `ClientTabs`.
 
+## Chat IA — layout bilateral (may-2026)
+
+Implementado en `components/chat/ChatWindow.tsx`. Patrón canónico — no revertir:
+
+- **Mensajes consultor**: `flex justify-end` + `bg-slate-100` + sin avatar. Label "Consultor" alineado derecha.
+- **Mensajes IA**: `flex items-start gap-3` + avatar circular (`rounded-full`) + bubble `bg-white border border-slate-200 border-l-4` con color semántico por rol.
+- **Borde izquierdo por rol**: Aurora=`border-l-brand-primary-dark`, Rebeca=`border-l-slate-500`, Elena=`border-l-amber-600`, Valeria=`border-l-emerald-700`. Definido en `ROLES[].borderColor`.
+- **Tipografía IA**: `prose-h1:text-sm prose-h2:text-sm prose-h3:text-xs` — headings nunca dominan el chat.
+- **Acciones** (thumbs, copy, retry): solo en mensajes IA, dentro del bubble.
+
 ## Chat IA — mejores prácticas (implementadas en ChatWindow, may-2026)
 
 Funciones activas en `components/chat/ChatWindow.tsx`:

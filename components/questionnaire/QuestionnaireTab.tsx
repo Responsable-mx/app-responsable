@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
+import { WizardStepNav } from "@/components/questionnaire/WizardStepNav";
+import { AiBulkBanner } from "@/components/questionnaire/AiBulkBanner";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -407,69 +409,21 @@ function WizardEditor({
   return (
     <div>
       {/* Banner global AI fill */}
-      <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-brand-primary-light to-slate-50 border border-brand-primary/30 rounded">
-        <div className="flex items-start gap-3 min-w-0">
-          <svg className="w-5 h-5 text-brand-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-slate-900">IA llena {aiCapableCount} pasos automáticamente</p>
-            <p className="text-[11px] text-slate-600">
-              Click una vez para llenar todos los pasos con datos públicos verificables y citados (sigue las 8 reglas operativas del cuestionario). Puedes refrescar después por paso individual.
-            </p>
-          </div>
-        </div>
-        <Button
-          variant="primary"
-          size="sm"
-          loading={!!aiBulkProgress}
-          onClick={aiFillAll}
-        >
-          {aiBulkProgress
-            ? `${aiBulkProgress.current}/${aiBulkProgress.total} · ${aiBulkProgress.stepTitle}`
-            : someStepHasResponses
-              ? "✨ Refrescar con IA"
-              : "✨ Llenar todos con IA"}
-        </Button>
-      </div>
+      <AiBulkBanner
+        aiCapableCount={aiCapableCount}
+        someStepHasResponses={someStepHasResponses}
+        progress={aiBulkProgress}
+        onFillAll={aiFillAll}
+      />
 
     <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-5">
       {/* Stepper lateral */}
-      <aside className="space-y-1 sticky top-4 self-start max-h-[calc(100vh-6rem)] overflow-y-auto">
-        {steps.map((s, i) => {
-          const sp = progress.sectionProgress[s.key] ?? { filled: 0, total: s.fields.length, pct: 0 };
-          const complete = sp.pct === 100 && s.fields.length > 0;
-          return (
-            <button
-              key={s.key}
-              onClick={() => setActiveStep(i)}
-              className={`w-full text-left px-3 py-2 rounded border transition-colors text-xs ${
-                activeStep === i
-                  ? "bg-brand-primary-light border-brand-primary text-brand-primary-dark"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
-                    complete
-                      ? "bg-emerald-500 text-white"
-                      : sp.pct > 0
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {complete ? "✓" : s.step}
-                </span>
-                <span className="font-semibold leading-tight flex-1 truncate">{s.title}</span>
-              </div>
-              <div className="mt-1 ml-7 text-[10px] text-slate-500 tabular-nums">
-                {sp.filled}/{sp.total} · {sp.pct}%
-              </div>
-            </button>
-          );
-        })}
-      </aside>
+      <WizardStepNav
+        steps={steps}
+        activeStep={activeStep}
+        sectionProgress={progress.sectionProgress}
+        onSelect={setActiveStep}
+      />
 
       {/* Step content */}
       <div className="min-w-0">

@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { ConfigTabs } from "@/components/config/ConfigTabs";
 import { ConfigSWRProvider } from "@/components/config/ConfigSWRProvider";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Configuración · App ResponSable" };
 
-export default function ConfigLayout({
+// D-59: Layout async para re-verificar rol admin desde DB (no JWT).
+// El middleware usa user_metadata.role del JWT (stale hasta próximo login).
+// Este check garantiza que un admin degradado no vea /configuracion aunque
+// su JWT siga diciendo "admin". requireAdmin() consulta authorized_users en DB.
+export default async function ConfigLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const admin = await requireAdmin();
+  if (!admin) redirect("/");
+
   return (
     <ConfigSWRProvider>
       <div className="flex flex-col h-screen bg-slate-50">

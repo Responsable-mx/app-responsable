@@ -63,7 +63,7 @@ export async function getUsageSummary(
   const { data: rows } = await admin
     .from("ai_calls")
     .select(
-      "user_email,client_id,input_tokens,output_tokens,cache_read_tokens,error,latency_ms"
+      "user_email,client_id,model,input_tokens,output_tokens,cache_read_tokens,error,latency_ms"
     )
     .gte("created_at", since)
     .limit(20000);
@@ -83,10 +83,19 @@ export async function getUsageSummary(
       )
     : 0;
 
-  // Costo estimado (Sonnet worst-case + Haiku proporción de Valeria)
-  const inputUsd = (totalInput * 3) / 1_000_000;
-  const outputUsd = (totalOutput * 15) / 1_000_000;
-  const cacheUsd = (totalCacheRead * 0.3) / 1_000_000;
+  // D-64: Costo estimado por modelo (antes era Sonnet para todos, sobreestimaba
+  // ~5× para Valeria/Haiku). Precios abr-2026 por 1M tokens:
+  //   Haiku:  $1 input / $5 output / $0.10 cache read
+  //   Sonnet: $3 input / $15 output / $0.30 cache read
+  let inputUsd = 0;
+  let outputUsd = 0;
+  let cacheUsd = 0;
+  for (const r of calls) {
+    const isHaiku = (r.model as string | null ?? "").includes("haiku");
+    inputUsd  += ((r.input_tokens  ?? 0) * (isHaiku ? 1  : 3 )) / 1_000_000;
+    outputUsd += ((r.output_tokens ?? 0) * (isHaiku ? 5  : 15)) / 1_000_000;
+    cacheUsd  += ((r.cache_read_tokens ?? 0) * (isHaiku ? 0.1 : 0.3)) / 1_000_000;
+  }
   const costUsd = Number((inputUsd + outputUsd + cacheUsd).toFixed(3));
 
   // Top 5 usuarios

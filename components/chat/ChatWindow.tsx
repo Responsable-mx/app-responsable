@@ -2,85 +2,42 @@
 
 import { useState, useRef, useEffect } from "react";
 import useSWR from "swr";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SelectField } from "@/components/ui/SelectField";
 import { isChatStreamEvent } from "@/lib/ai/stream-types";
 import { ChatSessionsPanel } from "@/components/chat/ChatSessionsPanel";
+import { ChatMessageBubble } from "@/components/chat/ChatMessageBubble";
+import { ChatEmptyState } from "@/components/chat/ChatEmptyState";
+import {
+  type ChatMessage,
+  type ClientOption,
+  type RoleId,
+  type SessionPreview,
+  ROLES,
+  STARTERS,
+  MODEL_PER_ROLE,
+  PRICE_INPUT_PER_TOKEN,
+  PRICE_OUTPUT_PER_TOKEN,
+  PRICE_CACHE_READ_PER_TOKEN,
+} from "@/components/chat/chat-types";
 
-type SessionPreview = {
-  id: string;
-  client_id: string | null;
-  role: RoleId;
-  title: string;
-  message_count: number;
-  updated_at: string;
-};
-
-type ClientOption = {
-  id: string;
-  name: string;
-  sector: string | null;
-  completeness: { filled: number; total: number };
-};
-type RoleId = "aurora" | "rebeca" | "elena" | "valeria";
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-  rating?: "up" | "down";
-  ts?: number;
-  // Identifica qué voz IA respondió. Persistido por mensaje porque el consultor
-  // puede cambiar de rol entre turnos — sin esto los mensajes viejos se renderizarían
-  // con el avatar del rol actual (atribución incorrecta).
-  roleId?: RoleId;
-};
-
-const MODEL_PER_ROLE: Record<RoleId, string> = {
-  aurora: "Sonnet",
-  rebeca: "Sonnet",
-  elena: "Opus",
-  valeria: "Haiku",
-};
-
-// Precios por 1M tokens. Input mucho más barato que output. Cache read 90% off del input.
-// Estos valores reflejan la lógica server (lib/ai/usage.ts cost estimator).
-const PRICE_INPUT_PER_TOKEN: Record<string, number> = {
-  Sonnet: 3 / 1_000_000,
-  Opus: 15 / 1_000_000,
-  Haiku: 1 / 1_000_000,
-};
-const PRICE_OUTPUT_PER_TOKEN: Record<string, number> = {
-  Sonnet: 15 / 1_000_000,
-  Opus: 75 / 1_000_000,
-  Haiku: 5 / 1_000_000,
-};
-const PRICE_CACHE_READ_PER_TOKEN: Record<string, number> = {
-  Sonnet: 0.3 / 1_000_000,
-  Opus: 1.5 / 1_000_000,
-  Haiku: 0.1 / 1_000_000,
-};
-
-// Orden lógico cadena calidad: Autor → Revisor → Elevador → Validador.
-// Sin emoji (regla CLAUDE.md: cero emoji en UI cliente). Avatar = monogram.
-const ROLES: Array<{
-  id: RoleId;
-  name: string;
-  fn: string;
-  color: string;
-  mono: string;
-  borderColor: string;
-}> = [
-  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-brand-primary-dark", mono: "A", borderColor: "border-l-brand-primary-dark" },
-  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-slate-700", mono: "R", borderColor: "border-l-slate-500" },
-  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-slate-800", mono: "E", borderColor: "border-l-amber-600" },
-  { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-slate-600", mono: "V", borderColor: "border-l-emerald-700" },
+// Cliente seed Distribuidora Altamira — UUID hardcoded del seed SQL (dummy-clients.sql).
+// Se usa para hidratar una conversación demo en first-load del cliente seed.
+const ALTAMIRA_ID = "11111111-1111-1111-1111-111111111111";
+const ALTAMIRA_DEMO_MSGS: ChatMessage[] = [
+  {
+    role: "user",
+    content: "Genera estructura de Estudio de Doble Materialidad para Altamira.",
+    ts: Date.now() - 60_000,
+  },
+  {
+    role: "assistant",
+    content:
+      "**Estructura — Estudio de Doble Materialidad · Distribuidora Altamira**\n\n1. **Contexto del negocio** — sector alimentos refrigerados, presencia MX, clientes B2B clave (Walmart, OXXO/FEMSA, Costco, La Comer).\n2. **Análisis regulatorio** — NOM-001-STPS-2023, LGPGIR (residuos), CTPAT.\n3. **Identificación de stakeholders** — clientes corporativos, comunidades, transportistas, autoridades.\n4. **Materialidad por impacto** — emisiones GHG (cadena de frío), refrigerantes HFC, residuos.\n5. **Materialidad financiera** — riesgos regulatorios HFC, presión clientes B2B sobre Scope 3, costo energético.\n6. **Matriz de doble materialidad** — 20 temas posicionados (5 doble material, 5 por impacto, 5 financiero, 5 seguimiento).\n7. **Plan de acción** — KPIs, owners, roadmap.\n\n¿Avanzamos con el contexto regulatorio detallado?",
+    ts: Date.now() - 30_000,
+  },
 ];
 
-/**
- * Convierte errores técnicos del backend en mensajes accionables para el consultor.
- * Nunca exponer "Invalid UUID", códigos HTTP crudos ni stack traces.
- */
 // Descarga conversación como archivo Markdown. Pattern ChatGPT/Claude.
 // Útil para entregables a comité — el consultor pega el .md en docs.
 function exportConversationMd(
@@ -120,6 +77,10 @@ function exportConversationMd(
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Convierte errores técnicos del backend en mensajes accionables para el consultor.
+ * Nunca exponer "Invalid UUID", códigos HTTP crudos ni stack traces.
+ */
 function humanizeError(raw: string): string {
   const m = raw.toLowerCase();
   if (m.includes("invalid uuid") || m.includes("uuid")) {
@@ -138,50 +99,6 @@ function humanizeError(raw: string): string {
   return raw;
 }
 
-// Cliente seed Distribuidora Altamira — UUID hardcoded del seed SQL (dummy-clients.sql).
-// Se usa para hidratar una conversación demo en first-load del cliente seed.
-const ALTAMIRA_ID = "11111111-1111-1111-1111-111111111111";
-const ALTAMIRA_DEMO_MSGS: ChatMessage[] = [
-  {
-    role: "user",
-    content: "Genera estructura de Estudio de Doble Materialidad para Altamira.",
-    ts: Date.now() - 60_000,
-  },
-  {
-    role: "assistant",
-    content:
-      "**Estructura — Estudio de Doble Materialidad · Distribuidora Altamira**\n\n1. **Contexto del negocio** — sector alimentos refrigerados, presencia MX, clientes B2B clave (Walmart, OXXO/FEMSA, Costco, La Comer).\n2. **Análisis regulatorio** — NOM-001-STPS-2023, LGPGIR (residuos), CTPAT.\n3. **Identificación de stakeholders** — clientes corporativos, comunidades, transportistas, autoridades.\n4. **Materialidad por impacto** — emisiones GHG (cadena de frío), refrigerantes HFC, residuos.\n5. **Materialidad financiera** — riesgos regulatorios HFC, presión clientes B2B sobre Scope 3, costo energético.\n6. **Matriz de doble materialidad** — 20 temas posicionados (5 doble material, 5 por impacto, 5 financiero, 5 seguimiento).\n7. **Plan de acción** — KPIs, owners, roadmap.\n\n¿Avanzamos con el contexto regulatorio detallado?",
-    ts: Date.now() - 30_000,
-  },
-];
-
-const STARTERS: Record<RoleId, string[]> = {
-  aurora: [
-    "Estructura de un Estudio de Doble Materialidad",
-    "Borrador de introducción para reporte GRI",
-    "Plantilla de matriz de stakeholders",
-    "Propuesta de alcance de diagnóstico RSE",
-  ],
-  rebeca: [
-    "Revisa este borrador (pega el texto)",
-    "Checklist de calidad para informe GRI",
-    "Errores comunes en Doble Materialidad",
-    "Rubrica de revisión de propuesta comercial",
-  ],
-  elena: [
-    "Qué insight estratégico aporta este hallazgo",
-    "Trade-offs de enfoque simple vs doble materialidad",
-    "Narrativa ejecutiva para comité de dirección",
-    "Recomendaciones post-diagnóstico",
-  ],
-  valeria: [
-    "Valida DoD de un entregable de Doble Materialidad",
-    "Inconsistencias entre secciones",
-    "Checklist de evidencia para auditoría",
-    "Trazabilidad de datos en reporte",
-  ],
-};
-
 export function ChatWindow({
   clients,
   initialClientId,
@@ -199,9 +116,7 @@ export function ChatWindow({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
-  const [pendingRoleChange, setPendingRoleChange] = useState<RoleId | null>(
-    null
-  );
+  const [pendingRoleChange, setPendingRoleChange] = useState<RoleId | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   // Acumulado real de tokens y costo desde eventos `done` del SSE.
   // Antes: estimación length/4 — siempre subestimaba input (system prompt no contado).
@@ -406,7 +321,7 @@ export function ChatWindow({
               setError(raw.error);
             }
           } catch {
-            /* ignore partial json */
+            /* ignorar json parcial */
           }
         }
       }
@@ -548,12 +463,15 @@ export function ChatWindow({
     void send(lastUser.content);
   }
 
-  // D-27: exportConversation() eliminado — era duplicado inferior de exportConversationMd().
-  // Los dos botones de export (header y footer) ahora usan la misma función.
-
   const ctxPct = selectedClient
     ? Math.round((selectedClient.completeness.filled / Math.max(selectedClient.completeness.total, 1)) * 100)
     : null;
+
+  // Índice del último mensaje asistente (para el botón de reintento).
+  const lastAssistantIdx = messages
+    .map((mm, k) => (mm.role === "assistant" ? k : -1))
+    .filter((k) => k >= 0)
+    .at(-1);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -640,11 +558,8 @@ export function ChatWindow({
           currentSessionId={sessionId}
         />
 
-        {/* Role chain */}
-        <div
-          className="flex items-center gap-1"
-          data-tour="role-selector"
-        >
+        {/* Cadena de roles */}
+        <div className="flex items-center gap-1" data-tour="role-selector">
           {ROLES.map((r, i) => {
             const isActive = role === r.id;
             const isVisited = !isActive && messages.some(
@@ -704,19 +619,8 @@ export function ChatWindow({
           role="status"
           className="bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-6 py-2 flex items-center gap-2"
         >
-          <svg
-            aria-hidden
-            className="w-3.5 h-3.5 shrink-0 text-amber-700"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.75}
-              d="M12 9v2m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-            />
+          <svg aria-hidden className="w-3.5 h-3.5 shrink-0 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           </svg>
           <span>
             El contexto de <strong>{selectedClient.name}</strong> tiene{" "}
@@ -734,7 +638,7 @@ export function ChatWindow({
 
       <div ref={scrollRef} role="log" aria-live="polite" aria-label="Conversación" className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-3xl mx-auto space-y-4">
-          {/* System message: contexto cargado (estilo mockup) */}
+          {/* System message: contexto cargado */}
           {selectedClient && (
             <div className="flex justify-center pt-1">
               <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-600 bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm">
@@ -744,7 +648,6 @@ export function ChatWindow({
                 <span className="font-medium text-slate-700">Contexto cargado</span>
                 <span className="text-slate-300">·</span>
                 <span className="font-semibold text-slate-900 truncate max-w-[260px]">{selectedClient.name}</span>
-                {/* Ocultar cifra de perfil cuando el banner amber ya lo muestra */}
                 {selectedClient.completeness.filled >= 6 && (
                   <>
                     <span className="text-slate-300">·</span>
@@ -762,207 +665,37 @@ export function ChatWindow({
           )}
 
           {messages.length === 0 && (
-            <div className="py-10 max-w-2xl mx-auto" data-tour="empty-state">
-              <p className="text-sm text-slate-600 mb-4 border-b border-slate-200 pb-4">
-                {clientId
-                  ? "Contexto de cliente cargado. Comienza con un objetivo o usa una sugerencia."
-                  : "Sin cliente seleccionado. Respondo sobre metodología general."}
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {STARTERS[role].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => send(s)}
-                    className="group text-left text-xs px-3 py-2.5 bg-white border border-slate-200 rounded hover:border-brand-primary hover:bg-brand-primary-light transition-colors text-slate-700 flex items-start justify-between gap-2"
-                  >
-                    <span className="font-medium">{s}</span>
-                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-slate-300 group-hover:text-brand-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-
-              {recentSessions.length > 0 && (
-                <div className="mt-6 pt-5 border-t border-slate-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      Recientes
-                    </p>
-                  </div>
-                  <ul className="space-y-0.5">
-                    {(() => {
-                      // eslint-disable-next-line react-hooks/purity
-                      const nowTs = Date.now();
-                      return recentSessions.map((s) => {
-                      const daysAgo = Math.floor(
-                        (nowTs - new Date(s.updated_at).getTime()) / 86400000
-                      );
-                      const stamp =
-                        daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
-                      const roleData = ROLES.find((r) => r.id === s.role) ?? ROLES[0];
-                      const clientMatch = clients.find((c) => c.id === s.client_id);
-                      return (
-                        <li key={s.id}>
-                          <button
-                            type="button"
-                            onClick={() => void loadSession(s.id)}
-                            className="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded hover:bg-slate-100 transition-colors"
-                          >
-                            <span
-                              className={`w-5 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${roleData.color}`}
-                              aria-hidden
-                            >
-                              {roleData.mono}
-                            </span>
-                            <span className="flex-1 min-w-0">
-                              <span className="text-xs text-slate-700 line-clamp-1 block">{s.title}</span>
-                              {clientMatch && (
-                                <span className="text-[10px] text-slate-500 block truncate">
-                                  {clientMatch.name}
-                                </span>
-                              )}
-                            </span>
-                            <span className="text-[10px] text-slate-400 shrink-0 tabular-nums">
-                              {stamp}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    });
-                    })()}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <ChatEmptyState
+              role={role}
+              clientId={clientId}
+              clients={clients}
+              recentSessions={recentSessions}
+              roles={ROLES}
+              starters={STARTERS}
+              onSend={(prompt) => void send(prompt)}
+              onLoadSession={(id) => void loadSession(id)}
+            />
           )}
 
-          {messages.map((m, i) => {
-            const isUser = m.role === "user";
-            const isLastAssistant =
-              !isUser &&
-              i === messages.map((mm, k) => (mm.role === "assistant" ? k : -1)).filter((k) => k >= 0).at(-1);
-            const showActions = !isUser && !!m.content && !streaming;
-            const tsLabel = m.ts
-              ? new Date(m.ts).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
-              : null;
-            // Atribución por mensaje. roleId se persiste al enviar; si falta (mensajes
-            // legacy o demo precargada) cae al rol activo actual.
-            const msgRole = !isUser
-              ? ROLES.find((r) => r.id === m.roleId) ?? currentRole
-              : null;
-
-            if (isUser) {
-              return (
-                <div key={i} className="animate-fade-in flex justify-end">
-                  <div className="max-w-[75%]">
-                    <div className="flex items-baseline gap-2 mb-1 justify-end">
-                      <span className="text-xs font-semibold text-slate-700 leading-none">Consultor</span>
-                      {tsLabel && <span className="text-[10px] text-slate-400 tabular-nums">{tsLabel}</span>}
-                    </div>
-                    <div className="bg-slate-100 rounded px-4 py-2.5 text-sm text-slate-800 whitespace-pre-wrap">
-                      {m.content}
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div key={i} className="animate-fade-in flex items-start gap-3">
-                <div
-                  aria-hidden
-                  className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold text-white mt-1 ${msgRole?.color ?? currentRole.color}`}
-                >
-                  {msgRole?.mono ?? currentRole.mono}
-                </div>
-                <div className="min-w-0 max-w-[85%]">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <p className="text-xs font-semibold text-slate-900 leading-none">
-                      {msgRole?.name ?? currentRole.name}
-                    </p>
-                    <span
-                      className="text-[10px] uppercase tracking-widest font-semibold text-slate-400"
-                      title={`Rol: ${msgRole?.fn ?? currentRole.fn}`}
-                    >
-                      {msgRole?.fn ?? currentRole.fn}
-                    </span>
-                    {tsLabel && <span className="text-[10px] text-slate-400 tabular-nums">{tsLabel}</span>}
-                  </div>
-                  <div className={`bg-white border border-slate-200 rounded border-l-4 px-4 py-3 ${msgRole?.borderColor ?? currentRole.borderColor}`}>
-                    <div className="prose prose-sm max-w-none prose-headings:mt-2 prose-headings:mb-1 prose-h1:text-sm prose-h1:font-semibold prose-h2:text-sm prose-h2:font-semibold prose-h3:text-xs prose-h3:font-semibold text-slate-800">
-                      {m.content ? (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {m.content}
-                        </ReactMarkdown>
-                      ) : (
-                        <span className="inline-block w-2 h-4 bg-slate-400 animate-pulse" />
-                      )}
-                    </div>
-                    {showActions && (
-                      <div className="flex items-center mt-2 -mx-1">
-                        <button
-                          onClick={() => rateMessage(i, "up")}
-                          className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "up" ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}
-                          title="Útil"
-                        >
-                          <svg className="w-3.5 h-3.5" fill={m.rating === "up" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => rateMessage(i, "down")}
-                          className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "down" ? "text-rose-500" : "text-slate-300 hover:text-slate-500"}`}
-                          title="No útil"
-                        >
-                          <svg className="w-3.5 h-3.5" fill={m.rating === "down" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => copyMessage(i, m.content)}
-                          className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-slate-500 transition-colors"
-                          title="Copiar"
-                        >
-                          {copiedIdx === i ? (
-                            <span className="text-[10px] text-emerald-600 font-medium">✓</span>
-                          ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                          )}
-                        </button>
-                        {isLastAssistant && (
-                          <button
-                            onClick={retryLast}
-                            className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-brand-primary transition-colors"
-                            title="Regenerar respuesta"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {messages.map((m, i) => (
+            <ChatMessageBubble
+              key={i}
+              message={m}
+              index={i}
+              isLastAssistant={i === lastAssistantIdx}
+              streaming={streaming}
+              currentRole={currentRole}
+              roles={ROLES}
+              copiedIdx={copiedIdx}
+              onRate={rateMessage}
+              onCopy={copyMessage}
+              onRetry={retryLast}
+            />
+          ))}
 
           {error && (
-            <div
-              role="alert"
-              className="bg-rose-50 border border-rose-200 rounded p-3 flex items-start gap-3"
-            >
-              <svg
-                aria-hidden
-                className="w-4 h-4 text-rose-700 shrink-0 mt-0.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+            <div role="alert" className="bg-rose-50 border border-rose-200 rounded p-3 flex items-start gap-3">
+              <svg aria-hidden className="w-4 h-4 text-rose-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <circle cx="12" cy="12" r="10" strokeWidth={1.5} />
                 <path strokeLinecap="round" strokeWidth={1.75} d="M12 8v4M12 16h.01" />
               </svg>
@@ -991,7 +724,7 @@ export function ChatWindow({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              send(input);
+              void send(input);
             }}
             className="flex items-end gap-2"
           >
@@ -1001,7 +734,7 @@ export function ChatWindow({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  send(input);
+                  void send(input);
                 }
               }}
               placeholder={`Escribe a ${currentRole.name}...`}

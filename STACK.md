@@ -15,7 +15,8 @@ Stack base: `~/.claude/STACK_BASE.md`. Solo se documenta aquí lo diferente.
 > Prompt engineering y model selection: ver `~/.claude/STACK_BASE.md` (sección AI / Prompt Engineering)
 
 - Claude API (Anthropic SDK) con 4 system prompts especializados por rol
-- **Aurora / Rebeca / Elena**: Sonnet 4 (calidad narrativa y juicio)
+- **Aurora / Rebeca**: Sonnet 4 (calidad narrativa y juicio)
+- **Elena**: Opus 4 (análisis estratégico profundo, trade-offs)
 - **Valeria**: Haiku 4.5 (validación estructurada)
 - Streaming SSE token-por-token (`.messages.stream()`)
 - **Prompt caching**: 2 breakpoints ephemerales por request — uno en contexto
@@ -103,4 +104,14 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 ### Aplicar migraciones
 - Helper: `node scripts/apply-sql.mjs` (modo paranoico, 17 patrones bloqueados)
 - PAT en `~/.claude/.env.global`
-- Project ref: pendiente de crear en Supabase (env `SUPABASE_PROJECT_REF`)
+- Project ref: `lyideepglavkmuuujoqz` (org ResponSable). Env: `SUPABASE_PROJECT_REF`
+
+## Infraestructura
+
+| Servicio | Cuenta / Equipo | Detalle |
+|----------|----------------|---------|
+| **Vercel** | Team `nblondel-coders-projects` | Owner: `nblondel-coder`. Producción: `https://app.responsable.net` |
+| **Supabase** | Cuenta `nblondel-coder` / Org ResponSable (`xjvhttmltlfxsekbhfid`) | Project `app-responsable` ref `lyideepglavkmuuujoqz`. PAT: `SUPABASE_ACCESS_TOKEN` en `~/.claude/.env.global` |
+| **GitHub** | Org `Responsable-mx` | Repo `Responsable-mx/app-responsable` (privado). Auto-deploy bloqueado: requiere instalar Vercel GitHub App en org `Responsable-mx` y re-correr `vercel git connect` |
+
+> Auto-deploy pendiente: `vercel git connect https://github.com/Responsable-mx/app-responsable --scope nblondel-coders-projects --yes` falla hasta que un admin de `Responsable-mx` instale la Vercel GitHub App en GitHub → Settings → GitHub Apps → Vercel.

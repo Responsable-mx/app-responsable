@@ -18,24 +18,12 @@ import { logAiCall } from "@/lib/ai/logging";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-// D-14: Rate limit por usuario — dos capas:
-// 1. In-memory (fast path, misma instancia serverless)
-// 2. DB via ai_calls (cross-instance — funciona con múltiples lambdas en paralelo)
-// Límite: MAX_CALLS_PER_WINDOW calls en WINDOW_MS por usuario.
+// D-14: Rate limit por usuario — capa única DB (cross-instance).
+// D-61: capa 1 in-memory eliminada — era engañosa en Vercel multi-instancia
+// (cada lambda tenía su propio Map; el límite se multiplicaba por N instancias).
+// La capa DB es suficiente para el piloto de 8 usuarios.
 const WINDOW_MS = 60_000; // 1 minuto
 const MAX_CALLS_PER_WINDOW = 15; // 9 pasos bulk + 6 individuales de margen
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimitMemory(userEmail: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(userEmail);
-  if (!entry || now >= entry.resetAt) {
-    rateLimitMap.set(userEmail, { count: 1, resetAt: now + WINDOW_MS });
-    return true;
-  }
-  entry.count += 1;
-  return entry.count <= MAX_CALLS_PER_WINDOW;
-}
 
 // D-13: allowlist de caracteres válidos para stepKey (alfanumérico + guion).
 // Previene inputs maliciosos aunque el lookup string-equality ya es seguro.
@@ -72,14 +60,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "stepKey inválido" }, { status: 400 });
   }
 
-  // D-14: rate limit capa 1 (in-memory, fast path).
-  if (!checkRateLimitMemory(user)) {
-    return NextResponse.json(
-      { error: "Demasiadas solicitudes. Espera 1 minuto antes de reintentar." },
-      { status: 429 }
-    );
-  }
-  // D-14: rate limit capa 2 (DB — funciona cross-instancias serverless).
+  // D-14: rate limit DB (cross-instancias serverless).
   {
     const { createAdminClient } = await import("@/lib/supabase/admin");
     const admin = createAdminClient();

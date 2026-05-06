@@ -161,6 +161,11 @@ export function ClientTabs({
               ? `${completedMacro}/${totalMacro}`
               : null
           }
+          badgeTitle={
+            questionnaireResp?.data
+              ? `${completedMacro} de ${totalMacro} secciones completas (todas sus preguntas respondidas)`
+              : undefined
+          }
         />
         <TabButton
           active={tab === "cuestionario"}
@@ -173,6 +178,11 @@ export function ClientTabs({
           }
           label="Cuestionario"
           badge={questionnaireProgress === null ? null : `${questionnaireProgress.filled}/${questionnaireProgress.total}`}
+          badgeTitle={
+            questionnaireProgress !== null
+              ? `${questionnaireProgress.filled} de ${questionnaireProgress.total} campos del cuestionario respondidos`
+              : undefined
+          }
         />
         <TabButton
           active={tab === "materialidad"}

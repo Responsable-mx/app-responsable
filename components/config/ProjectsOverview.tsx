@@ -55,6 +55,8 @@ export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [viewMode, setViewMode] = useState<Record<string, "list" | "gantt">>({});
 
+  const [now] = useState(() => Date.now());
+
   if (isLoading) return <SkeletonTable rows={4} cols={4} />;
   if (error)
     return (
@@ -94,7 +96,7 @@ export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) 
         return sv.stages.length > 0 || noFilter;
       });
       let total = 0, active = 0, delayed = 0, upcoming = 0;
-      const today = Date.now();
+      const today = now;
       const horizon = today + 30 * 86_400_000;
       for (const sv of services) {
         for (const st of sv.stages) {

@@ -3,7 +3,7 @@
 // Timeline global: 1 row por consultor, todas sus actividades cross-project en una sola línea.
 // Identifica solapamientos de carga al instante. Reutiliza /api/projects/overview.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
@@ -146,6 +146,8 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     return { min: min.getTime(), max: max.getTime(), months };
   }, [activities]);
 
+  const [now] = useState(() => Date.now());
+
   if (isLoading) return <SkeletonTable rows={5} cols={4} />;
   if (error)
     return (
@@ -171,7 +173,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
   }
 
   const totalMs = range.max - range.min;
-  const todayPct = ((Date.now() - range.min) / totalMs) * 100;
+  const todayPct = ((now - range.min) / totalMs) * 100;
   const todayInRange = todayPct >= 0 && todayPct <= 100;
 
   function pct(s: string | null): number | null {

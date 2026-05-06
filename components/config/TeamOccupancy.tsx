@@ -72,6 +72,7 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
   );
 
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
 
   const humanizeSeniority = (val: string | null) => {
     if (!val) return "—";
@@ -104,7 +105,7 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
           acts = acts.filter((a) => activityInDateRange(filters.dateRange, a.planned_start, a.planned_end));
         }
       }
-      const today = Date.now();
+      const today = now;
       const horizon = today + 30 * 86_400_000;
       let active = 0, delayed = 0, upcoming = 0;
       for (const a of acts) {

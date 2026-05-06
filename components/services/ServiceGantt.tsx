@@ -381,13 +381,13 @@ export function ServiceGantt({
   return (
     <>
       {/* ganttRef en el wrapper externo para PNG (captura toolbar+header+filas) */}
-      <div ref={ganttRef} className="bg-white border border-slate-200 rounded">
+      <div ref={ganttRef} className="bg-white border border-slate-200 rounded flex flex-col" style={{ maxHeight: "calc(100vh - 280px)", minHeight: 300 }}>
 
         {/* ─── Sticky: toolbar + header de fechas ───────────────────────────────
             Fuera del overflow-x-auto para que position:sticky funcione tanto
             vertical (scroll página) como horizontal (header sincronizado via
             transform en lugar de scrollLeft). */}
-        <div className="sticky top-0 z-20 bg-white shadow-sm">
+        <div className="flex-none bg-white border-b border-slate-100 shadow-sm">
 
           {/* Toolbar */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-200 bg-slate-50 flex-wrap">
@@ -499,15 +499,11 @@ export function ServiceGantt({
 
         </div>{/* /sticky */}
 
-        {/* ─── Filas scrollables ─── */}
-        {/* overflow-y:clip (no overflow-y:auto) → evita que el scrollRef atrape
-            scroll vertical. overflow-x:auto (CSS) fuerza overflow-y:auto si no
-            se sobreescribe; clip clips sin crear scroll container, así <main>
-            ve la altura total y puede scrollear verticalmente. */}
+        {/* ─── Filas scrollables (flex-1, ambos ejes) ─── */}
         <div
           ref={scrollRef}
-          className={`${timelineWidth ? "overflow-x-auto" : "overflow-hidden"} focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 focus-visible:ring-inset`}
-          style={timelineWidth ? { overflowY: "clip", cursor: "grab" } : undefined}
+          className={`flex-1 min-h-0 ${timelineWidth ? "overflow-auto" : "overflow-hidden"} focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 focus-visible:ring-inset`}
+          style={timelineWidth ? { cursor: "grab" } : undefined}
           tabIndex={timelineWidth ? 0 : undefined}
           onScroll={(e) => {
             // Sync header timeline via transform (sin re-render React)

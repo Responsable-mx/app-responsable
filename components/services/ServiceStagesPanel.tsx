@@ -5,8 +5,6 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { ActivityEditorModal } from "./ActivityEditorModal";
@@ -51,8 +49,6 @@ export function ServiceStagesPanel({
     fetcher
   );
 
-  const [newStageName, setNewStageName] = useState("");
-  const [creatingStage, setCreatingStage] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{
     stageId: string;
     activity?: StageActivity;
@@ -64,27 +60,6 @@ export function ServiceStagesPanel({
   // Filtrar etapas a las que pertenecen a este servicio
   const stages = (data?.data ?? []).filter((s) => s.client_service_id === clientServiceId);
 
-  async function handleCreateStage() {
-    if (!newStageName.trim()) return;
-    setCreatingStage(true);
-    try {
-      const res = await fetch(`/api/clients/${clientId}/stages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_service_id: clientServiceId, name: newStageName.trim() }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        push("error", j.error ?? "No se pudo crear la etapa");
-        return;
-      }
-      setNewStageName("");
-      push("success", "Etapa creada");
-      mutate();
-    } finally {
-      setCreatingStage(false);
-    }
-  }
 
   async function handleDeleteStage() {
     if (!deleteStageId) return;
@@ -98,76 +73,9 @@ export function ServiceStagesPanel({
     setDeleteStageId(null);
   }
 
-  async function renameStage(stageId: string, newName: string) {
-    const res = await fetch(`/api/stages/${stageId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName }),
-    });
-    if (!res.ok) {
-      push("error", "No se pudo renombrar");
-    } else {
-      mutate();
-    }
-  }
 
-  async function renameActivity(activityId: string, newName: string) {
-    const res = await fetch(`/api/activities/${activityId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName }),
-    });
-    if (!res.ok) {
-      push("error", "No se pudo renombrar");
-    } else {
-      mutate();
-    }
-  }
 
-  async function moveStage(stageId: string, dir: -1 | 1) {
-    const idx = stages.findIndex((s) => s.id === stageId);
-    if (idx < 0) return;
-    const target = stages[idx + dir];
-    if (!target) return;
-    // Swap order_index
-    const a = stages[idx];
-    await Promise.all([
-      fetch(`/api/stages/${a.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_index: target.order_index }),
-      }),
-      fetch(`/api/stages/${target.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_index: a.order_index }),
-      }),
-    ]);
-    mutate();
-  }
 
-  async function moveActivity(stageId: string, activityId: string, dir: -1 | 1) {
-    const stage = stages.find((s) => s.id === stageId);
-    if (!stage) return;
-    const idx = stage.activities.findIndex((a) => a.id === activityId);
-    if (idx < 0) return;
-    const target = stage.activities[idx + dir];
-    if (!target) return;
-    const a = stage.activities[idx];
-    await Promise.all([
-      fetch(`/api/activities/${a.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_index: target.order_index }),
-      }),
-      fetch(`/api/activities/${target.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_index: a.order_index }),
-      }),
-    ]);
-    mutate();
-  }
 
   async function handleDeleteActivity() {
     if (!deleteActivityId) return;

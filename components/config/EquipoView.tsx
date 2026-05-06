@@ -12,6 +12,7 @@ import { ProjectsOverview } from "./ProjectsOverview";
 import { GlobalTimeline } from "./GlobalTimeline";
 import { GanttPorProyecto } from "./GanttPorProyecto";
 import { FiltersBar, emptyFilters, type EquipoFilters } from "./EquipoFilters";
+import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 
 type View = "consultor" | "proyecto" | "timeline" | "gantt";
 
@@ -58,7 +59,9 @@ export function EquipoView() {
   );
 
   return (
-    <div className="space-y-4">
+    <div>
+      {/* Controles siempre acotados */}
+      <div className="max-w-6xl mx-auto space-y-4 mb-4">
       <div className="flex items-center justify-end gap-4">
         <div className="inline-flex items-center bg-white border border-slate-200 rounded p-0.5 shadow-sm">
           <ToggleButton
@@ -128,11 +131,32 @@ export function EquipoView() {
         consultors={consultors}
         projects={projects}
       />
+      </div>{/* fin controles */}
 
-      {view === "consultor" && <TeamOccupancy filters={filters} />}
-      {view === "proyecto" && <ProjectsOverview filters={filters} />}
-      {view === "timeline" && <GlobalTimeline filters={filters} />}
-      {view === "gantt" && <GanttPorProyecto filters={filters} />}
+      {/* Contenido: Gantt usa todo el ancho, resto acotado */}
+      {view === "gantt" ? (
+        <TabErrorBoundary tabName="Gantt">
+          <GanttPorProyecto filters={filters} />
+        </TabErrorBoundary>
+      ) : (
+        <div className="max-w-6xl mx-auto">
+          {view === "consultor" && (
+            <TabErrorBoundary tabName="Por consultor">
+              <TeamOccupancy filters={filters} />
+            </TabErrorBoundary>
+          )}
+          {view === "proyecto" && (
+            <TabErrorBoundary tabName="Por proyecto">
+              <ProjectsOverview filters={filters} />
+            </TabErrorBoundary>
+          )}
+          {view === "timeline" && (
+            <TabErrorBoundary tabName="Timeline">
+              <GlobalTimeline filters={filters} />
+            </TabErrorBoundary>
+          )}
+        </div>
+      )}
     </div>
   );
 }

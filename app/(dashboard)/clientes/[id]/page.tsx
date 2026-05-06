@@ -5,7 +5,6 @@ import { ClientTabs } from "@/components/ClientTabs";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
-import { isSystemAccount } from "@/lib/users";
 import { requireAdmin } from "@/lib/auth";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import { listMaterialityTopics } from "@/lib/materiality/queries";

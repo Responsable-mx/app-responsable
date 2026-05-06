@@ -166,6 +166,11 @@ export function GlobalTimeline({
   const [now] = useState(() => Date.now());
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Drag-to-pan: refs (no state) para evitar re-renders en cada mousemove
+  const isPanning = useRef(false);
+  const panStartX = useRef(0);
+  const panStartScrollLeft = useRef(0);
+  const didPan = useRef(false);
 
   const zoom = ZOOM_STEPS[zoomIdx];
   const chartW = Math.round(CHART_BASE * zoom);
@@ -427,6 +432,77 @@ export function GlobalTimeline({
     scrollRef.current.scrollLeft = Math.max(0, todayPx - cW / 3);
   }
 
+  // ── Teclado: ←/→ pan · Shift+←/→ salto · Home/End · +/- zoom ─────────────
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const el = scrollRef.current;
+    if (!el) return;
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        el.scrollLeft -= e.shiftKey ? 400 : 120;
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        el.scrollLeft += e.shiftKey ? 400 : 120;
+        break;
+      case "Home":
+        e.preventDefault();
+        el.scrollLeft = 0;
+        break;
+      case "End":
+        e.preventDefault();
+        el.scrollLeft = el.scrollWidth;
+        break;
+      case "+":
+      case "=":
+        e.preventDefault();
+        setZoomIdx((i) => Math.min(ZOOM_STEPS.length - 1, i + 1));
+        break;
+      case "-":
+        e.preventDefault();
+        setZoomIdx((i) => Math.max(0, i - 1));
+        break;
+    }
+  }
+
+  // ── Drag-to-pan (mouse) ───────────────────────────────────────────────────
+  function onPanStart(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("a,button")) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    isPanning.current = true;
+    didPan.current = false;
+    panStartX.current = e.clientX;
+    panStartScrollLeft.current = el.scrollLeft;
+    el.style.cursor = "grabbing";
+    e.preventDefault();
+  }
+
+  function onPanMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (!isPanning.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const dx = e.clientX - panStartX.current;
+    if (Math.abs(dx) > 4) didPan.current = true;
+    el.scrollLeft = panStartScrollLeft.current - dx;
+  }
+
+  function onPanEnd() {
+    if (!isPanning.current) return;
+    isPanning.current = false;
+    const el = scrollRef.current;
+    if (el) el.style.cursor = "grab";
+  }
+
+  // Suprime click en barras si hubo pan real
+  function onClickCapture(e: React.MouseEvent) {
+    if (didPan.current) {
+      e.stopPropagation();
+      didPan.current = false;
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -492,7 +568,7 @@ export function GlobalTimeline({
               ↔ Hoy
             </button>
           )}
-          <span className="ml-auto text-[10px] text-slate-400">Ctrl + rueda para zoom</span>
+          <span className="ml-auto text-[10px] text-slate-400" title="← → pan · Shift+← → salto · Home/End · +/− zoom · Arrastra con mouse">← → · drag · Ctrl+rueda</span>
         </div>
 
         {/* Grid: columna label fija + zona chart scrolleable */}
@@ -554,9 +630,16 @@ export function GlobalTimeline({
               altura total y puede scrollear verticalmente. */}
           <div
             ref={scrollRef}
-            className="overflow-x-auto flex-1 min-w-0"
-            style={{ overflowY: "clip" }}
+            className="overflow-x-auto flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 focus-visible:ring-inset"
+            style={{ overflowY: "clip", cursor: "grab" }}
+            tabIndex={0}
             onWheel={handleWheel}
+            onKeyDown={onKeyDown}
+            onMouseDown={onPanStart}
+            onMouseMove={onPanMove}
+            onMouseUp={onPanEnd}
+            onMouseLeave={onPanEnd}
+            onClickCapture={onClickCapture}
           >
             {/* Inner a ancho fijo en px */}
             <div style={{ width: chartW }} className="relative">

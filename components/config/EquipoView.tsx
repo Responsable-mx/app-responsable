@@ -18,12 +18,12 @@ type View = "consultor" | "proyecto" | "timeline" | "gantt";
 
 const INTRO: Record<View, string> = {
   consultor:
-    "Carga del equipo derivada de actividades activas. Click en un consultor para ver el detalle.",
-  proyecto: "Tus proyectos con etapas, actividades y fechas. Click en un proyecto para expandir.",
+    "Carga del equipo derivada de actividades activas. Clic en un consultor para ver el detalle.",
+  proyecto: "Tus proyectos con etapas, actividades y fechas. Clic en un proyecto para expandir.",
   timeline:
     "Timeline cross-project: 1 fila por consultor, todas sus actividades en una línea.",
   gantt:
-    "Gantt por proyecto: cada cliente con su cronograma plan vs real. Click en barra → ficha del cliente.",
+    "Gantt por proyecto: cada cliente con su cronograma plan vs real. Clic en barra → ficha del cliente.",
 };
 
 const fetcher = (url: string) =>
@@ -182,6 +182,7 @@ function ToggleButton({
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors ${
         active
           ? "bg-brand-primary-light text-brand-primary-dark"

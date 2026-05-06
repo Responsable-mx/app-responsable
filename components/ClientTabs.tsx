@@ -62,6 +62,18 @@ export function ClientTabs({
     }
   }, [searchParams]);
 
+  // Limpia autoFill=1 de la URL tras consumirlo para evitar retrigger en F5/bookmark.
+  useEffect(() => {
+    if (searchParams?.get("autoFill") === "1") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("autoFill");
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+    }
+    // Solo al montar — queremos limpiar una sola vez
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function goToTab(t: Tab) {
     setTab(t);
     router.replace(`?tab=${t}`, { scroll: false });

@@ -21,12 +21,13 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Esfuerzo**: Decisión de negocio, luego 30min de código
 
 
-### 🟢 D-10 — Sin trazabilidad Chat → Cuestionario
-- **Descripción**: Los mensajes del chat IA no linkean a campos específicos del cuestionario.
-- **Fix sugerido**: Cuando el cuestionario esté maduro, `buildClientContext` debe incluir field IDs; el chat puede citar `[ver campo X]`.
-- **Esfuerzo**: 4-6h
-
 ---
+
+## Deuda resuelta (sesión 11 — may-2026)
+
+| ID | Descripción | Resuelto |
+|----|-------------|---------|
+| D-10 | Trazabilidad Chat→Cuestionario — `buildClientContext` inyecta campos llenos; LLM cita `[campo:key]`; UI convierte a link `/clientes/{id}?tab=cuestionario` | may-2026 |
 
 ## Deuda resuelta (sesión 10 — may-2026)
 

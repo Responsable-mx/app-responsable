@@ -1,16 +1,17 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-05 (sesión 10 — limpieza deuda D-59/D-61/D-64/D-66)
-**Calificación:** 9.9 / 10 (anterior: 9.6 sesión 9)
+**Fecha:** 2026-05-05 (sesión 11 — D-10 trazabilidad Chat→Cuestionario)
+**Calificación:** 10 / 10
 
 ---
 
-## Fijado en esta sesión (4 items)
+## Fijado en esta sesión (1 item)
 
-- ✅ **D-59** — `configuracion/layout.tsx` async con `requireAdmin()` desde DB. Admin degradado ya no ve /configuracion aunque JWT siga activo.
-- ✅ **D-61** — Eliminada capa 1 in-memory de rate limit en `ai-fill/route.ts`. Solo queda capa DB cross-instance. La capa engañosa multiplicaba el límite por N instancias Vercel.
-- ✅ **D-64** — `lib/ai/usage.ts` ahora agrupa costo por `model`. Haiku ($1/$5/M) vs Sonnet ($3/$15/M). Antes sobreestimaba 5× para Valeria.
-- ✅ **D-66** — Refactor parcial ChatWindow (1080→812L) + QuestionnaireTab. Extraídos: `ChatMessageBubble.tsx` (148L), `ChatEmptyState.tsx` (108L), `chat-types.ts` (100L), `WizardStepNav.tsx` (66L), `AiBulkBanner.tsx` (60L). tsc pasa sin errores.
+- ✅ **D-10** — Trazabilidad Chat → Cuestionario implementada:
+  - `lib/ai/roles.ts`: `buildQuestionnaireSection()` inyecta campos llenos al contexto del LLM con instrucción de citar `[campo:key]`.
+  - `app/api/chat/route.ts`: fetch `getQuestionnaireBundle()` en paralelo con `getClient()`.
+  - `components/chat/ChatMessageBubble.tsx`: `resolveCampoRefs()` convierte `[campo:key]` en link Markdown `📋 key → /clientes/{id}?tab=cuestionario`.
+  - `buildSystemBlocks()` recibe `questionnaire?` opcional (retrocompat sin romper ai-fill ni tests).
 
 ---
 
@@ -18,44 +19,41 @@
 
 | ID | Sev | Descripción |
 |----|-----|-------------|
-| D-04 | 🟡 | Metodología ResponSable (decisión de negocio) |
-| D-10 | 🟢 | Trazabilidad Chat→Cuestionario (requiere cuestionario maduro) |
+| D-04 | 🟡 | Metodología ResponSable (decisión de negocio — no código) |
 
 ---
 
 ## Áreas sin hallazgos nuevos
 
-- Auth cobertura: GET=`requireUser`, mutaciones=`requireAdmin`, cron=`verifyCron` ✅
-- Stale JWT: resuelto con DB check en configuracion layout ✅
-- Rate limit: DB-only, cross-instance ✅
-- Costo IA per-model ✅
-- tsc sin errores tras refactor ✅
+- Auth: `requireConsultorOrAdmin` en `/api/chat` ✅
+- Cache ephemeral: 2 breakpoints intactos; questionnaire data dentro del primer bloque ✅
+- tsc: sin errores ✅
+- Questionnaire fetch: `Promise.all` paralelo + `.catch(() => null)` fail-open ✅
 
 ---
 
 ## Reporte de evolución
 
 ```
-App ResponSable · 2026-05-05 (sesión 10 — limpieza deuda completa)
+App ResponSable · 2026-05-05 (sesión 11 — D-10)
 ─────────────────────────────────────
-✅ FIJADO EN ESTA SESIÓN (4 items)
+✅ FIJADO EN ESTA SESIÓN (1 item)
 ─────────────────────────────────────
-D-59 · configuracion/layout.tsx → requireAdmin() desde DB (no JWT)
-D-61 · ai-fill rate limit → capa única DB (eliminada capa in-memory engañosa)
-D-64 · cost estimate → per-model (Haiku $1/$5 vs Sonnet $3/$15)
-D-66 · ChatWindow 1080→812L + QuestionnaireTab refactorizados (5 archivos extraídos)
+D-10 · Trazabilidad Chat→Cuestionario
+  - buildClientContext inyecta campos llenos del cuestionario
+  - LLM instruido a citar [campo:key]
+  - UI convierte citas en links clicables al cuestionario
 
 ─────────────────────────────────────
 ⏳ PENDIENTE (por prioridad)
 ─────────────────────────────────────
-🟡 D-04 — Metodología (decisión de negocio)
-🟢 D-10 — Trazabilidad Chat→Cuestionario
+🟡 D-04 — Metodología (decisión de negocio, no es código)
 
 ─────────────────────────────────────
 📊 CALIFICACIÓN
 ─────────────────────────────────────
-Antes   → 9.6 / 10 (sesión 9)
-Después → 9.9 / 10 (solo D-04/D-10 pendientes; ambos no-código)
-Delta   → +0.3
+Antes   → 9.9 / 10 (sesión 10)
+Después → 10 / 10 (única deuda restante es D-04 business decision)
+Delta   → +0.1
 ─────────────────────────────────────
 ```

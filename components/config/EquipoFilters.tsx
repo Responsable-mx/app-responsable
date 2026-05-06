@@ -104,7 +104,7 @@ const STATUS_LABEL: Record<ActivityStatus, string> = {
 const STATUS_CHIP: Record<ActivityStatus, string> = {
   pending: "bg-slate-100 text-slate-700 border-slate-200",
   in_progress: "bg-brand-primary-light text-brand-primary-dark border-brand-primary/30",
-  completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  completed: "bg-teal-50 text-teal-700 border-teal-200",
   delayed: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
@@ -152,6 +152,7 @@ export function FiltersBar({
               <button
                 key={s}
                 onClick={() => toggleStatus(s)}
+                aria-pressed={active}
                 className={`text-[11px] font-medium px-2 py-0.5 rounded-sm border transition-colors ${
                   active
                     ? STATUS_CHIP[s]
@@ -167,7 +168,7 @@ export function FiltersBar({
               onClick={() => onChange({ ...value, statuses: new Set() })}
               className="text-[11px] text-slate-400 hover:text-slate-700 underline ml-1"
             >
-              limpiar
+              Limpiar
             </button>
           )}
         </div>

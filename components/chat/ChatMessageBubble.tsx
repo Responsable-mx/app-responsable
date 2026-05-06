@@ -19,7 +19,21 @@ export type ChatMessageBubbleProps = {
   onRate: (idx: number, rating: "up" | "down") => void;
   onCopy: (idx: number, text: string) => void;
   onRetry: () => void;
+  /** D-10: clientId para convertir [campo:key] en links al cuestionario. */
+  clientId?: string;
 };
+
+/**
+ * D-10: Convierte citas [campo:key] del LLM en links Markdown al cuestionario.
+ * Solo aplica a mensajes IA con clientId disponible.
+ */
+function resolveCampoRefs(content: string, clientId: string): string {
+  return content.replace(
+    /\[campo:([a-z0-9_]+)\]/g,
+    (_match, key: string) =>
+      `[📋 ${key}](/clientes/${clientId}?tab=cuestionario "Ver campo ${key} en el cuestionario")`
+  );
+}
 
 /**
  * Burbuja de un solo mensaje del chat (usuario o asistente IA).
@@ -36,6 +50,7 @@ export function ChatMessageBubble({
   onRate,
   onCopy,
   onRetry,
+  clientId,
 }: ChatMessageBubbleProps) {
   const isUser = m.role === "user";
   const showActions = !isUser && !!m.content && !streaming;
@@ -89,7 +104,7 @@ export function ChatMessageBubble({
           <div className="prose prose-sm max-w-none prose-headings:mt-2 prose-headings:mb-1 prose-h1:text-sm prose-h1:font-semibold prose-h2:text-sm prose-h2:font-semibold prose-h3:text-xs prose-h3:font-semibold text-slate-800">
             {m.content ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {m.content}
+                {clientId ? resolveCampoRefs(m.content, clientId) : m.content}
               </ReactMarkdown>
             ) : (
               <span className="inline-block w-2 h-4 bg-slate-400 animate-pulse" />

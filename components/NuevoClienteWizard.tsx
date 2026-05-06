@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 
 const SERVICIOS = [
@@ -88,7 +90,7 @@ export function NuevoClienteWizard() {
             </svg>
           </div>
           <div className="text-xs text-slate-700 leading-relaxed">
-            <p className="font-bold text-slate-900 mb-1">Captura mínima del paso 1 — la IA hace el resto</p>
+            <p className="font-bold text-slate-900 mb-1">Captura mínima del paso 1</p>
             <p>
               Este paso (5 campos) lo llena el asesor. Los pasos 2-9 (~80 campos) se llenarán
               automáticamente con datos públicos verificables y citados, siguiendo las reglas operativas
@@ -99,66 +101,57 @@ export function NuevoClienteWizard() {
       </div>
 
       <Section title="Información base" subtitle="Captura del asesor — 5 campos" stepLabel="1 / 9">
-        <Field label="Nombre de la empresa" required>
-          <input
-            type="text"
-            value={form.nombre}
-            onChange={(e) => set("nombre", e.target.value)}
-            placeholder="Razón social completa"
-            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          />
-        </Field>
+        <Input
+          label="Nombre de la empresa *"
+          value={form.nombre}
+          onChange={(e) => set("nombre", e.target.value)}
+          placeholder="Razón social completa"
+        />
 
-        <Field label="Servicio contratado" required>
-          <select
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Servicio contratado <span className="text-rose-500">*</span>
+          </label>
+          <SelectField
             value={form.servicio}
-            onChange={(e) => set("servicio", e.target.value)}
-            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          >
-            {SERVICIOS.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Alcance geográfico del proyecto" required helper="País o región del estudio. Ej: México — Bajío y Centro-Norte">
-          <input
-            type="text"
-            value={form.alcance}
-            onChange={(e) => set("alcance", e.target.value)}
-            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+            onChange={(v) => set("servicio", v)}
+            options={SERVICIOS.map((s) => ({ value: s, label: s }))}
+            placeholder="Seleccionar servicio"
           />
-        </Field>
+        </div>
 
-        <Field label="Página web corporativa" helper="URL del sitio oficial — la IA usará este dominio como fuente primaria para llenar pasos 2-9">
-          <input
-            type="url"
-            value={form.pagina_web}
-            onChange={(e) => set("pagina_web", e.target.value)}
-            placeholder="https://empresa.com.mx"
-            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          />
-        </Field>
+        <Input
+          label="Alcance geográfico del proyecto *"
+          value={form.alcance}
+          onChange={(e) => set("alcance", e.target.value)}
+          helper="País o región del estudio. Ej: México — Bajío y Centro-Norte"
+        />
 
-        <Field label="Propuesta comercial" helper="URL Google Drive / OneDrive — para validar alcance">
-          <input
-            type="url"
-            value={form.propuesta_url}
-            onChange={(e) => set("propuesta_url", e.target.value)}
-            placeholder="https://drive.google.com/file/..."
-            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          />
-        </Field>
+        <Input
+          label="Página web corporativa"
+          type="url"
+          value={form.pagina_web}
+          onChange={(e) => set("pagina_web", e.target.value)}
+          placeholder="https://empresa.com.mx"
+          helper="Dominio que usará la IA como fuente primaria para los pasos 2-9"
+        />
 
-        <Field label="Relación con otras empresas del sistema" helper="Madre / hija / hermana — si aplica">
-          <input
-            type="text"
-            value={form.relacion}
-            onChange={(e) => set("relacion", e.target.value)}
-            placeholder="Empresa independiente o relación"
-            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          />
-        </Field>
+        <Input
+          label="Propuesta comercial"
+          type="url"
+          value={form.propuesta_url}
+          onChange={(e) => set("propuesta_url", e.target.value)}
+          placeholder="https://drive.google.com/file/..."
+          helper="URL Google Drive / OneDrive — para validar alcance"
+        />
+
+        <Input
+          label="Relación con otras empresas del sistema"
+          value={form.relacion}
+          onChange={(e) => set("relacion", e.target.value)}
+          placeholder="Empresa independiente o relación"
+          helper="Madre / hija / hermana — si aplica"
+        />
       </Section>
 
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">
@@ -166,7 +159,7 @@ export function NuevoClienteWizard() {
           Después de crear, te llevo al cuestionario en paso 2 con sugerencia de IA.
         </p>
         <Button type="submit" variant="primary" loading={busy} disabled={!valid}>
-          Crear cliente y continuar al wizard →
+          Crear cliente y continuar al cuestionario
         </Button>
       </div>
     </form>
@@ -193,7 +186,7 @@ function Section({
           <p className="text-xs text-slate-600 mt-0.5">{subtitle}</p>
         </div>
         <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
-          ● solo asesor
+          Solo asesor
         </span>
       </div>
       <div className="p-4 space-y-4">{children}</div>
@@ -201,25 +194,3 @@ function Section({
   );
 }
 
-function Field({
-  label,
-  required,
-  helper,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  helper?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-700 mb-1">
-        {label}
-        {required && <span className="text-rose-500 ml-0.5">*</span>}
-      </label>
-      {children}
-      {helper && <p className="text-[11px] text-slate-500 italic mt-1">{helper}</p>}
-    </div>
-  );
-}

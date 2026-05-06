@@ -7,6 +7,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { SelectField } from "@/components/ui/SelectField";
 
 type User = {
   email: string;
@@ -321,62 +322,45 @@ function UserEditor({
           placeholder="María López"
         />
         <div className="flex flex-col gap-1">
-          <label htmlFor="user-role-select" className="text-sm font-medium text-slate-700">
-            Rol
-          </label>
-          <select
-            id="user-role-select"
+          <label className="text-sm font-medium text-slate-700">Rol</label>
+          <SelectField
             value={role}
-            onChange={(e) => setRole(e.target.value as "admin" | "consultor")}
-            className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <option value="consultor">Consultor · chat IA y clientes</option>
-            <option value="admin">Admin · además gestiona configuración</option>
-            <option value="cliente">Cliente · solo ve su propia empresa</option>
-          </select>
+            onChange={(v) => setRole(v as "admin" | "consultor" | "cliente")}
+            options={[
+              { value: "consultor", label: "Consultor · chat IA y clientes" },
+              { value: "admin", label: "Admin · además gestiona configuración" },
+              { value: "cliente", label: "Cliente · solo ve su propia empresa" },
+            ]}
+            placeholder="Seleccionar rol"
+          />
         </div>
 
         {role === "cliente" && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="user-client-select" className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-slate-700">
               Empresa <span className="text-brand-berry">*</span>
             </label>
-            <select
-              id="user-client-select"
+            <SelectField
               value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              required
-            >
-              <option value="">— Seleccionar empresa —</option>
-              {(clientsData?.data ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setClientId(v)}
+              options={(clientsData?.data ?? []).map((c) => ({ value: c.id, label: c.name }))}
+              placeholder="— Seleccionar empresa —"
+            />
             <p className="text-xs text-slate-500">
               El usuario solo verá datos de esta empresa.
             </p>
           </div>
         )}
         <div className="flex flex-col gap-1">
-          <label htmlFor="user-seniority-select" className="text-sm font-medium text-slate-700">
+          <label className="text-sm font-medium text-slate-700">
             Nivel de seniority (default)
           </label>
-          <select
-            id="user-seniority-select"
+          <SelectField
             value={seniorityLevel}
-            onChange={(e) => setSeniorityLevel(e.target.value)}
-            className="rounded border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <option value="">— Sin asignar —</option>
-            {seniorityItems.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setSeniorityLevel(v)}
+            options={seniorityItems.map((s) => ({ value: s.value, label: s.label }))}
+            placeholder="— Sin asignar —"
+          />
           <p className="text-xs text-slate-500">
             Nivel global del consultor. Puede sobreescribirse por proyecto en la pestaña Equipo del cliente.
           </p>

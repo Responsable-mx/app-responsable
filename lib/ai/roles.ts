@@ -4,6 +4,8 @@ import type { RoleId } from "@/lib/ai/models";
 import { buildRoleSystemText } from "@/lib/ai/prompts";
 import { NARRATIVE_SCHEMAS } from "@/lib/clients/narrative-schemas";
 import { CATALOG_SEEDS, type CatalogCategory } from "@/lib/catalogs/seeds";
+import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
+import { isWizardSchema, isFieldResponse } from "@/lib/questionnaires/types";
 
 export { DEFAULT_PROMPTS, PROMPT_KEYS } from "@/lib/ai/prompts";
 
@@ -39,7 +41,29 @@ function humanizeList(category: CatalogCategory, values: string[]): string[] {
  * "doble_materialidad, esr" — evita que el consultor lea jerga interna en la
  * respuesta. STARTER_UX §7.3.
  */
-export function buildClientContext(client: Client | null): string {
+// D-10: Trazabilidad Chat → Cuestionario.
+// Campos llenos del cuestionario se inyectan al contexto del LLM con su key.
+// El LLM cita campos como [campo:key] y el UI los convierte en links.
+function buildQuestionnaireSection(questionnaire: QuestionnaireBundle | null | undefined, clientId: string): string {
+  if (!questionnaire || !isWizardSchema(questionnaire.template.schema) || !questionnaire.response?.responses) {
+    return "";
+  }
+  const lines: string[] = [];
+  for (const step of questionnaire.template.schema.steps) {
+    const stepResp = (questionnaire.response.responses[step.key] as Record<string, unknown>) ?? {};
+    for (const field of step.fields) {
+      const resp = stepResp[field.key];
+      if (isFieldResponse(resp) && resp.value !== null && resp.value !== "") {
+        const val = String(resp.value).slice(0, 200);
+        lines.push(`  [${field.key}] ${field.label}: ${val}`);
+      }
+    }
+  }
+  if (lines.length === 0) return "";
+  return `\n<questionnaire_data>\nCampos del Cuestionario de Doble Materialidad ya llenados para /clientes/${clientId}:\n${lines.join("\n")}\n</questionnaire_data>\n\nInstrucción de trazabilidad: cuando cites un dato de estos campos, usa la notación [campo:key] (ej: [campo:razon_social]). El sistema convierte la cita en un link clicable para que el consultor verifique en el cuestionario. Solo usa keys listadas arriba.`;
+}
+
+export function buildClientContext(client: Client | null, questionnaire?: QuestionnaireBundle | null): string {
   if (!client) {
     return `<context>
 No hay cliente seleccionado en este chat. El usuario te está preguntando
@@ -124,13 +148,15 @@ de arriba o que cree el cliente en /clientes.
     return serializeBlock(schema.block, json);
   }).join("\n\n");
 
+  const questionnaireSection = buildQuestionnaireSection(questionnaire, client.id);
+
   return `<context>
 <client>
 ${attrs}
 
 ${narrativeBlocks}
 </client>
-
+${questionnaireSection}
 Instrucción sobre este contexto:
 - Úsalo para personalizar. No lo repitas literal en tu respuesta.
 - Los atributos estructurados (frameworks_reported, certifications,
@@ -210,8 +236,8 @@ function escapeAttr(s: string): string {
  * cuando el consultor cambia entre Aurora/Rebeca/Elena/Valeria sobre el
  * mismo cliente. STARTER_IA §2 + STACK.md "2 breakpoints ephemerales".
  */
-export async function buildSystemBlocks(role: RoleId, client: Client | null) {
-  const contextBlock = buildClientContext(client);
+export async function buildSystemBlocks(role: RoleId, client: Client | null, questionnaire?: QuestionnaireBundle | null) {
+  const contextBlock = buildClientContext(client, questionnaire);
   const roleBlock = await buildRoleSystemText(role);
 
   return [

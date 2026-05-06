@@ -301,7 +301,7 @@ function EditTemplateModal({
     <Modal
       open
       onClose={onClose}
-      title="Editar plantilla"
+      title="Editar nombre y descripción"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
@@ -350,9 +350,8 @@ function EditTemplateModal({
           </p>
         </div>
         <div className="bg-slate-50 border border-slate-200 rounded p-2.5 text-xs text-slate-600">
-          La estructura (etapas + actividades + offsets) no se edita acá. Para cambiarla,
-          aplica esta plantilla a un servicio nuevo, edita las actividades, y guárdala
-          como plantilla nueva.
+          Para modificar etapas, actividades u offsets: aplica la plantilla a un servicio,
+          edita las actividades ahí y guarda como plantilla nueva.
         </div>
       </div>
     </Modal>

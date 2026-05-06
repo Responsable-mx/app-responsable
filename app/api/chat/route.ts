@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
+import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import { getModelConfig } from "@/lib/ai/models";
 import { buildSystemBlocks } from "@/lib/ai/roles";
 import { logAiCall } from "@/lib/ai/logging";
@@ -105,9 +106,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const client = clientId ? await getClient(clientId).catch(() => null) : null;
+  // D-10: fetch client + questionnaire en paralelo para trazabilidad Chat→Cuestionario.
+  const [client, questionnaire] = await Promise.all([
+    clientId ? getClient(clientId).catch(() => null) : Promise.resolve(null),
+    clientId ? getQuestionnaireBundle(clientId, "doble-materialidad").catch(() => null) : Promise.resolve(null),
+  ]);
   const config = getModelConfig(role);
-  const systemBlocks = await buildSystemBlocks(role, client);
+  const systemBlocks = await buildSystemBlocks(role, client, questionnaire);
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const encoder = new TextEncoder();

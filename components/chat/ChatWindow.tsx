@@ -690,6 +690,7 @@ export function ChatWindow({
               onRate={rateMessage}
               onCopy={copyMessage}
               onRetry={retryLast}
+              clientId={clientId || undefined}
             />
           ))}
 

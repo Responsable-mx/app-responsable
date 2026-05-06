@@ -293,10 +293,10 @@ export function ServiceGantt({
             Fuera del overflow-x-auto para que position:sticky funcione tanto
             vertical (scroll página) como horizontal (header sincronizado via
             transform en lugar de scrollLeft). */}
-        <div className="sticky top-0 z-20 bg-white">
+        <div className="sticky top-0 z-20 bg-white shadow-sm">
 
           {/* Toolbar */}
-          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-200 bg-slate-50 flex-wrap">
             <div className="flex items-center gap-0.5">
               {([
                 { v: "fit", label: "Ajustar" },
@@ -410,14 +410,14 @@ export function ServiceGantt({
         >
           <div style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
             {/* ─── Filas ─── */}
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-200">
               {stages.map((s) => {
                 const isCollapsed = collapsed.has(s.id);
                 return (
                   <div key={s.id}>
                     {/* Etapa header */}
-                    <div className="flex bg-slate-50/60">
-                      <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-50 px-3 py-1.5 border-r border-slate-200 flex items-center gap-1.5 min-w-0`}>
+                    <div className="flex bg-slate-100/70 border-t border-slate-200">
+                      <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-100/70 px-3 py-1.5 border-r border-slate-200 flex items-center gap-1.5 min-w-0`}>
                         <button onClick={() => toggleCollapse(s.id)} className="shrink-0 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-700">
                           <svg className={`w-3 h-3 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -496,8 +496,8 @@ export function ServiceGantt({
                                 <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{
                                   left: `${left}%`,
                                   width: zoom === "dia" ? `${(MS_DAY / totalMs) * 100}%` : 0,
-                                  borderLeft: zoom === "dia" ? (isWeekend ? "1px solid rgba(148,163,184,0.4)" : "1px solid rgba(148,163,184,0.15)") : "1px dashed rgba(148,163,184,0.18)",
-                                  background: zoom === "dia" && isWeekend ? "rgba(241,245,249,0.5)" : undefined,
+                                  borderLeft: zoom === "dia" ? (isWeekend ? "1px solid rgba(148,163,184,0.5)" : "1px solid rgba(148,163,184,0.3)") : "1px dashed rgba(148,163,184,0.25)",
+                                  background: zoom === "dia" && isWeekend ? "rgba(226,232,240,0.35)" : undefined,
                                 }} />
                               );
                             })}

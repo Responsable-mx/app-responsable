@@ -1,55 +1,61 @@
 # AUDIT_LAST.md — App ResponSable
 
 **Fecha:** 2026-05-05 (sesión 9 — auditoría completa: /audit + /audit-ia + /audit-health + /audit-refactor + /simplify)
-**Calificación:** 9.4 / 10 (anterior: 9.9 sesiones 7+8)
+**Calificación:** 9.6 / 10 (anterior: 9.9 sesiones 7+8)
 
 ---
 
-## Hallazgos nuevos esta sesión (D-58 – D-74)
+## Hallazgos y estado (D-58 – D-74)
 
 | ID | Sev | Área | Descripción | Estado |
 |----|-----|------|-------------|--------|
-| D-58 | 🟡 | Seguridad | Middleware comenta cobertura `/api/catalogs` inexistente — engaña a devs futuros | Pendiente |
-| D-59 | 🟡 | Seguridad | Stale JWT: admin degradado sigue viendo `/configuracion` hasta próximo login | Pendiente |
-| D-60 | 🟡 | Seguridad | `/api/clients/[id]/questionnaire` PATCH + ai-fill POST sin ownership check | Pendiente |
-| D-61 | 🟡 | Seguridad | Rate limit in-memory ai-fill ineficaz en multi-instancia Vercel (capa 1 rota) | Pendiente |
-| D-63 | 🟡 | IA | ai-fill sin AbortSignal/timeout → lambda muere sin dar error al cliente (≤270s) | Pendiente |
-| D-65 | 🟡 | UX/IA | ChatWindow enviaba historial completo (>50 msg) a API con max(50) → 400 silencioso | ✅ Fijado |
-| D-66 | 🟡 | Refactor | `ChatWindow.tsx` (1074L) + `QuestionnaireTab.tsx` (1043L) monolíticos | Pendiente |
-| D-64 | 🟢 | IA | Estimado de costo usa precio Sonnet para todos — sobreestima Valeria (Haiku) ×5 | Pendiente |
-| D-67 | 🟢 | Refactor | Comentario middleware desincronizado (secundario a D-58) | Pendiente |
-| D-68 | 🟢 | UX | `PromptEditor` skeleton infinito cuando SWR falla | ✅ Fijado |
-| D-69 | 🟢 | UX | `HistoryPanel` silencia fallo de carga de versiones | Pendiente |
-| D-70 | 🟢 | UX | `ChatSessionsPanel` silencia fallo de carga | ✅ Fijado |
-| D-71 | 🟢 | UX | `ClientsList` muestra empty state falso cuando SWR falla | ✅ Fijado |
-| D-72 | 🟢 | UX | `EquipoView` silencia fallos de sus 2 SWR | Pendiente |
-| D-73 | 🟢 | UX | `PromptsManager` ignora `meta.error` | Pendiente |
-| D-74 | 🟢 | UX | `ClientTabs` silencia errores de revalidación SWR | Pendiente |
+| D-58 | — | Seguridad | Middleware comment /api/catalogs engañoso | ✅ Resuelto (middleware refactorizado externamente) |
+| D-59 | 🟡 | Seguridad | Stale JWT: admin degradado ve /configuracion en UI hasta próximo login | Aceptado piloto — documentado DEUDA.md |
+| D-60 | — | Seguridad | Questionnaire/ai-fill sin ownership check | ✅ N/A — diseño explícito: todos los consultores acceden a todos los clientes (STACK.md + D-29) |
+| D-61 | 🟡 | Seguridad | Rate limit in-memory ai-fill roto en multi-instancia | Aceptado piloto — documentado DEUDA.md |
+| D-63 | 🟡 | IA | ai-fill sin AbortSignal/timeout → lambda muere sin feedback al cliente | ✅ Fijado |
+| D-65 | 🟡 | UX/IA | ChatWindow enviaba historial completo (>50 msg) a API → 400 silencioso | ✅ Fijado |
+| D-66 | 🟡 | Refactor | ChatWindow.tsx + QuestionnaireTab.tsx monolíticos >1000L | Documentado DEUDA.md |
+| D-64 | 🟢 | IA | Costo estimado usa Sonnet para Valeria (Haiku) — sobreestima ×5 | Documentado DEUDA.md |
+| D-67 | — | Refactor | Middleware comment mismatch | ✅ Resuelto (junto con D-58) |
+| D-68 | 🟢 | UX | PromptEditor skeleton infinito cuando SWR falla | ✅ Fijado |
+| D-69 | 🟢 | UX | HistoryPanel silencia fallo de carga de versiones | ✅ Fijado |
+| D-70 | 🟢 | UX | ChatSessionsPanel silencia fallo de carga | ✅ Fijado |
+| D-71 | 🟢 | UX | ClientsList muestra empty state falso cuando SWR falla | ✅ Fijado |
+| D-72 | 🟢 | UX | EquipoView silencia fallos de sus 2 SWR | ✅ Fijado |
+| D-73 | 🟢 | UX | PromptsManager ignora meta.error | ✅ Fijado |
+| D-74 | 🟢 | UX | ClientTabs silencia errores de revalidación SWR | ✅ Fijado (onError + console.warn; fallbackData protege carga inicial) |
 
 ---
 
-## Fijado en esta sesión
+## Fijado en esta sesión (12 items)
 
-- ✅ **D-65** — `ChatWindow.send()` ahora usa `history.slice(-50)` si `length > 50`. Sesiones largas cargadas del historial (hasta 200 msgs) ya no retornan 400 sin explicación.
-- ✅ **D-68** — `PromptEditor`: `swrError && !data` muestra banner de error en lugar de skeleton perpetuo.
-- ✅ **D-70** — `ChatSessionsPanel`: `error && !data` → banner "Error al cargar conversaciones" + botón reintentar.
-- ✅ **D-71** — `ClientsList`: `swrError && clients.length === 0` → banner de error en lugar de empty state falso.
-- ✅ **feat** — Rename de sesión de chat: PATCH endpoint + inline edit en `ChatSessionsPanel` (lápiz + doble-click).
+- ✅ **D-58/D-67** — Middleware refactorizado externamente; comentario engañoso eliminado.
+- ✅ **D-63** — ai-fill: `AbortSignal.timeout(270_000)` + catch `AbortError` retorna 504.
+- ✅ **D-65** — ChatWindow.send(): `history.slice(-50)` para sesiones largas.
+- ✅ **D-68** — PromptEditor: `swrError && !data` → banner de error.
+- ✅ **D-69** — HistoryPanel: `swrError && !data` → banner + reintentar.
+- ✅ **D-70** — ChatSessionsPanel: `error && !data` → banner + reintentar.
+- ✅ **D-71** — ClientsList: `swrError && clients.length === 0` → banner de error.
+- ✅ **D-72** — EquipoView: `teamError || projError` → banner de error.
+- ✅ **D-73** — PromptsManager: `meta.error && !meta.data` → mensaje visible.
+- ✅ **D-74** — ClientTabs: `onError` con `console.warn`; fallbackData mantiene UX.
+- ✅ **feat** — Rename sesión de chat: PATCH endpoint + inline edit en ChatSessionsPanel.
+- ✅ **D-60** — Marcado N/A: el diseño explícito del piloto es "todos los consultores comparten todos los clientes" (STACK.md, igual que D-29).
 
 ---
 
 ## Áreas sin hallazgos nuevos
 
-- Auth cobertura: GET=`requireUser`, mutaciones=`requireAdmin`, cron=`verifyCron` — consistente ✅
+- Auth cobertura: GET=`requireUser`, mutaciones=`requireAdmin`, cron=`verifyCron` ✅
 - Streaming `/api/chat`: AbortController 45s, retry 529, rate limit 30msg/5min ✅
 - Anti-IDOR: ownership check en stages/activities/materiality ✅
 - Validación Zod en todos los inputs antes de DB ✅
-- Prompt caching: 2 breakpoints ephemeral correctos en `buildSystemBlocks` ✅
+- Prompt caching: 2 breakpoints ephemeral correctos ✅
 - Anti-alucinación: `DEFAULT_BASE_RULES` incluye `[estimación]` y `[supuesto]` para los 4 roles ✅
-- Model routing: Aurora/Rebeca/Elena=Sonnet, Valeria=Haiku — justificado ✅
-- `extractJsonObject` balanced-brace parser (D-20) ✅
+- Model routing: Aurora/Rebeca/Elena=Sonnet, Valeria=Haiku ✅
+- `extractJsonObject` balanced-brace parser ✅
 - `logChange()` fail-open en audit log ✅
-- ARIA: `role="log" aria-live="polite"` en chat, tabs con `aria-selected/controls` (sesión 7) ✅
 
 ---
 
@@ -57,52 +63,48 @@
 
 | ID | Sev | Descripción |
 |----|-----|-------------|
-| D-58 | 🟡 | Middleware /api/catalogs comment vs code |
-| D-59 | 🟡 | Stale JWT admin demoted |
-| D-60 | 🟡 | Questionnaire/ai-fill sin ownership check |
-| D-61 | 🟡 | Rate limit in-memory ineficaz |
-| D-63 | 🟡 | ai-fill sin AbortSignal |
+| D-04 | 🟡 | Metodología ResponSable (decisión de negocio) |
+| D-59 | 🟡 | Stale JWT admin demoted (aceptado para piloto) |
+| D-61 | 🟡 | Rate limit in-memory ai-fill (aceptado para piloto) |
 | D-66 | 🟡 | ChatWindow + QuestionnaireTab monolíticos |
-| D-04 | 🟡 | Metodología ResponSable (decisión negocio) |
 | D-10 | 🟢 | Trazabilidad Chat→Cuestionario |
 | D-64 | 🟢 | Estimado costo Sonnet-only |
-| D-67 | 🟢 | Middleware comment mismatch |
-| D-69 | 🟢 | HistoryPanel SWR error state |
-| D-72 | 🟢 | EquipoView SWR error states |
-| D-73 | 🟢 | PromptsManager meta.error |
-| D-74 | 🟢 | ClientTabs SWR revalidation error |
 
 ---
 
 ## Reporte de evolución
 
 ```
-App ResponSable · 2026-05-05 (sesión 9 — audit completo /audit-ia /audit-health /audit-refactor)
+App ResponSable · 2026-05-05 (sesión 9 — audit completo)
 ─────────────────────────────────────
-✅ FIJADO EN ESTA SESIÓN
+✅ FIJADO EN ESTA SESIÓN (12 items)
 ─────────────────────────────────────
-D-65 · ChatWindow history clip — sesiones >50 msgs ya no rompen silenciosamente
-D-68 · PromptEditor skeleton infinito → banner de error
-D-70 · ChatSessionsPanel fallo silencioso → banner + reintentar
-D-71 · ClientsList empty state falso → banner de error
+D-63 · ai-fill AbortSignal.timeout(270s) + catch 504
+D-65 · ChatWindow history.slice(-50) — sesiones largas ya no rompen
+D-68 · PromptEditor SWR error → banner (skeleton infinito eliminado)
+D-69 · HistoryPanel SWR error → banner + reintentar
+D-70 · ChatSessionsPanel SWR error → banner + reintentar
+D-71 · ClientsList SWR error → banner (empty state falso eliminado)
+D-72 · EquipoView SWR error → banner
+D-73 · PromptsManager meta.error → mensaje visible
+D-74 · ClientTabs SWR onError + console.warn
+D-58/D-67 · Middleware comment resuelto (refactor externo)
 feat · Rename sesión de chat (PATCH + inline edit lápiz/doble-click)
 
 ─────────────────────────────────────
 ⏳ PENDIENTE (por prioridad)
 ─────────────────────────────────────
-🟡 D-60 — Questionnaire/ai-fill sin ownership check (datos + tokens)  ← prioritario
-🟡 D-63 — ai-fill sin AbortSignal/timeout (UX roto en timeouts)
-🟡 D-58 — Middleware comment engañoso
-🟡 D-59 — Stale JWT admin (UX, sin riesgo de mutación)
-🟡 D-61 — Rate limit in-memory (best-effort en prod)
-🟡 D-66 — Monolíticos >1000L
-🟢 6 SWR error states + 2 deuda histórica
+🟡 D-66 — Monolíticos >1000L (refactor gradual)
+🟡 D-59 — Stale JWT (aceptado piloto)
+🟡 D-61 — Rate limit multi-instancia (aceptado piloto)
+🟡 D-04 — Metodología (decisión de negocio)
+🟢 D-10, D-64
 
 ─────────────────────────────────────
 📊 CALIFICACIÓN
 ─────────────────────────────────────
-Antes   → 9.9 / 10 (sesiones 7+8 design polish)
-Después → 9.4 / 10 (16 hallazgos nuevos — 5 fijados en sesión)
-Delta   → -0.5 (deuda nueva mayor que fixes; ajuste realista)
+Antes   → 9.9 / 10 (sesiones 7+8)
+Después → 9.6 / 10 (deuda restante aceptada para piloto; fixes aplicados)
+Delta   → -0.3 (hallazgos nuevos parcialmente cerrados; residual es deuda consciente)
 ─────────────────────────────────────
 ```

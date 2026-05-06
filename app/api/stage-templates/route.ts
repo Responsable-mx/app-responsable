@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, requireAdmin } from "@/lib/auth";
+import { requireConsultorOrAdmin, requireAdmin } from "@/lib/auth";
 import {
   listTemplates,
   createTemplateFromService,
@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logChange } from "@/lib/audit-log";
 
 export async function GET(req: NextRequest) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
 
   const url = new URL(req.url);

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getModelConfig } from "@/lib/ai/models";
 import { buildSystemBlocks } from "@/lib/ai/roles";
@@ -52,7 +52,7 @@ async function checkAndRecordRateLimit(
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) {
     return new Response(JSON.stringify({ error: "No autorizado" }), {
       status: 401,

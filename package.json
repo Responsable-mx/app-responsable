@@ -22,6 +22,7 @@
     "@supabase/supabase-js": "^2.99.2",
     "@tailwindcss/typography": "^0.5.19",
     "driver.js": "^1.4.0",
+    "html2canvas": "^1.4.1",
     "next": "^16.2.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

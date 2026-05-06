@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorOrAdmin } from "@/lib/auth";
 import { archiveChatSession, getChatSession, renameChatSession } from "@/lib/chat-sessions";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
   try {
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 // PATCH = renombrar título.
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
   let body: { title?: string };
@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
 // DELETE = archive (soft). Conserva historia para audit.
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
   try {

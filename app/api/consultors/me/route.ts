@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorOrAdmin } from "@/lib/auth";
 import { listConsultorProjects } from "@/lib/consultors";
 
 /**
@@ -8,7 +8,7 @@ import { listConsultorProjects } from "@/lib/consultors";
  * Usado en el sidebar ("Mis proyectos"). Cache: 1h (asignaciones cambian poco).
  */
 export async function GET() {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {

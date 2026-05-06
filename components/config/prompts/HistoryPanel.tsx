@@ -26,7 +26,7 @@ export function HistoryPanel({
   promptKey: PromptKey;
   onRestored: () => void;
 }) {
-  const { data, mutate, isLoading } = useSWR<{ data: PromptVersion[] }>(
+  const { data, mutate, isLoading, error: swrError } = useSWR<{ data: PromptVersion[] }>(
     `/api/prompts/${encodeURIComponent(promptKey)}/versions`,
     fetcher,
   );
@@ -66,6 +66,14 @@ export function HistoryPanel({
     mutate();
   }
 
+  if (swrError && !data) {
+    return (
+      <div className="mb-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">
+        Error al cargar versiones.{" "}
+        <button onClick={() => void mutate()} className="underline">Reintentar</button>
+      </div>
+    );
+  }
   if (isLoading) {
     return <div className="text-sm text-slate-600 mb-4">Cargando…</div>;
   }

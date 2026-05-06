@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import {
@@ -230,6 +230,11 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
   let stopReason: string | null = null;
   const startedAt = Date.now();
 
+  // D-63: AbortSignal para evitar que Vercel mate la lambda abruptamente sin
+  // dar feedback al cliente. maxDuration=300s; con 2 web_search (~90s c/u)
+  // el timeout real es ~270s. AbortError se captura en el catch y retorna 504.
+  const timeoutSignal = AbortSignal.timeout(270_000);
+
   try {
     const msg = await anthropic.messages.create({
       model: modelCfg.model,
@@ -255,7 +260,8 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
         },
       ],
       messages: [{ role: "user", content: userPrompt }],
-    });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any, { signal: timeoutSignal });
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -277,7 +283,10 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
       }
     }
   } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : "Error Anthropic";
+    const isTimeout = e instanceof Error && e.name === "AbortError";
+    const errorMsg = isTimeout
+      ? "La búsqueda tardó demasiado. Inténtalo de nuevo en unos segundos."
+      : e instanceof Error ? e.message : "Error Anthropic";
     void logAiCall({
       userEmail: user,
       role: "aurora",
@@ -291,7 +300,7 @@ Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"}
       latencyMs: Date.now() - startedAt,
       error: errorMsg,
     });
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    return NextResponse.json({ error: errorMsg }, { status: isTimeout ? 504 : 500 });
   }
 
   // Loggear uso real de tokens (visible en /configuracion/uso-ia).

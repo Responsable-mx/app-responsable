@@ -71,22 +71,28 @@ export function ClientTabs({
   const [jumpToStep, setJumpToStep] = useState<number | null>(null);
   // Ambos fetches inmediatos: KPIs los necesitan para count.
   // revalidateOnFocus: false evita spam si el usuario alterna tabs.
-  const { data: questionnaireResp } = useSWR(
+  const { data: questionnaireResp, error: questionnaireError } = useSWR(
     `/api/clients/${client.id}/questionnaire`,
     questionnaireFetcher,
     {
       revalidateOnFocus: false,
       fallbackData: initialQuestionnaire ? { data: initialQuestionnaire } : undefined,
+      onError: (e: unknown) => console.warn("[ClientTabs] questionnaire revalidation failed:", e),
     }
   );
-  const { data: materialityResp } = useSWR(
+  const { data: materialityResp, error: materialityError } = useSWR(
     `/api/clients/${client.id}/materiality`,
     materialityFetcher,
     {
       revalidateOnFocus: false,
       fallbackData: initialMateriality ? { data: initialMateriality } : undefined,
+      onError: (e: unknown) => console.warn("[ClientTabs] materiality revalidation failed:", e),
     }
   );
+  // D-74: fallbackData garantiza la carga inicial. Si revalidación falla, los badges
+  // quedan con datos del servidor (aceptable). El console.warn permite detectar en logs.
+  void questionnaireError;
+  void materialityError;
 
   const questionnaireProgress = questionnaireResp?.data.progress
     ? {

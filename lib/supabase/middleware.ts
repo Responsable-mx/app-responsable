@@ -85,15 +85,43 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Gate /configuracion y /api/catalogs|users mutaciones → solo admin.
-  // Lectura a /api/catalogs sigue abierta a todo consultor autenticado.
+  // Role leído del JWT (escrito en login-code). Sin DB call adicional por request.
+  // Si el role cambia en DB, aplica al próximo login del usuario.
+  // Los route handlers siempre re-validan con requireAdmin()/requireConsultorOrAdmin().
   const role = (user?.user_metadata?.role as string | undefined) ?? "consultor";
+
+  // ── Gate rol cliente ─────────────────────────────────────────
+  // Rutas internas bloqueadas para role='cliente'.
+  if (user && role === "cliente") {
+    const CLIENT_BLOCKED = [
+      "/chat",
+      "/equipo",
+      "/clientes/nuevo",
+      "/api/chat",
+      "/api/chat-sessions",
+      "/api/stage-templates",
+      "/api/consultors",
+      "/api/extract-test",
+    ];
+    if (CLIENT_BLOCKED.some((p) => pathname.startsWith(p))) {
+      if (pathname.startsWith("/api/")) {
+        return new NextResponse(
+          JSON.stringify({ error: "No autorizado." }),
+          { status: 403, headers: { "content-type": "application/json" } }
+        );
+      }
+      const url = request.nextUrl.clone();
+      url.pathname = "/clientes";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // ── Gate admin ───────────────────────────────────────────────
   const isAdminRoute =
     pathname.startsWith("/configuracion") ||
     pathname.startsWith("/api/users") ||
     pathname.startsWith("/api/prompts");
   if (user && isAdminRoute && role !== "admin") {
-    // API → JSON 403; UI → redirect /chat
     if (pathname.startsWith("/api/")) {
       return new NextResponse(
         JSON.stringify({ error: "Requiere permisos de administrador." }),
@@ -101,7 +129,7 @@ export async function updateSession(request: NextRequest) {
       );
     }
     const url = request.nextUrl.clone();
-    url.pathname = "/chat";
+    url.pathname = role === "cliente" ? "/clientes" : "/chat";
     return NextResponse.redirect(url);
   }
 

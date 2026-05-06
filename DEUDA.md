@@ -20,11 +20,33 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Responsable**: Equipo metodología ResponSable
 - **Esfuerzo**: Decisión de negocio, luego 30min de código
 
+### 🟡 D-59 — Stale JWT: admin degradado sigue viendo `/configuracion` en UI
+- **Descripción**: Middleware lee `user_metadata.role` del JWT (escrito al login). Si un admin es degradado a consultor en DB, sigue accediendo a la UI de /configuracion hasta su próximo login.
+- **Impacto**: UX inconsistente — UI accesible, pero endpoints bloquean con `requireAdmin()` contra DB. Sin riesgo de mutación.
+- **Aceptado para piloto** (8 usuarios internos). Fix: forzar re-sync de metadata al cargar /configuracion.
+- **Esfuerzo**: 2h
+
+### 🟡 D-61 — Rate limit in-memory de ai-fill ineficaz en multi-instancia Vercel
+- **Descripción**: `rateLimitMap` es `Map` por instancia serverless. En producción con N lambdas paralelas, el límite de 15 calls/min se multiplica por N. La capa 2 (DB `ai_calls` count) protege cross-instance pero tiene race entre `SELECT count` e `INSERT`.
+- **Impacto**: Protección best-effort. Con 8 usuarios piloto el riesgo real es bajo.
+- **Fix**: Redis/Upstash para rate limit distribuido, o aceptar capa 2 como definitiva y documentar.
+- **Esfuerzo**: 3h (Redis) o 30min (documentar + eliminar capa 1 engañosa)
+
+### 🟡 D-66 — `ChatWindow.tsx` (1074L) + `QuestionnaireTab.tsx` (1043L) monolíticos
+- **Descripción**: Ambos componentes mezclan estado, fetching, renderizado y subcomponentes inline.
+- **Impacto**: Difícil de testear, alto costo de modificación, riesgo de regresión. No bloqueante para piloto de 8 usuarios.
+- **Fix**: Extraer hooks (`useChatStream`, `useQuestionnaireAutosave`) + subcomponentes (`ChatMessages`, `ChatInput`, `WizardStepPanel`).
+- **Esfuerzo**: 4-6h cada uno
 
 ### 🟢 D-10 — Sin trazabilidad Chat → Cuestionario
 - **Descripción**: Los mensajes del chat IA no linkean a campos específicos del cuestionario.
 - **Fix sugerido**: Cuando el cuestionario esté maduro, `buildClientContext` debe incluir field IDs; el chat puede citar `[ver campo X]`.
 - **Esfuerzo**: 4-6h
+
+### 🟢 D-64 — Estimado de costo IA usa precio Sonnet para todos los roles (incluye Valeria/Haiku)
+- **Descripción**: `lib/ai/usage.ts` y `app/api/cron/audit-health/route.ts` aplican `$3/M + $15/M` a todas las filas. Valeria usa Haiku (`$1/M + $5/M`). Campo documentado como `cost_usd_estimate_max` (worst-case), pero el panel lo muestra sin aclaración.
+- **Fix**: Agrupar por `model` en la query y aplicar precio correcto, o agregar tooltip "(estimación conservadora)" en la UI.
+- **Esfuerzo**: 2h
 
 ---
 

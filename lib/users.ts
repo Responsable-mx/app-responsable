@@ -19,7 +19,7 @@ export function isSystemAccount(email: string | null | undefined): boolean {
   return /^(seed|system|cron)([-_].*)?@/.test(normalized);
 }
 
-export type UserRole = "admin" | "consultor";
+export type UserRole = "admin" | "consultor" | "cliente";
 
 export type AuthorizedUser = {
   email: string;
@@ -29,6 +29,9 @@ export type AuthorizedUser = {
   invited_by: string | null;
   last_login: string | null;
   seniority_level: string | null;
+  // Solo para role='cliente'. NULL para admin/consultor. DB constraint
+  // authorized_users_cliente_requires_client garantiza no-null cuando role='cliente'.
+  client_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,6 +42,7 @@ export type UserInput = {
   full_name?: string | null;
   active?: boolean;
   seniority_level?: string | null;
+  client_id?: string | null;
 };
 
 /**
@@ -63,6 +67,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     invited_by: null,
     last_login: null,
     seniority_level: "director",
+    client_id: null,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -74,6 +79,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     invited_by: null,
     last_login: null,
     seniority_level: "director",
+    client_id: null,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -85,6 +91,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     invited_by: null,
     last_login: null,
     seniority_level: null,
+    client_id: null,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -153,6 +160,28 @@ export async function isAdmin(email: string): Promise<boolean> {
   return fallbackAdmins().includes(normalized);
 }
 
+export async function isConsultor(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  if (isDevMode() && normalized === "dev@localhost") return true;
+  const user = await getUser(normalized);
+  return !!user && user.active && (user.role === "admin" || user.role === "consultor");
+}
+
+export async function isClient(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  if (isDevMode() && normalized === "dev@localhost") return false;
+  const user = await getUser(normalized);
+  return !!user && user.active && user.role === "cliente";
+}
+
+export async function getUserClientId(email: string): Promise<string | null> {
+  const normalized = email.trim().toLowerCase();
+  if (isDevMode() && normalized === "dev@localhost") return null;
+  const user = await getUser(normalized);
+  if (!user || !user.active || user.role !== "cliente") return null;
+  return user.client_id;
+}
+
 export async function createUser(
   input: UserInput,
   invitedBy: string
@@ -163,6 +192,11 @@ export async function createUser(
     );
   }
   const email = input.email.trim().toLowerCase();
+  // Defensa en profundidad: rol cliente requiere client_id en código,
+  // además del CHECK en DB (authorized_users_cliente_requires_client).
+  if (input.role === "cliente" && !input.client_id) {
+    throw new Error("createUser: role 'cliente' requires client_id");
+  }
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("authorized_users")
@@ -171,6 +205,8 @@ export async function createUser(
       role: input.role,
       full_name: input.full_name ?? null,
       active: input.active ?? true,
+      seniority_level: input.seniority_level ?? null,
+      client_id: input.client_id ?? null,
       invited_by: invitedBy,
     })
     .select("*")
@@ -195,6 +231,13 @@ export async function updateUser(
   if (patch.full_name !== undefined) update.full_name = patch.full_name;
   if (patch.active !== undefined) update.active = patch.active;
   if (patch.seniority_level !== undefined) update.seniority_level = patch.seniority_level;
+  if (patch.client_id !== undefined) update.client_id = patch.client_id;
+
+  // Defensa en profundidad: si el patch deja al usuario como cliente sin client_id,
+  // bloquear antes de tocar DB (el CHECK constraint también lo atajaría).
+  if (patch.role === "cliente" && patch.client_id === null) {
+    throw new Error("updateUser: role 'cliente' requires client_id");
+  }
 
   const { data, error } = await admin
     .from("authorized_users")

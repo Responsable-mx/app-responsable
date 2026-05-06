@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorOrAdmin } from "@/lib/auth";
 import {
   listChatSessions,
   upsertChatSession,
@@ -10,7 +10,7 @@ import type { RoleId } from "@/lib/ai/models";
 const VALID_ROLES: RoleId[] = ["aurora", "rebeca", "elena", "valeria"];
 
 export async function GET(req: NextRequest) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const url = new URL(req.url);
   const clientIdParam = url.searchParams.get("clientId");
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   let body: {
     id?: string;

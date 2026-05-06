@@ -38,8 +38,8 @@ export function EquipoView() {
 
   // Para popular dropdowns de filtros: lista de consultores + lista de proyectos.
   // Reutiliza los mismos endpoints que las vistas (SWR comparte cache).
-  const { data: teamData } = useSWR<{ data: TeamMember[] }>("/api/team/occupancy", fetcher);
-  const { data: projData } = useSWR<{ data: ProjectOverview[] }>(
+  const { data: teamData, error: teamError } = useSWR<{ data: TeamMember[] }>("/api/team/occupancy", fetcher);
+  const { data: projData, error: projError } = useSWR<{ data: ProjectOverview[] }>(
     "/api/projects/overview",
     fetcher
   );
@@ -60,6 +60,12 @@ export function EquipoView() {
 
   return (
     <div>
+      {/* D-72: error state SWR */}
+      {(teamError || projError) && !teamData && !projData && (
+        <div className="max-w-6xl mx-auto mb-3 p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-700">
+          Error al cargar datos del equipo. Recarga la página.
+        </div>
+      )}
       {/* Controles siempre acotados */}
       <div className="max-w-6xl mx-auto space-y-4 mb-4">
       <div className="flex items-center justify-end gap-4">

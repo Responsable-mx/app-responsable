@@ -18,6 +18,8 @@ export type StageActivity = {
   assignee_email: string | null;
   depends_on_activity_id: string | null;
   actual_progress: number | null;
+  baseline_start: string | null;
+  baseline_end: string | null;
   status: ActivityStatus;
   created_at: string;
   updated_at: string;
@@ -90,6 +92,8 @@ export const ActivityInputSchema = z.object({
   assignee_email: z.string().email().nullable().optional(),
   depends_on_activity_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "UUID inválido").nullable().optional(),
   actual_progress: z.number().int().min(0).max(100).nullable().optional(),
+  baseline_start: dateOrNull,
+  baseline_end: dateOrNull,
 });
 export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 
@@ -252,6 +256,8 @@ export async function createActivity(
       assignee_email: input.assignee_email ?? null,
       depends_on_activity_id: input.depends_on_activity_id ?? null,
       actual_progress: input.actual_progress ?? null,
+      baseline_start: input.baseline_start ?? null,
+      baseline_end: input.baseline_end ?? null,
       status: computeStatus(input as Parameters<typeof computeStatus>[0]),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

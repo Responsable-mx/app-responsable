@@ -498,10 +498,10 @@ export function ChatWindow({
                         ? "bg-brand-primary-light text-brand-primary-dark border-brand-primary/20"
                         : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}
-                  title={`Perfil del cliente: ${selectedClient.completeness.filled} de ${selectedClient.completeness.total} atributos llenos (sector, frameworks, certificaciones, riesgos, etc). A más perfil completo, mejor calidad de respuestas IA. Distinto del progreso del Cuestionario.`}
+                  title={`Perfil del cliente: ${selectedClient.completeness.filled} de ${selectedClient.completeness.total} atributos completos (sector, frameworks, certificaciones, riesgos, etc). Más campos = mejor calidad de respuestas IA.`}
                 >
                   <span>Perfil</span>
-                  <span>{selectedClient.completeness.filled}/{selectedClient.completeness.total}</span>
+                  <span>{selectedClient.completeness.filled}/{selectedClient.completeness.total} campos</span>
                 </span>
                 {!clientLocked && (
                   <a
@@ -643,12 +643,6 @@ export function ChatWindow({
                 <span className="font-medium text-slate-700">Contexto cargado</span>
                 <span className="text-slate-300">·</span>
                 <span className="font-semibold text-slate-900 truncate max-w-[260px]">{selectedClient.name}</span>
-                {selectedClient.completeness.filled >= 6 && (
-                  <>
-                    <span className="text-slate-300">·</span>
-                    <span className="tabular-nums text-slate-600">Perfil {selectedClient.completeness.filled}/{selectedClient.completeness.total}</span>
-                  </>
-                )}
                 {selectedClient.sector && (
                   <>
                     <span className="text-slate-300">·</span>

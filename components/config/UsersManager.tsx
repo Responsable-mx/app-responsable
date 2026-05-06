@@ -74,7 +74,11 @@ export function UsersManager() {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">
-            {isLoading ? "—" : users.length} {isLoading ? "usuarios" : users.length === 1 ? "usuario" : "usuarios"}
+            {isLoading ? (
+              <span className="inline-block h-5 w-20 bg-slate-100 rounded animate-pulse align-middle" />
+            ) : (
+              <>{users.length} {users.length === 1 ? "usuario" : "usuarios"}</>
+            )}
           </h2>
         </div>
         <Button variant="primary" size="sm" onClick={() => setInviting(true)}>

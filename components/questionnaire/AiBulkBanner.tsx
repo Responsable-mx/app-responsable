@@ -42,7 +42,7 @@ export function AiBulkBanner({
             IA puede completar {aiCapableCount} de {totalSteps} pasos automáticamente
           </p>
           <p className="text-[11px] text-slate-600">
-            Click una vez para llenar todos los pasos con datos públicos verificables y citados (sigue las 8 reglas operativas del cuestionario). Puedes refrescar después por paso individual.
+            Usa datos públicos verificables y citados. Puedes ajustar cada paso individualmente después.
           </p>
         </div>
       </div>

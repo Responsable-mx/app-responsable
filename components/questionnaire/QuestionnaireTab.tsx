@@ -543,10 +543,7 @@ function WizardEditor({
 
         <div className="flex items-start justify-between gap-3 mb-4 px-1">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Paso {step.step} de {steps.length}
-            </p>
-            <h2 className="text-lg font-bold text-slate-900 mt-0.5">{step.title}</h2>
+            <h2 className="text-lg font-bold text-slate-900">{step.title}</h2>
             <p className="text-xs text-slate-600 mt-0.5">{step.subtitle}</p>
             {step.only_double_materialidad && (
               <span className="inline-flex items-center mt-2 text-[10px] font-bold uppercase tracking-wide bg-rose-50 text-rose-700 rounded-sm px-1.5 py-0.5">

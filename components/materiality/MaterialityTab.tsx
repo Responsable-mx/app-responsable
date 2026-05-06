@@ -77,6 +77,7 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
   }, [topics]);
 
   const [busyBulk, setBusyBulk] = useState(false);
+  const [confirmUnvalidate, setConfirmUnvalidate] = useState(false);
 
   // Bulk toggle validated. Antes el badge "Todas validadas" se mostraba
   // automáticamente sin que el consultor confirmara; ahora exige aprobación
@@ -262,7 +263,7 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
         {stats.total > 0 && (
           stats.validated === stats.total ? (
             <button
-              onClick={() => bulkSetValidated(false)}
+              onClick={() => setConfirmUnvalidate(true)}
               disabled={busyBulk}
               className="text-[10px] font-semibold text-slate-600 hover:text-slate-900 hover:underline shrink-0 disabled:opacity-40 disabled:no-underline"
               title="Quitar validación a todos los temas"
@@ -465,6 +466,19 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
           onDelete={async () => deleteTopic(editingTopic.id)}
         />
       )}
+
+      <ConfirmModal
+        open={confirmUnvalidate}
+        onCancel={() => setConfirmUnvalidate(false)}
+        onConfirm={async () => {
+          setConfirmUnvalidate(false);
+          await bulkSetValidated(false);
+        }}
+        title="Quitar validación a todos los temas"
+        description={`Se quitará el estado validado de los ${stats.validated} temas marcados. Esta acción es reversible.`}
+        confirmLabel="Quitar validación"
+        tone="destructive"
+      />
     </div>
   );
 }

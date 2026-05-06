@@ -553,7 +553,7 @@ function ClientCard({ client }: { client: Row }) {
               {client.name}
             </h3>
             <p className="text-[11px] text-slate-500 truncate mt-0.5">
-              {client.sector ?? "—"}
+              {client.sector ?? <span className="italic text-slate-400">Sin sector</span>}
               {client.size ? ` · ${client.size}` : ""}
             </p>
           </div>

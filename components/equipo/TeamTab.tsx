@@ -78,6 +78,8 @@ export function TeamTab({
   // Columna "Seniority global" solo es informativa cuando algún consultor
   // tiene override de proyecto — sin overrides la columna repite el nivel global sin contraste.
   const hasAnyOverride = consultors.some((c) => c.seniority_level !== null);
+  // Solo mostrar columna "Seniority global" si hay overrides Y al menos un consultor tiene nivel global definido.
+  const hasAnyGlobalSeniority = consultors.some((c) => c.user_seniority_level !== null);
 
   async function handleRemove() {
     if (!removeTarget) return;
@@ -140,7 +142,7 @@ export function TeamTab({
                 <th className="pb-2 pr-6">Consultor</th>
                 <th className="pb-2 pr-6">Email</th>
                 <th className="pb-2 pr-6">Seniority en este proyecto</th>
-                {hasAnyOverride && <th className="pb-2 pr-6">Seniority global</th>}
+                {hasAnyOverride && hasAnyGlobalSeniority && <th className="pb-2 pr-6">Seniority global</th>}
                 <th className="pb-2 pr-6">Asignado</th>
                 {isAdmin && <th className="pb-2 text-right">Acciones</th>}
               </tr>
@@ -163,7 +165,7 @@ export function TeamTab({
                       <span className="text-slate-400 text-xs">Usa global</span>
                     )}
                   </td>
-                  {hasAnyOverride && (
+                  {hasAnyOverride && hasAnyGlobalSeniority && (
                     <td className="py-2 pr-6">
                       <span className="text-xs text-slate-600">
                         {seniorityLabel(c.user_seniority_level, seniorityItems)}

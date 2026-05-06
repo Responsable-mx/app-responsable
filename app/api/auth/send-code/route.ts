@@ -12,15 +12,26 @@ function getResend(): Resend | null {
 
 async function isRateLimited(
   email: string,
-  admin: ReturnType<typeof createAdminClient>
+  admin: ReturnType<typeof createAdminClient>,
+  ip: string | null
 ): Promise<boolean> {
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const { count } = await admin
+  const { count: emailCount } = await admin
     .from("access_codes")
     .select("*", { count: "exact", head: true })
     .eq("email", email)
     .gte("created_at", fiveMinAgo);
-  return (count ?? 0) >= 3;
+  if ((emailCount ?? 0) >= 3) return true;
+
+  if (ip) {
+    const { count: ipCount } = await admin
+      .from("access_codes")
+      .select("*", { count: "exact", head: true })
+      .eq("ip_address", ip)
+      .gte("created_at", fiveMinAgo);
+    if ((ipCount ?? 0) >= 10) return true;
+  }
+  return false;
 }
 
 function generateCode(): string {
@@ -97,9 +108,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    req.headers.get("x-real-ip") ??
+    null;
+
   const admin = createAdminClient();
 
-  if (await isRateLimited(normalizedEmail, admin)) {
+  if (await isRateLimited(normalizedEmail, admin, ip)) {
     return NextResponse.json(
       { error: "Demasiados intentos. Espera unos minutos." },
       { status: 429 }
@@ -120,6 +136,7 @@ export async function POST(req: NextRequest) {
     code,
     expires_at: expiresAt,
     used: false,
+    ip_address: ip,
   });
 
   if (insertError) {

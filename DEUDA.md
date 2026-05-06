@@ -23,6 +23,19 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+## Deuda resuelta (sesión 12 — may-2026, auditoría seguridad)
+
+| ID | Descripción | Resuelto |
+|----|-------------|---------|
+| D-67 | `/dev/app-preview` bypass en producción — eliminado; unified guard `NODE_ENV !== 'production'` | may-2026 |
+| D-68 | ReactMarkdown sin `rehype-sanitize` — `rehypePlugins={[rehypeSanitize]}` en `ChatMessageBubble` | may-2026 |
+| D-69 | CSP + HSTS ausentes — `Content-Security-Policy` + `Strict-Transport-Security` en `next.config.ts` | may-2026 |
+| D-70 | Rate limit `send-code` solo por email — migración 0039 + check por IP (10/5min) en `send-code` | may-2026 |
+| D-71 | `listUsers(perPage:200)` — reducido a `perPage:50` en `login-code` | may-2026 |
+| D-72 | `isAuthorizedEmailSync` deprecated activo — función + tests eliminados | may-2026 |
+
+---
+
 ## Deuda resuelta (sesión 11 — may-2026)
 
 | ID | Descripción | Resuelto |

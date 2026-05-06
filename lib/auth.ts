@@ -21,18 +21,6 @@ export async function isAuthorizedEmail(email: string): Promise<boolean> {
 }
 
 /**
- * Sincrónico solo para compatibilidad con código anterior.
- * Deprecated — usar isAuthorizedEmail (async) en código nuevo.
- */
-export function isAuthorizedEmailSync(email: string): boolean {
-  const authorized = (process.env.AUTHORIZED_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return authorized.includes(email.trim().toLowerCase());
-}
-
-/**
  * Valida sesión y devuelve email del usuario. Null si no autenticado.
  * En dev mode (sin Supabase) devuelve dev@localhost para no bloquear.
  */

@@ -57,11 +57,7 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // /dev/app-preview: público en prod para demos con stakeholders (mockup sin backend).
-  if (pathname === "/dev/app-preview") {
-    return supabaseResponse;
-  }
-  // Otros /dev/* solo en non-prod.
+  // /dev/* solo en non-prod — nunca en producción.
   if (pathname.startsWith("/dev/") && process.env.NODE_ENV !== "production") {
     return supabaseResponse;
   }

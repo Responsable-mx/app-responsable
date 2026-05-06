@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       // Usuario ya existe → actualizamos su metadata con el rol actual.
       const { data: list } = await admin.auth.admin.listUsers({
         page: 1,
-        perPage: 200,
+        perPage: 50,
       });
       const existing = list?.users.find(
         (u) => u.email?.toLowerCase() === normalizedEmail

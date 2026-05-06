@@ -2,6 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import {
   type ChatMessage,
   type RoleId,
@@ -103,7 +104,7 @@ export function ChatMessageBubble({
         <div className={`bg-white border border-slate-200 rounded border-l-4 px-4 py-3 ${msgRole?.borderColor ?? currentRole.borderColor}`}>
           <div className="prose prose-sm max-w-none prose-headings:mt-2 prose-headings:mb-1 prose-h1:text-sm prose-h1:font-semibold prose-h2:text-sm prose-h2:font-semibold prose-h3:text-xs prose-h3:font-semibold text-slate-800">
             {m.content ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                 {clientId ? resolveCampoRefs(m.content, clientId) : m.content}
               </ReactMarkdown>
             ) : (

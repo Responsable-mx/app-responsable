@@ -146,7 +146,7 @@ export function ClientResumen({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-      {MACRO_CARDS.map((card) => {
+      {MACRO_CARDS.map((card, cardIdx) => {
         // Sumar progreso de todos los steps de la card macro
         let filled = 0;
         let total = 0;
@@ -170,12 +170,14 @@ export function ClientResumen({
           return { label, value };
         });
 
+        // Última card en grid impar → ancho completo para evitar card huérfana
+        const isOrphan = cardIdx === MACRO_CARDS.length - 1 && MACRO_CARDS.length % 2 !== 0;
         return (
           <button
             key={card.key}
             type="button"
             onClick={() => onJumpToCuestionario(card.stepKeys[0])}
-            className={`group bg-white border border-slate-200 ${card.accentBorder} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:border-brand-primary/40 transition-all`}
+            className={`group bg-white border border-slate-200 ${card.accentBorder} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:border-brand-primary/40 transition-all${isOrphan ? " lg:col-span-2" : ""}`}
           >
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
               <div className={`w-10 h-10 rounded ${card.iconBg} flex items-center justify-center shrink-0`}>

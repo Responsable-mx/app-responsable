@@ -35,6 +35,7 @@ export function WizardStepNav({
           <button
             key={s.key}
             onClick={() => onSelect(i)}
+            title={s.title}
             className={`w-full text-left px-3 py-2 rounded border transition-colors text-xs ${
               activeStep === i
                 ? "bg-brand-primary-light border-brand-primary text-brand-primary-dark"

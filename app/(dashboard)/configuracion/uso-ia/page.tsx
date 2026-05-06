@@ -62,7 +62,7 @@ export default async function UsoIaPage() {
                   sparkColor="#0f766e"
                 />
                 <Metric
-                  label="Costo estimado (USD)"
+                  label="Costo estimado"
                   value={usdFmt.format(s.cost_usd_estimate_max)}
                   spark={costSeries}
                   sparkColor="#7c3aed"
@@ -86,7 +86,7 @@ export default async function UsoIaPage() {
                   label="Errores"
                   value={String(s.total_errors)}
                   tone={s.total_errors > 0 ? "red" : "ok"}
-                  hint={`Latencia ~${s.avg_latency_ms}ms`}
+                  hint={`Latencia ~${(s.avg_latency_ms / 1000).toFixed(1)} s`}
                   spark={errorsSeries}
                   sparkColor={s.total_errors > 0 ? "#be123c" : "#94a3b8"}
                 />
@@ -99,46 +99,48 @@ export default async function UsoIaPage() {
               {s.top_users.length === 0 ? (
                 <Empty />
               ) : (
-                <ul className="text-sm divide-y divide-slate-100">
-                  {s.top_users.map((u) => (
-                    <li
-                      key={u.user_email}
-                      className="py-2 flex items-center justify-between"
-                    >
-                      <span className="font-mono text-xs text-slate-700">
-                        {u.user_email}
-                      </span>
-                      <span className="text-slate-900 font-medium">
-                        {u.calls}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                      <th className="pb-1.5 text-left">Consultor</th>
+                      <th className="pb-1.5 text-right">Llamadas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {s.top_users.map((u) => (
+                      <tr key={u.user_email}>
+                        <td className="py-1.5 font-mono text-slate-700">{u.user_email}</td>
+                        <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{u.calls}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </Panel>
             <Panel title="Top clientes">
               {s.top_clients.length === 0 ? (
                 <Empty />
               ) : (
-                <ul className="text-sm divide-y divide-slate-100">
-                  {s.top_clients.map((c) => (
-                    <li
-                      key={c.client_id}
-                      className="py-2 flex items-center justify-between"
-                    >
-                      <span className="text-slate-700">
-                        {c.client_name ?? (
-                          <span className="font-mono text-xs text-slate-600">
-                            {c.client_id.slice(0, 8)}…
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-slate-900 font-medium">
-                        {c.calls}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                      <th className="pb-1.5 text-left">Cliente</th>
+                      <th className="pb-1.5 text-right">Llamadas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {s.top_clients.map((c) => (
+                      <tr key={c.client_id}>
+                        <td className="py-1.5 text-slate-700">
+                          {c.client_name ?? (
+                            <span className="font-mono text-slate-600">{c.client_id.slice(0, 8)}…</span>
+                          )}
+                        </td>
+                        <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{c.calls}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </Panel>
           </div>
@@ -157,7 +159,7 @@ export default async function UsoIaPage() {
                       <th className="py-2 pr-3 text-right">Input</th>
                       <th className="py-2 pr-3 text-right">Output</th>
                       <th className="py-2 pr-3 text-right">Cache</th>
-                      <th className="py-2 pr-3 text-right">Latencia</th>
+                      <th className="py-2 pr-3 text-right">Latencia (s)</th>
                       <th className="py-2 pr-3 text-right">Errores</th>
                     </tr>
                   </thead>
@@ -186,7 +188,7 @@ export default async function UsoIaPage() {
                           {numFmt.format(r.total_cache_hits)}
                         </td>
                         <td className="py-1.5 pr-3 text-right text-slate-600">
-                          {r.avg_latency_ms}ms
+                          {(r.avg_latency_ms / 1000).toFixed(1)} s
                         </td>
                         <td
                           className={`py-1.5 pr-3 text-right ${

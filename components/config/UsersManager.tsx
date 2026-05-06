@@ -103,85 +103,96 @@ export function UsersManager() {
 
       {isLoading && <SkeletonTable rows={4} cols={5} />}
 
-      {!isLoading && users.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="min-w-full w-max text-sm">
-            <thead>
-              <tr className="text-left text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-                <th className="pb-2 pr-4">Email</th>
-                <th className="pb-2 pr-4">Nombre</th>
-                <th className="pb-2 pr-4">Rol</th>
-                <th className="pb-2 pr-4">Seniority</th>
-                <th className="pb-2 pr-4">Estado</th>
-                <th className="pb-2 pr-4">Último login</th>
-                <th className="pb-2 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map((u) => (
-                <tr key={u.email} className="even:bg-slate-50 hover:bg-slate-100">
-                  <td className="py-2 pr-4 font-mono text-xs">{u.email}</td>
-                  <td className="py-2 pr-4 text-slate-700">{u.full_name ?? "—"}</td>
-                  <td className="py-2 pr-4">
-                    <span
-                      className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm ${
-                        u.role === "admin"
-                          ? "bg-indigo-50 text-indigo-800"
-                          : u.role === "cliente"
-                          ? "bg-teal-50 text-teal-800"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4">
-                    {u.seniority_level ? (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm bg-teal-50 text-teal-800">
-                        {seniorityItems.find((s) => s.value === u.seniority_level)?.label ?? u.seniority_level}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-sm ${
-                        u.active
-                          ? "bg-green-50 text-green-800"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {u.active ? "Activo" : "Inactivo"}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4 text-xs text-slate-600">
-                    {u.last_login ? (
-                      new Date(u.last_login).toLocaleDateString("es-MX")
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 text-right">
-                    <button
-                      onClick={() => setEditing(u)}
-                      className="text-xs px-3 py-2 text-slate-700 hover:bg-slate-100 rounded min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(u)}
-                      className="text-xs px-3 py-2 text-red-700 hover:bg-red-50 rounded ml-1 min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
-                    >
-                      ⊗
-                    </button>
-                  </td>
+      {!isLoading && users.length > 0 && (() => {
+        const hasSeniority = users.some((u) => u.seniority_level !== null);
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full w-max text-sm">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                  <th className="pb-2 pr-4">Email</th>
+                  <th className="pb-2 pr-4">Nombre</th>
+                  <th className="pb-2 pr-4">Rol</th>
+                  {hasSeniority && <th className="pb-2 pr-4">Seniority</th>}
+                  <th className="pb-2 pr-4">Estado</th>
+                  <th className="pb-2 pr-4">Último login</th>
+                  <th className="pb-2 text-right">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {users.map((u) => (
+                  <tr key={u.email} className="even:bg-slate-50 hover:bg-slate-100">
+                    <td className="py-2 pr-4 font-mono text-xs">{u.email}</td>
+                    <td className="py-2 pr-4 text-slate-700">{u.full_name ?? "—"}</td>
+                    <td className="py-2 pr-4">
+                      <span
+                        className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm ${
+                          u.role === "admin"
+                            ? "bg-indigo-50 text-indigo-800"
+                            : u.role === "cliente"
+                            ? "bg-teal-50 text-teal-800"
+                            : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {u.role}
+                      </span>
+                    </td>
+                    {hasSeniority && (
+                      <td className="py-2 pr-4">
+                        {u.seniority_level ? (
+                          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm bg-teal-50 text-teal-800">
+                            {seniorityItems.find((s) => s.value === u.seniority_level)?.label ?? u.seniority_level}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="py-2 pr-4">
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-sm ${
+                          u.active
+                            ? "bg-green-50 text-green-800"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {u.active ? "Activo" : "Inactivo"}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 text-xs text-slate-600">
+                      {u.last_login ? (
+                        new Date(u.last_login).toLocaleDateString("es-MX")
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => setEditing(u)}
+                        title="Editar usuario"
+                        className="text-xs px-3 py-2 text-slate-700 hover:bg-slate-100 rounded min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(u)}
+                        title="Eliminar usuario"
+                        className="text-xs px-3 py-2 text-red-700 hover:bg-red-50 rounded ml-1 min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
 
       {(inviting || editing) && (
         <UserEditor

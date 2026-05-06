@@ -581,9 +581,8 @@ function ClientCard({ client }: { client: Row }) {
           <div className="mb-3" />
         )}
 
-        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-100">
-          <span className="uppercase tracking-widest font-bold">Actualizado</span>
-          <span className="tabular-nums text-slate-600">{updatedLabel}</span>
+        <div className="flex items-center justify-end text-[10px] pt-2 border-t border-slate-100">
+          <span className="tabular-nums text-slate-400">{updatedLabel}</span>
         </div>
       </Link>
 

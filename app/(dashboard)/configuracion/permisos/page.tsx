@@ -17,7 +17,7 @@ const MATRIX: Row[] = [
   // ── Cuestionario ──────────────────────────────────
   { feature: "Ver cuestionario",              admin: true,          consultor: true,        cliente: "solo-propio" },
   { feature: "Editar cuestionario",           admin: true,          consultor: true,        cliente: false },
-  { feature: "AI-fill cuestionario",          admin: true,          consultor: true,        cliente: false },
+  { feature: "Llenado IA del cuestionario",    admin: true,          consultor: true,        cliente: false },
   // ── Materialidad ──────────────────────────────────
   { feature: "Ver matriz de materialidad",    admin: true,          consultor: true,        cliente: "solo-propio" },
   { feature: "Editar temas materialidad",     admin: true,          consultor: true,        cliente: false },

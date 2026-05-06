@@ -81,6 +81,15 @@ export function WorkloadHeatmap() {
     });
   }
 
+  // Tendencia: compara primera mitad vs segunda mitad de las 12 semanas
+  function trendOf(loads: number[]): { arrow: string; color: string; label: string } {
+    const a = (loads[0] + loads[1] + loads[2] + loads[3]) / 4;
+    const b = (loads[4] + loads[5] + loads[6] + loads[7]) / 4;
+    if (b > a + 0.5) return { arrow: "↑", color: "text-rose-600", label: "Carga creciente" };
+    if (b < a - 0.5) return { arrow: "↓", color: "text-emerald-600", label: "Carga decreciente" };
+    return { arrow: "→", color: "text-slate-400", label: "Carga estable" };
+  }
+
   function cellBg(n: number): string {
     if (n === 0) return "bg-white";
     if (n <= 2) return "bg-emerald-50";
@@ -160,12 +169,16 @@ export function WorkloadHeatmap() {
               <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-16">
                 Pico
               </th>
+              <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-10">
+                Tend.
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {consultors.map((c) => {
               const peakLoad = Math.max(...heatmap[c]);
               const peakWeekIdx = heatmap[c].indexOf(peakLoad);
+              const trend = trendOf(heatmap[c]);
               return (
                 <tr key={c} className="hover:bg-slate-50/50 transition-colors">
                   <td
@@ -201,6 +214,12 @@ export function WorkloadHeatmap() {
                         />
                       ))}
                     </div>
+                  </td>
+                  <td
+                    className="px-2 py-1.5 text-center text-sm font-bold"
+                    title={trend.label}
+                  >
+                    <span className={trend.color}>{trend.arrow}</span>
                   </td>
                 </tr>
               );

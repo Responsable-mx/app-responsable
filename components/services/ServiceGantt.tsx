@@ -5,7 +5,7 @@
 // Zoom: Ajustar | Mes (200px/mes) | Trim (440px/mes) — ambos con marcadores de semana.
 // Baseline freeze · export PNG (html2canvas dyn-import).
 
-import { useMemo, useState, useRef, useId } from "react";
+import { useEffect, useMemo, useState, useRef, useId } from "react";
 import type { ActivityStatus, ServiceStage, StageActivity } from "@/lib/stages";
 import { QuickActionPopover, type QuickPatch } from "./QuickActionPopover";
 
@@ -162,6 +162,7 @@ export function ServiceGantt({
   const [showFloat, setShowFloat] = useState(false);
   const [showDeps, setShowDeps] = useState(false);
   const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [showEvm, setShowEvm] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerTimelineInnerRef = useRef<HTMLDivElement>(null);
@@ -245,6 +246,37 @@ export function ServiceGantt({
     }
     return map;
   }, [stages, collapsed, showDeps]);
+
+  // EVM: Schedule Performance Index + pronóstico de cierre
+  const evmMetrics = useMemo(() => {
+    const actsWithPlan = allActivities.filter((a) => a.planned_start && a.planned_end);
+    if (actsWithPlan.length < 2) return null;
+    const total = allActivities.length;
+    const done = allActivities.filter((a) => a.status === "completed").length;
+    if (done === 0) return null;
+    const pcDone = done / total;
+    const planMin = Math.min(...actsWithPlan.map((a) => parseDate(a.planned_start)!.getTime()));
+    const planMax = Math.max(...actsWithPlan.map((a) => parseDate(a.planned_end)!.getTime()));
+    const totalPlanMs = planMax - planMin;
+    if (totalPlanMs <= 0) return null;
+    const elapsed = Math.min(Math.max((now - planMin) / totalPlanMs, 0), 1);
+    if (elapsed < 0.03) return null; // muy temprano para SPI significativo
+    const spi = pcDone / elapsed;
+    const forecastEnd = spi > 0.1 && spi < 10
+      ? new Date(planMin + totalPlanMs / spi)
+      : null;
+    const varianceDays = forecastEnd
+      ? Math.round((planMax - forecastEnd.getTime()) / MS_DAY)
+      : null;
+    return {
+      pcDone: Math.round(pcDone * 100),
+      pcElapsed: Math.round(elapsed * 100),
+      spi,
+      forecastEnd,
+      varianceDays,
+      planEndDate: new Date(planMax),
+    };
+  }, [allActivities, now]);
 
   const range = useMemo(() => {
     const dates: number[] = [];
@@ -576,6 +608,13 @@ export function ServiceGantt({
               >
                 Ruta
               </button>
+              <button
+                onClick={() => setShowEvm((v) => !v)}
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showEvm ? "bg-brand-primary/10 text-brand-primary-dark" : "text-slate-400 hover:text-slate-700"}`}
+                title="EVM: índice de desempeño de cronograma y pronóstico de cierre"
+              >
+                EVM
+              </button>
             </div>
             {/* Grupo 3: Acciones — ml-auto */}
             <div className="flex items-center gap-1.5 ml-auto">
@@ -637,6 +676,75 @@ export function ServiceGantt({
               )}
             </div>
           </div>
+
+          {/* Panel EVM — colapsable, entre toolbar y header de fechas */}
+          {showEvm && evmMetrics && (
+            <div className="flex items-center gap-5 px-4 py-2.5 bg-slate-50/80 border-b border-slate-200 flex-wrap">
+              {/* Dual progress bar: real vs planeado */}
+              <div className="flex-1 min-w-[140px] max-w-xs space-y-0.5">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Avance real</span>
+                  <span className="text-[9px] font-bold tabular-nums text-slate-600">{evmMetrics.pcDone}%</span>
+                </div>
+                <div className="h-2 bg-slate-200 rounded-sm overflow-hidden relative">
+                  {/* Tiempo transcurrido (planeado) */}
+                  <div
+                    className="absolute top-0 bottom-0 left-0 bg-slate-400/30"
+                    style={{ width: `${evmMetrics.pcElapsed}%` }}
+                    title={`Tiempo plan transcurrido: ${evmMetrics.pcElapsed}%`}
+                  />
+                  {/* Avance real */}
+                  <div
+                    className={`absolute top-0 bottom-0 left-0 transition-all ${evmMetrics.pcDone >= evmMetrics.pcElapsed ? "bg-emerald-500" : "bg-amber-500"}`}
+                    style={{ width: `${evmMetrics.pcDone}%` }}
+                  />
+                </div>
+                <div className="text-[8px] text-slate-400 tabular-nums">
+                  Plan: {evmMetrics.pcElapsed}% tiempo · Real: {evmMetrics.pcDone}% avance
+                </div>
+              </div>
+              {/* SPI */}
+              <div className="shrink-0 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">SPI</p>
+                <p className={`text-base font-bold tabular-nums leading-none ${
+                  evmMetrics.spi >= 1 ? "text-emerald-600" :
+                  evmMetrics.spi >= 0.8 ? "text-amber-600" : "text-rose-600"
+                }`}>{evmMetrics.spi.toFixed(2)}</p>
+                <p className="text-[8px] text-slate-400 mt-0.5">
+                  {evmMetrics.spi >= 1 ? "en tiempo" : evmMetrics.spi >= 0.8 ? "leve retraso" : "riesgo alto"}
+                </p>
+              </div>
+              {/* Pronóstico cierre */}
+              {evmMetrics.forecastEnd && (
+                <div className="shrink-0">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Est. cierre</p>
+                  <p className="text-xs font-bold text-slate-700 tabular-nums leading-snug">
+                    {evmMetrics.forecastEnd.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
+                  </p>
+                  <p className="text-[8px] text-slate-400">
+                    plan: {evmMetrics.planEndDate.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
+                  </p>
+                </div>
+              )}
+              {/* Varianza días */}
+              {evmMetrics.varianceDays !== null && (
+                <div className="shrink-0 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Varianza</p>
+                  <p className={`text-base font-bold tabular-nums leading-none ${evmMetrics.varianceDays >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    {evmMetrics.varianceDays > 0 ? `+${evmMetrics.varianceDays}` : evmMetrics.varianceDays}d
+                  </p>
+                  <p className="text-[8px] text-slate-400 mt-0.5">
+                    {evmMetrics.varianceDays >= 0 ? "adelantado" : "retrasado"}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          {showEvm && !evmMetrics && (
+            <div className="px-4 py-2 text-[10px] text-slate-400 border-b border-slate-200 bg-slate-50/80">
+              EVM disponible cuando hay actividades completadas y fechas plan definidas.
+            </div>
+          )}
 
           {/* Header de fechas */}
           <div className="flex border-b border-slate-200 bg-slate-50">

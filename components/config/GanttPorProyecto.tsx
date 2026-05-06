@@ -216,6 +216,21 @@ ${delayed.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>
   const onTrackProjects = rawProjects.filter((p) => p.active_count > 0 && p.delayed_count === 0).length;
   const quietProjects = rawProjects.filter((p) => p.active_count === 0 && p.delayed_count === 0).length;
 
+  // Portfolio completion %
+  const { totalActs, doneActs } = rawProjects.reduce(
+    (acc, p) => {
+      for (const sv of p.services) {
+        for (const st of sv.stages) {
+          acc.totalActs += st.activities.length;
+          acc.doneActs += st.activities.filter((a) => a.status === "completed").length;
+        }
+      }
+      return acc;
+    },
+    { totalActs: 0, doneActs: 0 }
+  );
+  const portfolioPct = totalActs > 0 ? Math.round((doneActs / totalActs) * 100) : null;
+
   // Sort por riesgo opcional
   const displayProjects = sortByRisk
     ? [...projects].sort((a, b) => b.delayed_count - a.delayed_count || b.active_count - a.active_count)
@@ -260,6 +275,15 @@ ${delayed.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>
             <span className="flex items-center gap-1 text-emerald-700">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
               {quietProjects} al día
+            </span>
+          )}
+          {portfolioPct !== null && (
+            <span className="flex items-center gap-1 text-slate-500 border-l border-slate-200 pl-4 ml-1">
+              <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10" strokeWidth={1.75} />
+                <path d="M12 6v6l4 2" strokeWidth={1.75} strokeLinecap="round" />
+              </svg>
+              {portfolioPct}% completado
             </span>
           )}
         </div>

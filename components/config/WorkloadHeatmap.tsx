@@ -36,6 +36,7 @@ export function WorkloadHeatmap() {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
+  const [todayMonday] = useState(() => mondayOf(Date.now()));
 
   if (isLoading) {
     return (
@@ -69,7 +70,6 @@ export function WorkloadHeatmap() {
   if (consultors.length === 0) return null;
 
   // Próximas 12 semanas desde el lunes actual
-  const todayMonday = mondayOf(Date.now());
   const weeks = Array.from({ length: 12 }, (_, i) => todayMonday + i * MS_WEEK);
 
   // heatmap[consultor][semana] = count actividades solapando esa semana

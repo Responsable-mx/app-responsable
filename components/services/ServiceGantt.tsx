@@ -5,7 +5,7 @@
 // Zoom: Ajustar | Mes (200px/mes) | Trim (440px/mes) — ambos con marcadores de semana.
 // Baseline freeze · export PNG (html2canvas dyn-import).
 
-import { useEffect, useMemo, useState, useRef, useId } from "react";
+import { useMemo, useState, useRef, useId } from "react";
 import type { ActivityStatus, ServiceStage, StageActivity } from "@/lib/stages";
 import { QuickActionPopover, type QuickPatch } from "./QuickActionPopover";
 
@@ -489,7 +489,7 @@ export function ServiceGantt({
   function toggleCollapse(id: string) {
     setCollapsed((prev) => {
       const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) { n.delete(id); } else { n.add(id); }
       if (storageKey) {
         try { localStorage.setItem(storageKey, JSON.stringify([...n])); } catch {}
       }

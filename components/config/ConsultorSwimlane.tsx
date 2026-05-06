@@ -152,6 +152,19 @@ export function ConsultorSwimlane({ filters }: { filters?: EquipoFilters } = {})
     return { min: min.getTime(), max: max.getTime(), months };
   }, [flatActs]);
 
+  // Leyenda de proyectos — antes de early returns (regla hooks)
+  const uniqueProjects = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { id: string; name: string; color: string }[] = [];
+    for (const p of projects) {
+      if (!seen.has(p.client_id)) {
+        seen.add(p.client_id);
+        out.push({ id: p.client_id, name: p.client_name, color: clientColorMap.get(p.client_id) ?? "#64748b" });
+      }
+    }
+    return out;
+  }, [projects, clientColorMap]);
+
   if (isLoading) return <SkeletonTable rows={4} cols={5} />;
   if (error) return <div className="text-xs text-rose-700 p-4 bg-rose-50 border border-rose-200 rounded">Error al cargar vista swimlane.</div>;
   if (!range || consultorRows.length === 0) return <div className="text-xs text-slate-500 italic p-4">Sin actividades asignadas para mostrar en swimlane.</div>;
@@ -175,19 +188,6 @@ export function ConsultorSwimlane({ filters }: { filters?: EquipoFilters } = {})
     if (right <= 0 || left >= 100) return null;
     return { left: `${left}%`, width: `${Math.max(right - left, 0.6)}%` };
   }
-
-  // Leyenda de proyectos
-  const uniqueProjects = useMemo(() => {
-    const seen = new Set<string>();
-    const out: { id: string; name: string; color: string }[] = [];
-    for (const p of projects) {
-      if (!seen.has(p.client_id)) {
-        seen.add(p.client_id);
-        out.push({ id: p.client_id, name: p.client_name, color: clientColorMap.get(p.client_id) ?? "#64748b" });
-      }
-    }
-    return out;
-  }, [projects, clientColorMap]);
 
   return (
     <div className="bg-white border border-slate-200 rounded overflow-hidden">

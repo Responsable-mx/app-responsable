@@ -209,7 +209,11 @@ export function ServiceGantt({
     const a = pct(start);
     const b = pct(end);
     if (a === null || b === null) return null;
-    return { left: `${a}%`, width: `${Math.max(b - a, 0.8)}%` };
+    // Clamp a [0,100]: barras fuera de rango no sangran fuera del timeline div.
+    const left = Math.max(0, a);
+    const right = Math.min(100, b);
+    if (right <= 0 || left >= 100) return null; // totalmente fuera de vista
+    return { left: `${left}%`, width: `${Math.max(right - left, 0.8)}%` };
   }
 
   function scrollToToday() {
@@ -281,8 +285,9 @@ export function ServiceGantt({
     ? { width: timelineWidth, flexShrink: 0 as const }
     : { flex: 1, minWidth: 0 };
 
-  // Sticky solo cuando hay scroll horizontal
-  const stickyBg = timelineWidth ? " sticky left-0 z-10" : "";
+  // Sticky solo cuando hay scroll horizontal.
+  // z-30 > z-20 (barras real) > z-10 (barras plan) → label siempre encima.
+  const stickyBg = timelineWidth ? " sticky left-0 z-30" : "";
 
   return (
     <>

@@ -1,6 +1,47 @@
 import type { Metadata } from "next";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { Sparkline } from "@/components/Sparkline";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+type DocStats = {
+  total: number;
+  by_kind: { general: number; sustainability_report: number; financial_report: number };
+  by_parse_status: { ok: number; pending: number; failed: number };
+  total_bytes: number;
+  recent_count: number; // últimos 7d
+};
+
+async function getDocumentsStats(): Promise<DocStats | null> {
+  try {
+    const sb = createAdminClient();
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await sb
+      .from("client_documents")
+      .select("kind, parse_status, size_bytes, created_at");
+    if (error) {
+      console.error("[uso-ia] documents stats:", error.message);
+      return null;
+    }
+    const rows = data ?? [];
+    return {
+      total: rows.length,
+      by_kind: {
+        general: rows.filter((r) => r.kind === "general").length,
+        sustainability_report: rows.filter((r) => r.kind === "sustainability_report").length,
+        financial_report: rows.filter((r) => r.kind === "financial_report").length,
+      },
+      by_parse_status: {
+        ok: rows.filter((r) => r.parse_status === "ok").length,
+        pending: rows.filter((r) => r.parse_status === "pending").length,
+        failed: rows.filter((r) => r.parse_status === "failed").length,
+      },
+      total_bytes: rows.reduce((sum, r) => sum + (r.size_bytes ?? 0), 0),
+      recent_count: rows.filter((r) => r.created_at >= since).length,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export const metadata: Metadata = { title: "Uso IA · Configuración · App ResponSable" };
 export const dynamic = "force-dynamic";
@@ -14,7 +55,10 @@ const usdFmt = new Intl.NumberFormat("es-MX", {
 });
 
 export default async function UsoIaPage() {
-  const s = await getUsageSummary(30).catch(() => null);
+  const [s, docs] = await Promise.all([
+    getUsageSummary(30).catch(() => null),
+    getDocumentsStats(),
+  ]);
 
   return (
     <div className="px-8 py-6 max-w-6xl mx-auto">
@@ -207,6 +251,83 @@ export default async function UsoIaPage() {
           </Panel>
         </>
       )}
+
+      {/* Documentos por cliente — Sprint B */}
+      {docs && (
+        <div className="mt-8">
+          <div className="mb-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Documentos por cliente
+            </p>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Archivos subidos + informes IA convertidos a Markdown como contexto persistente.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <DocStat label="Total" value={numFmt.format(docs.total)} />
+            <DocStat label="Últimos 7d" value={numFmt.format(docs.recent_count)} />
+            <DocStat
+              label="General"
+              value={numFmt.format(docs.by_kind.general)}
+              tone="neutral"
+            />
+            <DocStat
+              label="Informe sust."
+              value={numFmt.format(docs.by_kind.sustainability_report)}
+              tone="emerald"
+            />
+            <DocStat
+              label="Informe fin."
+              value={numFmt.format(docs.by_kind.financial_report)}
+              tone="amber"
+            />
+          </div>
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <DocStat
+              label="Parse OK"
+              value={numFmt.format(docs.by_parse_status.ok)}
+              tone="emerald"
+            />
+            <DocStat
+              label="Parse pendiente"
+              value={numFmt.format(docs.by_parse_status.pending)}
+              tone="neutral"
+            />
+            <DocStat
+              label="Parse fallido"
+              value={numFmt.format(docs.by_parse_status.failed)}
+              tone={docs.by_parse_status.failed > 0 ? "rose" : "neutral"}
+            />
+            <DocStat
+              label="Storage usado"
+              value={`${(docs.total_bytes / 1024 / 1024).toFixed(1)} MB`}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DocStat({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "emerald" | "amber" | "rose";
+}) {
+  const toneColor = {
+    neutral: "text-slate-900",
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+    rose: "text-rose-700",
+  }[tone];
+  return (
+    <div className="border border-slate-200 rounded bg-white px-3 py-2 shadow-sm">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
+      <p className={`text-lg font-bold tabular-nums mt-0.5 ${toneColor}`}>{value}</p>
     </div>
   );
 }

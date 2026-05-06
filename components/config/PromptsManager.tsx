@@ -36,30 +36,36 @@ export function PromptsManager() {
           <button onClick={() => void meta.mutate()} className="underline">Reintentar</button>
         </p>
       )}
-      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg mb-4">
-        {PROMPT_KEYS.map((k) => {
+      <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-lg mb-4">
+        {PROMPT_KEYS.map((k, idx) => {
           const m = meta.data?.data.find((x) => x.key === k);
           const isActive = active === k;
+          // Separador visual entre prompts comunes (system.*) y por rol (role.*)
+          const isFirstRole = k.startsWith("role.") && !PROMPT_KEYS[idx - 1]?.startsWith("role.");
           return (
-            <button
-              key={k}
-              onClick={() => {
-                setActive(k);
-                setShowHistory(false);
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                isActive
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <span>{PROMPT_LABELS[k]}</span>
-              {m?.has_override && (
-                <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
-                  Custom
-                </span>
+            <div key={k} className="flex items-center gap-1">
+              {isFirstRole && (
+                <div className="w-px h-5 bg-slate-300 mx-0.5" aria-hidden />
               )}
-            </button>
+              <button
+                onClick={() => {
+                  setActive(k);
+                  setShowHistory(false);
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  isActive
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>{PROMPT_LABELS[k]}</span>
+                {m?.has_override && (
+                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
+                    Custom
+                  </span>
+                )}
+              </button>
+            </div>
           );
         })}
       </div>

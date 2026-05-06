@@ -44,19 +44,6 @@ export default async function EditarClientePage({ params }: Props) {
   const next = idx < sorted.length - 1 ? sorted[idx + 1] : null;
   const counter = idx >= 0 ? `${idx + 1}/${sorted.length}` : "";
 
-  const status =
-    completeness.filled === completeness.total
-      ? { label: "COMPLETADO", tone: "success" }
-      : completeness.filled === 0
-        ? { label: "SIN INICIAR", tone: "neutral" }
-        : { label: "EN PROGRESO", tone: "primary" };
-  const statusClasses =
-    status.tone === "success"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-      : status.tone === "primary"
-        ? "bg-brand-primary-light text-brand-primary-dark border-brand-primary/30"
-        : "bg-slate-100 text-slate-600 border-slate-200";
-
   return (
     <>
     <div className="px-6 py-4 pb-0 max-w-6xl mx-auto">
@@ -109,12 +96,6 @@ export default async function EditarClientePage({ params }: Props) {
       <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
         <ClientAvatar name={client.name} logoUrl={client.logo_url} />
         <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
-        <span
-          title={`Perfil del cliente: ${completeness.filled}/${completeness.total} campos contextuales completados`}
-          className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide rounded-sm border px-2 py-0.5 ${statusClasses}`}
-        >
-          {status.label}
-        </span>
         {meta && <span className="text-slate-300">·</span>}
         {meta && <span className="text-xs text-slate-600">{meta}</span>}
         {client.services && client.services.length > 0 && (

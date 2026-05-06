@@ -115,7 +115,7 @@ export function UsersManager() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {users.map((u) => (
-                <tr key={u.email} className="hover:bg-slate-50">
+                <tr key={u.email} className="even:bg-slate-50 hover:bg-slate-100">
                   <td className="py-2 pr-4 font-mono text-xs">{u.email}</td>
                   <td className="py-2 pr-4 text-slate-700">{u.full_name ?? "—"}</td>
                   <td className="py-2 pr-4">

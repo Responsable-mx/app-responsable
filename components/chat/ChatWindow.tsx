@@ -12,7 +12,6 @@ import {
   type ChatMessage,
   type ClientOption,
   type RoleId,
-  type SessionPreview,
   ROLES,
   STARTERS,
   MODEL_PER_ROLE,
@@ -133,14 +132,8 @@ export function ChatWindow({
   const scrollRef = useRef<HTMLDivElement>(null);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sesiones recientes: solo se cargan en empty state para no pagar el fetch cuando
-  // ya hay conversación activa. revalidateOnFocus:false evita refetch al volver de otra tab.
-  const { data: recentData } = useSWR<{ data: SessionPreview[] }>(
-    messages.length === 0 ? "/api/chat-sessions?limit=5" : null,
-    (url: string) => fetch(url).then((r) => r.json()),
-    { revalidateOnFocus: false }
-  );
-  const recentSessions = recentData?.data ?? [];
+  // Sesiones recientes: accesibles vía panel Historial (botón en header). No se cargan
+  // en el empty state — el usuario las abre on-demand via ChatSessionsPanel.
 
   const totalTokens = usageAcc.inputTokens + usageAcc.outputTokens + usageAcc.cacheReadTokens;
   const totalCost = usageAcc.costUsd;
@@ -671,11 +664,9 @@ export function ChatWindow({
               role={role}
               clientId={clientId}
               clients={clients}
-              recentSessions={recentSessions}
               roles={ROLES}
               starters={STARTERS}
               onSend={(prompt) => void send(prompt)}
-              onLoadSession={(id) => void loadSession(id)}
             />
           )}
 

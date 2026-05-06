@@ -41,7 +41,6 @@ const MACRO_CARDS: MacroCard[] = [
     stepKeys: ["informacion-base"],
     previewFields: [
       { stepKey: "informacion-base", fieldKey: "nombre_empresa", labelOverride: "Razón social" },
-      { stepKey: "informacion-base", fieldKey: "servicio_contratado", labelOverride: "Servicio" },
       { stepKey: "informacion-base", fieldKey: "alcance_geografico", labelOverride: "Alcance" },
       { stepKey: "informacion-base", fieldKey: "relacion_empresas", labelOverride: "Relación" },
     ],
@@ -57,7 +56,6 @@ const MACRO_CARDS: MacroCard[] = [
     accentBorder: "border-l-brand-primary",
     stepKeys: ["informacion-general"],
     previewFields: [
-      { stepKey: "informacion-general", fieldKey: "sector", labelOverride: "Sector" },
       { stepKey: "informacion-general", fieldKey: "empleados", labelOverride: "Empleados" },
       { stepKey: "informacion-general", fieldKey: "paises", labelOverride: "Países" },
       { stepKey: "informacion-general", fieldKey: "tipo_clientes", labelOverride: "Clientes clave" },

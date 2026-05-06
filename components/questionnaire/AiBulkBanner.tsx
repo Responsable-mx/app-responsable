@@ -55,8 +55,8 @@ export function AiBulkBanner({
         {progress
           ? `${progress.current}/${progress.total} · ${progress.stepTitle}`
           : someStepHasResponses
-            ? "✨ Refrescar con IA"
-            : "✨ Llenar todos con IA"}
+            ? "Refrescar con IA"
+            : "Llenar todos con IA"}
       </Button>
     </div>
   );

@@ -580,7 +580,7 @@ function WizardEditor({
                     onClick={() => aiFill(step.key)}
                     disabled={!!aiBulkProgress}
                   >
-                    {stepHasData ? "✨ Refrescar este paso" : "✨ Llenar con IA"}
+                    {stepHasData ? "Refrescar este paso" : "Llenar con IA"}
                   </Button>
                 );
               })()}

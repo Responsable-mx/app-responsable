@@ -182,8 +182,9 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Mis proyectos: lista completa expandida, iconos en modo colapsado */}
-      {!isClient && projects.length > 0 && (
+      {/* Mis proyectos: lista completa expandida, iconos en modo colapsado.
+          Se oculta dentro de /clientes/[id] — el nombre ya aparece en H1 + breadcrumb. */}
+      {!isClient && projects.length > 0 && !pathname.startsWith('/clientes/') && (
         <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200`}>
           {!collapsed && (
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1.5">

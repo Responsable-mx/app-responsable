@@ -3,13 +3,9 @@
 import {
   type ClientOption,
   type RoleId,
-  type SessionPreview,
   ROLES,
   STARTERS,
 } from "@/components/chat/chat-types";
-
-// Evaluado una vez al cargar el módulo — no es una llamada impura en render.
-const MODULE_NOW = Date.now();
 
 /** Sugerencias contextuales cuando hay cliente seleccionado. */
 function getContextualStarters(role: RoleId, clientName: string): string[] {
@@ -50,27 +46,23 @@ export type ChatEmptyStateProps = {
   role: RoleId;
   clientId: string;
   clients: ClientOption[];
-  recentSessions: SessionPreview[];
   roles: typeof ROLES;
   starters: typeof STARTERS;
   onSend: (prompt: string) => void;
-  onLoadSession: (id: string) => void;
 };
 
 /**
- * Estado vacío del chat: sugerencias de inicio y lista de sesiones recientes.
+ * Estado vacío del chat: sugerencias de inicio contextual por rol y cliente.
  * Solo se renderiza cuando messages.length === 0.
+ * Sesiones recientes: disponibles en el panel Historial (botón en header).
  */
 export function ChatEmptyState({
   role,
   clientId,
   clients,
-  recentSessions,
   starters,
   onSend,
-  onLoadSession,
 }: ChatEmptyStateProps) {
-
   const clientName = clients.find((c) => c.id === clientId)?.name ?? null;
   const suggestions = clientName
     ? getContextualStarters(role, clientName)
@@ -97,54 +89,6 @@ export function ChatEmptyState({
           </button>
         ))}
       </div>
-
-      {recentSessions.length > 0 && (
-        <div className="mt-6 pt-5 border-t border-slate-200">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Recientes
-            </p>
-          </div>
-          <ul className="space-y-0.5">
-            {recentSessions.map((s) => {
-              const daysAgo = Math.floor(
-                (MODULE_NOW - new Date(s.updated_at).getTime()) / 86400000
-              );
-              const stamp =
-                daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
-              const roleData = ROLES.find((r) => r.id === s.role) ?? ROLES[0];
-              const clientMatch = clients.find((c) => c.id === s.client_id);
-              return (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => onLoadSession(s.id)}
-                    className="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded hover:bg-slate-100 transition-colors"
-                  >
-                    <span
-                      className={`w-5 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${roleData.color}`}
-                      aria-hidden
-                    >
-                      {roleData.mono}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="text-xs text-slate-700 line-clamp-1 block">{s.title}</span>
-                      {clientMatch && (
-                        <span className="text-[10px] text-slate-500 block truncate">
-                          {clientMatch.name}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[10px] text-slate-400 shrink-0 tabular-nums">
-                      {stamp}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

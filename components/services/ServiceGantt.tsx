@@ -582,6 +582,22 @@ export function ServiceGantt({
                 const stagePct = stageTotal > 0 ? Math.round((stageDone / stageTotal) * 100) : 0;
                 const stageRag: "red" | "amber" | "green" =
                   stageDelayed > 0 ? "red" : stageActive > 0 ? "amber" : "green";
+
+                // Duración etapa: span de fechas plan y real
+                const actsWithPlan = s.activities.filter((a) => a.planned_start && a.planned_end);
+                const plannedDays = actsWithPlan.length > 0
+                  ? Math.round((Math.max(...actsWithPlan.map((a) => parseDate(a.planned_end)!.getTime())) -
+                      Math.min(...actsWithPlan.map((a) => parseDate(a.planned_start)!.getTime()))) / MS_DAY) + 1
+                  : null;
+                const actsWithReal = s.activities.filter((a) => a.actual_start);
+                const actualDays = actsWithReal.length > 0
+                  ? Math.round((Math.max(...actsWithReal.map((a) => {
+                      if (a.actual_end) return parseDate(a.actual_end)!.getTime();
+                      if (a.status === "in_progress" || a.status === "delayed") return now;
+                      return parseDate(a.actual_start)!.getTime();
+                    })) - Math.min(...actsWithReal.map((a) => parseDate(a.actual_start)!.getTime()))) / MS_DAY) + 1
+                  : null;
+                const daysOver = actualDays !== null && plannedDays !== null && actualDays > plannedDays;
                 return (
                   <div key={s.id}>
                     {/* Etapa header */}
@@ -601,6 +617,19 @@ export function ServiceGantt({
                           {stagePct}%
                         </span>
                       </div>
+                      {/* Duración plan vs real en el lado timeline de la fila */}
+                      {plannedDays !== null && (
+                        <div className="flex items-center px-3">
+                          <span
+                            className={`text-[9px] tabular-nums font-bold whitespace-nowrap ${
+                              daysOver ? "text-rose-600" : actualDays !== null ? "text-emerald-600" : "text-slate-400"
+                            }`}
+                            title={`Duración etapa — Planeado: ${plannedDays} días${actualDays !== null ? ` / Real: ${actualDays} días` : ""}`}
+                          >
+                            {plannedDays}d{actualDays !== null ? ` / ${actualDays}d` : " plan"}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0" />
                     </div>
 

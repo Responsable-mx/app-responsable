@@ -137,19 +137,28 @@ export function ServiceGantt({
   onQuickAction,
   onFreezeBaseline,
   isAdmin = false,
+  storageKey,
 }: {
   stages: ServiceStage[];
   onEditActivity: (stageId: string, activity: StageActivity) => void;
   onQuickAction?: (activityId: string, patch: QuickPatch) => Promise<void>;
   onFreezeBaseline?: () => Promise<void>;
   isAdmin?: boolean;
+  storageKey?: string;
 }) {
   const [zoom, setZoom] = useState<Zoom>("fit");
   const [overlay, setOverlay] = useState<Overlay>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    if (!storageKey || typeof window === "undefined") return new Set();
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
+    } catch { return new Set(); }
+  });
   const [confirmFreeze, setConfirmFreeze] = useState(false);
   const [freezing, setFreezing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerTimelineInnerRef = useRef<HTMLDivElement>(null);
@@ -351,6 +360,9 @@ export function ServiceGantt({
     setCollapsed((prev) => {
       const n = new Set(prev);
       n.has(id) ? n.delete(id) : n.add(id);
+      if (storageKey) {
+        try { localStorage.setItem(storageKey, JSON.stringify([...n])); } catch {}
+      }
       return n;
     });
   }
@@ -464,24 +476,47 @@ export function ServiceGantt({
                   Hoy
                 </button>
               )}
-              <button onClick={exportPng} disabled={exporting} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-50" title="Exportar como imagen PNG">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                </svg>
-                {exporting ? "..." : "PNG"}
-              </button>
-              <button onClick={exportCsv} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors" title="Exportar como CSV (Excel)">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                CSV
-              </button>
+              {/* Exportar dropdown (PNG + CSV) */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu((v) => !v)}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                  {exporting ? "..." : "Exportar"}
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showExportMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded shadow-md py-1 w-36">
+                      <button
+                        onClick={() => { void exportPng(); setShowExportMenu(false); }}
+                        disabled={exporting}
+                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        PNG (imagen)
+                      </button>
+                      <button
+                        onClick={() => { exportCsv(); setShowExportMenu(false); }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                      >
+                        CSV (Excel)
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
               {isAdmin && onFreezeBaseline && !confirmFreeze && (
-                <button onClick={() => setConfirmFreeze(true)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-amber-700 transition-colors" title={hasBaseline ? "Ya existe baseline. Usar ?force=1 para sobrescribir." : "Congelar fechas plan como baseline de referencia"}>
+                <button onClick={() => setConfirmFreeze(true)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-amber-700 transition-colors" title={hasBaseline ? "Ya existe baseline — actualizará el de referencia." : "Congelar fechas plan como baseline de referencia"}>
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-                  {hasBaseline ? "Refreeze" : "Baseline"}
+                  {hasBaseline ? "Actualizar baseline" : "Baseline"}
                 </button>
               )}
               {confirmFreeze && (
@@ -598,6 +633,28 @@ export function ServiceGantt({
                     })) - Math.min(...actsWithReal.map((a) => parseDate(a.actual_start)!.getTime()))) / MS_DAY) + 1
                   : null;
                 const daysOver = actualDays !== null && plannedDays !== null && actualDays > plannedDays;
+
+                // SPI (Schedule Performance Index) = % completado / % tiempo transcurrido
+                // Solo significativo cuando hay fechas plan y >5% del tiempo ha pasado
+                const planMinTs = actsWithPlan.length > 0
+                  ? Math.min(...actsWithPlan.map((a) => parseDate(a.planned_start)!.getTime()))
+                  : null;
+                const planMaxTs = actsWithPlan.length > 0
+                  ? Math.max(...actsWithPlan.map((a) => parseDate(a.planned_end)!.getTime()))
+                  : null;
+                let stageSpi: number | null = null;
+                let stageForecastEnd: Date | null = null;
+                if (planMinTs !== null && planMaxTs !== null && planMaxTs > planMinTs && stagePct > 0) {
+                  const totalPlanMs = planMaxTs - planMinTs;
+                  const elapsedPct = Math.min(Math.max((now - planMinTs) / totalPlanMs, 0), 1);
+                  if (elapsedPct >= 0.05) {
+                    stageSpi = Math.min((stagePct / 100) / elapsedPct, 2);
+                    if (stageSpi > 0 && stageSpi < 2 && stagePct < 100) {
+                      stageForecastEnd = new Date(planMinTs + totalPlanMs / stageSpi);
+                    }
+                  }
+                }
+
                 return (
                   <div key={s.id}>
                     {/* Etapa header */}
@@ -617,17 +674,31 @@ export function ServiceGantt({
                           {stagePct}%
                         </span>
                       </div>
-                      {/* Duración plan vs real en el lado timeline de la fila */}
-                      {plannedDays !== null && (
-                        <div className="flex items-center px-3">
-                          <span
-                            className={`text-[9px] tabular-nums font-bold whitespace-nowrap ${
-                              daysOver ? "text-rose-600" : actualDays !== null ? "text-emerald-600" : "text-slate-400"
-                            }`}
-                            title={`Duración etapa — Planeado: ${plannedDays} días${actualDays !== null ? ` / Real: ${actualDays} días` : ""}`}
-                          >
-                            {plannedDays}d{actualDays !== null ? ` / ${actualDays}d` : " plan"}
-                          </span>
+                      {/* Métricas etapa en lado timeline */}
+                      {(plannedDays !== null || stageSpi !== null) && (
+                        <div className="flex items-center gap-3 px-3 shrink-0">
+                          {plannedDays !== null && (
+                            <span
+                              className={`text-[9px] tabular-nums font-bold whitespace-nowrap ${
+                                daysOver ? "text-rose-600" : actualDays !== null ? "text-emerald-600" : "text-slate-400"
+                              }`}
+                              title={`Duración etapa — Planeado: ${plannedDays} días${actualDays !== null ? ` / Real: ${actualDays} días` : ""}`}
+                            >
+                              {plannedDays}d{actualDays !== null ? ` / ${actualDays}d` : ""}
+                            </span>
+                          )}
+                          {stageSpi !== null && (
+                            <span
+                              className={`text-[9px] tabular-nums font-bold whitespace-nowrap px-1 rounded-sm ${
+                                stageSpi >= 1.0 ? "text-emerald-700 bg-emerald-50" :
+                                stageSpi >= 0.8 ? "text-amber-700 bg-amber-50" :
+                                "text-rose-600 bg-rose-50"
+                              }`}
+                              title={`SPI ${stageSpi.toFixed(2)} — ${stageSpi >= 1 ? "Adelantado o en tiempo" : stageSpi >= 0.8 ? "Leve retraso" : "Riesgo alto de retraso"}${stageForecastEnd ? ` · Est. fin: ${stageForecastEnd.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}` : ""}`}
+                            >
+                              SPI {stageSpi.toFixed(1)}
+                            </span>
+                          )}
                         </div>
                       )}
                       <div className="flex-1 min-w-0" />

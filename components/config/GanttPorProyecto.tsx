@@ -3,6 +3,7 @@
 // 4ta vista de /equipo: Gantt por proyecto.
 // Cada proyecto se renderiza con ServiceGantt completo (timeline plan/real).
 
+import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
@@ -26,6 +27,7 @@ const catalogFetcher = (url: string) =>
 export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) {
   const { data, error, isLoading, mutate } = useSWR("/api/projects/overview", fetcher);
   const { push: pushToast } = useToast();
+  const [sortByRisk, setSortByRisk] = useState(false);
 
   async function handleQuickAction(activityId: string, patch: QuickPatch) {
     const res = await fetch(`/api/activities/${activityId}`, {
@@ -84,6 +86,17 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
     }))
     .filter((p) => p.services.some((sv) => sv.stages.some((st) => st.activities.length > 0)));
 
+  // Portfolio health (usa rawProjects para no filtrar la barra de resumen)
+  const totalProjects = rawProjects.length;
+  const atRiskProjects = rawProjects.filter((p) => p.delayed_count > 0).length;
+  const onTrackProjects = rawProjects.filter((p) => p.active_count > 0 && p.delayed_count === 0).length;
+  const quietProjects = rawProjects.filter((p) => p.active_count === 0 && p.delayed_count === 0).length;
+
+  // Sort por riesgo opcional
+  const displayProjects = sortByRisk
+    ? [...projects].sort((a, b) => b.delayed_count - a.delayed_count || b.active_count - a.active_count)
+    : projects;
+
   if (projects.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded p-12 text-center">
@@ -100,7 +113,42 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
 
   return (
     <div className="space-y-6">
-      {projects.map((p) => (
+      {/* Portfolio health summary */}
+      <div className="flex items-center justify-between gap-3 px-3 py-2 bg-white border border-slate-200 rounded">
+        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
+          <span className="text-slate-500">{totalProjects} proyecto{totalProjects !== 1 ? "s" : ""}</span>
+          {atRiskProjects > 0 && (
+            <span className="flex items-center gap-1 text-rose-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+              {atRiskProjects} en riesgo
+            </span>
+          )}
+          {onTrackProjects > 0 && (
+            <span className="flex items-center gap-1 text-amber-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+              {onTrackProjects} en curso
+            </span>
+          )}
+          {quietProjects > 0 && (
+            <span className="flex items-center gap-1 text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              {quietProjects} al día
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setSortByRisk((v) => !v)}
+          className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm transition-colors ${
+            sortByRisk
+              ? "bg-rose-100 text-rose-700"
+              : "text-slate-400 hover:text-slate-700"
+          }`}
+        >
+          {sortByRisk ? "Ordenado por riesgo" : "Ordenar por riesgo"}
+        </button>
+      </div>
+
+      {displayProjects.map((p) => (
         <div key={p.client_id} className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -118,8 +166,11 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
             </div>
             <div className="flex items-center gap-1.5">
               {p.delayed_count > 0 && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700">
-                  ⚠ {p.delayed_count} retrasada{p.delayed_count === 1 ? "" : "s"}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700">
+                  <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  {p.delayed_count} retrasada{p.delayed_count === 1 ? "" : "s"}
                 </span>
               )}
               {p.active_count > 0 && (

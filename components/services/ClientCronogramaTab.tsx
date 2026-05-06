@@ -44,7 +44,16 @@ export function ClientCronogramaTab({
   initialView?: ViewMode;
 }) {
   const [view, setView] = useState<ViewMode>(initialView);
-  const [filterAssignee, setFilterAssignee] = useState<string | null>(null);
+  const [filterAssignee, setFilterAssignee] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return sessionStorage.getItem(`gantt-filter-${clientId}`) ?? null;
+  });
+
+  function changeFilter(email: string | null) {
+    setFilterAssignee(email);
+    if (email) sessionStorage.setItem(`gantt-filter-${clientId}`, email);
+    else sessionStorage.removeItem(`gantt-filter-${clientId}`);
+  }
   const { push: pushToast } = useToast();
   const [editingActivity, setEditingActivity] = useState<{
     stageId: string;
@@ -237,7 +246,7 @@ export function ClientCronogramaTab({
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filtrar:</span>
           <button
-            onClick={() => setFilterAssignee(null)}
+            onClick={() => changeFilter(null)}
             className={`px-2 py-0.5 rounded-sm text-[10px] font-bold transition-colors ${
               filterAssignee === null
                 ? "bg-brand-primary text-white"
@@ -249,7 +258,7 @@ export function ClientCronogramaTab({
           {consultorEmails.map((email) => (
             <button
               key={email}
-              onClick={() => setFilterAssignee(filterAssignee === email ? null : email)}
+              onClick={() => changeFilter(filterAssignee === email ? null : email)}
               className={`px-2 py-0.5 rounded-sm text-[10px] font-bold transition-colors ${
                 filterAssignee === email
                   ? "bg-brand-primary text-white"
@@ -296,6 +305,7 @@ export function ClientCronogramaTab({
                   onQuickAction={handleQuickAction}
                   onFreezeBaseline={isAdmin ? handleFreezeBaseline : undefined}
                   isAdmin={isAdmin}
+                  storageKey={`gantt-collapsed-${clientId}-${s.id}`}
                 />
               )}
             </div>

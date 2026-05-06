@@ -126,6 +126,11 @@ export function QuickActionPopover({
                 </div>
               </div>
             )}
+            {isAdmin && (planStart !== (activity.planned_start ?? "") || planEnd !== (activity.planned_end ?? "")) && (
+              <p className="text-[9px] text-amber-700 bg-amber-50 px-2 py-1 rounded-sm border border-amber-200 leading-tight">
+                Modificar fechas plan afecta el cronograma de referencia.
+              </p>
+            )}
             <button
               onClick={saveDates}
               disabled={savingDates || loading !== null}

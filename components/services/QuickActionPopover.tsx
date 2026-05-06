@@ -9,6 +9,7 @@ export type QuickPatch = {
   planned_start?: string;
   planned_end?: string;
   status?: "pending" | "in_progress" | "completed" | "delayed";
+  actual_progress?: number;
 };
 
 type Props = {
@@ -36,6 +37,7 @@ export function QuickActionPopover({
   const [realEnd, setRealEnd] = useState(activity.actual_end ?? "");
   const [planStart, setPlanStart] = useState(activity.planned_start ?? "");
   const [planEnd, setPlanEnd] = useState(activity.planned_end ?? "");
+  const [progress, setProgress] = useState(activity.actual_progress != null ? String(activity.actual_progress) : "");
   const [savingDates, setSavingDates] = useState(false);
 
   const x = Math.min(anchor.x, window.innerWidth - 256);
@@ -59,6 +61,10 @@ export function QuickActionPopover({
     if (realEnd !== (activity.actual_end ?? "")) patch.actual_end = realEnd || undefined;
     if (isAdmin && planStart !== (activity.planned_start ?? "")) patch.planned_start = planStart || undefined;
     if (isAdmin && planEnd !== (activity.planned_end ?? "")) patch.planned_end = planEnd || undefined;
+    if (progress !== "") {
+      const pv = Math.min(100, Math.max(0, parseInt(progress, 10)));
+      if (!isNaN(pv) && pv !== activity.actual_progress) patch.actual_progress = pv;
+    }
     if (Object.keys(patch).length === 0) { onClose(); return; }
     setSavingDates(true);
     try {
@@ -126,6 +132,31 @@ export function QuickActionPopover({
                 </div>
               </div>
             )}
+            {/* Progreso */}
+            <div className="space-y-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Progreso</p>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[10px] text-slate-500 w-10 shrink-0">% avance</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={progress}
+                  onChange={(e) => setProgress(e.target.value)}
+                  placeholder="0–100"
+                  className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 font-sans text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary"
+                />
+                <span className="text-[9px] text-slate-400 shrink-0">%</span>
+              </div>
+              {progress !== "" && !isNaN(parseInt(progress, 10)) && (
+                <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-brand-primary rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.max(0, parseInt(progress, 10)))}%` }}
+                  />
+                </div>
+              )}
+            </div>
             {isAdmin && (planStart !== (activity.planned_start ?? "") || planEnd !== (activity.planned_end ?? "")) && (
               <p className="text-[9px] text-amber-700 bg-amber-50 px-2 py-1 rounded-sm border border-amber-200 leading-tight">
                 Modificar fechas plan afecta el cronograma de referencia.

@@ -161,6 +161,7 @@ export function ServiceGantt({
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showFloat, setShowFloat] = useState(false);
   const [showDeps, setShowDeps] = useState(false);
+  const [showCriticalPath, setShowCriticalPath] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerTimelineInnerRef = useRef<HTMLDivElement>(null);
@@ -196,6 +197,36 @@ export function ServiceGantt({
     }
     return map;
   }, [stages, allActivities]);
+
+  // Ruta crítica: traza hacia atrás desde la actividad con fin más tardío
+  const criticalPathIds = useMemo(() => {
+    if (!showCriticalPath) return new Set<string>();
+    const acts = allActivities.filter((a) => a.planned_start && a.planned_end);
+    if (acts.length === 0) return new Set<string>();
+    const idToAct = new Map(acts.map((a) => [a.id, a]));
+    const last = acts.reduce((a, b) =>
+      parseDate(b.planned_end)!.getTime() > parseDate(a.planned_end)!.getTime() ? b : a
+    );
+    const critical = new Set<string>();
+    let cur: StageActivity | undefined = last;
+    let depth = 0;
+    while (cur && depth < 200) {
+      critical.add(cur.id);
+      cur = cur.depends_on_activity_id ? idToAct.get(cur.depends_on_activity_id) : undefined;
+      depth++;
+    }
+    return critical;
+  }, [allActivities, showCriticalPath]);
+
+  // Lunes de la semana actual para la banda de hoy
+  const todayWeekStart = useMemo(() => {
+    const d = new Date(now);
+    const dow = d.getDay();
+    const diff = dow === 0 ? -6 : 1 - dow;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, [now]);
 
   // Posición Y de cada actividad en el área de filas (para flechas de dependencia)
   const rowY = useMemo(() => {
@@ -439,16 +470,24 @@ export function ServiceGantt({
 
   function exportCsv() {
     const rows: string[][] = [
-      ["Etapa", "Actividad", "Asignado", "Status", "Plan Inicio", "Plan Fin", "Real Inicio", "Real Fin", "Desvío (días)"],
+      ["Etapa", "Actividad", "Asignado", "Status", "Plan Inicio", "Plan Fin", "Real Inicio", "Real Fin", "Desvío Plan (días)", "Float (días)", "% Avance", "Desv. Baseline (días)"],
     ];
     for (const s of stages) {
       for (const a of s.activities) {
         const dev = devDays(a);
+        const floatDays = floatMap.get(a.id) ?? 0;
+        const progressStr = a.actual_progress != null ? String(a.actual_progress) : "";
+        const baselineDev = a.baseline_end && a.planned_end
+          ? String(Math.round((parseDate(a.planned_end)!.getTime() - parseDate(a.baseline_end)!.getTime()) / MS_DAY))
+          : "";
         rows.push([
           s.name, a.name, a.assignee_email ?? "", a.status,
           a.planned_start ?? "", a.planned_end ?? "",
           a.actual_start ?? "", a.actual_end ?? "",
           dev !== null ? String(dev) : "",
+          String(floatDays),
+          progressStr,
+          baselineDev,
         ]);
       }
     }
@@ -482,8 +521,9 @@ export function ServiceGantt({
             transform en lugar de scrollLeft). */}
         <div className="flex-none bg-white border-b border-slate-100 shadow-sm">
 
-          {/* Toolbar */}
+          {/* Toolbar — 3 grupos: [Zoom] · [Capas] · [Acciones] */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-200 bg-slate-50 flex-wrap">
+            {/* Grupo 1: Zoom */}
             <div className="flex items-center gap-0.5">
               {([
                 { v: "fit", label: "Ajustar" },
@@ -511,21 +551,33 @@ export function ServiceGantt({
                 ← → · drag
               </span>
             )}
+            {/* Separador */}
             <div className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden />
-            <button
-              onClick={() => setShowFloat((v) => !v)}
-              className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showFloat ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
-              title="Holgura: días de buffer disponible por actividad"
-            >
-              Float
-            </button>
-            <button
-              onClick={() => setShowDeps((v) => !v)}
-              className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showDeps ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
-              title="Flechas de dependencia entre actividades"
-            >
-              Deps
-            </button>
+            {/* Grupo 2: Capas de visualización */}
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => setShowFloat((v) => !v)}
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showFloat ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
+                title="Holgura: días de buffer disponible por actividad"
+              >
+                Holgura
+              </button>
+              <button
+                onClick={() => setShowDeps((v) => !v)}
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showDeps ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
+                title="Flechas de dependencia entre actividades"
+              >
+                Dep.
+              </button>
+              <button
+                onClick={() => setShowCriticalPath((v) => !v)}
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showCriticalPath ? "bg-amber-100 text-amber-700" : "text-slate-400 hover:text-slate-700"}`}
+                title="Ruta crítica: cadena de actividades que determina la duración total del proyecto"
+              >
+                Ruta
+              </button>
+            </div>
+            {/* Grupo 3: Acciones — ml-auto */}
             <div className="flex items-center gap-1.5 ml-auto">
               {todayInRange && (
                 <button onClick={scrollToToday} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-brand-primary-dark transition-colors">
@@ -813,7 +865,39 @@ export function ServiceGantt({
                           </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0" />
+                      {/* Barra de span de etapa en área de timeline */}
+                      <div className="relative overflow-hidden" style={{ ...tStyle, alignSelf: "stretch" }}>
+                        {actsWithPlan.length > 0 && (() => {
+                          const minStart = actsWithPlan.reduce((m, a) =>
+                            a.planned_start! < m ? a.planned_start! : m,
+                            actsWithPlan[0].planned_start!
+                          );
+                          const maxEnd = actsWithPlan.reduce((m, a) =>
+                            a.planned_end! > m ? a.planned_end! : m,
+                            actsWithPlan[0].planned_end!
+                          );
+                          const spanStyle = barStyle(minStart, maxEnd);
+                          if (!spanStyle) return null;
+                          return (
+                            <div
+                              className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-sm overflow-hidden bg-slate-200"
+                              style={spanStyle}
+                              title={`Etapa: ${minStart} → ${maxEnd} · ${stagePct}% completado`}
+                            >
+                              <div
+                                className={`h-full ${stagePct === 100 ? "bg-emerald-400" : stageRag === "red" ? "bg-rose-400/70" : "bg-brand-primary/50"}`}
+                                style={{ width: `${stagePct}%` }}
+                              />
+                            </div>
+                          );
+                        })()}
+                        {todayInRange && (
+                          <div
+                            className="absolute top-0 bottom-0 border-l border-rose-400/30 pointer-events-none"
+                            style={{ left: `${todayPct}%` }}
+                          />
+                        )}
+                      </div>
                     </div>
 
                     {/* Actividades */}
@@ -867,8 +951,15 @@ export function ServiceGantt({
                               </span>
                             )}
                             {dep && (
-                              <p className={`text-[10px] truncate pl-4 ${conflict ? "text-rose-700 font-bold" : "text-slate-400"}`}>
-                                {conflict ? "⚠ " : "↳ "}{dep.name}
+                              <p className={`text-[10px] pl-4 flex items-center gap-0.5 ${conflict ? "text-rose-700 font-bold" : "text-slate-400"}`}>
+                                {conflict ? (
+                                  <svg className="shrink-0 w-3 h-3 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                  </svg>
+                                ) : (
+                                  <span className="shrink-0">↳</span>
+                                )}
+                                <span className="truncate">{dep.name}</span>
                               </p>
                             )}
                           </div>
@@ -894,6 +985,17 @@ export function ServiceGantt({
                                 }} />
                               );
                             })}
+                            {/* Banda semana actual */}
+                            {todayInRange && (
+                              <div
+                                className="absolute top-0 bottom-0 pointer-events-none"
+                                style={{
+                                  left: `${((todayWeekStart - range.min) / totalMs) * 100}%`,
+                                  width: `${(7 * MS_DAY / totalMs) * 100}%`,
+                                  background: "rgba(251,113,133,0.04)",
+                                }}
+                              />
+                            )}
                             {todayInRange && (
                               <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%`, width: 0 }} />
                             )}
@@ -909,7 +1011,18 @@ export function ServiceGantt({
                               <div className="absolute h-1.5 rounded pointer-events-none z-[5]" style={{ ...baselineStyle, top: 6, background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)", opacity: 0.7 }} title={`Baseline: ${fmtShort(a.baseline_start)} → ${fmtShort(a.baseline_end)}`} />
                             )}
                             {planStyle && (
-                              <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-4 rounded border-2 bg-white/80 hover:opacity-80 transition-all z-10 ${isOnRisk ? "border-rose-400" : "border-slate-400 hover:border-brand-primary"}`} style={{ ...planStyle, top: 10 }} title={`Plan: ${fmtShort(a.planned_start)} → ${fmtShort(a.planned_end)}`} />
+                              <button
+                                onClick={(e) => openPopover(e, s.id, a)}
+                                className={`absolute h-4 rounded border-2 bg-white/80 hover:opacity-80 transition-all z-10 ${
+                                  criticalPathIds.has(a.id)
+                                    ? "border-amber-500 bg-amber-50/80"
+                                    : isOnRisk
+                                    ? "border-rose-400"
+                                    : "border-slate-400 hover:border-brand-primary"
+                                }`}
+                                style={{ ...planStyle, top: 10 }}
+                                title={`Plan: ${fmtShort(a.planned_start)} → ${fmtShort(a.planned_end)}${criticalPathIds.has(a.id) ? " · Ruta crítica" : ""}`}
+                              />
                             )}
                             {showFloat && (() => {
                               const floatDays = floatMap.get(a.id);
@@ -933,6 +1046,11 @@ export function ServiceGantt({
                               <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-3 rounded overflow-hidden ${barColor} hover:opacity-90 z-20`} style={{ ...realStyle, top: 13 }} title={`Real: ${fmtShort(a.actual_start)} → ${fmtShort(a.actual_end)} · ${STATUS_LABEL[a.status]}${a.actual_progress != null ? ` · ${a.actual_progress}%` : ""}`}>
                                 {a.actual_progress != null && a.actual_progress < 100 && (
                                   <div className="absolute top-0 right-0 bottom-0 bg-white/40" style={{ width: `${100 - a.actual_progress}%` }} />
+                                )}
+                                {a.actual_progress != null && a.actual_progress >= 20 && (
+                                  <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-white/90 leading-none pointer-events-none tabular-nums">
+                                    {a.actual_progress}%
+                                  </span>
                                 )}
                               </button>
                             ) : planStyle ? (
@@ -976,6 +1094,12 @@ export function ServiceGantt({
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-4 h-0 inline-block border-b border-dashed border-slate-400" />
                   Dependencia
+                </span>
+              )}
+              {showCriticalPath && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-4 h-2.5 border-2 border-amber-500 bg-amber-50/80 rounded-sm" />
+                  Ruta crítica
                 </span>
               )}
             </div>

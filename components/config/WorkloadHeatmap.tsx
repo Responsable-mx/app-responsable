@@ -4,6 +4,7 @@
 // Calculado client-side desde /api/projects/overview — sin endpoint extra.
 // Color: blanco=libre · emerald=1-2 · amber=3-4 · rose=5+.
 
+import { useState } from "react";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
 
@@ -27,6 +28,10 @@ function fmtWeek(ts: number): string {
 }
 
 export function WorkloadHeatmap() {
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("workload-heatmap-collapsed") === "true";
+  });
   const { data, isLoading } = useSWR("/api/projects/overview", fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
@@ -93,28 +98,49 @@ export function WorkloadHeatmap() {
   // Máximo por consultor para mini sparkbar
   const maxLoad = Math.max(...consultors.map((c) => Math.max(...heatmap[c])), 1);
 
+  function toggleCollapsed() {
+    setCollapsed((v) => {
+      const next = !v;
+      try { localStorage.setItem("workload-heatmap-collapsed", String(next)); } catch {}
+      return next;
+    });
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded overflow-hidden">
       <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between gap-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        <button
+          onClick={toggleCollapsed}
+          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors"
+        >
+          <svg
+            className={`w-3 h-3 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
           Carga semanal — próximas 12 semanas
-        </p>
-        <div className="flex items-center gap-3 text-[9px] font-bold uppercase tracking-widest text-slate-500">
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-50 border border-emerald-200 inline-block" />
-            1–2
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-sm bg-amber-50 border border-amber-200 inline-block" />
-            3–4
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-sm bg-rose-50 border border-rose-200 inline-block" />
-            5+
-          </span>
-        </div>
+        </button>
+        {!collapsed && (
+          <div className="flex items-center gap-3 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-emerald-50 border border-emerald-200 inline-block" />
+              1–2
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-50 border border-amber-200 inline-block" />
+              3–4
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-rose-50 border border-rose-200 inline-block" />
+              5+
+            </span>
+          </div>
+        )}
       </div>
-      <div className="overflow-x-auto">
+      {!collapsed && <div className="overflow-x-auto">
         <table className="min-w-full w-max text-[10px] border-collapse">
           <thead>
             <tr className="bg-slate-50">
@@ -181,7 +207,7 @@ export function WorkloadHeatmap() {
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   );
 }

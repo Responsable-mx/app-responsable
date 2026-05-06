@@ -153,11 +153,17 @@ ${delayed.length === 0 ? "<p style='color:#64748b;font-size:11px;padding:8px 0'>
 </body>
 </html>`;
 
-    const w = window.open("", "_blank", "width=900,height=700");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-    }
+    // Blob URL → abre en nueva pestaña sin bloqueador de pop-ups
+    const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
   }
 
   const { data: serviceCat = [] } = useSWR<{ value: string; label: string }[]>(

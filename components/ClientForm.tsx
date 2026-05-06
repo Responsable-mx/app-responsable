@@ -439,15 +439,10 @@ export function ClientForm(props: Props) {
 
         {/* Reporte financiero anual */}
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
-            URL del reporte financiero anual
-          </label>
-          <input
-            type="url"
+          <UrlField
+            label="URL del reporte financiero anual"
             value={form.financial_report_url}
-            onChange={(e) => update("financial_report_url", e.target.value)}
-            className={inputCls}
-            placeholder="https:// … reporte anual o 10-K"
+            onChange={(v) => update("financial_report_url", v)}
           />
           <ReportIaButton
             clientId={props.initial?.id}

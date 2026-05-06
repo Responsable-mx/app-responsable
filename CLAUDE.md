@@ -198,6 +198,78 @@ Al agregar un nuevo endpoint admin con mutación: integrar `logChange({ actorEma
 - Lectura → `requireUser` (todos los consultores activos)
 - Mutaciones → `requireAdmin` + `logChange()`
 
+## Subsistema de documentos por cliente (Sprint B, may-2026)
+
+Documentos persistentes asociados a un cliente, convertidos a Markdown para
+contexto IA. Reemplazan el doc-fill solo-texto del MVP.
+
+### Modelo de datos
+
+- `clients.sustainability_report_url` / `financial_report_url` — columnas de
+  metadata. La IA puede investigar y poblar estos URLs.
+- `client_documents` (mig 0041): `kind` ∈ {`general`, `sustainability_report`,
+  `financial_report`} · `parse_status` ∈ {`pending`, `ok`, `failed`} ·
+  `markdown_content` (nullable hasta parse) · `storage_path` único en bucket
+  privado `client-documents`. RLS permite lectura/escritura a authenticated;
+  DELETE solo via service role (admin via API).
+- Cap 25MB por archivo (DB CHECK + bucket file_size_limit + API check
+  `MAX_BYTES`). MIME whitelist en bucket + en endpoint POST.
+
+### Parsers (`lib/documents/parsers.ts`)
+
+- PDF: `pdf-parse` v1.1.1 (no actualizar a v2 — API rota)
+- DOCX: `mammoth.convertToHtml` + `htmlToMarkdownLite` custom (mammoth no tiene
+  markdown nativo aún; cambiar cuando exista)
+- XLSX: `exceljs` → markdown table por hoja (xlsx tiene CVE sin fix, NO usar)
+- PPTX: `JSZip` extrae `<a:t>` de `ppt/slides/slideN.xml`
+- TXT/MD: passthrough
+- `truncateMarkdown(MAX=200_000 chars)` para tope global.
+
+### Pipeline ingest desde URL externa
+
+`POST /api/clients/[id]/ingest-report` body `{kind, url}`:
+
+1. SSRF guard (`lib/documents/ssrf.ts`): bloquea localhost, RFC1918, link-local,
+   IPv6 ULA. **Cualquier endpoint que haga `fetch()` a URL externa debe usar
+   `isPublicHttpUrl` antes**.
+2. Fetch con `User-Agent: ResponSable-DocIngest/1.0` + timeout 60s + redirect
+   follow.
+3. Content-Type whitelist (PDF/DOCX/XLSX/PPTX/TXT/MD/HTML). HTML strip → texto.
+4. Tope 25MB (Content-Length + buffer.length post-download).
+5. Parse → `client_documents` con `kind` + `source_url`. Actualiza columna URL
+   en `clients`.
+
+### Uso en flujo IA (`ai-fill`)
+
+- Carga `listDocumentsByClient(clientId)` y filtra `kind !== general` con
+  `parse_status === ok`.
+- Inyecta hasta 30k chars/doc como `INFORMES PÚBLICOS DEL CLIENTE — FUENTE
+  PRIMARIA` antes de instrucción `web_search`.
+- LLM debe citar `source_url` real del informe en `sources.url`. Solo si dato
+  no está en informes, complementa con web_search.
+
+### Cron refresh
+
+- `/api/cron/refresh-reports` — semestral (1ro junio + 1ro diciembre 11:00 UTC).
+  Solo lista clientes con `sustainability_report` o `financial_report` >180d.
+  No re-research automático (costo IA + riesgo URL equivocada). Refresh es
+  manual desde botón "Buscar de nuevo" del `ReportIaButton`.
+
+### UI canónica
+
+- Tab "Documentos" en `ClientTabs` (7ma tab) — `components/documents/DocumentsTab.tsx`
+- Modal "Importar" en cuestionario tabbed (Pegar / Subir / Mis docs) —
+  `components/questionnaire/ImportModal.tsx`
+- Botón IA en ClientForm — `components/clients/ReportIaButton.tsx` con timer
+  visible 30-90s + cancelable via `AbortController`.
+
+### Reglas para ampliar
+
+- Nuevo `kind` → agregar al CHECK de migración + `KIND_LABEL` + ai-fill mapping
+- Nuevo formato → agregar a `detectFileType`/`MIME_TO_TYPE` + parser + bucket
+  `allowed_mime_types`
+- Nuevo endpoint que descarga URL externa → SIEMPRE pasar por `isPublicHttpUrl`
+
 ## Cache breakpoints IA
 
 `buildSystemBlocks` de `lib/ai/roles.ts` emite **2** cache breakpoints `ephemeral`:

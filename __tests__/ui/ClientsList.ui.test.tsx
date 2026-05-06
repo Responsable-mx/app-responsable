@@ -1,7 +1,14 @@
 /** @vitest-environment jsdom */
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import { ClientsList } from "@/components/ClientsList";
+import { ToastProvider } from "@/components/ui/Toast";
+
+// Wrap render con ToastProvider — ClientsList llama useToast()
+function renderWithProviders(ui: ReactNode) {
+  return render(<ToastProvider>{ui}</ToastProvider>);
+}
 
 vi.mock("next/link", () => ({
   default: ({
@@ -76,7 +83,7 @@ afterEach(() => {
 describe("ClientsList", () => {
   it("renderiza empty state cuando no hay clientes", () => {
     mockClients = [];
-    render(<ClientsList />);
+    renderWithProviders(<ClientsList />);
     expect(screen.getByText(/Aún no hay clientes/i)).toBeTruthy();
   });
 
@@ -85,7 +92,7 @@ describe("ClientsList", () => {
       base("Heineken", { sector: "Bebidas" }),
       base("IKEA", { sector: "Retail" }),
     ];
-    render(<ClientsList />);
+    renderWithProviders(<ClientsList />);
     expect(screen.getByText("Heineken")).toBeTruthy();
     expect(screen.getByText("IKEA")).toBeTruthy();
     expect(screen.getByText(/2 clientes/)).toBeTruthy();
@@ -93,7 +100,7 @@ describe("ClientsList", () => {
 
   it("filtra por nombre (server-side debounce 300ms)", () => {
     mockClients = [base("Heineken"), base("IKEA"), base("Sanofi")];
-    render(<ClientsList />);
+    renderWithProviders(<ClientsList />);
     const input = screen.getByPlaceholderText(/Buscar/i);
     // fireEvent.change es síncrono — setQuery dispara inmediatamente.
     // act + vi.runAllTimers ejecuta el setTimeout del debounce → setDebouncedQ → re-render.
@@ -112,7 +119,7 @@ describe("ClientsList", () => {
       base("Heineken", { frameworks: ["gri", "sbti"] }),
       base("IKEA", { frameworks: ["issb"] }),
     ];
-    render(<ClientsList />);
+    renderWithProviders(<ClientsList />);
     act(() => {
       fireEvent.change(screen.getByPlaceholderText(/Buscar/i), {
         target: { value: "sbti" },
@@ -128,7 +135,7 @@ describe("ClientsList", () => {
       base("A", { sector: "Bebidas" }),
       base("B", { sector: "Retail" }),
     ];
-    render(<ClientsList />);
+    renderWithProviders(<ClientsList />);
     expect(screen.getByText(/Todos los sectores/i)).toBeTruthy();
   });
 
@@ -137,7 +144,7 @@ describe("ClientsList", () => {
       base("A", { sector: "Bebidas" }),
       base("B", { sector: "Bebidas" }),
     ];
-    render(<ClientsList />);
+    renderWithProviders(<ClientsList />);
     expect(screen.queryByText(/Todos los sectores/i)).toBeNull();
   });
 });

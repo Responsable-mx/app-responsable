@@ -3,8 +3,9 @@
 // Timeline global v2 — vista gerencial cross-project.
 // 8 mejoras: KPIs header · RAG badge · sort por riesgo · heatmap solapamiento ·
 // milestones por etapa · cascade alert · stage-gate progress · tooltip rico.
+// v2.1: zoom (0.5×–4×) + scroll horizontal + scroll-to-today automático.
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
@@ -27,6 +28,9 @@ const STATUS_BAR: Record<ActivityStatus, string> = {
 
 const MS_DAY = 86_400_000;
 const LABEL_W = 210;
+const CHART_BASE = 900; // px de ancho del chart a zoom 1×
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+const ZOOM_DEFAULT = 2; // índice → 1×
 
 type FlatActivity = {
   id: string;
@@ -45,7 +49,7 @@ type FlatActivity = {
 };
 
 type Milestone = { date: string; label: string; client: string; progress: string };
-type OverlapBand = { left: number; width: number };
+type OverlapBand = { leftPx: number; widthPx: number };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -91,11 +95,12 @@ function assignLanes(acts: FlatActivity[]): number[] {
   });
 }
 
-// Detecta zonas donde ≥2 actividades se solapan → heatmap de carga
+// Detecta zonas donde ≥2 actividades se solapan → heatmap de carga (px)
 function computeOverlapBands(
   acts: FlatActivity[],
   rangeMin: number,
-  totalMs: number
+  totalMs: number,
+  chartW: number
 ): OverlapBand[] {
   const intervals = acts
     .map((a) => ({
@@ -111,8 +116,8 @@ function computeOverlapBands(
       const oE = Math.min(intervals[i].e, intervals[j].e);
       if (oS < oE) {
         bands.push({
-          left: ((oS - rangeMin) / totalMs) * 100,
-          width: Math.max(((oE - oS) / totalMs) * 100, 0.3),
+          leftPx: ((oS - rangeMin) / totalMs) * chartW,
+          widthPx: Math.max(((oE - oS) / totalMs) * chartW, 2),
         });
       }
     }
@@ -120,7 +125,7 @@ function computeOverlapBands(
   return bands;
 }
 
-// Último milestone (◆) por (client + stage) para cada consultor
+// Último milestone (◆) por (client + stage)
 function computeMilestones(acts: FlatActivity[]): Milestone[] {
   const byStage = new Map<string, FlatActivity[]>();
   for (const a of acts) {
@@ -152,6 +157,11 @@ function computeMilestones(acts: FlatActivity[]): Milestone[] {
 export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
   const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
   const [now] = useState(() => Date.now());
+  const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const zoom = ZOOM_STEPS[zoomIdx];
+  const chartW = Math.round(CHART_BASE * zoom);
 
   // Aplanar + filtrar (incluye depends_on_activity_id para cascade)
   const activities = useMemo<FlatActivity[]>(() => {
@@ -206,7 +216,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     return out;
   }, [data, filters]);
 
-  // KPIs globales (feature 1)
+  // KPIs globales
   const globalStats = useMemo(() => {
     const consultores = new Set(
       activities.map((a) => a.assignee_email).filter(Boolean)
@@ -224,7 +234,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     return { consultores, activas, retrasadas, proximas };
   }, [activities, now]);
 
-  // IDs con dependientes — para cascade alert (feature 6)
+  // IDs con dependientes — cascade alert
   const activitiesWithDependents = useMemo(() => {
     const set = new Set<string>();
     for (const a of activities) {
@@ -233,7 +243,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     return set;
   }, [activities]);
 
-  // Progreso por etapa — para stage-gate tooltip (feature 7)
+  // Progreso por etapa — stage-gate tooltip
   const stageProgress = useMemo(() => {
     const map = new Map<string, { total: number; completed: number }>();
     for (const a of activities) {
@@ -246,7 +256,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     return map;
   }, [activities]);
 
-  // Agrupar por consultor + sort por riesgo (feature 3)
+  // Agrupar por consultor + sort por riesgo
   const byConsultor = useMemo(() => {
     const map = new Map<string, FlatActivity[]>();
     for (const a of activities) {
@@ -256,7 +266,6 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
       map.set(key, list);
     }
     return Array.from(map.entries()).sort(([, a], [, b]) => {
-      // Retrasadas desc → en curso desc → sin asignar al final
       const aD = a.filter((x) => x.status === "delayed").length;
       const bD = b.filter((x) => x.status === "delayed").length;
       if (bD !== aD) return bD - aD;
@@ -270,22 +279,14 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
   const range = useMemo(() => {
     const dates: number[] = [];
     for (const a of activities) {
-      for (const k of [
-        a.planned_start,
-        a.planned_end,
-        a.actual_start,
-        a.actual_end,
-      ]) {
+      for (const k of [a.planned_start, a.planned_end, a.actual_start, a.actual_end]) {
         const d = parseDate(k);
         if (d) dates.push(d.getTime());
       }
     }
     if (dates.length === 0) return null;
     const min = startOfMonth(new Date(Math.min(...dates) - MS_DAY * 7));
-    const max = addMonths(
-      startOfMonth(new Date(Math.max(...dates) + MS_DAY * 7)),
-      1
-    );
+    const max = addMonths(startOfMonth(new Date(Math.max(...dates) + MS_DAY * 7)), 1);
     const months: Date[] = [];
     let cur = new Date(min);
     while (cur < max) {
@@ -294,6 +295,34 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     }
     return { min: min.getTime(), max: max.getTime(), months };
   }, [activities]);
+
+  // Datos computados por fila (dependen de range + chartW para px)
+  const rowData = useMemo(() => {
+    if (!range) return [];
+    const ms = range.max - range.min;
+    return byConsultor.map(([key, acts]) => {
+      const delayed = acts.filter((a) => a.status === "delayed").length;
+      const active = acts.filter((a) => a.status === "in_progress").length;
+      const rag: "red" | "amber" | "green" =
+        delayed > 0 ? "red" : active > 0 ? "amber" : "green";
+      const overlapBands = computeOverlapBands(acts, range.min, ms, chartW);
+      const milestones = computeMilestones(acts);
+      const lanes = assignLanes(acts);
+      const maxLane = acts.length > 0 ? Math.max(0, ...lanes) : 0;
+      const rowH = Math.max(64, 14 + (maxLane + 1) * 20 + 14);
+      return { key, acts, delayed, active, rag, overlapBands, milestones, lanes, rowH };
+    });
+  }, [byConsultor, range, chartW]);
+
+  // Scroll automático hacia "Hoy" al montar o cambiar zoom
+  useEffect(() => {
+    if (!scrollRef.current || !range) return;
+    const ms = range.max - range.min;
+    const todayX = ((now - range.min) / ms) * chartW;
+    if (todayX < 0 || todayX > chartW) return;
+    const cW = scrollRef.current.clientWidth;
+    scrollRef.current.scrollLeft = Math.max(0, todayX - cW / 3);
+  }, [range, chartW, now]);
 
   // ── Early returns ─────────────────────────────────────────────────────────
 
@@ -319,75 +348,56 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
     );
 
   const totalMs = range.max - range.min;
-  const todayPct = ((now - range.min) / totalMs) * 100;
-  const todayInRange = todayPct >= 0 && todayPct <= 100;
+  const todayPx = ((now - range.min) / totalMs) * chartW;
+  const todayInRange = todayPx >= 0 && todayPx <= chartW;
 
-  function pct(s: string | null): number | null {
+  function pxOf(s: string | null): number | null {
     const d = parseDate(s);
     if (!d) return null;
-    return ((d.getTime() - range!.min) / totalMs) * 100;
+    return ((d.getTime() - range!.min) / totalMs) * chartW;
   }
-  function barStyle(s: string | null, e: string | null) {
-    const a = pct(s);
-    const b = pct(e);
+  function barPx(s: string | null, e: string | null): { left: number; width: number } | null {
+    const a = pxOf(s);
+    const b = pxOf(e);
     if (a === null || b === null) return null;
-    return { left: `${a}%`, width: `${Math.max(b - a, 1)}%` };
+    return { left: a, width: Math.max(b - a, 2) };
+  }
+
+  function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    if (e.deltaY < 0) setZoomIdx((i) => Math.min(ZOOM_STEPS.length - 1, i + 1));
+    else setZoomIdx((i) => Math.max(0, i - 1));
+  }
+
+  function scrollToToday() {
+    if (!scrollRef.current) return;
+    const cW = scrollRef.current.clientWidth;
+    scrollRef.current.scrollLeft = Math.max(0, todayPx - cW / 3);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-3">
-      {/* ── Feature 1: Header KPIs ── */}
+      {/* ── KPIs ── */}
       <div className="grid grid-cols-4 gap-3">
         {(
           [
-            {
-              label: "Consultores",
-              value: globalStats.consultores,
-              tone: "neutral" as const,
-              hint: "con actividades visibles",
-            },
-            {
-              label: "En curso",
-              value: globalStats.activas,
-              tone: "primary" as const,
-              hint: "activas o retrasadas",
-            },
-            {
-              label: "Retrasadas",
-              value: globalStats.retrasadas,
-              tone: "red" as const,
-              hint: "requieren atención",
-            },
-            {
-              label: "Próximas 30d",
-              value: globalStats.proximas,
-              tone: "amber" as const,
-              hint: "inician pronto",
-            },
+            { label: "Consultores", value: globalStats.consultores, tone: "neutral" as const, hint: "con actividades visibles" },
+            { label: "En curso", value: globalStats.activas, tone: "primary" as const, hint: "activas o retrasadas" },
+            { label: "Retrasadas", value: globalStats.retrasadas, tone: "red" as const, hint: "requieren atención" },
+            { label: "Próximas 30d", value: globalStats.proximas, tone: "amber" as const, hint: "inician pronto" },
           ] as const
         ).map(({ label, value, tone, hint }) => (
-          <div
-            key={label}
-            className="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm"
-          >
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              {label}
-            </p>
-            <p
-              className={`text-2xl font-bold tabular-nums mt-0.5 ${
-                tone === "red"
-                  ? "text-rose-600"
-                  : tone === "amber"
-                  ? "text-amber-600"
-                  : tone === "primary"
-                  ? "text-brand-primary-dark"
-                  : "text-slate-900"
-              }`}
-            >
-              {value}
-            </p>
+          <div key={label} className="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+            <p className={`text-2xl font-bold tabular-nums mt-0.5 ${
+              tone === "red" ? "text-rose-600"
+              : tone === "amber" ? "text-amber-600"
+              : tone === "primary" ? "text-brand-primary-dark"
+              : "text-slate-900"
+            }`}>{value}</p>
             <p className="text-[10px] text-slate-500 mt-0.5">{hint}</p>
           </div>
         ))}
@@ -395,205 +405,186 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
 
       {/* ── Timeline ── */}
       <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        {/* Header meses */}
-        <div className="flex border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
-          <div
-            style={{ width: LABEL_W }}
-            className="shrink-0 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-slate-200"
-          >
-            Consultor
+
+        {/* Barra de zoom */}
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 bg-slate-50/60">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-1">Zoom</span>
+          <button
+            onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
+            disabled={zoomIdx === 0}
+            className="w-6 h-6 flex items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-bold"
+            title="Alejar"
+          >−</button>
+          <span className="text-xs font-bold tabular-nums text-slate-700 w-8 text-center">{zoom}×</span>
+          <button
+            onClick={() => setZoomIdx((i) => Math.min(ZOOM_STEPS.length - 1, i + 1))}
+            disabled={zoomIdx === ZOOM_STEPS.length - 1}
+            className="w-6 h-6 flex items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-bold"
+            title="Acercar"
+          >+</button>
+          <div className="flex gap-1 ml-1">
+            {ZOOM_STEPS.map((z, i) => (
+              <button
+                key={z}
+                onClick={() => setZoomIdx(i)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${i === zoomIdx ? "bg-brand-primary" : "bg-slate-300 hover:bg-slate-400"}`}
+                title={`${z}×`}
+              />
+            ))}
           </div>
-          <div className="relative flex-1 min-w-0 h-9">
-            {range.months.map((m, i) => {
-              const left = ((m.getTime() - range.min) / totalMs) * 100;
-              const next =
-                i + 1 < range.months.length
-                  ? range.months[i + 1]
-                  : new Date(range.max);
-              const width = ((next.getTime() - m.getTime()) / totalMs) * 100;
+          {todayInRange && (
+            <button
+              onClick={scrollToToday}
+              className="ml-2 text-[10px] font-semibold text-brand-primary-dark hover:underline"
+              title="Centrar en hoy"
+            >
+              ↔ Hoy
+            </button>
+          )}
+          <span className="ml-auto text-[10px] text-slate-400">Ctrl + rueda para zoom</span>
+        </div>
+
+        {/* Grid: columna label fija + zona chart scrolleable */}
+        <div className="flex">
+
+          {/* Columna label — ancho fijo, no scrollea */}
+          <div className="shrink-0 border-r border-slate-200 bg-white" style={{ width: LABEL_W }}>
+            {/* Header */}
+            <div className="h-9 border-b border-slate-200 bg-slate-50 px-3 flex items-center">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Consultor</span>
+            </div>
+            {/* Filas de consultor */}
+            {rowData.map(({ key, acts, rag, delayed, active, rowH }) => {
+              const isUnassigned = key === "__unassigned__";
+              const display = isUnassigned ? "Sin asignar" : key.split("@")[0];
+              const subtitle = isUnassigned ? `${acts.length} sin owner` : key;
+              const RAG_DOT = { red: "bg-rose-500", amber: "bg-amber-400", green: "bg-emerald-500" } as const;
+              const RAG_TEXT = { red: "text-rose-700 font-bold", amber: "text-amber-700 font-semibold", green: "text-slate-500" } as const;
+              const RAG_LABEL = {
+                red: `${delayed} retrasada${delayed !== 1 ? "s" : ""}`,
+                amber: `${active} en curso`,
+                green: "Sin carga activa",
+              } as const;
               return (
                 <div
-                  key={i}
-                  className="absolute top-0 bottom-0 border-r border-slate-200 px-1.5 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate"
-                  style={{ left: `${left}%`, width: `${width}%` }}
+                  key={key}
+                  className="border-b border-slate-100 px-3 py-2.5 flex flex-col justify-start gap-0.5"
+                  style={{ height: rowH }}
                 >
-                  {fmtMonth(m)}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`shrink-0 w-2 h-2 rounded-full ${RAG_DOT[rag]}`} aria-label={RAG_LABEL[rag]} />
+                    <p className={`text-xs font-semibold truncate ${isUnassigned ? "text-slate-500 italic" : "text-slate-900"}`}>
+                      {display}
+                    </p>
+                  </div>
+                  <p className="text-[10px] text-slate-500 truncate pl-3.5" title={subtitle}>{subtitle}</p>
+                  {!isUnassigned && (
+                    <p className={`text-[10px] tabular-nums pl-3.5 ${RAG_TEXT[rag]}`}>{RAG_LABEL[rag]}</p>
+                  )}
                 </div>
               );
             })}
           </div>
-        </div>
 
-        {/* Filas por consultor */}
-        <div className="divide-y divide-slate-100">
-          {byConsultor.map(([key, acts]) => {
-            const isUnassigned = key === "__unassigned__";
-            const display = isUnassigned ? "Sin asignar" : key.split("@")[0];
-            const subtitle = isUnassigned ? `${acts.length} sin owner` : key;
+          {/* Zona chart — scroll horizontal */}
+          <div
+            ref={scrollRef}
+            className="overflow-x-auto flex-1 min-w-0"
+            onWheel={handleWheel}
+          >
+            {/* Inner a ancho fijo en px */}
+            <div style={{ width: chartW }} className="relative">
 
-            // ── Feature 2: RAG badge ──
-            const delayed = acts.filter((a) => a.status === "delayed").length;
-            const active = acts.filter(
-              (a) => a.status === "in_progress"
-            ).length;
-            const rag: "red" | "amber" | "green" =
-              delayed > 0 ? "red" : active > 0 ? "amber" : "green";
-            const RAG_DOT = {
-              red: "bg-rose-500",
-              amber: "bg-amber-400",
-              green: "bg-emerald-500",
-            } as const;
-            const RAG_TEXT = {
-              red: `text-rose-700 font-bold`,
-              amber: `text-amber-700 font-semibold`,
-              green: `text-slate-500`,
-            } as const;
-            const RAG_LABEL = {
-              red: `${delayed} retrasada${delayed !== 1 ? "s" : ""}`,
-              amber: `${active} en curso`,
-              green: "Sin carga activa",
-            } as const;
-
-            // ── Feature 4: Heatmap solapamiento ──
-            const overlapBands = computeOverlapBands(acts, range.min, totalMs);
-
-            // ── Feature 5: Milestones ──
-            const milestones = computeMilestones(acts);
-
-            // Lane assignment sin superposición visual
-            const lanes = assignLanes(acts);
-            const maxLane = acts.length > 0 ? Math.max(0, ...lanes) : 0;
-            const rowH = Math.max(64, 14 + (maxLane + 1) * 20 + 14);
-
-            return (
-              <div key={key} className="flex" style={{ minHeight: rowH }}>
-                {/* Label column */}
-                <div
-                  style={{ width: LABEL_W }}
-                  className="shrink-0 px-3 py-2.5 border-r border-slate-200 min-w-0 flex flex-col justify-start gap-0.5"
-                >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {/* RAG dot */}
-                    <span
-                      className={`shrink-0 w-2 h-2 rounded-full ${RAG_DOT[rag]}`}
-                      aria-label={RAG_LABEL[rag]}
-                    />
-                    <p
-                      className={`text-xs font-semibold truncate ${
-                        isUnassigned
-                          ? "text-slate-500 italic"
-                          : "text-slate-900"
-                      }`}
+              {/* Header meses */}
+              <div className="h-9 border-b border-slate-200 bg-slate-50 relative overflow-hidden">
+                {range.months.map((m, i) => {
+                  const leftPx = ((m.getTime() - range.min) / totalMs) * chartW;
+                  const nextMs = i + 1 < range.months.length
+                    ? range.months[i + 1].getTime()
+                    : range.max;
+                  const widthPx = ((nextMs - m.getTime()) / totalMs) * chartW;
+                  return (
+                    <div
+                      key={i}
+                      className="absolute top-0 bottom-0 border-r border-slate-200 px-1.5 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 overflow-hidden"
+                      style={{ left: leftPx, width: widthPx }}
                     >
-                      {display}
-                    </p>
-                  </div>
-                  <p
-                    className="text-[10px] text-slate-500 truncate pl-3.5"
-                    title={subtitle}
-                  >
-                    {subtitle}
-                  </p>
-                  {!isUnassigned && (
-                    <p className={`text-[10px] tabular-nums pl-3.5 ${RAG_TEXT[rag]}`}>
-                      {RAG_LABEL[rag]}
-                    </p>
-                  )}
-                </div>
+                      {fmtMonth(m)}
+                    </div>
+                  );
+                })}
+              </div>
 
-                {/* Timeline column */}
-                <div className="relative flex-1 min-w-0">
-                  {/* Líneas de meses */}
+              {/* Filas de actividades */}
+              {rowData.map(({ key, acts, lanes, rowH, overlapBands, milestones }) => (
+                <div key={key} className="relative border-b border-slate-100" style={{ height: rowH }}>
+
+                  {/* Líneas de mes */}
                   {range.months.map((m, i) => (
                     <div
                       key={i}
-                      className="absolute top-0 bottom-0 border-r border-slate-100"
-                      style={{
-                        left: `${((m.getTime() - range.min) / totalMs) * 100}%`,
-                        width: 0,
-                      }}
+                      className="absolute top-0 bottom-0 border-r border-slate-100 pointer-events-none"
+                      style={{ left: ((m.getTime() - range.min) / totalMs) * chartW, width: 0 }}
                     />
                   ))}
 
-                  {/* Feature 4: Bandas de solapamiento (heatmap de carga) */}
+                  {/* Heatmap de solapamiento */}
                   {overlapBands.map((band, i) => (
                     <div
                       key={i}
                       className="absolute top-0 bottom-0 bg-amber-100/70 pointer-events-none"
-                      style={{
-                        left: `${band.left}%`,
-                        width: `${band.width}%`,
-                      }}
+                      style={{ left: band.leftPx, width: band.widthPx }}
                       title="Actividades solapadas — carga alta en este período"
                     />
                   ))}
 
-                  {/* Hoy */}
+                  {/* Línea de hoy */}
                   {todayInRange && (
                     <div
                       className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none z-20"
-                      style={{ left: `${todayPct}%`, width: 0 }}
+                      style={{ left: todayPx, width: 0 }}
                       title="Hoy"
                     />
                   )}
 
                   {/* Barras de actividades */}
                   {acts.map((a, idx) => {
-                    const realStyle = barStyle(a.actual_start, a.actual_end);
-                    const planStyle = barStyle(
-                      a.planned_start,
-                      a.planned_end
-                    );
+                    const realStyle = barPx(a.actual_start, a.actual_end);
+                    const planStyle = barPx(a.planned_start, a.planned_end);
                     const style = realStyle ?? planStyle;
                     if (!style) return null;
 
                     const colorClass = STATUS_BAR[a.status];
                     const lane = lanes[idx];
                     const top = 14 + lane * 20;
+                    const isCascade = a.status === "delayed" && activitiesWithDependents.has(a.id);
 
-                    // Feature 6: Cascade alert
-                    const isCascade =
-                      a.status === "delayed" &&
-                      activitiesWithDependents.has(a.id);
-
-                    // Feature 7: Stage-gate progress
                     const stageKey = `${a.client_id}::${a.stage_name}`;
                     const sp = stageProgress.get(stageKey);
-                    const spLabel = sp
-                      ? `${sp.completed}/${sp.total} completas`
-                      : "";
+                    const spLabel = sp ? `${sp.completed}/${sp.total} completas` : "";
 
-                    // Feature 8: Tooltip rico
                     const tooltip = [
-                      isCascade
-                        ? "⚡ RIESGO CASCADA — dependientes afectados"
-                        : null,
+                      isCascade ? "⚡ RIESGO CASCADA — dependientes afectados" : null,
                       `Cliente: ${a.client_name}`,
                       `Etapa: ${a.stage_name}${spLabel ? ` · ${spLabel}` : ""}`,
                       `Actividad: ${a.name}`,
                       `Plan: ${fmt(a.planned_start)} → ${fmt(a.planned_end)}`,
                       `Real: ${fmt(a.actual_start)} → ${fmt(a.actual_end)}`,
                       `Status: ${a.status}`,
-                    ]
-                      .filter(Boolean)
-                      .join("\n");
+                    ].filter(Boolean).join("\n");
 
                     return (
                       <Link
                         key={a.id}
                         href={`/clientes/${a.client_id}?tab=cronograma`}
                         className={`absolute h-4 rounded ${colorClass} transition-colors flex items-center px-1 overflow-hidden gap-0.5 ${
-                          isCascade
-                            ? "ring-1 ring-rose-300 ring-offset-0"
-                            : ""
+                          isCascade ? "ring-1 ring-rose-300 ring-offset-0" : ""
                         }`}
-                        style={{ ...style, top }}
+                        style={{ left: style.left, width: style.width, top }}
                         title={tooltip}
                       >
                         {isCascade && (
-                          <span className="text-[8px] shrink-0 leading-none">
-                            ⚡
-                          </span>
+                          <span className="text-[8px] shrink-0 leading-none">⚡</span>
                         )}
                         <span className="text-[9px] text-white font-semibold truncate leading-none">
                           {a.client_name} · {a.name}
@@ -602,36 +593,27 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
                     );
                   })}
 
-                  {/* Feature 5: Milestone diamonds (◆ cierre de etapa) */}
+                  {/* Milestones ◆ */}
                   {milestones.map((m, i) => {
-                    const p = pct(m.date);
-                    if (p === null || p < 0 || p > 100) return null;
+                    const mPx = pxOf(m.date);
+                    if (mPx === null || mPx < 0 || mPx > chartW) return null;
                     return (
                       <div
                         key={i}
                         className="absolute z-10 pointer-events-none"
-                        style={{
-                          left: `${p}%`,
-                          bottom: 5,
-                          transform: "translateX(-50%)",
-                        }}
+                        style={{ left: mPx, bottom: 5, transform: "translateX(-50%)" }}
                         title={`◆ Cierre: ${m.client} · ${m.label}\n${m.progress} actividades completadas\nFecha: ${fmt(m.date)}`}
                       >
-                        <svg
-                          width="10"
-                          height="10"
-                          viewBox="0 0 10 10"
-                          className="fill-slate-500"
-                        >
+                        <svg width="10" height="10" viewBox="0 0 10 10" className="fill-slate-500">
                           <polygon points="5,0 10,5 5,10 0,5" />
                         </svg>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Leyenda */}
@@ -651,12 +633,7 @@ export function GlobalTimeline({ filters }: { filters?: EquipoFilters } = {}) {
             </span>
           ))}
           <span className="inline-flex items-center gap-1.5 border-l border-slate-200 pl-4">
-            <svg
-              width="8"
-              height="8"
-              viewBox="0 0 10 10"
-              className="fill-slate-500 shrink-0"
-            >
+            <svg width="8" height="8" viewBox="0 0 10 10" className="fill-slate-500 shrink-0">
               <polygon points="5,0 10,5 5,10 0,5" />
             </svg>
             Cierre de etapa

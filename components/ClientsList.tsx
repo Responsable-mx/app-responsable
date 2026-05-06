@@ -79,7 +79,7 @@ export function ClientsList() {
   const swrKey = debouncedQ
     ? `/api/clients?q=${encodeURIComponent(debouncedQ)}&limit=200`
     : "/api/clients?limit=500";
-  const { data: swrData, isLoading } = useSWR(swrKey, fetcher, {
+  const { data: swrData, isLoading, error: swrError } = useSWR(swrKey, fetcher, {
     revalidateOnFocus: false,
     keepPreviousData: true,
   });
@@ -373,7 +373,11 @@ export function ClientsList() {
         </div>
       </div>
 
-      {isLoading && clients.length === 0 ? (
+      {swrError && clients.length === 0 ? (
+        <div className="bg-rose-50 border border-rose-200 rounded p-4 text-sm text-rose-700">
+          Error al cargar la lista de clientes. Recarga la página.
+        </div>
+      ) : isLoading && clients.length === 0 ? (
         <SkeletonTable rows={6} cols={4} />
       ) : filtered.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded p-10 text-center shadow-sm">

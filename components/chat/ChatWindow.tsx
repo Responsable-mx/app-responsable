@@ -332,6 +332,11 @@ export function ChatWindow({
       { role: "assistant", content: "", ts: now, roleId: role },
     ]);
 
+    // D-65: API valida max 50 mensajes. Sesiones largas (cargadas del historial)
+    // pueden superar ese límite → 400 silencioso. Enviamos los últimos 50 para
+    // mantener contexto reciente sin romper la validación.
+    const sendHistory = history.length > 50 ? history.slice(-50) : history;
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -339,7 +344,7 @@ export function ChatWindow({
         body: JSON.stringify({
           role,
           clientId: clientId || null,
-          messages: history,
+          messages: sendHistory,
         }),
         signal: controller.signal,
       });

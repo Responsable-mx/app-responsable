@@ -44,7 +44,7 @@ export function ChatSessionsPanel({
   const url = filterClientId
     ? `/api/chat-sessions?clientId=${filterClientId}`
     : "/api/chat-sessions";
-  const { data, isLoading, mutate } = useSWR(open ? url : null, fetcher, {
+  const { data, isLoading, error, mutate } = useSWR(open ? url : null, fetcher, {
     revalidateOnFocus: false,
   });
   const sessions = data?.data ?? [];
@@ -117,6 +117,16 @@ export function ChatSessionsPanel({
           {isLoading ? (
             <div className="px-4 py-8 text-center text-xs text-slate-500">
               Cargando…
+            </div>
+          ) : error && !data ? (
+            <div className="px-4 py-6 text-center">
+              <p className="text-xs text-rose-700 mb-2">Error al cargar conversaciones.</p>
+              <button
+                onClick={() => void mutate()}
+                className="text-xs text-brand-primary hover:underline"
+              >
+                Reintentar
+              </button>
             </div>
           ) : sessions.length === 0 ? (
             <div className="px-4 py-8 text-center text-xs text-slate-500">

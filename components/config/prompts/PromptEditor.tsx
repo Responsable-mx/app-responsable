@@ -33,7 +33,7 @@ export function PromptEditor({
   onToggleHistory: () => void;
   onSaved: () => void;
 }) {
-  const { data, mutate, isLoading } = useSWR<{ data: PromptDetail }>(
+  const { data, mutate, isLoading, error: swrError } = useSWR<{ data: PromptDetail }>(
     `/api/prompts/${encodeURIComponent(promptKey)}`,
     fetcher,
   );
@@ -106,6 +106,13 @@ export function PromptEditor({
     }
   }
 
+  if (swrError && !data) {
+    return (
+      <div className="bg-white border border-slate-200 rounded p-6 text-sm text-rose-700">
+        No se pudo cargar el prompt. Recarga la página o revisa tu conexión.
+      </div>
+    );
+  }
   if (isLoading || !data) {
     return <SkeletonDetail />;
   }

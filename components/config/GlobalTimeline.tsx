@@ -539,7 +539,7 @@ export function GlobalTimeline({
                       {display}
                     </p>
                   </div>
-                  <p className="text-[10px] text-slate-500 truncate pl-8" title={subtitle}>{subtitle}</p>
+                  <p className="text-[10px] leading-4 text-slate-600 truncate pl-8" title={subtitle}>{subtitle}</p>
                   {!isUnassigned && (
                     <p className={`text-[10px] tabular-nums pl-8 ${RAG_TEXT[rag]}`}>{RAG_LABEL[rag]}</p>
                   )}

@@ -141,8 +141,12 @@ export function TeamTab({
               <tr className="text-left text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                 <th className="pb-2 pr-6">Consultor</th>
                 <th className="pb-2 pr-6">Email</th>
-                <th className="pb-2 pr-6">Seniority en este proyecto</th>
-                {hasAnyOverride && hasAnyGlobalSeniority && <th className="pb-2 pr-6">Seniority global</th>}
+                <th className="pb-2 pr-6">Nivel en proyecto</th>
+                {hasAnyOverride && hasAnyGlobalSeniority && (
+                  <th className="pb-2 pr-6" title="Nivel del consultor en todos los proyectos (default cuando no hay override)">
+                    Nivel global
+                  </th>
+                )}
                 <th className="pb-2 pr-6">Asignado</th>
                 {isAdmin && <th className="pb-2 text-right">Acciones</th>}
               </tr>
@@ -184,17 +188,23 @@ export function TeamTab({
                     <td className="py-2 text-right">
                       <button
                         onClick={() => setEditTarget(c)}
-                        className="text-xs px-3 py-2 text-slate-700 hover:bg-slate-100 rounded min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
-                        title="Cambiar seniority en este proyecto"
+                        className="px-2.5 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded min-w-[40px] min-h-[40px] inline-flex items-center justify-center transition-colors"
+                        title="Cambiar nivel en este proyecto"
+                        aria-label={`Editar nivel de ${c.full_name ?? c.user_email}`}
                       >
-                        ✎
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
                       </button>
                       <button
                         onClick={() => setRemoveTarget(c)}
-                        className="text-xs px-3 py-2 text-red-700 hover:bg-red-50 rounded ml-1 min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
+                        className="px-2.5 py-2 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded ml-1 min-w-[40px] min-h-[40px] inline-flex items-center justify-center transition-colors"
                         title="Remover del proyecto"
+                        aria-label={`Remover a ${c.full_name ?? c.user_email} del proyecto`}
                       >
-                        ⊗
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     </td>
                   )}

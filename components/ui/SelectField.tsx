@@ -29,6 +29,7 @@ export function SelectField({
   const [open, setOpen] = useState(false);
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const uid = useId();
   const listId = `${externalId ?? uid}-listbox`;
 
@@ -69,7 +70,11 @@ export function SelectField({
         e.preventDefault();
         if (focusedIdx >= 0) onChange(allOptions[focusedIdx].value);
         setOpen(false); setFocusedIdx(-1);
-      } else if (e.key === "Escape" || e.key === "Tab") {
+      } else if (e.key === "Escape") {
+        setOpen(false); setFocusedIdx(-1);
+        // Devolver foco al trigger tras cerrar con ESC (patrón WAI-ARIA combobox)
+        triggerRef.current?.focus();
+      } else if (e.key === "Tab") {
         setOpen(false); setFocusedIdx(-1);
       }
     }
@@ -81,6 +86,7 @@ export function SelectField({
   return (
     <div ref={ref} className={`relative ${className ?? ""}`}>
       <button
+        ref={triggerRef}
         id={externalId}
         type="button"
         role="combobox"

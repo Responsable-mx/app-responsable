@@ -433,9 +433,15 @@ export function ServiceGantt({
   async function exportPng() {
     if (!ganttRef.current || exporting) return;
     setExporting(true);
+    // Quitar maxHeight temporalmente — html2canvas solo captura el área visible del card.
+    // Sin este fix el PNG queda cortado al viewport del contenedor.
+    const el = ganttRef.current;
+    const prevMaxH = el.style.maxHeight;
+    el.style.maxHeight = "none";
+    void el.offsetHeight; // force reflow antes de captura
     try {
       const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(ganttRef.current, {
+      const canvas = await html2canvas(el, {
         backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
@@ -446,6 +452,7 @@ export function ServiceGantt({
       link.href = canvas.toDataURL("image/png");
       link.click();
     } finally {
+      el.style.maxHeight = prevMaxH;
       setExporting(false);
     }
   }
@@ -558,7 +565,7 @@ export function ServiceGantt({
             {/* Grupo 1: Zoom */}
             <div className="flex items-center gap-0.5">
               {([
-                { v: "fit", label: "Ajustar" },
+                { v: "fit", label: "Completa" },
                 { v: "mes", label: "Mes" },
                 { v: "quarter", label: "Trim." },
                 { v: "semana", label: "Sem." },
@@ -791,7 +798,7 @@ export function ServiceGantt({
                 })}
                 {todayInRange && (
                   <div className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${todayPct}%` }}>
-                    <div className="absolute top-0 bottom-0 border-l border-rose-400/60" />
+                    <div className="absolute top-0 bottom-0 border-l-2 border-rose-500/70" />
                     <div className="absolute -translate-x-1/2 px-1 rounded-sm bg-rose-50 border border-rose-200 text-[9px] font-bold text-rose-600 whitespace-nowrap z-10 leading-4" style={{ top: 3 }}>
                       {new Date(now).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
                     </div>
@@ -1001,7 +1008,7 @@ export function ServiceGantt({
                         })()}
                         {todayInRange && (
                           <div
-                            className="absolute top-0 bottom-0 border-l border-rose-400/30 pointer-events-none"
+                            className="absolute top-0 bottom-0 border-l-2 border-rose-500/50 pointer-events-none"
                             style={{ left: `${todayPct}%` }}
                           />
                         )}
@@ -1105,7 +1112,7 @@ export function ServiceGantt({
                               />
                             )}
                             {todayInRange && (
-                              <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%`, width: 0 }} />
+                              <div className="absolute top-0 bottom-0 border-l-2 border-rose-500/70 pointer-events-none" style={{ left: `${todayPct}%`, width: 0 }} />
                             )}
                             {isOnRisk && (
                               <div className="absolute inset-0 pointer-events-none" style={{ background: "repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(251,113,133,0.07) 4px,rgba(251,113,133,0.07) 8px)" }} />
@@ -1113,7 +1120,17 @@ export function ServiceGantt({
                             {isMilestone && (() => {
                               const p = pct(a.planned_start);
                               if (p === null) return null;
-                              return <button onClick={(e) => openPopover(e, s.id, a)} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rotate-45 bg-amber-400 border-2 border-amber-600 hover:bg-amber-300 transition-colors z-20" style={{ left: `${p}%` }} title={`Hito: ${fmtShort(a.planned_start)}`} />;
+                              return (
+                                <button
+                                  onClick={(e) => openPopover(e, s.id, a)}
+                                  className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 rounded"
+                                  style={{ left: `${p}%`, width: 44, height: 44 }}
+                                  title={`Hito: ${fmtShort(a.planned_start)}`}
+                                  aria-label={`Hito: ${a.name} · ${fmtShort(a.planned_start)}`}
+                                >
+                                  <span aria-hidden className="w-4 h-4 rotate-45 bg-amber-400 border-2 border-amber-600 hover:bg-amber-300 transition-colors block" />
+                                </button>
+                              );
                             })()}
                             {baselineStyle && (
                               <div className="absolute h-1.5 rounded pointer-events-none z-[5]" style={{ ...baselineStyle, top: 6, background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)", opacity: 0.7 }} title={`Baseline: ${fmtShort(a.baseline_start)} → ${fmtShort(a.baseline_end)}`} />

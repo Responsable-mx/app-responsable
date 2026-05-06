@@ -131,6 +131,9 @@ export function ChatWindow({
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Buffer de texto del streaming activo. Acumula chunks SSE sin causar re-render
+  // en cada delta — el intervalo de 50ms hace flush a state en batch.
+  const streamTextRef = useRef("");
 
   // Sesiones recientes: accesibles vía panel Historial (botón en header). No se cargan
   // en el empty state — el usuario las abre on-demand via ChatSessionsPanel.
@@ -144,6 +147,33 @@ export function ChatWindow({
       behavior: "smooth",
     });
   }, [messages, streaming]);
+
+  // Batch flush: mientras streaming, escribe al estado cada 50ms en lugar de
+  // en cada chunk SSE. Elimina el "titileo" visual en respuestas largas de
+  // Elena/Aurora (>500 tokens = >500 setState en <10s).
+  useEffect(() => {
+    if (!streaming) return;
+    const id = setInterval(() => {
+      const text = streamTextRef.current;
+      setMessages((m) => {
+        const last = m[m.length - 1];
+        if (!last || last.role !== "assistant" || last.content === text) return m;
+        return [...m.slice(0, -1), { ...last, content: text }];
+      });
+    }, 50);
+    return () => clearInterval(id);
+  }, [streaming]);
+
+  // Avisa al usuario si intenta cerrar la pestaña durante un stream activo.
+  useEffect(() => {
+    if (!streaming) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [streaming]);
 
   // Auto-simula conversación demo cuando cliente Altamira (seed dummy) está
   // seleccionado y el chat está vacío. Streaming carácter por carácter para
@@ -224,6 +254,7 @@ export function ChatWindow({
   async function send(prompt: string) {
     if (!prompt.trim() || streaming) return;
     setError("");
+    streamTextRef.current = ""; // reset buffer antes de cada turno
     const now = Date.now();
     const userMsg: ChatMessage = { role: "user", content: prompt, ts: now };
     const history = [...messages, userMsg];
@@ -284,14 +315,8 @@ export function ChatWindow({
               continue;
             }
             if (raw.type === "delta") {
-              setMessages((m) => {
-                const last = m[m.length - 1];
-                if (!last || last.role !== "assistant") return m;
-                return [
-                  ...m.slice(0, -1),
-                  { ...last, content: last.content + raw.text },
-                ];
-              });
+              // Acumular en ref — el intervalo de 50ms hace flush a state en batch.
+              streamTextRef.current += raw.text;
             } else if (raw.type === "done") {
               // Acumular tokens reales del turno + calcular costo según modelo del rol.
               const modelKey = MODEL_PER_ROLE[role];
@@ -324,6 +349,16 @@ export function ChatWindow({
         setError("Sin conexión con el servidor. Reintenta cuando recuperes la red.");
       }
     } finally {
+      // Flush final — asegura que el último fragmento llega al estado
+      // antes de que el intervalo de 50ms se desmonte.
+      const finalText = streamTextRef.current;
+      if (finalText) {
+        setMessages((m) => {
+          const last = m[m.length - 1];
+          if (!last || last.role !== "assistant") return m;
+          return [...m.slice(0, -1), { ...last, content: finalText }];
+        });
+      }
       setStreaming(false);
       abortRef.current = null;
     }

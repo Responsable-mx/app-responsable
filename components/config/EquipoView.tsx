@@ -59,8 +59,7 @@ export function EquipoView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <p className="text-sm text-slate-600 max-w-2xl">{INTRO[view]}</p>
+      <div className="flex items-center justify-end gap-4">
         <div className="inline-flex items-center bg-white border border-slate-200 rounded p-0.5 shadow-sm">
           <ToggleButton
             active={view === "consultor"}
@@ -121,6 +120,7 @@ export function EquipoView() {
           />
         </div>
       </div>
+      <p className="text-sm text-slate-600 max-w-2xl -mt-2">{INTRO[view]}</p>
 
       <FiltersBar
         value={filters}

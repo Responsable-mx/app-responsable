@@ -885,10 +885,10 @@ export function ChatWindow({
                       <p className="whitespace-pre-wrap text-sm text-slate-800">{m.content}</p>
                     )}
                   {showActions && (
-                    <div className="flex items-center gap-1 mt-1 px-2">
+                    <div className="flex items-center mt-1 px-1">
                       <button
                         onClick={() => rateMessage(i, "up")}
-                        className={`p-1 rounded transition-colors ${m.rating === "up" ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}
+                        className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "up" ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}
                         title="Útil"
                       >
                         <svg className="w-3.5 h-3.5" fill={m.rating === "up" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
@@ -897,7 +897,7 @@ export function ChatWindow({
                       </button>
                       <button
                         onClick={() => rateMessage(i, "down")}
-                        className={`p-1 rounded transition-colors ${m.rating === "down" ? "text-rose-500" : "text-slate-300 hover:text-slate-500"}`}
+                        className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "down" ? "text-rose-500" : "text-slate-300 hover:text-slate-500"}`}
                         title="No útil"
                       >
                         <svg className="w-3.5 h-3.5" fill={m.rating === "down" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
@@ -906,7 +906,7 @@ export function ChatWindow({
                       </button>
                       <button
                         onClick={() => copyMessage(i, m.content)}
-                        className="p-1 rounded text-slate-300 hover:text-slate-500 transition-colors"
+                        className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-slate-500 transition-colors"
                         title="Copiar"
                       >
                         {copiedIdx === i ? (
@@ -920,7 +920,7 @@ export function ChatWindow({
                       {isLastAssistant && (
                         <button
                           onClick={retryLast}
-                          className="p-1 rounded text-slate-300 hover:text-brand-primary transition-colors"
+                          className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded text-slate-300 hover:text-brand-primary transition-colors"
                           title="Regenerar respuesta"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

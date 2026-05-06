@@ -53,7 +53,7 @@ export function ConfigTabs() {
                 : "border-transparent text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Icon className="w-4 h-4" />
+            <Icon className="w-[18px] h-[18px]" />
             {t.label}
           </Link>
         );

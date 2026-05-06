@@ -191,7 +191,7 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
     const msg = await anthropic.messages.create(
       {
         model: modelCfg.model,
-        max_tokens: 4096,
+        max_tokens: 2000,
         system: [
           {
             type: "text",

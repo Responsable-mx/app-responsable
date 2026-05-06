@@ -1,15 +1,14 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-05 (sesión 12 — auditoría seguridad + cierre de deuda)
+**Fecha:** 2026-05-05 (sesión 13 — auditoría IA + cierre D-73→D-78)
 **Calificación:** 10 / 10
 
 ---
 
 ## Contexto de esta auditoría
 
-Repo recién hecho **público** en GitHub (may-2026) para habilitar auto-deploy Vercel Hobby.
-Auditoría enfocada en seguridad: historial git, auth, rate limiting, headers, inputs, secrets.
-Todos los hallazgos D-67→D-72 fueron cerrados en la misma sesión.
+Auditoría `/audit-ia` post-seguridad. Foco: call sites Anthropic SDK, costos, cache, max_tokens, anti-alucinación.
+Todos los hallazgos D-73→D-78 cerrados en la misma sesión.
 
 ---
 
@@ -17,20 +16,16 @@ Todos los hallazgos D-67→D-72 fueron cerrados en la misma sesión.
 
 | Categoría | Resultado |
 |-----------|-----------|
-| **Git history — secrets** | Limpio. `.env*` nunca trackeado. Sin tokens en ningún commit. |
-| **`.gitignore`** | Cubre `.env`, `.env*.local`, `.env.cron`, `.claude/`. Sin brechas. |
-| **Secrets hardcodeados en código** | Cero `sk-ant-`, `sbp_`, `SUPABASE_SERVICE_ROLE_KEY` en `.ts/.tsx/.js`. |
-| **Auth en 44 API routes** | 100% protegidas. `requireAdmin` / `requireConsultorOrAdmin` / `requireUser` / `verifyCron` correctamente aplicados. |
-| **Rutas `/dev/*` en producción** | Bloqueadas todas (D-67 resuelto). Guard único `NODE_ENV !== 'production'`. |
-| **Service role key** | Solo en server-side (`lib/supabase/admin.ts` importa `server-only`). |
-| **Rate limiting auth** | `send-code`: 3/5min por email + 10/5min por IP (D-70 resuelto). `login-code`: 5/5min + invalida en fuerza bruta. `/api/chat`: 30/5min por email. |
-| **CORS** | Same-origin only. Sin `Access-Control-Allow-Origin: *`. |
-| **Cookies de sesión** | `@supabase/ssr` emite `httpOnly + secure + sameSite=Lax` en producción. |
-| **`dangerouslySetInnerHTML`** | Cero usos en todo el proyecto. |
-| **Input validation** | `ClientInputSchema` + `ChatRequestSchema` con Zod en todos los endpoints mutantes. |
-| **ReactMarkdown** | `rehypeSanitize` activo en `ChatMessageBubble` (D-68 resuelto). |
-| **CSP + HSTS** | Ambos headers activos en `next.config.ts` (D-69 resuelto). |
-| **`isAuthorizedEmailSync`** | Eliminado de `lib/auth.ts` + `__tests__/lib/auth.test.ts` (D-72 resuelto). |
+| **Call sites Anthropic SDK** | 3 activos: `api/chat`, `ai-fill`, `doc-fill`, `extract-test`. Todos con timeout `AbortSignal.timeout`. |
+| **Modelos** | Aurora/Rebeca=Sonnet4, Elena=Opus4 (D-75 resuelto), Valeria=Haiku4.5. Routing correcto. |
+| **Cache** | 2 breakpoints ephemeral en `buildSystemBlocks`. `doc-fill` y `extract-test` añaden ephemeral (D-78 resuelto). |
+| **max_tokens** | Todos calibrados: chat 1500, ai-fill 4096 (web_search extenso), doc-fill 2000 (D-77), extract-test 400. |
+| **Rate limiting IA** | `ai-fill` 15/min, `doc-fill` 15/min (D-76 resuelto), `chat` 30/5min. Sin gaps. |
+| **persistSession** | Fail-open correcto; catch loguea para debug prod (D-73 resuelto). |
+| **Tipos beta SDK** | `cache_control`, `web_search`, cache fields — `eslint-disable` justificados (D-74 documentado). |
+| **Anti-alucinación tools** | No aplica — este proyecto no usa tool-use con arrays >10 items en el chat IA. |
+| **Parsing JSON LLM** | `extractJsonObject` con balanced-brace parser en `ai-fill`, `doc-fill`, `chat`. Robusto. |
+| **Env vars modelos** | `ANTHROPIC_MODEL_SONNET`, `ANTHROPIC_MODEL_OPUS`, `ANTHROPIC_MODEL_HAIKU` — fallbacks hardcoded. |
 
 ---
 
@@ -45,27 +40,26 @@ Todos los hallazgos D-67→D-72 fueron cerrados en la misma sesión.
 ## Reporte de evolución
 
 ```
-App ResponSable · 2026-05-05 (sesión 12 — cierre de deuda seguridad)
+App ResponSable · 2026-05-05 (sesión 13 — auditoría IA)
 ─────────────────────────────────────
 🔴 CRÍTICOS: 0
-🟡 MODERADOS: 0 (D-67/68/69/70 cerrados)
-🟢 MENORES: 0 (D-71/72 cerrados)
+🟡 MODERADOS: 0 (D-73→D-78 cerrados)
+🟢 MENORES: 0
 
 ─────────────────────────────────────
-✅ GIT HISTORY LIMPIO
-✅ 44/44 endpoints con auth guard
-✅ Sin secrets en código
-✅ CSP + HSTS activos
-✅ rehype-sanitize en chat
-✅ IP rate limit en send-code
+✅ D-73 — persistSession loguea errores en prod
+✅ D-74 — tipos beta SDK documentados
+✅ D-75 — Elena → Opus 4 (correcto para synthesis estratégica)
+✅ D-76 — doc-fill rate limit 15/min igual que ai-fill
+✅ D-77 — doc-fill max_tokens 4096→2000
+✅ D-78 — extract-test cache_control ephemeral
 
 ─────────────────────────────────────
 📊 CALIFICACIÓN
 ─────────────────────────────────────
-Antes   →  8.5 / 10 (hallazgos D-67→D-72 pendientes)
-Después → 10 / 10 (todos cerrados)
-Delta   → +1.5
+Antes   → 10 / 10 (sesión 12, seguridad)
+Después → 10 / 10 (IA limpia también)
 ─────────────────────────────────────
-Próxima auditoría: D-04 (decisión de negocio, no técnico)
+Deuda activa: D-04 (decisión de negocio, no técnico)
 ─────────────────────────────────────
 ```

@@ -23,6 +23,17 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+## Deuda resuelta (sesión 13 — may-2026, auditoría IA)
+
+| ID | Descripción | Resuelto |
+|----|-------------|---------|
+| D-73 | `persistSession` catch silencioso — `console.error` añadido para debug en prod | may-2026 |
+| D-74 | Tipos beta Anthropic SDK (`cache_control`, `web_search`) — `eslint-disable` justificados documentados | may-2026 |
+| D-75 | Elena usaba Sonnet en código (Opus en comentario) — `claude-opus-4-7` aplicado en `models.ts` | may-2026 |
+| D-76 | `doc-fill` sin rate limit — misma capa DB (15 calls/min) que `ai-fill` añadida | may-2026 |
+| D-77 | `doc-fill` `max_tokens: 4096` sobredimensionado — reducido a `2000` (output típico <1000) | may-2026 |
+| D-78 | `extract-test` sin `cache_control` en system prompt — ephemeral añadido | may-2026 |
+
 ## Deuda resuelta (sesión 12 — may-2026, auditoría seguridad)
 
 | ID | Descripción | Resuelto |

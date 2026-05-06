@@ -215,7 +215,14 @@ Reglas:
   const resp = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 400,
-    system: systemPrompt,
+    system: [
+      {
+        type: "text",
+        text: systemPrompt,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        cache_control: { type: "ephemeral" } as any,
+      },
+    ],
     messages: [{ role: "user", content: `<input>\n${truncated}\n</input>` }],
   }, { signal: AbortSignal.timeout(55_000) });
 

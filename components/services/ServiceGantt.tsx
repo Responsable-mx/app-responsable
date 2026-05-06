@@ -81,11 +81,25 @@ function weekBoundaries(min: number, max: number): number[] {
   return out;
 }
 
+function dayBoundaries(min: number, max: number): number[] {
+  const out: number[] = [];
+  const d = new Date(min);
+  d.setHours(0, 0, 0, 0);
+  while (d.getTime() < max) {
+    out.push(d.getTime());
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+// Dom=0→"D", Lun=1→"L", Mar=2→"M", Mié=3→"X", Jue=4→"J", Vie=5→"V", Sáb=6→"S"
+const DOW = ["D", "L", "M", "X", "J", "V", "S"];
+
 // ─── Zoom ─────────────────────────────────────────────────────────────────────
 
-type Zoom = "fit" | "mes" | "quarter";
-// fit=auto-escala · mes=200px/mes · quarter=440px/mes (~110px/semana)
-const MONTH_PX: Record<Zoom, number | null> = { fit: null, mes: 200, quarter: 440 };
+type Zoom = "fit" | "mes" | "quarter" | "semana" | "dia";
+// fit=auto · mes=200px/mes · quarter=440 (~110px/sem) · semana=1000 (~33px/día) · dia=3000 (~100px/día)
+const MONTH_PX: Record<Zoom, number | null> = { fit: null, mes: 200, quarter: 440, semana: 1000, dia: 3000 };
 
 // ─── Ruta crítica ─────────────────────────────────────────────────────────────
 
@@ -178,7 +192,11 @@ export function ServiceGantt({
 
   const monthPx = MONTH_PX[zoom];
   const timelineWidth = monthPx ? range.months.length * monthPx : null;
-  const weeks = zoom !== "fit" ? weekBoundaries(range.min, range.max) : [];
+  const weeks = (zoom === "quarter" || zoom === "semana") ? weekBoundaries(range.min, range.max) : [];
+  const days = (zoom === "semana" || zoom === "dia") ? dayBoundaries(range.min, range.max) : [];
+  const hasSubRow = zoom !== "fit" && zoom !== "mes";
+  const headerH = hasSubRow ? 52 : 36;
+  const monthRowH = hasSubRow ? 28 : 36;
 
   function pct(dateStr: string | null): number | null {
     const d = parseDate(dateStr);
@@ -276,6 +294,8 @@ export function ServiceGantt({
               { v: "fit", label: "Ajustar" },
               { v: "mes", label: "Mes" },
               { v: "quarter", label: "Trim." },
+              { v: "semana", label: "Sem." },
+              { v: "dia", label: "Día" },
             ] as { v: Zoom; label: string }[]).map(({ v, label }) => (
               <button
                 key={v}
@@ -355,29 +375,72 @@ export function ServiceGantt({
         <div ref={ganttRef} style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
           {/* ─── Header meses ─── */}
           <div className="flex border-b border-slate-200 bg-slate-50">
-            <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-50 px-3 py-2 border-r border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-400`}>
+            <div
+              style={{ width: LABEL_W, height: headerH }}
+              className={`shrink-0${stickyBg} bg-slate-50 px-3 border-r border-slate-200 flex items-center text-[10px] font-bold uppercase tracking-widest text-slate-400`}
+            >
               Actividad
             </div>
-            <div className="relative h-9" style={tStyle}>
+            <div className="relative" style={{ ...tStyle, height: headerH }}>
+              {/* Fila 1: meses */}
               {range.months.map((m, i) => {
                 const left = ((m.getTime() - range.min) / totalMs) * 100;
                 const next = i + 1 < range.months.length ? range.months[i + 1] : new Date(range.max);
                 const width = ((next.getTime() - m.getTime()) / totalMs) * 100;
                 return (
-                  <div key={i} className="absolute top-0 bottom-0 border-r border-slate-200 px-1.5 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate" style={{ left: `${left}%`, width: `${width}%` }}>
+                  <div
+                    key={i}
+                    className="absolute border-r border-slate-200 px-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate flex items-center"
+                    style={{ left: `${left}%`, width: `${width}%`, top: 0, height: monthRowH }}
+                  >
                     {fmtMonth(m)}
                   </div>
                 );
               })}
-              {/* Week labels en Trim. */}
-              {zoom === "quarter" && weeks.map((wt, i) => {
+
+              {/* Divisor fila 2 */}
+              {hasSubRow && (
+                <div className="absolute left-0 right-0 border-t border-slate-100" style={{ top: monthRowH }} />
+              )}
+
+              {/* Fila 2: semanas (quarter / semana) */}
+              {(zoom === "quarter" || zoom === "semana") && weeks.map((wt, i) => {
+                const nextWt = i + 1 < weeks.length ? weeks[i + 1] : range.max;
                 const left = ((wt - range.min) / totalMs) * 100;
+                const width = ((nextWt - wt) / totalMs) * 100;
                 return (
-                  <div key={i} className="absolute bottom-0 text-[9px] text-slate-400 -translate-x-1/2" style={{ left: `${left}%`, top: "auto", lineHeight: "12px" }}>
+                  <div
+                    key={i}
+                    className="absolute border-r border-slate-100 px-1 text-[9px] text-slate-500 font-medium flex items-center truncate"
+                    style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}
+                  >
                     {new Date(wt).toLocaleDateString("es-MX", { day: "2-digit", month: "numeric" })}
                   </div>
                 );
               })}
+
+              {/* Fila 2: días (dia) */}
+              {zoom === "dia" && days.map((dt, i) => {
+                const left = ((dt - range.min) / totalMs) * 100;
+                const width = (MS_DAY / totalMs) * 100;
+                const d = new Date(dt);
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                return (
+                  <div
+                    key={i}
+                    className={`absolute border-r border-slate-100 flex flex-col items-center justify-center ${isWeekend ? "bg-slate-100/60 text-slate-400" : "text-slate-600"}`}
+                    style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}
+                  >
+                    <span className="text-[9px] font-bold leading-tight">{DOW[d.getDay()]}</span>
+                    <span className="text-[9px] leading-tight">{String(d.getDate()).padStart(2, "0")}</span>
+                  </div>
+                );
+              })}
+
+              {/* Hoy en header */}
+              {todayInRange && (
+                <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%` }} />
+              )}
             </div>
           </div>
 
@@ -461,10 +524,27 @@ export function ServiceGantt({
                             <div key={i} className="absolute top-0 bottom-0 border-r border-slate-100" style={{ left: `${((m.getTime() - range.min) / totalMs) * 100}%`, width: 0 }} />
                           ))}
 
-                          {/* Week markers cuando hay zoom */}
+                          {/* Week markers (quarter / semana) */}
                           {weeks.map((wt, i) => (
-                            <div key={i} className="absolute top-0 bottom-0" style={{ left: `${((wt - range.min) / totalMs) * 100}%`, width: 0, borderLeft: "1px dashed rgba(148,163,184,0.35)" }} />
+                            <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${((wt - range.min) / totalMs) * 100}%`, width: 0, borderLeft: "1px dashed rgba(148,163,184,0.35)" }} />
                           ))}
+
+                          {/* Day markers (semana: muy sutiles · dia: sólidos + fondo fin de semana) */}
+                          {days.map((dt, i) => {
+                            const left = ((dt - range.min) / totalMs) * 100;
+                            const d = new Date(dt);
+                            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                            return (
+                              <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{
+                                left: `${left}%`,
+                                width: zoom === "dia" ? `${(MS_DAY / totalMs) * 100}%` : 0,
+                                borderLeft: zoom === "dia"
+                                  ? (isWeekend ? "1px solid rgba(148,163,184,0.4)" : "1px solid rgba(148,163,184,0.15)")
+                                  : "1px dashed rgba(148,163,184,0.18)",
+                                background: zoom === "dia" && isWeekend ? "rgba(241,245,249,0.5)" : undefined,
+                              }} />
+                            );
+                          })}
 
                           {/* Línea hoy */}
                           {todayInRange && (

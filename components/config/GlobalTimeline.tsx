@@ -510,10 +510,10 @@ export function GlobalTimeline({
               const display = isUnassigned
                 ? "Sin asignar"
                 : (consultorNames?.get(key) ?? key.split("@")[0]);
-              const uniqueClients = new Set(acts.map((a) => a.client_id)).size;
+              const completed = acts.filter((a) => a.status === "completed").length;
               const subtitle = isUnassigned
                 ? `${acts.length} sin owner`
-                : `${acts.length} ${acts.length === 1 ? "actividad" : "actividades"} · ${uniqueClients} ${uniqueClients === 1 ? "cliente" : "clientes"}`;
+                : `${completed}/${acts.length} completadas`;
               const RAG_BORDER = { red: "border-l-rose-500", amber: "border-l-amber-400", green: "border-l-emerald-400" } as const;
               const RAG_AVATAR = { red: "bg-rose-100 text-rose-700", amber: "bg-amber-100 text-amber-700", green: "bg-emerald-100 text-emerald-700" } as const;
               const RAG_TEXT = { red: "text-rose-700 font-semibold", amber: "text-amber-700 font-semibold", green: "text-slate-500" } as const;

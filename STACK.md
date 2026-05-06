@@ -112,6 +112,6 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 |----------|----------------|---------|
 | **Vercel** | Team `nblondel-coders-projects` | Owner: `nblondel-coder`. Producción: `https://app.responsable.net` |
 | **Supabase** | Cuenta `nblondel-coder` / Org ResponSable (`xjvhttmltlfxsekbhfid`) | Project `app-responsable` ref `lyideepglavkmuuujoqz`. PAT: `SUPABASE_ACCESS_TOKEN` en `~/.claude/.env.global` |
-| **GitHub** | Org `Responsable-mx` | Repo `Responsable-mx/app-responsable` (privado). Auto-deploy bloqueado: requiere instalar Vercel GitHub App en org `Responsable-mx` y re-correr `vercel git connect` |
+| **GitHub** | Org `Responsable-mx` | Repo `Responsable-mx/app-responsable` (**público** — código open, app protegida por OTP auth). Auto-deploy activo vía Vercel GitHub App |
 
-> Auto-deploy pendiente: `vercel git connect https://github.com/Responsable-mx/app-responsable --scope nblondel-coders-projects --yes` falla hasta que un admin de `Responsable-mx` instale la Vercel GitHub App en GitHub → Settings → GitHub Apps → Vercel.
+> Auto-deploy: cada `git push` a `main` deploya automáticamente a `https://app.responsable.net`. Repo público para evitar el límite de Vercel Hobby (repos privados de org requieren Pro). El código no tiene secretos hardcodeados — todos van en env vars de Vercel.

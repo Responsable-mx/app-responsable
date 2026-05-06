@@ -27,7 +27,7 @@
 
 - [B] Knowledge Base con sync desde OneDrive (pgvector + Microsoft Graph API)
 - [B] Web Research con citas y protección de KB (Brave Search API)
-- [B] Documentos por cliente (PDFs, DOCX) con extracción automática
+- [B] 🔄 Documentos por cliente con extracción automática — **MVP text-paste implementado** (`/wizard/[stepKey]/doc-fill`, modal "Importar" en QuestionnaireTab). Pendiente: parsers xlsx/docx/pdf + file upload UI.
 - [B] Control de acceso RBAC (admin gestiona prompts/KB/logs, consultor solo usa)
 - [B] ✅ Export PDF de reporte de cliente — `@react-pdf/renderer`, endpoint `/api/clients/[id]/export-pdf`, botón `ExportPdfButton`, may-2026
 - [B] ✅ Logo del cliente via URL — campo `logo_url` en `ClientForm`, preview live en `ClientAvatar`, may-2026

@@ -14,6 +14,58 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ## Deuda activa
 
+### 🔴 D-80 — Home = Chat IA vacío, flujo mental invertido
+- **Descripción**: La app abre en `/chat` con un selector de cliente y un chat vacío. El consultor real empieza por el cliente, no por la herramienta. Un usuario nuevo no sabe por dónde iniciar.
+- **Impacto**: Fricción inmediata en primer uso. Mayor tiempo hasta primera acción útil.
+- **Fix**: Cambiar la ruta raíz `/` para que redirija a `/clientes`. "Chat IA" en nav se convierte en "Chat general" (metodología sin cliente). El flujo queda: Clientes → cliente → Chat IA (tab) — natural y consistente con herramientas McKinsey/Salesforce.
+- **Esfuerzo**: 30min — cambiar redirect en `middleware.ts` + re-label nav item
+
+### 🔴 D-81 — Roles del chat IA (Rebeca/Elena/Valeria) sin affordance de interactividad
+- **Descripción**: Los avatares de Rebeca, Elena y Valeria están greyed-out. No hay hover state, cursor, ni tooltip que indique que son clickeables para cambiar de rol. Parecen disabled.
+- **Impacto**: Usuarios no descubren cómo cambiar de rol sin documentación externa. La cadena de calidad Aurora→Valeria, que es el feature central de la app, queda oculta.
+- **Fix**: Agregar `cursor-pointer`, hover state + tooltip "Cambiar a Revisora — detecta fallas y omisiones" en cada avatar. Dot ● "Activo" en el rol seleccionado.
+- **Esfuerzo**: 45min
+
+### 🟡 D-82 — 3 niveles de tabs en Configuración (Configuración → Identidad cliente → Sectores)
+- **Descripción**: `/configuracion` tiene tabs horizontales (Usuarios/Permisos/Catálogos/…), dentro de Catálogos hay sub-tabs (Identidad/Cumplimiento/…), y dentro de cada sub-tab hay pills de categoría. 3 niveles de navegación anidados visibles simultáneamente.
+- **Impacto**: Usuarios admin se pierden; no saben qué nivel están editando.
+- **Fix**: Convertir el nivel superior a sidebar nav izquierdo (patrón SAP Fiori, Notion Settings). Conservar sub-tabs + pills internos (2 niveles máximo visibles).
+- **Esfuerzo**: 2-3h
+
+### 🟡 D-83 — "Equipo" en nav global vs tab de cliente — mismo label, scope opuesto
+- **Descripción**: Nav global "Equipo" = todos los consultores de la firma. Tab "Equipo" en cliente = consultores de ese proyecto. Mismo label, contexto radicalmente diferente.
+- **Impacto**: Un consultor junior no distingue cuándo está viendo el equipo global vs el del proyecto.
+- **Fix**: Renombrar tab de cliente a "Consultores del proyecto" o "Equipo del proyecto".
+- **Esfuerzo**: 5min
+
+### 🟡 D-84 — Sugerencias de chat genéricas cuando hay cliente seleccionado
+- **Descripción**: Los 4 prompts de sugerencia en el chat (tanto en `/chat` como en el tab del cliente) son siempre los mismos prompts genéricos. No cambian con el contexto del cliente.
+- **Impacto**: Se pierde la mayor oportunidad de reducir carga cognitiva: decirle al consultor exactamente qué puede hacer con ese cliente ahora.
+- **Fix**: Cuando hay cliente seleccionado, generar sugerencias dinámicas basadas en el estado real: "Analiza los 5 temas de doble materialidad de Altamira", "Redacta la introducción del reporte GRI con los datos del cuestionario". Puede ser strings template simples (sin IA) interpolando datos del cliente.
+- **Esfuerzo**: 1.5h
+
+### 🟡 D-85 — "MIS PROYECTOS" en sidebar duplica acceso ya dado por nav "Clientes"
+- **Descripción**: El sidebar muestra una sección "MIS PROYECTOS" con links a clientes específicos (ej: Distribuidora Altamira + EPH). El nav ya tiene "Clientes" que lleva a la lista completa. El nombre del cliente además aparece en breadcrumb + H1 cuando estás dentro.
+- **Impacto**: Ruido visual. 4 instancias del nombre del cliente en pantalla simultáneamente cuando estás en `/clientes/[id]`.
+- **Fix**: Si `/clientes` se vuelve home (D-80), MIS PROYECTOS puede ser un pin en la lista de clientes (star ★ que fija al top). Eliminar del sidebar.
+- **Esfuerzo**: 1h
+
+### 🟡 D-86 — Cronograma header redundante dentro del tab
+- **Descripción**: El tab "Cronograma" muestra dentro un h2 "CRONOGRAMA DEL CLIENTE" + descripción. El usuario ya sabe que está en Cronograma por el tab activo.
+- **Impacto**: ~80px de altura desperdiciada. El contenido real (servicios/actividades) se empuja hacia abajo.
+- **Fix**: Eliminar h2 y descripción. Mantener solo la barra de acciones (+ Servicio, PDF, Lista/Gantt).
+- **Esfuerzo**: 10min
+
+### 🟢 D-87 — Copy inconsistente: "IA llena 7 pasos" vs "PASO 1 DE 9"
+- **Descripción**: El banner del Cuestionario dice "IA llena 7 pasos automáticamente" pero el wizard tiene 9 pasos.
+- **Fix**: "IA puede completar automáticamente hasta 7 de los 9 pasos con datos públicos verificables"
+- **Esfuerzo**: 2min
+
+### 🟢 D-88 — "ADMIN" label redundante en headers de Equipo y Configuración
+- **Descripción**: Ambas páginas muestran "ADMIN" como prefix del título de página. El rol ya aparece en el perfil del sidebar (nblondel / Admin). Repetido sin propósito.
+- **Fix**: Eliminar el label ADMIN de los page headers.
+- **Esfuerzo**: 5min
+
 ### 🟡 D-04 — Metodología ResponSable: pasos no definidos
 - **Descripción**: El equipo aún no ha definido los pasos reales de la metodología.
 - **Impacto**: La KPI card de Metodología no existe en `ClientTabs`. Cuando se defina, agregar.

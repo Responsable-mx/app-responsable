@@ -21,18 +21,19 @@ export default async function ConfigLayout({
   return (
     <ConfigSWRProvider>
       <div className="flex flex-col h-screen bg-slate-50">
-        <header className="bg-white border-b border-slate-200 px-8 pt-6 pb-0">
+        <header className="bg-white border-b border-slate-200 px-8 pt-6 pb-5">
           <div className="max-w-6xl mx-auto">
-            <div className="text-[10px] text-slate-600 uppercase tracking-wide">
-              Admin
-            </div>
-            <h1 className="text-lg font-bold text-slate-900 mt-0.5 mb-3">
-              Configuración
-            </h1>
-            <ConfigTabs />
+            <h1 className="text-lg font-bold text-slate-900">Configuración</h1>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <div className="flex flex-1 overflow-hidden max-w-6xl w-full mx-auto">
+          {/* Sidebar nav */}
+          <aside className="w-48 shrink-0 border-r border-slate-200 bg-white px-3 py-4 overflow-y-auto">
+            <ConfigTabs />
+          </aside>
+          {/* Content */}
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
       </div>
     </ConfigSWRProvider>
   );

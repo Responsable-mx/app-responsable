@@ -168,16 +168,8 @@ export function ClientCronogramaTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
-            Cronograma del cliente
-          </h2>
-          <p className="text-xs text-slate-600 mt-0.5">
-            Etapas y actividades por servicio. Plan vs real, status automático.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Acciones + toggle vista — sin h2 redundante (el tab ya indica contexto) */}
+      <div className="flex items-center justify-end gap-2 flex-wrap">
           {isAdmin && (
             <button
               onClick={() => setCreatingService(true)}
@@ -187,7 +179,7 @@ export function ClientCronogramaTab({
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
               </svg>
-              Servicio
+              + Servicio
             </button>
           )}
           <a
@@ -202,8 +194,9 @@ export function ClientCronogramaTab({
             </svg>
             PDF
           </a>
+          {/* Separador visual acciones ↔ vistas */}
+          <div className="w-px h-5 bg-slate-200 mx-0.5" aria-hidden />
           <ViewToggle value={view} onChange={setView} />
-        </div>
       </div>
 
       {!isAdmin && (

@@ -26,13 +26,13 @@ type NavItem = {
 };
 
 const NAV_BASE: NavItem[] = [
-  { href: "/chat", label: "Chat IA", tour: "nav-chat", icon: IconChat },
   {
     href: "/clientes",
     label: "Clientes",
     tour: "nav-clientes",
     icon: IconBuilding,
   },
+  { href: "/chat", label: "Chat general", tour: "nav-chat", icon: IconChat },
 ];
 
 const NAV_ADMIN: NavItem[] = [
@@ -187,7 +187,7 @@ export function Sidebar({
         <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200`}>
           {!collapsed && (
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1.5">
-              Mis proyectos
+              Acceso rápido
             </p>
           )}
           <div className="space-y-0.5">

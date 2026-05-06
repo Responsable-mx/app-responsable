@@ -26,7 +26,7 @@ const TABS = [
 export function ConfigTabs() {
   const pathname = usePathname();
   return (
-    <nav className="flex items-center gap-1 -mb-px">
+    <nav className="flex flex-col gap-0.5">
       {TABS.map((t) => {
         const active =
           pathname === t.href || pathname.startsWith(t.href + "/");
@@ -35,14 +35,15 @@ export function ConfigTabs() {
           <Link
             key={t.href}
             href={t.href}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 transition-colors ${
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
               active
-                ? "border-brand-primary-hover text-brand-primary-dark font-medium"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                ? "bg-brand-primary-light text-brand-primary-dark font-medium"
+                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
-            <Icon className="w-[18px] h-[18px]" />
-            {t.label}
+            <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? "text-brand-primary-hover" : "text-slate-500"}`} />
+            <span className="truncate">{t.label}</span>
+            {active && <span className="ml-auto w-1 h-5 rounded-full bg-brand-primary/70" />}
           </Link>
         );
       })}

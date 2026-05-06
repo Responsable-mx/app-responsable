@@ -32,18 +32,21 @@ export type ChatMessage = {
 
 // Orden lógico cadena calidad: Autor → Revisor → Elevador → Validador.
 // Sin emoji (regla CLAUDE.md: cero emoji en UI cliente). Avatar = monogram.
+// desc: frase corta para tooltip de rol inactivo. softColor: avatar cuando inactivo.
 export const ROLES: Array<{
   id: RoleId;
   name: string;
   fn: string;
+  desc: string;
   color: string;
+  softColor: string;
   mono: string;
   borderColor: string;
 }> = [
-  { id: "aurora", name: "Aurora", fn: "Autor", color: "bg-brand-primary-dark", mono: "A", borderColor: "border-l-brand-primary-dark" },
-  { id: "rebeca", name: "Rebeca", fn: "Revisor", color: "bg-slate-700", mono: "R", borderColor: "border-l-slate-500" },
-  { id: "elena", name: "Elena", fn: "Elevador", color: "bg-slate-800", mono: "E", borderColor: "border-l-amber-600" },
-  { id: "valeria", name: "Valeria", fn: "Validador", color: "bg-slate-600", mono: "V", borderColor: "border-l-emerald-700" },
+  { id: "aurora", name: "Aurora", fn: "Autor", desc: "Construye el primer borrador", color: "bg-brand-primary-dark", softColor: "bg-brand-primary-light", mono: "A", borderColor: "border-l-brand-primary-dark" },
+  { id: "rebeca", name: "Rebeca", fn: "Revisor", desc: "Detecta fallas y omisiones", color: "bg-slate-700", softColor: "bg-slate-200", mono: "R", borderColor: "border-l-slate-500" },
+  { id: "elena", name: "Elena", fn: "Elevador", desc: "Insight estratégico y narrativa", color: "bg-slate-800", softColor: "bg-amber-100", mono: "E", borderColor: "border-l-amber-600" },
+  { id: "valeria", name: "Valeria", fn: "Validador", desc: "Verifica consistencia y evidencia", color: "bg-slate-600", softColor: "bg-emerald-100", mono: "V", borderColor: "border-l-emerald-700" },
 ];
 
 export const STARTERS: Record<RoleId, string[]> = {

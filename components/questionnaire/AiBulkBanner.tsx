@@ -11,6 +11,8 @@ type BulkProgress = {
 type AiBulkBannerProps = {
   /** Cuántos pasos pueden ser llenados por IA */
   aiCapableCount: number;
+  /** Total de pasos del cuestionario */
+  totalSteps: number;
   /** Si algún paso ya tiene respuestas (cambia la etiqueta del botón) */
   someStepHasResponses: boolean;
   /** Progreso del llenado masivo en curso, null cuando no está activo */
@@ -24,6 +26,7 @@ type AiBulkBannerProps = {
  */
 export function AiBulkBanner({
   aiCapableCount,
+  totalSteps,
   someStepHasResponses,
   progress,
   onFillAll,
@@ -36,7 +39,7 @@ export function AiBulkBanner({
         </svg>
         <div className="min-w-0">
           <p className="text-xs font-bold text-slate-900">
-            IA llena {aiCapableCount} pasos automáticamente
+            IA puede completar {aiCapableCount} de {totalSteps} pasos automáticamente
           </p>
           <p className="text-[11px] text-slate-600">
             Click una vez para llenar todos los pasos con datos públicos verificables y citados (sigue las 8 reglas operativas del cuestionario). Puedes refrescar después por paso individual.

@@ -447,6 +447,7 @@ function WizardEditor({
       {/* Banner global AI fill */}
       <AiBulkBanner
         aiCapableCount={aiCapableCount}
+        totalSteps={steps.length}
         someStepHasResponses={someStepHasResponses}
         progress={aiBulkProgress}
         onFillAll={aiFillAll}
@@ -809,36 +810,56 @@ function FieldRow({
           {field.required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
         <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={onOpenDrawer}
-            className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text}`}
-            title="Ver fuentes"
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
-            {chip.label}
-            {sourcesCount > 0 && <span className="opacity-70">· {sourcesCount}</span>}
-          </button>
+          {/* Chip de origen: solo cuando es excepcional (público/interpretación) o hay fuentes */}
+          {(sourceType !== "consultor_only" || sourcesCount > 0) && (
+            <button
+              type="button"
+              onClick={onOpenDrawer}
+              className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text}`}
+              title="Ver fuentes"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
+              {chip.label}
+              {sourcesCount > 0 && <span className="opacity-70">· {sourcesCount}</span>}
+            </button>
+          )}
+          {/* Fuentes vacías: botón minimal para abrir drawer */}
+          {sourceType === "consultor_only" && sourcesCount === 0 && (
+            <button
+              type="button"
+              onClick={onOpenDrawer}
+              className="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
+              title="Agregar fuentes"
+            >
+              + fuente
+            </button>
+          )}
           {stale && (
             <span title="Alguna fuente >2 años" className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5 font-medium">
               ⚠ desactualizada
             </span>
           )}
-          <button
-            type="button"
-            onClick={onToggleValidated}
-            disabled={!filled}
-            className={`text-[10px] font-bold rounded-sm px-1.5 py-0.5 transition-colors ${
-              validated
-                ? "bg-emerald-100 text-emerald-700"
-                : filled
-                  ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                  : "bg-slate-50 text-slate-300 cursor-not-allowed"
-            }`}
-            title={validated ? "Validado por consultor" : "Marcar como validado"}
-          >
-            {validated ? "✓ validado" : "validar"}
-          </button>
+          {/* Badge validado: solo cuando validado o cuando está lleno y no validado */}
+          {validated && (
+            <button
+              type="button"
+              onClick={onToggleValidated}
+              className="text-[10px] font-bold rounded-sm px-1.5 py-0.5 bg-emerald-100 text-emerald-700 transition-colors"
+              title="Validado por consultor"
+            >
+              ✓ validado
+            </button>
+          )}
+          {!validated && filled && (
+            <button
+              type="button"
+              onClick={onToggleValidated}
+              className="text-[10px] font-bold rounded-sm px-1.5 py-0.5 bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+              title="Marcar como validado"
+            >
+              validar
+            </button>
+          )}
         </div>
       </div>
 

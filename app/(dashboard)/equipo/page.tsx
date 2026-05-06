@@ -9,8 +9,7 @@ export default function EquipoPage() {
       <header className="bg-white border-b border-slate-200 px-8 pt-6 pb-5">
         <div className="max-w-6xl mx-auto flex items-end justify-between gap-4">
           <div>
-            <div className="text-[10px] text-slate-600 uppercase tracking-wide">Admin</div>
-            <h1 className="text-lg font-bold text-slate-900 mt-0.5">Equipo</h1>
+            <h1 className="text-lg font-bold text-slate-900">Equipo</h1>
           </div>
           <Link
             href="/clientes"

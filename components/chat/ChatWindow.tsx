@@ -578,12 +578,14 @@ export function ChatWindow({
                   }`}
                   aria-pressed={isActive}
                   aria-label={`${r.name} — ${r.fn}${isVisited ? " (ya intervino)" : ""}`}
-                  title={isVisited ? `${r.name} · ya intervino` : r.fn}
+                  title={isVisited ? `${r.name} · ya intervino` : `${r.fn} · ${r.desc}`}
                 >
                   <span
                     aria-hidden
-                    className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold text-white relative shrink-0 ${
-                      isActive || isVisited ? r.color : "bg-slate-300"
+                    className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold relative shrink-0 ${
+                      isActive || isVisited
+                        ? `${r.color} text-white`
+                        : `${r.softColor} text-slate-500`
                     }`}
                   >
                     {r.mono}

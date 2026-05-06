@@ -136,6 +136,7 @@ export function ServiceStagesPanel({
           isAdmin={false}
           canMoveUp={false}
           canMoveDown={false}
+          consultorNames={consultorNames}
           onAddActivity={() => {}}
           onEditActivity={(act) => setEditingActivity({ stageId: s.id, activity: act })}
           onDeleteStage={() => {}}
@@ -210,6 +211,7 @@ function StageRow({
   isAdmin,
   canMoveUp,
   canMoveDown,
+  consultorNames,
   onAddActivity,
   onEditActivity,
   onDeleteStage,
@@ -223,6 +225,7 @@ function StageRow({
   isAdmin: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  consultorNames?: Map<string, string>;
   onAddActivity: () => void;
   onEditActivity: (a: StageActivity) => void;
   onDeleteStage: () => void;

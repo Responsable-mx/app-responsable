@@ -6,6 +6,8 @@ import type { StageActivity } from "@/lib/stages";
 export type QuickPatch = {
   actual_start?: string;
   actual_end?: string;
+  planned_start?: string;
+  planned_end?: string;
   status?: "pending" | "in_progress" | "completed" | "delayed";
 };
 
@@ -15,6 +17,7 @@ type Props = {
   onClose: () => void;
   onEditFull: () => void;
   onQuickAction?: (activityId: string, patch: QuickPatch) => Promise<void>;
+  isAdmin?: boolean;
 };
 
 export function QuickActionPopover({
@@ -23,11 +26,19 @@ export function QuickActionPopover({
   onClose,
   onEditFull,
   onQuickAction,
+  isAdmin = false,
 }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
 
-  const x = Math.min(anchor.x, window.innerWidth - 208);
+  // Inline date form state
+  const [realStart, setRealStart] = useState(activity.actual_start ?? "");
+  const [realEnd, setRealEnd] = useState(activity.actual_end ?? "");
+  const [planStart, setPlanStart] = useState(activity.planned_start ?? "");
+  const [planEnd, setPlanEnd] = useState(activity.planned_end ?? "");
+  const [savingDates, setSavingDates] = useState(false);
+
+  const x = Math.min(anchor.x, window.innerWidth - 256);
   const y = Math.min(anchor.y, window.innerHeight - 160);
 
   async function fire(key: string, patch: QuickPatch) {
@@ -41,16 +52,90 @@ export function QuickActionPopover({
     }
   }
 
+  async function saveDates() {
+    if (!onQuickAction) return;
+    const patch: QuickPatch = {};
+    if (realStart !== (activity.actual_start ?? "")) patch.actual_start = realStart || undefined;
+    if (realEnd !== (activity.actual_end ?? "")) patch.actual_end = realEnd || undefined;
+    if (isAdmin && planStart !== (activity.planned_start ?? "")) patch.planned_start = planStart || undefined;
+    if (isAdmin && planEnd !== (activity.planned_end ?? "")) patch.planned_end = planEnd || undefined;
+    if (Object.keys(patch).length === 0) { onClose(); return; }
+    setSavingDates(true);
+    try {
+      await onQuickAction(activity.id, patch);
+      onClose();
+    } finally {
+      setSavingDates(false);
+    }
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
-        className="fixed z-50 bg-white border border-slate-200 rounded shadow-md w-52"
+        className="fixed z-50 bg-white border border-slate-200 rounded shadow-md w-64"
         style={{ top: y, left: x }}
       >
         <p className="px-3 pt-2 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100 truncate">
           {activity.name}
         </p>
+        {/* ─── Inline date form ─── */}
+        {onQuickAction && (
+          <div className="px-3 py-2 border-b border-slate-100 space-y-2">
+            <div className="space-y-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Fechas reales</p>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[10px] text-slate-500 w-10 shrink-0">Inicio</label>
+                <input
+                  type="date"
+                  value={realStart}
+                  onChange={(e) => setRealStart(e.target.value)}
+                  className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 font-sans text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[10px] text-slate-500 w-10 shrink-0">Fin</label>
+                <input
+                  type="date"
+                  value={realEnd}
+                  onChange={(e) => setRealEnd(e.target.value)}
+                  className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 font-sans text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary"
+                />
+              </div>
+            </div>
+            {isAdmin && (
+              <div className="space-y-1">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Fechas plan</p>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[10px] text-slate-500 w-10 shrink-0">Inicio</label>
+                  <input
+                    type="date"
+                    value={planStart}
+                    onChange={(e) => setPlanStart(e.target.value)}
+                    className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 font-sans text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[10px] text-slate-500 w-10 shrink-0">Fin</label>
+                  <input
+                    type="date"
+                    value={planEnd}
+                    onChange={(e) => setPlanEnd(e.target.value)}
+                    className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 font-sans text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary"
+                  />
+                </div>
+              </div>
+            )}
+            <button
+              onClick={saveDates}
+              disabled={savingDates || loading !== null}
+              className="w-full py-1 text-[10px] font-bold uppercase tracking-widest bg-brand-primary text-white rounded hover:bg-brand-primary-dark transition-colors disabled:opacity-50"
+            >
+              {savingDates ? "Guardando..." : "Guardar fechas"}
+            </button>
+          </div>
+        )}
+
         <div className="py-1">
           {onQuickAction && !activity.actual_start && (
             <ActionBtn

@@ -750,6 +750,7 @@ export function ServiceGantt({
           onClose={() => setOverlay(null)}
           onEditFull={() => onEditActivity(overlay.stageId, overlay.activity)}
           onQuickAction={onQuickAction}
+          isAdmin={isAdmin}
         />
       )}
     </>

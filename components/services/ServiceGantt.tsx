@@ -152,6 +152,7 @@ export function ServiceGantt({
   const [exporting, setExporting] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const headerTimelineInnerRef = useRef<HTMLDivElement>(null);
   const [now] = useState(() => Date.now());
 
   const allActivities = useMemo(() => stages.flatMap((s) => s.activities), [stages]);
@@ -212,9 +213,9 @@ export function ServiceGantt({
   }
 
   function scrollToToday() {
-    const el = ganttRef.current;
-    if (!el) return;
-    if (timelineWidth && todayInRange) {
+    const el = scrollRef.current;
+    if (!el || !todayInRange) return;
+    if (timelineWidth) {
       const px = (todayPct / 100) * timelineWidth;
       el.scrollLeft = Math.max(0, px - (el.clientWidth - LABEL_W) / 2);
     } else {
@@ -285,356 +286,280 @@ export function ServiceGantt({
 
   return (
     <>
-      <div ref={scrollRef} className={`bg-white border border-slate-200 rounded ${timelineWidth ? "overflow-x-auto" : "overflow-hidden"}`}>
-        {/* ─── Toolbar ─── */}
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 bg-slate-50/80 flex-wrap">
-          {/* Zoom */}
-          <div className="flex items-center gap-0.5">
-            {([
-              { v: "fit", label: "Ajustar" },
-              { v: "mes", label: "Mes" },
-              { v: "quarter", label: "Trim." },
-              { v: "semana", label: "Sem." },
-              { v: "dia", label: "Día" },
-            ] as { v: Zoom; label: string }[]).map(({ v, label }) => (
-              <button
-                key={v}
-                onClick={() => setZoom(v)}
-                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${
-                  zoom === v ? "bg-white border border-slate-200 text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      {/* ganttRef en el wrapper externo para PNG (captura toolbar+header+filas) */}
+      <div ref={ganttRef} className="bg-white border border-slate-200 rounded">
 
-          <div className="flex items-center gap-1.5 ml-auto">
-            {/* Hoy */}
-            {todayInRange && (
-              <button
-                onClick={scrollToToday}
-                className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-brand-primary-dark transition-colors"
-              >
-                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="4" /></svg>
-                Hoy
-              </button>
-            )}
+        {/* ─── Sticky: toolbar + header de fechas ───────────────────────────────
+            Fuera del overflow-x-auto para que position:sticky funcione tanto
+            vertical (scroll página) como horizontal (header sincronizado via
+            transform en lugar de scrollLeft). */}
+        <div className="sticky top-0 z-20 bg-white">
 
-            {/* PNG export */}
-            <button
-              onClick={exportPng}
-              disabled={exporting}
-              className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-50"
-              title="Exportar como imagen PNG"
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-              </svg>
-              {exporting ? "..." : "PNG"}
-            </button>
-
-            {/* Freeze baseline (solo admin) */}
-            {isAdmin && onFreezeBaseline && !confirmFreeze && (
-              <button
-                onClick={() => setConfirmFreeze(true)}
-                className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-amber-700 transition-colors"
-                title={hasBaseline ? "Ya existe baseline. Usar ?force=1 para sobrescribir." : "Congelar fechas plan como baseline de referencia"}
-              >
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+            <div className="flex items-center gap-0.5">
+              {([
+                { v: "fit", label: "Ajustar" },
+                { v: "mes", label: "Mes" },
+                { v: "quarter", label: "Trim." },
+                { v: "semana", label: "Sem." },
+                { v: "dia", label: "Día" },
+              ] as { v: Zoom; label: string }[]).map(({ v, label }) => (
+                <button
+                  key={v}
+                  onClick={() => setZoom(v)}
+                  className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${
+                    zoom === v ? "bg-white border border-slate-200 text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5 ml-auto">
+              {todayInRange && (
+                <button onClick={scrollToToday} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-brand-primary-dark transition-colors">
+                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="4" /></svg>
+                  Hoy
+                </button>
+              )}
+              <button onClick={exportPng} disabled={exporting} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-50" title="Exportar como imagen PNG">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
                 </svg>
-                {hasBaseline ? "Refreeze" : "Baseline"}
+                {exporting ? "..." : "PNG"}
               </button>
-            )}
-
-            {/* Confirm freeze inline */}
-            {confirmFreeze && (
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded text-[10px]">
-                <span className="text-amber-700 font-medium">
-                  {hasBaseline ? "Sobrescribir baseline?" : "Congelar plan actual como baseline?"}
-                </span>
-                <button
-                  onClick={doFreeze}
-                  disabled={freezing}
-                  className="px-1.5 py-0.5 bg-amber-500 text-white rounded-sm font-bold hover:bg-amber-600 disabled:opacity-50"
-                >
-                  {freezing ? "..." : "Sí"}
+              {isAdmin && onFreezeBaseline && !confirmFreeze && (
+                <button onClick={() => setConfirmFreeze(true)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-amber-700 transition-colors" title={hasBaseline ? "Ya existe baseline. Usar ?force=1 para sobrescribir." : "Congelar fechas plan como baseline de referencia"}>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  {hasBaseline ? "Refreeze" : "Baseline"}
                 </button>
-                <button
-                  onClick={() => setConfirmFreeze(false)}
-                  className="px-1.5 py-0.5 text-slate-500 hover:text-slate-700"
-                >
-                  No
-                </button>
-              </div>
-            )}
+              )}
+              {confirmFreeze && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded text-[10px]">
+                  <span className="text-amber-700 font-medium">{hasBaseline ? "Sobrescribir baseline?" : "Congelar plan actual como baseline?"}</span>
+                  <button onClick={doFreeze} disabled={freezing} className="px-1.5 py-0.5 bg-amber-500 text-white rounded-sm font-bold hover:bg-amber-600 disabled:opacity-50">{freezing ? "..." : "Sí"}</button>
+                  <button onClick={() => setConfirmFreeze(false)} className="px-1.5 py-0.5 text-slate-500 hover:text-slate-700">No</button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div ref={ganttRef} style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
-          {/* ─── Header meses ─── */}
+          {/* Header de fechas */}
           <div className="flex border-b border-slate-200 bg-slate-50">
-            <div
-              style={{ width: LABEL_W, height: headerH }}
-              className={`shrink-0${stickyBg} bg-slate-50 px-3 border-r border-slate-200 flex items-center text-[10px] font-bold uppercase tracking-widest text-slate-400`}
-            >
+            {/* Columna label — siempre visible */}
+            <div style={{ width: LABEL_W, height: headerH }} className="shrink-0 bg-slate-50 px-3 border-r border-slate-200 flex items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Actividad
             </div>
-            <div className="relative" style={{ ...tStyle, height: headerH }}>
-              {/* Fila 1: meses */}
-              {range.months.map((m, i) => {
-                const left = ((m.getTime() - range.min) / totalMs) * 100;
-                const next = i + 1 < range.months.length ? range.months[i + 1] : new Date(range.max);
-                const width = ((next.getTime() - m.getTime()) / totalMs) * 100;
-                return (
-                  <div
-                    key={i}
-                    className="absolute border-r border-slate-200 px-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate flex items-center"
-                    style={{ left: `${left}%`, width: `${width}%`, top: 0, height: monthRowH }}
-                  >
-                    {fmtMonth(m)}
-                  </div>
-                );
-              })}
-
-              {/* Divisor fila 2 */}
-              {hasSubRow && (
-                <div className="absolute left-0 right-0 border-t border-slate-100" style={{ top: monthRowH }} />
-              )}
-
-              {/* Fila 2: semanas (quarter / semana) */}
-              {(zoom === "quarter" || zoom === "semana") && weeks.map((wt, i) => {
-                const nextWt = i + 1 < weeks.length ? weeks[i + 1] : range.max;
-                const left = ((wt - range.min) / totalMs) * 100;
-                const width = ((nextWt - wt) / totalMs) * 100;
-                return (
-                  <div
-                    key={i}
-                    className="absolute border-r border-slate-100 px-1 text-[9px] text-slate-500 font-medium flex items-center truncate"
-                    style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}
-                  >
-                    {new Date(wt).toLocaleDateString("es-MX", { day: "2-digit", month: "numeric" })}
-                  </div>
-                );
-              })}
-
-              {/* Fila 2: días (dia) */}
-              {zoom === "dia" && days.map((dt, i) => {
-                const left = ((dt - range.min) / totalMs) * 100;
-                const width = (MS_DAY / totalMs) * 100;
-                const d = new Date(dt);
-                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                return (
-                  <div
-                    key={i}
-                    className={`absolute border-r border-slate-100 flex flex-col items-center justify-center ${isWeekend ? "bg-slate-100/60 text-slate-400" : "text-slate-600"}`}
-                    style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}
-                  >
-                    <span className="text-[9px] font-bold leading-tight">{DOW[d.getDay()]}</span>
-                    <span className="text-[9px] leading-tight">{String(d.getDate()).padStart(2, "0")}</span>
-                  </div>
-                );
-              })}
-
-              {/* Hoy en header */}
-              {todayInRange && (
-                <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%` }} />
-              )}
+            {/* Timeline header: overflow:hidden + translateX sync (no scrollbar propio) */}
+            <div style={{ flex: 1, overflow: "hidden", height: headerH }}>
+              <div ref={headerTimelineInnerRef} className="relative h-full" style={{ width: timelineWidth ?? "100%" }}>
+                {/* Fila 1: meses */}
+                {range.months.map((m, i) => {
+                  const left = ((m.getTime() - range.min) / totalMs) * 100;
+                  const next = i + 1 < range.months.length ? range.months[i + 1] : new Date(range.max);
+                  const width = ((next.getTime() - m.getTime()) / totalMs) * 100;
+                  return (
+                    <div key={i} className="absolute border-r border-slate-200 px-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate flex items-center" style={{ left: `${left}%`, width: `${width}%`, top: 0, height: monthRowH }}>
+                      {fmtMonth(m)}
+                    </div>
+                  );
+                })}
+                {hasSubRow && <div className="absolute left-0 right-0 border-t border-slate-100" style={{ top: monthRowH }} />}
+                {(zoom === "quarter" || zoom === "semana") && weeks.map((wt, i) => {
+                  const nextWt = i + 1 < weeks.length ? weeks[i + 1] : range.max;
+                  const left = ((wt - range.min) / totalMs) * 100;
+                  const width = ((nextWt - wt) / totalMs) * 100;
+                  return (
+                    <div key={i} className="absolute border-r border-slate-100 px-1 text-[9px] text-slate-500 font-medium flex items-center truncate" style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}>
+                      {new Date(wt).toLocaleDateString("es-MX", { day: "2-digit", month: "numeric" })}
+                    </div>
+                  );
+                })}
+                {zoom === "dia" && days.map((dt, i) => {
+                  const left = ((dt - range.min) / totalMs) * 100;
+                  const width = (MS_DAY / totalMs) * 100;
+                  const d = new Date(dt);
+                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                  return (
+                    <div key={i} className={`absolute border-r border-slate-100 flex flex-col items-center justify-center ${isWeekend ? "bg-slate-100/60 text-slate-400" : "text-slate-600"}`} style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}>
+                      <span className="text-[9px] font-bold leading-tight">{DOW[d.getDay()]}</span>
+                      <span className="text-[9px] leading-tight">{String(d.getDate()).padStart(2, "0")}</span>
+                    </div>
+                  );
+                })}
+                {todayInRange && <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%` }} />}
+              </div>
             </div>
           </div>
 
-          {/* ─── Filas ─── */}
-          <div className="divide-y divide-slate-100">
-            {stages.map((s) => {
-              const isCollapsed = collapsed.has(s.id);
-              return (
-                <div key={s.id}>
-                  {/* Etapa header */}
-                  <div className="flex bg-slate-50/60">
-                    <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-50 px-3 py-1.5 border-r border-slate-200 flex items-center gap-1.5 min-w-0`}>
-                      <button onClick={() => toggleCollapse(s.id)} className="shrink-0 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-700">
-                        <svg className={`w-3 h-3 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      <span className="text-xs font-bold text-slate-700 truncate">{s.name}</span>
-                      <span className="shrink-0 ml-auto text-[10px] text-slate-400">{s.activities.length}</span>
-                    </div>
-                    <div className="flex-1 min-w-0" />
-                  </div>
+        </div>{/* /sticky */}
 
-                  {/* Actividades */}
-                  {!isCollapsed && s.activities.map((a) => {
-                    const isMilestone = !!a.planned_start && !!a.planned_end && a.planned_start === a.planned_end;
-                    const planStyle = isMilestone ? null : barStyle(a.planned_start, a.planned_end);
-                    const realStyle = barStyle(a.actual_start, a.actual_end);
-                    const baselineStyle = barStyle(a.baseline_start, a.baseline_end);
-                    const barColor = STATUS_BAR[a.status];
-                    const isOnRisk = atRisk.has(a.id);
-                    const noFechas = !a.planned_start && !a.planned_end;
-                    const dep = a.depends_on_activity_id
-                      ? allActivities.find((x) => x.id === a.depends_on_activity_id)
-                      : null;
-                    const conflict = !!(dep && a.planned_start && dep.planned_end && a.planned_start < dep.planned_end);
-
-                    return (
-                      <div key={a.id} className={`flex hover:bg-slate-50/80 transition-colors${isOnRisk ? " bg-rose-50/30" : ""}`}>
-                        {/* Label */}
-                        <div
-                          style={{ width: LABEL_W }}
-                          className={`shrink-0${stickyBg} bg-white px-3 py-2 border-r border-slate-200 min-w-0 cursor-default`}
-                          onMouseEnter={(e) => showTooltip(e, a)}
-                          onMouseLeave={hideTooltip}
-                        >
-                          <div className="flex items-center gap-1 min-w-0">
-                            {isOnRisk && (
-                              <svg className="shrink-0 w-3 h-3 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                            {isMilestone && (
-                              <svg className="shrink-0 w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 1l2.928 5.941L19 8l-4.5 4.385L15.618 19 10 16.118 4.382 19l1.118-6.615L1 8l6.072-1.059L10 1z" />
-                              </svg>
-                            )}
-                            <p className="text-xs font-medium text-slate-900 truncate">{a.name}</p>
-                          </div>
-                          {a.assignee_email && (
-                            <p className="text-[10px] text-slate-500 truncate pl-4" title={a.assignee_email}>
-                              @ {a.assignee_email.split("@")[0]}
-                            </p>
-                          )}
-                          {noFechas && (
-                            <span className="inline-flex items-center gap-0.5 mt-0.5 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-sm bg-amber-50 text-amber-700 border border-amber-200">
-                              Sin plan
-                            </span>
-                          )}
-                          {dep && (
-                            <p className={`text-[10px] truncate pl-4 ${conflict ? "text-rose-700 font-bold" : "text-slate-400"}`}>
-                              {conflict ? "⚠ " : "↳ "}{dep.name}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Timeline */}
-                        <div className="relative" style={{ ...tStyle, height: ROW_H }}>
-                          {/* Grid meses */}
-                          {range.months.map((m, i) => (
-                            <div key={i} className="absolute top-0 bottom-0 border-r border-slate-100" style={{ left: `${((m.getTime() - range.min) / totalMs) * 100}%`, width: 0 }} />
-                          ))}
-
-                          {/* Week markers (quarter / semana) */}
-                          {weeks.map((wt, i) => (
-                            <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${((wt - range.min) / totalMs) * 100}%`, width: 0, borderLeft: "1px dashed rgba(148,163,184,0.35)" }} />
-                          ))}
-
-                          {/* Day markers (semana: muy sutiles · dia: sólidos + fondo fin de semana) */}
-                          {days.map((dt, i) => {
-                            const left = ((dt - range.min) / totalMs) * 100;
-                            const d = new Date(dt);
-                            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                            return (
-                              <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{
-                                left: `${left}%`,
-                                width: zoom === "dia" ? `${(MS_DAY / totalMs) * 100}%` : 0,
-                                borderLeft: zoom === "dia"
-                                  ? (isWeekend ? "1px solid rgba(148,163,184,0.4)" : "1px solid rgba(148,163,184,0.15)")
-                                  : "1px dashed rgba(148,163,184,0.18)",
-                                background: zoom === "dia" && isWeekend ? "rgba(241,245,249,0.5)" : undefined,
-                              }} />
-                            );
-                          })}
-
-                          {/* Línea hoy */}
-                          {todayInRange && (
-                            <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%`, width: 0 }} />
-                          )}
-
-                          {/* Ruta crítica: trama */}
-                          {isOnRisk && (
-                            <div className="absolute inset-0 pointer-events-none" style={{ background: "repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(251,113,133,0.07) 4px,rgba(251,113,133,0.07) 8px)" }} />
-                          )}
-
-                          {/* ── Milestone: diamante ── */}
-                          {isMilestone && (() => {
-                            const p = pct(a.planned_start);
-                            if (p === null) return null;
-                            return (
-                              <button onClick={(e) => openPopover(e, s.id, a)} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rotate-45 bg-amber-400 border-2 border-amber-600 hover:bg-amber-300 transition-colors z-20" style={{ left: `${p}%` }} title={`Hito: ${fmtShort(a.planned_start)}`} />
-                            );
-                          })()}
-
-                          {/* ── Baseline (dashed naranja, debajo de plan) ── */}
-                          {baselineStyle && (
-                            <div
-                              className="absolute h-1.5 rounded pointer-events-none z-[5]"
-                              style={{ ...baselineStyle, top: 6, background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)", opacity: 0.7 }}
-                              title={`Baseline: ${fmtShort(a.baseline_start)} → ${fmtShort(a.baseline_end)}`}
-                            />
-                          )}
-
-                          {/* ── Plan (outline) ── */}
-                          {planStyle && (
-                            <button
-                              onClick={(e) => openPopover(e, s.id, a)}
-                              className={`absolute h-4 rounded border-2 bg-white/80 hover:opacity-80 transition-all z-10 ${isOnRisk ? "border-rose-400" : "border-slate-400 hover:border-brand-primary"}`}
-                              style={{ ...planStyle, top: 10 }}
-                              title={`Plan: ${fmtShort(a.planned_start)} → ${fmtShort(a.planned_end)}`}
-                            />
-                          )}
-
-                          {/* ── Real (sólida + progreso) ── */}
-                          {realStyle ? (
-                            <button
-                              onClick={(e) => openPopover(e, s.id, a)}
-                              className={`absolute h-3 rounded overflow-hidden ${barColor} hover:opacity-90 z-20`}
-                              style={{ ...realStyle, top: 13 }}
-                              title={`Real: ${fmtShort(a.actual_start)} → ${fmtShort(a.actual_end)} · ${STATUS_LABEL[a.status]}${a.actual_progress != null ? ` · ${a.actual_progress}%` : ""}`}
-                            >
-                              {a.actual_progress != null && a.actual_progress < 100 && (
-                                <div className="absolute top-0 right-0 bottom-0 bg-white/40" style={{ width: `${100 - a.actual_progress}%` }} />
-                              )}
-                            </button>
-                          ) : planStyle ? (
-                            <button
-                              onClick={(e) => openPopover(e, s.id, a)}
-                              className="absolute h-2 rounded border border-dashed border-slate-300 bg-transparent hover:border-brand-primary z-20"
-                              style={{ ...planStyle, top: 14 }}
-                              title="Sin fechas reales — click para registrar"
-                            />
-                          ) : null}
-                        </div>
+        {/* ─── Filas scrollables ─── */}
+        <div
+          ref={scrollRef}
+          className={timelineWidth ? "overflow-x-auto" : "overflow-hidden"}
+          onScroll={(e) => {
+            // Sync header timeline via transform (sin re-render React)
+            if (headerTimelineInnerRef.current) {
+              headerTimelineInnerRef.current.style.transform = `translateX(-${e.currentTarget.scrollLeft}px)`;
+            }
+          }}
+        >
+          <div style={timelineWidth ? { minWidth: LABEL_W + timelineWidth } : undefined}>
+            {/* ─── Filas ─── */}
+            <div className="divide-y divide-slate-100">
+              {stages.map((s) => {
+                const isCollapsed = collapsed.has(s.id);
+                return (
+                  <div key={s.id}>
+                    {/* Etapa header */}
+                    <div className="flex bg-slate-50/60">
+                      <div style={{ width: LABEL_W }} className={`shrink-0${stickyBg} bg-slate-50 px-3 py-1.5 border-r border-slate-200 flex items-center gap-1.5 min-w-0`}>
+                        <button onClick={() => toggleCollapse(s.id)} className="shrink-0 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-700">
+                          <svg className={`w-3 h-3 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        <span className="text-xs font-bold text-slate-700 truncate">{s.name}</span>
+                        <span className="shrink-0 ml-auto text-[10px] text-slate-400">{s.activities.length}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+                      <div className="flex-1 min-w-0" />
+                    </div>
 
-          {/* ─── Leyenda ─── */}
-          <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-600">
-            {hasBaseline && (
+                    {/* Actividades */}
+                    {!isCollapsed && s.activities.map((a) => {
+                      const isMilestone = !!a.planned_start && !!a.planned_end && a.planned_start === a.planned_end;
+                      const planStyle = isMilestone ? null : barStyle(a.planned_start, a.planned_end);
+                      const realStyle = barStyle(a.actual_start, a.actual_end);
+                      const baselineStyle = barStyle(a.baseline_start, a.baseline_end);
+                      const barColor = STATUS_BAR[a.status];
+                      const isOnRisk = atRisk.has(a.id);
+                      const noFechas = !a.planned_start && !a.planned_end;
+                      const dep = a.depends_on_activity_id ? allActivities.find((x) => x.id === a.depends_on_activity_id) : null;
+                      const conflict = !!(dep && a.planned_start && dep.planned_end && a.planned_start < dep.planned_end);
+
+                      return (
+                        <div key={a.id} className={`flex hover:bg-slate-50/80 transition-colors${isOnRisk ? " bg-rose-50/30" : ""}`}>
+                          {/* Label */}
+                          <div
+                            style={{ width: LABEL_W }}
+                            className={`shrink-0${stickyBg} bg-white px-3 py-2 border-r border-slate-200 min-w-0 cursor-default`}
+                            onMouseEnter={(e) => showTooltip(e, a)}
+                            onMouseLeave={hideTooltip}
+                          >
+                            <div className="flex items-center gap-1 min-w-0">
+                              {isOnRisk && (
+                                <svg className="shrink-0 w-3 h-3 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                              {isMilestone && (
+                                <svg className="shrink-0 w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M10 1l2.928 5.941L19 8l-4.5 4.385L15.618 19 10 16.118 4.382 19l1.118-6.615L1 8l6.072-1.059L10 1z" />
+                                </svg>
+                              )}
+                              <p className="text-xs font-medium text-slate-900 truncate">{a.name}</p>
+                            </div>
+                            {a.assignee_email && (
+                              <p className="text-[10px] text-slate-500 truncate pl-4" title={a.assignee_email}>
+                                @ {a.assignee_email.split("@")[0]}
+                              </p>
+                            )}
+                            {noFechas && (
+                              <span className="inline-flex items-center gap-0.5 mt-0.5 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-sm bg-amber-50 text-amber-700 border border-amber-200">
+                                Sin plan
+                              </span>
+                            )}
+                            {dep && (
+                              <p className={`text-[10px] truncate pl-4 ${conflict ? "text-rose-700 font-bold" : "text-slate-400"}`}>
+                                {conflict ? "⚠ " : "↳ "}{dep.name}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Timeline */}
+                          <div className="relative" style={{ ...tStyle, height: ROW_H }}>
+                            {range.months.map((m, i) => (
+                              <div key={i} className="absolute top-0 bottom-0 border-r border-slate-100" style={{ left: `${((m.getTime() - range.min) / totalMs) * 100}%`, width: 0 }} />
+                            ))}
+                            {weeks.map((wt, i) => (
+                              <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${((wt - range.min) / totalMs) * 100}%`, width: 0, borderLeft: "1px dashed rgba(148,163,184,0.35)" }} />
+                            ))}
+                            {days.map((dt, i) => {
+                              const left = ((dt - range.min) / totalMs) * 100;
+                              const d = new Date(dt);
+                              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                              return (
+                                <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{
+                                  left: `${left}%`,
+                                  width: zoom === "dia" ? `${(MS_DAY / totalMs) * 100}%` : 0,
+                                  borderLeft: zoom === "dia" ? (isWeekend ? "1px solid rgba(148,163,184,0.4)" : "1px solid rgba(148,163,184,0.15)") : "1px dashed rgba(148,163,184,0.18)",
+                                  background: zoom === "dia" && isWeekend ? "rgba(241,245,249,0.5)" : undefined,
+                                }} />
+                              );
+                            })}
+                            {todayInRange && (
+                              <div className="absolute top-0 bottom-0 border-l border-rose-400/60 pointer-events-none" style={{ left: `${todayPct}%`, width: 0 }} />
+                            )}
+                            {isOnRisk && (
+                              <div className="absolute inset-0 pointer-events-none" style={{ background: "repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(251,113,133,0.07) 4px,rgba(251,113,133,0.07) 8px)" }} />
+                            )}
+                            {isMilestone && (() => {
+                              const p = pct(a.planned_start);
+                              if (p === null) return null;
+                              return <button onClick={(e) => openPopover(e, s.id, a)} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rotate-45 bg-amber-400 border-2 border-amber-600 hover:bg-amber-300 transition-colors z-20" style={{ left: `${p}%` }} title={`Hito: ${fmtShort(a.planned_start)}`} />;
+                            })()}
+                            {baselineStyle && (
+                              <div className="absolute h-1.5 rounded pointer-events-none z-[5]" style={{ ...baselineStyle, top: 6, background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)", opacity: 0.7 }} title={`Baseline: ${fmtShort(a.baseline_start)} → ${fmtShort(a.baseline_end)}`} />
+                            )}
+                            {planStyle && (
+                              <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-4 rounded border-2 bg-white/80 hover:opacity-80 transition-all z-10 ${isOnRisk ? "border-rose-400" : "border-slate-400 hover:border-brand-primary"}`} style={{ ...planStyle, top: 10 }} title={`Plan: ${fmtShort(a.planned_start)} → ${fmtShort(a.planned_end)}`} />
+                            )}
+                            {realStyle ? (
+                              <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-3 rounded overflow-hidden ${barColor} hover:opacity-90 z-20`} style={{ ...realStyle, top: 13 }} title={`Real: ${fmtShort(a.actual_start)} → ${fmtShort(a.actual_end)} · ${STATUS_LABEL[a.status]}${a.actual_progress != null ? ` · ${a.actual_progress}%` : ""}`}>
+                                {a.actual_progress != null && a.actual_progress < 100 && (
+                                  <div className="absolute top-0 right-0 bottom-0 bg-white/40" style={{ width: `${100 - a.actual_progress}%` }} />
+                                )}
+                              </button>
+                            ) : planStyle ? (
+                              <button onClick={(e) => openPopover(e, s.id, a)} className="absolute h-2 rounded border border-dashed border-slate-300 bg-transparent hover:border-brand-primary z-20" style={{ ...planStyle, top: 14 }} title="Sin fechas reales — click para registrar" />
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ─── Leyenda ─── */}
+            <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-600">
+              {hasBaseline && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-4 h-1.5 rounded" style={{ background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)" }} />
+                  Baseline
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 border-2 border-slate-400 bg-white rounded-sm" />Plan</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-slate-300 rounded-sm" />Pendiente</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-brand-primary rounded-sm" />En curso</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-emerald-500 rounded-sm" />Completada</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-rose-500 rounded-sm" />Retrasada</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rotate-45 bg-amber-400 border-2 border-amber-600 inline-block" />Hito</span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-4 h-1.5 rounded" style={{ background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)" }} />
-                Baseline
+                <svg className="w-3 h-3 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
+                Ruta crítica
               </span>
-            )}
-            <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 border-2 border-slate-400 bg-white rounded-sm" />Plan</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-slate-300 rounded-sm" />Pendiente</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-brand-primary rounded-sm" />En curso</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-emerald-500 rounded-sm" />Completada</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-rose-500 rounded-sm" />Retrasada</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rotate-45 bg-amber-400 border-2 border-amber-600 inline-block" />Hito</span>
-            <span className="inline-flex items-center gap-1.5">
-              <svg className="w-3 h-3 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-              Ruta crítica
-            </span>
-            {todayInRange && <span className="inline-flex items-center gap-1.5"><span className="w-px h-3 bg-rose-400/60" />Hoy</span>}
+              {todayInRange && <span className="inline-flex items-center gap-1.5"><span className="w-px h-3 bg-rose-400/60" />Hoy</span>}
+            </div>
           </div>
-        </div>
-      </div>
+        </div>{/* /scrollRef */}
+
+      </div>{/* /ganttRef */}
 
       {overlay?.kind === "tooltip" && <RichTooltip activity={overlay.activity} anchor={overlay.anchor} />}
       {overlay?.kind === "popover" && (

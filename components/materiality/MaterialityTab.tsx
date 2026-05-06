@@ -237,6 +237,15 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
       <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded">
         <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
         <p className="flex-1 text-[11px] text-slate-700 font-medium">
+          {/* Riesgo principal primero — dato más relevante para el gerente */}
+          {stats.dm > 0 && (
+            <>
+              <span className="font-bold text-slate-900">
+                Riesgo principal: {stats.top}
+              </span>
+              {" · "}
+            </>
+          )}
           <span className="font-bold text-rose-600">{stats.dm} doble material</span>
           {" · "}
           <span className="font-bold text-brand-primary-dark">{stats.fin} financiero</span>
@@ -253,12 +262,6 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
           >
             {stats.validated}/{stats.total} validados
           </span>
-          {stats.dm > 0 && (
-            <>
-              {" · "}
-              Riesgo principal: <span className="font-bold text-slate-900">{stats.top}</span>
-            </>
-          )}
         </p>
         {stats.total > 0 && (
           stats.validated === stats.total ? (
@@ -294,7 +297,7 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
                 className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.12em] -rotate-90 whitespace-nowrap origin-center"
                 title="Impacto del negocio en sociedad y medio ambiente"
               >
-                Impacto sociedad/medio amb.
+                Impacto
               </span>
               <span className="text-[9px] text-slate-400 tabular-nums">0</span>
             </div>

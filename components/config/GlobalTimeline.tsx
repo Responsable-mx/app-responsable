@@ -196,8 +196,9 @@ export function GlobalTimeline({
   const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
   const [now] = useState(() => Date.now());
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
-  // Filtro interno "solo retrasadas" — quick toggle para el gerente
-  const [delayedOnly, setDelayedOnly] = useState(false);
+  type QuickFilter = 'delayed' | 'active' | 'upcoming' | 'completed' | null;
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
+  const toggleFilter = (f: QuickFilter) => setQuickFilter((v) => (v === f ? null : f));
   const [colorMode, setColorMode] = useState<ColorMode>('estado');
   const scrollRef = useRef<HTMLDivElement>(null);
   // Drag-to-pan: refs (no state) para evitar re-renders en cada mousemove
@@ -259,10 +260,16 @@ export function GlobalTimeline({
         }
       }
     }
-    // Override interno: mostrar solo retrasadas cuando el gerente lo solicita
-    if (delayedOnly) return out.filter((a) => a.status === "delayed");
+    if (quickFilter === 'delayed')   return out.filter((a) => a.status === 'delayed');
+    if (quickFilter === 'active')    return out.filter((a) => a.status === 'in_progress' || a.status === 'delayed');
+    if (quickFilter === 'completed') return out.filter((a) => a.status === 'completed');
+    if (quickFilter === 'upcoming')  return out.filter((a) => {
+      if (a.status !== 'pending' || !a.planned_start) return false;
+      const ts = new Date(a.planned_start + 'T00:00:00').getTime();
+      return ts >= now && ts <= now + 30 * MS_DAY;
+    });
     return out;
-  }, [data, filters, delayedOnly]);
+  }, [data, filters, quickFilter, now]);
 
   // KPIs globales — calculados sobre el universo completo (sin delayedOnly) para no perder contexto
   const allActivities = useMemo<FlatActivity[]>(() => {
@@ -588,14 +595,14 @@ export function GlobalTimeline({
             {globalStats.clientesConRetraso} {globalStats.clientesConRetraso === 1 ? "proyecto" : "proyectos"}
           </p>
           <button
-            onClick={() => setDelayedOnly((v) => !v)}
+            onClick={() => toggleFilter('delayed')}
             className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
-              delayedOnly
+              quickFilter === 'delayed'
                 ? "bg-rose-600 text-white border-rose-600 hover:bg-rose-700"
                 : "bg-white text-rose-700 border-rose-300 hover:bg-rose-50"
             }`}
           >
-            {delayedOnly ? "× Ver todas" : "Ver solo retrasadas →"}
+            {quickFilter === 'delayed' ? "× Ver todas" : "Ver solo retrasadas →"}
           </button>
         </div>
       )}
@@ -605,18 +612,42 @@ export function GlobalTimeline({
         {(
           [
             { label: "Consultores", value: globalStats.consultores, tone: "neutral" as const, hint: "con actividades visibles" },
-            { label: "En curso", value: globalStats.activas, tone: "primary" as const, hint: "activas o retrasadas" },
+            {
+              label: "En curso",
+              value: globalStats.activas,
+              tone: "primary" as const,
+              hint: "activas o retrasadas",
+              hintActive: "× clic para ver todas",
+              onClick: () => toggleFilter('active'),
+              active: quickFilter === 'active',
+            },
             {
               label: "Retrasadas",
               value: globalStats.retrasadas,
               tone: "red" as const,
               hint: `${globalStats.clientesConRetraso} proyecto${globalStats.clientesConRetraso !== 1 ? "s" : ""} afectado${globalStats.clientesConRetraso !== 1 ? "s" : ""}`,
               hintActive: "× clic para ver todas",
-              onClick: () => setDelayedOnly((v) => !v),
-              active: delayedOnly,
+              onClick: () => toggleFilter('delayed'),
+              active: quickFilter === 'delayed',
             },
-            { label: "Próximas 30d", value: globalStats.proximas, tone: "amber" as const, hint: "inician pronto" },
-            { label: "Completado", value: `${globalStats.pctComplete}%`, tone: "green" as const, hint: `${globalStats.completadas} de ${allActivities.length} actividades` },
+            {
+              label: "Próximas 30d",
+              value: globalStats.proximas,
+              tone: "amber" as const,
+              hint: "inician pronto",
+              hintActive: "× clic para ver todas",
+              onClick: () => toggleFilter('upcoming'),
+              active: quickFilter === 'upcoming',
+            },
+            {
+              label: "Completado",
+              value: `${globalStats.pctComplete}%`,
+              tone: "green" as const,
+              hint: `${globalStats.completadas} de ${allActivities.length} actividades`,
+              hintActive: "× clic para ver todas",
+              onClick: () => toggleFilter('completed'),
+              active: quickFilter === 'completed',
+            },
           ] as { label: string; value: string | number; tone: "neutral"|"primary"|"red"|"amber"|"green"; hint: string; hintActive?: string; onClick?: () => void; active?: boolean }[]
         ).map(({ label, value, tone, hint, hintActive, onClick, active }) => (
           <div
@@ -625,7 +656,13 @@ export function GlobalTimeline({
             className={`bg-white border rounded px-4 py-3 shadow-sm transition-all ${
               onClick ? "cursor-pointer hover:shadow-md hover:border-slate-300 select-none" : ""
             } ${
-              active ? "border-rose-400 ring-2 ring-rose-100" : "border-slate-200"
+              active
+                ? tone === "red"    ? "border-rose-400 ring-2 ring-rose-100"
+                : tone === "amber"  ? "border-amber-400 ring-2 ring-amber-100"
+                : tone === "green"  ? "border-emerald-400 ring-2 ring-emerald-100"
+                : tone === "primary"? "border-brand-primary ring-2 ring-brand-primary-light"
+                : "border-slate-400 ring-2 ring-slate-100"
+                : "border-slate-200"
             }`}
           >
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>

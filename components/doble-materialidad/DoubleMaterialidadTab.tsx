@@ -616,10 +616,14 @@ export function DoubleMaterialidadTab({
   const [isPolling, setIsPolling] = useState(false);
   const { push } = useToast();
   const pollingNotified = useRef(false);
+  // Guarda el id del resultado que YA existía al arrancar el polling.
+  // El effect solo para cuando llega un resultado con id DIFERENTE (el nuevo).
+  const pollingStartId = useRef<string | null>(null);
 
   // Polling reporte batch
   const [isReportPolling, setIsReportPolling] = useState(false);
   const pollingNotifiedReport = useRef(false);
+  const pollingStartReportId = useRef<string | null>(null);
 
   const { data: benchmarkResp, isLoading: loadingBenchmark, mutate: mutateBenchmark } = useSWR<{
     data: BenchmarkData;
@@ -639,12 +643,16 @@ export function DoubleMaterialidadTab({
   const latestResult = benchmarkResp?.data.latest_result ?? null;
   const latestReport = reportResp?.data ?? null;
 
-  // Detectar cuando el batch del benchmark termina
+  // Detectar cuando el batch del benchmark termina.
+  // Solo para cuando llega un resultado con id DISTINTO al que había al arrancar
+  // (evita falso-positivo con datos cacheados del benchmark anterior).
   useEffect(() => {
     if (!isPolling) {
       pollingNotified.current = false;
       return;
     }
+    const isStale = latestResult?.id === pollingStartId.current;
+    if (isStale) return;
     if (latestResult?.status === "done" && !pollingNotified.current) {
       pollingNotified.current = true;
       setIsPolling(false);
@@ -655,14 +663,17 @@ export function DoubleMaterialidadTab({
       setIsPolling(false);
       push("error", "El benchmark falló. Intenta de nuevo.");
     }
-  }, [latestResult?.status, isPolling, push]);
+  }, [latestResult?.id, latestResult?.status, isPolling, push]);
 
-  // Detectar cuando el batch del reporte termina
+  // Detectar cuando el batch del reporte termina.
+  // Mismo patrón anti-stale que el benchmark.
   useEffect(() => {
     if (!isReportPolling) {
       pollingNotifiedReport.current = false;
       return;
     }
+    const isStale = latestReport?.id === pollingStartReportId.current;
+    if (isStale) return;
     if (latestReport?.parse_status === "ok" && !pollingNotifiedReport.current) {
       pollingNotifiedReport.current = true;
       setIsReportPolling(false);
@@ -673,7 +684,7 @@ export function DoubleMaterialidadTab({
       setIsReportPolling(false);
       push("error", "El reporte falló. Intenta de nuevo.");
     }
-  }, [latestReport?.parse_status, isReportPolling, push]);
+  }, [latestReport?.id, latestReport?.parse_status, isReportPolling, push]);
 
   const stage1Status: StageStatus =
     questionnaireProgress &&
@@ -739,7 +750,11 @@ export function DoubleMaterialidadTab({
           latestResult={latestResult}
           onDataMutate={() => mutateBenchmark()}
           isPolling={isPolling}
-          onStartPolling={() => setIsPolling(true)}
+          onStartPolling={() => {
+            pollingStartId.current = latestResult?.id ?? null;
+            setIsPolling(true);
+            void mutateBenchmark(); // Invalida caché para recibir status pending
+          }}
         />
       </section>
 
@@ -755,7 +770,11 @@ export function DoubleMaterialidadTab({
           latestReport={latestReport}
           onReportMutate={() => mutateReport()}
           isReportPolling={isReportPolling}
-          onStartReportPolling={() => setIsReportPolling(true)}
+          onStartReportPolling={() => {
+            pollingStartReportId.current = latestReport?.id ?? null;
+            setIsReportPolling(true);
+            void mutateReport(); // Invalida caché para recibir parse_status pending
+          }}
         />
       </section>
     </div>

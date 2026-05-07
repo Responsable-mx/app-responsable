@@ -1,31 +1,30 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-06 (sesión 17 — auditoría completa: IA, seguridad, arquitectura, rendimiento, UX)
-**Calificación global:** 8.0 / 10 (post-limpieza completa)
+**Fecha:** 2026-05-06 (sesión 18 — auditoría completa: IA, seguridad, health, refactor)
+**Calificación global:** 7.8 / 10
 
 ---
 
-## Hallazgos nuevos (no en DEUDA.md al inicio de sesión)
+## Hallazgos nuevos (no en DEUDA.md al inicio de sesión 18)
 
 | ID | Sev | Descripción | Archivo |
 |----|-----|-------------|---------|
-| D-109 | 🟡 | Fallback Sonnet stale `claude-sonnet-4-20250514` en 5 lugares — app corre en Sonnet 4 en lugar de Sonnet 4.6 si env var apunta al ID viejo | `lib/ai/models.ts:27,33`, `lib/ai/extract-test.ts:13`, `dm-benchmark/route.ts:172`, `dm-report/route.ts:155`, `env.example:20` |
-| D-110 | 🟡 | `dm-benchmark` y `dm-report` hardcodean model lookup propio — no usan `getModelConfig()` — config de modelo en 3 fuentes distintas | `dm-benchmark/route.ts:172`, `dm-report/route.ts:155` |
-| D-111 | 🟡 | `dm-benchmark` POST sin rate limit — propose (4 web_search) + compare (Sonnet 150s) sin conteo en ai_calls | `dm-benchmark/route.ts` |
-| D-112 | 🟡 | `logAiCall` sin `cacheCreationTokens`/`cacheReadTokens` en dm-benchmark y dm-report — dashboard uso-IA subreporta costos | `dm-benchmark/route.ts:211,215,314,319`, `dm-report/route.ts:183,187` |
-| D-113 | 🟡 | `ai-fill` llama `getClient(id)` dos veces (líneas 101 y 157) — 2 DB round-trips para la misma fila | `ai-fill/route.ts:101,157` |
-| D-114 | 🟢 | Middleware: cron bypass ocurre después de `auth.getUser()` — round-trip Supabase innecesario en cada cron | `lib/supabase/middleware.ts:42-56` |
-| D-115 | 🟢 | DEUDA.md stale: D-86/D-87/D-88 resueltos en código pero no tachados. D-85 "Acceso rápido" renombrado pero lógica aún presente | `DEUDA.md` |
+| D-121 | 🔴 | RBAC bypass en export-pdf y export-cronograma-pdf — usan `requireUser()` en lugar de `requireConsultorForClient(id)`. Cualquier consultor puede descargar PDF de cualquier cliente. | `export-pdf/route.ts:36`, `export-cronograma-pdf/route.ts:25` |
+| D-122 | 🟡 | `dm-report` POST sin rate limit — Elena (Opus $5/$25) sin throttle. `dm-benchmark` sí tiene rate limit (D-111) pero `dm-report` se omitió | `dm-report/route.ts` |
+| D-123 | 🟡 | `research-reports` POST sin rate limit — Aurora + web_search (3 usos) sin throttle por usuario | `research-reports/route.ts` |
+| D-124 | 🟢 | `audit-health` cron usa precios Sonnet fijos ($3/$15) para todos los modelos — Elena (Opus) se subestima, Valeria (Haiku) se sobreestima. `lib/ai/usage.ts` ya tiene pricing por modelo. | `cron/audit-health/route.ts:51–53` |
 
 ---
 
-## Resueltos confirmados en código (sesiones anteriores, no en DEUDA.md)
+## Resueltos ANTES de esta sesión (limpieza D-116–D-120 + coverage sprint)
 
-| ID | Descripción | Verificación |
-|----|-------------|--------------|
-| D-86 | Cronograma h2 redundante eliminado | `ClientCronogramaTab.tsx` — no hay `CRONOGRAMA DEL CLIENTE` |
-| D-87 | Copy "IA llena 7 pasos" → `{aiCapableCount} de {totalSteps}` | `AiBulkBanner.tsx:42` |
-| D-88 | Label "ADMIN" eliminado de page headers | `equipo/page.tsx:12`, `configuracion/layout.tsx:26` |
+| ID | Descripción |
+|----|-------------|
+| D-116 | audit log `activities/[activityId]` PATCH — before-snapshot añadido |
+| D-117 | WorkloadHeatmap SWR error state visible |
+| D-118 | ImportModal library tab `docsError` visible |
+| D-120 | `documents` GET/POST: `Promise.all([requireConsultorForClient, getClient])` |
+| coverage | 3 describe blocks nuevos: `isSystemAccount` / `getUserRoles` / `recordLogin` — 289 tests, 90.22% stmts |
 
 ---
 
@@ -34,7 +33,7 @@
 | ID | Sev | Descripción |
 |----|-----|-------------|
 | D-04 | 🟡 | Metodología ResponSable — decisión de negocio |
-| D-85 | 🟢 | "Acceso rápido" sidebar — lógica aún activa, pendiente de pin en lista de clientes |
+| D-85 | 🟢 | "MIS PROYECTOS" sidebar — duplica nav de clientes |
 
 ---
 
@@ -42,39 +41,37 @@
 
 | Área | Resultado |
 |------|-----------|
-| Auth guards todos los endpoints | ✅ `requireConsultorForClient` en wizard, docs, materiality, benchmark, dm-report |
-| Seguridad headers CSP/HSTS | ✅ `next.config.ts` completo |
-| SSRF guard + magic bytes | ✅ `ingest-report` + `isPublicHttpUrl` |
-| Rate limit chat / ai-fill / doc-fill | ✅ DB-based cross-instance |
+| Crons `verifyCron` (4 crons) | ✅ dialy-qa, delayed-activities, refresh-reports, audit-health |
+| Model routing por rol | ✅ `getModelConfig()` en todos los endpoints IA |
 | Prompt caching chat (2 breakpoints) | ✅ `buildSystemBlocks` ephemeral correcto |
-| Opus 4 en Elena / Haiku 4.5 en Valeria | ✅ IDs correctos en `models.ts` |
-| Audit log mutaciones admin | ✅ `logChange` en todos los endpoints admin |
-| `extractJsonObject` centralizado | ✅ `lib/ai/extract-json.ts` — 5 importaciones |
-| RBAC consultor-per-client | ✅ `requireConsultorForClient` en 9+ endpoints |
-| Tests | ✅ suite 246+ tests |
-| Crons `verifyCron` | ✅ 4 crons protegidos |
-| SWR retry global | ✅ `DashboardSWRProvider` exponencial |
+| Rate limit chat / ai-fill / doc-fill / dm-benchmark | ✅ DB-based cross-instance |
+| Audit log mutaciones admin | ✅ `logChange` + before-snapshot en todos los endpoints |
+| SSRF guard magic bytes | ✅ `ingest-report` + `isPublicHttpUrl` |
+| RBAC `requireConsultorForClient` en endpoints de datos | ✅ 9+ endpoints correctos |
+| Cron killswitches env | ✅ `DISABLE_DELAYED_NOTIFICATIONS` en delayed-activities |
+| CSP/HSTS headers | ✅ `next.config.ts` |
+| materiality-topics IDOR guard | ✅ D-12 pattern — `getMaterialityTopicVerified(topicId, clientId)` |
 
 ---
 
 ## Evolución de calificación
 
-| Dimensión | Anterior | Ahora |
-|-----------|---------|-------|
-| Seguridad | 8.5 | 8.5 |
-| Confiabilidad | 8.0 | 7.5 |
-| UX | 7.0 | 7.5 |
-| Arquitectura | 7.5 | 7.0 |
-| Rendimiento | 8.0 | 7.5 |
-| Calidad de código | 7.5 | 7.5 |
-| Observabilidad | 8.5 | 7.5 |
-| Deuda técnica | 7.0 | 7.5 |
-| **Global** | **7.8** | **7.6** |
+| Dimensión | Sesión 17 | Sesión 18 |
+|-----------|-----------|-----------|
+| Seguridad | 8.5 | 7.5 (D-121 RBAC activo) |
+| Confiabilidad | 7.5 | 8.0 (D-116–D-120 resueltos) |
+| UX | 7.5 | 7.5 |
+| Arquitectura | 7.0 | 7.0 |
+| Rendimiento | 7.5 | 7.5 |
+| Calidad de código | 7.5 | 8.0 (coverage subió a 90%) |
+| Observabilidad | 7.5 | 7.5 |
+| Deuda técnica | 7.5 | 7.5 |
+| **Global** | **8.0** | **7.8** |
 
-> Baja leve: observabilidad pierde por cache tokens faltantes en dm-benchmark/report; arquitectura pierde por config modelo en 3 fuentes.
-> Sube UX (D-86/87/88 confirmados resueltos) y deuda técnica (pocos ítems activos reales).
+> Baja seguridad: D-121 RBAC bypass activo en 2 rutas PDF.
+> Sube confiabilidad y calidad: error states completos, 289 tests, coverage >90%.
 
 ---
 
-## Auditoría anterior: 2026-05-06 (sesión 16)
-**Score:** 7.8/10
+## Auditoría anterior: 2026-05-06 (sesión 17)
+**Score:** 8.0/10

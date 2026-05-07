@@ -87,7 +87,7 @@ export function WorkloadHeatmap() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("workload-heatmap-collapsed") === "true";
   });
-  const { data, isLoading } = useSWR("/api/projects/overview", fetcher, {
+  const { data, isLoading, error } = useSWR("/api/projects/overview", fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
@@ -98,6 +98,14 @@ export function WorkloadHeatmap() {
     return (
       <div className="bg-white border border-slate-200 rounded p-4">
         <div className="h-20 animate-pulse bg-slate-100 rounded" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white border border-slate-200 rounded p-4">
+        <p className="text-xs text-rose-600">Error al cargar datos de carga del equipo.</p>
       </div>
     );
   }

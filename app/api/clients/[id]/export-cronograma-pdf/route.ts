@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 
-import { requireUser } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { listClientServices } from "@/lib/client-services";
 import { listStagesByService } from "@/lib/stages";
@@ -22,10 +22,9 @@ const SERVICE_LABELS = (() => {
 })();
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const [client, services] = await Promise.all([
     getClient(id).catch(() => null),

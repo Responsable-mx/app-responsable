@@ -96,6 +96,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
   }
 
+  const adminSnap = createAdminClient();
+  const { data: beforeSnap } = await adminSnap
+    .from("stage_activities")
+    .select("*")
+    .eq("id", activityId)
+    .single();
+
   try {
     await updateActivity(activityId, parsed.data);
     await logChange({
@@ -103,6 +110,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       entityType: "stage_activity",
       entityId: activityId,
       action: "update",
+      before: beforeSnap ?? null,
       after: parsed.data,
     });
     revalidateTag(PROJECTS_OVERVIEW_TAG);

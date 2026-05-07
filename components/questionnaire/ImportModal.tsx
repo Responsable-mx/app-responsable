@@ -63,7 +63,7 @@ export function ImportModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
-  const { data: docsData, mutate: mutateDocs } = useSWR<{ data: DocMeta[] }>(
+  const { data: docsData, mutate: mutateDocs, error: docsError } = useSWR<{ data: DocMeta[] }>(
     open ? `/api/clients/${clientId}/documents` : null,
     fetcher
   );
@@ -273,7 +273,11 @@ export function ImportModal({
           <p className="text-xs text-slate-600">
             Selecciona uno o varios documentos del cliente. Aurora usará su contenido para extraer los campos.
           </p>
-          {docs.length === 0 ? (
+          {docsError ? (
+            <div className="text-center py-6 text-sm text-rose-600">
+              Error al cargar documentos. Intenta de nuevo.
+            </div>
+          ) : docs.length === 0 ? (
             <div className="text-center py-6 text-sm text-slate-400">
               Sin documentos. Usa la pestaña &quot;Subir archivo&quot;.
             </div>

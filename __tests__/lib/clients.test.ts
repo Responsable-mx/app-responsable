@@ -3,7 +3,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   clientContextCompleteness,
   listClients,
+  listClientsLight,
+  listClientsForTable,
   getClient,
+  getClientMini,
   createClientRow,
   updateClientRow,
   deleteClientRow,
@@ -135,5 +138,35 @@ describe("dev mode guards (sin Supabase)", () => {
 
   it("deleteClientRow lanza error en dev mode", async () => {
     await expect(deleteClientRow("id")).rejects.toThrow(/eliminar clientes/);
+  });
+
+  it("getClientMini devuelve { id, has_double_materiality } para seed", async () => {
+    const mini = await getClientMini("dev-heineken");
+    expect(mini).not.toBeNull();
+    expect(mini?.id).toBe("dev-heineken");
+    expect(mini?.has_double_materiality).toBe(true);
+  });
+
+  it("getClientMini devuelve null para id desconocido", async () => {
+    await expect(getClientMini("no-existe")).resolves.toBeNull();
+  });
+
+  it("listClientsLight devuelve solo id y name", async () => {
+    const list = await listClientsLight();
+    expect(list.length).toBeGreaterThanOrEqual(2);
+    for (const item of list) {
+      expect(item).toHaveProperty("id");
+      expect(item).toHaveProperty("name");
+      expect(Object.keys(item)).toHaveLength(2);
+    }
+  });
+
+  it("listClientsForTable devuelve ClientRow con sector, frameworks, certifications", async () => {
+    const list = await listClientsForTable();
+    expect(list.length).toBeGreaterThanOrEqual(2);
+    const heineken = list.find((c) => c.id === "dev-heineken");
+    expect(heineken).toBeDefined();
+    expect(heineken?.sector).toBe("bebidas");
+    expect(Array.isArray(heineken?.frameworks)).toBe(true);
   });
 });

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
 import { extractJsonObject } from "@/lib/ai/extract-json";
@@ -10,6 +11,10 @@ import { extractJsonObject } from "@/lib/ai/extract-json";
 export const runtime = "nodejs";
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
+
+// Rate limit: 5 búsquedas por 5 min por usuario (Aurora + web_search × 3)
+const RL_WINDOW_MS = 5 * 60_000;
+const RL_MAX_CALLS = 5;
 
 const RequestSchema = z.object({
   kind: z.enum(["sustainability_report", "financial_report"]),
@@ -38,6 +43,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  // Rate limit DB cross-instancias: 5 búsquedas por 5 minutos por usuario.
+  {
+    const adminRl = createAdminClient();
+    const windowStart = new Date(Date.now() - RL_WINDOW_MS).toISOString();
+    const { count } = await adminRl
+      .from("ai_calls")
+      .select("id", { count: "exact", head: true })
+      .eq("user_email", user)
+      .gte("created_at", windowStart);
+    if ((count ?? 0) >= RL_MAX_CALLS) {
+      return NextResponse.json(
+        { error: "Demasiadas búsquedas de informes. Espera 5 minutos antes de reintentar." },
+        { status: 429 }
+      );
+    }
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });

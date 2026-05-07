@@ -15,6 +15,10 @@ export const runtime = "nodejs";
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
 
+// Rate limit: 3 reportes DM por 5 min por usuario (Elena/Opus — ~$0.20-0.50/call)
+const RL_WINDOW_MS = 5 * 60_000;
+const RL_MAX_CALLS = 3;
+
 const GenerateBody = z.object({
   result_id: z.string().uuid(),
 });
@@ -113,6 +117,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  // Rate limit DB cross-instancias: 3 calls por 5 minutos por usuario.
+  {
+    const adminRl = createAdminClient();
+    const windowStart = new Date(Date.now() - RL_WINDOW_MS).toISOString();
+    const { count } = await adminRl
+      .from("ai_calls")
+      .select("id", { count: "exact", head: true })
+      .eq("user_email", user)
+      .gte("created_at", windowStart);
+    if ((count ?? 0) >= RL_MAX_CALLS) {
+      return NextResponse.json(
+        { error: "Demasiadas solicitudes de reporte. Espera 5 minutos antes de reintentar." },
+        { status: 429 }
+      );
+    }
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });

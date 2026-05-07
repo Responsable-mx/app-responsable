@@ -83,18 +83,23 @@ export async function getUsageSummary(
       )
     : 0;
 
-  // D-64: Costo estimado por modelo (antes era Sonnet para todos, sobreestimaba
-  // ~5× para Valeria/Haiku). Precios abr-2026 por 1M tokens:
-  //   Haiku:  $1 input / $5 output / $0.10 cache read
-  //   Sonnet: $3 input / $15 output / $0.30 cache read
+  // D-64 + D-124: Costo estimado por modelo. Precios abr-2026 por 1M tokens:
+  //   Haiku:  $0.25 input / $1.25 output / $0.03 cache read
+  //   Sonnet: $3    input / $15   output / $0.30 cache read
+  //   Opus:   $5    input / $25   output / $0.50 cache read
   let inputUsd = 0;
   let outputUsd = 0;
   let cacheUsd = 0;
   for (const r of calls) {
-    const isHaiku = (r.model as string | null ?? "").includes("haiku");
-    inputUsd  += ((r.input_tokens  ?? 0) * (isHaiku ? 1  : 3 )) / 1_000_000;
-    outputUsd += ((r.output_tokens ?? 0) * (isHaiku ? 5  : 15)) / 1_000_000;
-    cacheUsd  += ((r.cache_read_tokens ?? 0) * (isHaiku ? 0.1 : 0.3)) / 1_000_000;
+    const m = (r.model as string | null ?? "").toLowerCase();
+    const isHaiku = m.includes("haiku");
+    const isOpus  = m.includes("opus");
+    const iIn  = isHaiku ? 0.25 : isOpus ? 5  : 3;
+    const iOut = isHaiku ? 1.25 : isOpus ? 25 : 15;
+    const iCache = isHaiku ? 0.03 : isOpus ? 0.5 : 0.3;
+    inputUsd  += ((r.input_tokens  ?? 0) * iIn)    / 1_000_000;
+    outputUsd += ((r.output_tokens ?? 0) * iOut)   / 1_000_000;
+    cacheUsd  += ((r.cache_read_tokens ?? 0) * iCache) / 1_000_000;
   }
   const costUsd = Number((inputUsd + outputUsd + cacheUsd).toFixed(3));
 

@@ -65,6 +65,22 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟡 D-84 — Sugerencias de chat genéricas cuando hay cliente seleccionado~~ ✅ RESUELTO
 - `ChatEmptyState.tsx`: `getContextualStarters()` genera sugerencias interpolando el nombre del cliente por rol (Aurora/Rebeca/Elena/Valeria). Implementado en sprint anterior.
 
+### Bloque D-121–D-124 — Hallazgos auditoría sesión 18 (may-2026)
+
+### ~~🔴 D-121 — RBAC bypass en export-pdf y export-cronograma-pdf~~ ✅ RESUELTO
+- `requireUser()` → `requireConsultorForClient(id)` en ambas rutas. Fix aplicado en sesión 18.
+
+### ~~🟡 D-122 — dm-report POST sin rate limit (Elena/Opus)~~ ✅ RESUELTO
+- Rate limit DB cross-instancias 3 calls/5min añadido al inicio del POST handler. Mismo patrón que dm-benchmark (D-111). Sesión 18.
+
+### ~~🟡 D-123 — research-reports POST sin rate limit~~ ✅ RESUELTO
+- Rate limit DB 5 calls/5min añadido. Aurora + web_search × 3, menor costo que Opus pero acumulable. Sesión 18.
+
+### ~~🟢 D-124 — audit-health y usage.ts: cost estimate no era model-aware para Opus~~ ✅ RESUELTO
+- Ambos archivos ahora usan precios por modelo: Haiku $0.25/$1.25, Sonnet $3/$15, Opus $5/$25. Sesión 18.
+
+---
+
 ### 🟡 D-85 — "MIS PROYECTOS" en sidebar duplica acceso ya dado por nav "Clientes"
 - **Descripción**: El sidebar muestra una sección "MIS PROYECTOS" con links a clientes específicos (ej: Distribuidora Altamira + EPH). El nav ya tiene "Clientes" que lleva a la lista completa. El nombre del cliente además aparece en breadcrumb + H1 cuando estás dentro.
 - **Impacto**: Ruido visual. 4 instancias del nombre del cliente en pantalla simultáneamente cuando estás en `/clientes/[id]`.
@@ -316,4 +332,4 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 ---
 
-*Última auditoría: may-2026 sesión 17 — D-86/87/88/109/110/111/112/113/114/115 todos resueltos. Items activos: D-04 (metodología — decisión de negocio), D-85 (sidebar acceso rápido — diseño). Score global actualizado a 8.0/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+*Última auditoría: may-2026 sesión 18 — D-121/122/123/124 todos resueltos. Items activos: D-04 (metodología — decisión de negocio), D-85 (sidebar acceso rápido — diseño). Score global 7.8/10 → sube a 8.2/10 post-limpieza. Próxima revisión: ver tareas programadas en `MEMORY.md`.*

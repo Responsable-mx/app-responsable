@@ -7,9 +7,12 @@ import {
   isConsultor,
   isClient,
   getUserClientId,
+  getUserRoles,
+  recordLogin,
   createUser,
   updateUser,
   deleteUser,
+  isSystemAccount,
 } from "@/lib/users";
 
 describe("dev mode — seeds de admins iniciales", () => {
@@ -101,5 +104,78 @@ describe("dev mode — mutaciones lanzan error", () => {
 
   it("deleteUser falla", async () => {
     await expect(deleteUser("x@y.com")).rejects.toThrow(/dev mode/);
+  });
+});
+
+describe("isSystemAccount", () => {
+  it("null/undefined → false", () => {
+    expect(isSystemAccount(null)).toBe(false);
+    expect(isSystemAccount(undefined)).toBe(false);
+    expect(isSystemAccount("")).toBe(false);
+  });
+
+  it("cuentas de sistema exactas → true", () => {
+    expect(isSystemAccount("seed@responsable.net")).toBe(true);
+    expect(isSystemAccount("system@responsable.net")).toBe(true);
+    expect(isSystemAccount("cron@responsable.net")).toBe(true);
+  });
+
+  it("regex: prefijos seed-*, system-*, cron-* → true", () => {
+    expect(isSystemAccount("seed-2025@responsable.net")).toBe(true);
+    expect(isSystemAccount("cron_daily@example.com")).toBe(true);
+    expect(isSystemAccount("system-import@x.com")).toBe(true);
+  });
+
+  it("normaliza a lowercase antes de comparar", () => {
+    expect(isSystemAccount("SEED@responsable.net")).toBe(true);
+  });
+
+  it("email de consultor normal → false", () => {
+    expect(isSystemAccount("gwenaelle@responsable.net")).toBe(false);
+    expect(isSystemAccount("normal@example.com")).toBe(false);
+  });
+});
+
+describe("getUserRoles — dev mode", () => {
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.AUTHORIZED_EMAILS;
+  });
+
+  it("dev@localhost → isAdmin true, isClient false", async () => {
+    const r = await getUserRoles("dev@localhost");
+    expect(r.isAdmin).toBe(true);
+    expect(r.isClient).toBe(false);
+    expect(r.clientId).toBeNull();
+    expect(r.featureFlags).toEqual({});
+  });
+
+  it("admin seed → isAdmin true", async () => {
+    const r = await getUserRoles("gwenaelle@responsable.net");
+    expect(r.isAdmin).toBe(true);
+    expect(r.isClient).toBe(false);
+    expect(r.clientId).toBeNull();
+  });
+
+  it("email desconocido sin AUTHORIZED_EMAILS → isAdmin false", async () => {
+    const r = await getUserRoles("desconocido@example.com");
+    expect(r.isAdmin).toBe(false);
+    expect(r.isClient).toBe(false);
+  });
+
+  it("email desconocido con AUTHORIZED_EMAILS → isAdmin true via fallback", async () => {
+    process.env.AUTHORIZED_EMAILS = "fallback@x.com";
+    const r = await getUserRoles("fallback@x.com");
+    expect(r.isAdmin).toBe(true);
+  });
+});
+
+describe("recordLogin — dev mode (no-op)", () => {
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  });
+
+  it("resuelve sin error en dev mode", async () => {
+    await expect(recordLogin("gwenaelle@responsable.net")).resolves.toBeUndefined();
   });
 });

@@ -27,9 +27,11 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
-  const user = await requireConsultorForClient(id);
+  const [user, client] = await Promise.all([
+    requireConsultorForClient(id),
+    getClient(id).catch(() => null),
+  ]);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
   const docs = await listDocumentsByClient(id);
@@ -55,9 +57,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
-  const user = await requireConsultorForClient(id);
+  const [user, client] = await Promise.all([
+    requireConsultorForClient(id),
+    getClient(id).catch(() => null),
+  ]);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
   let formData: FormData;

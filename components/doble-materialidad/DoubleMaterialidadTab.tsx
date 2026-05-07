@@ -104,6 +104,47 @@ function StageIndicator({
   );
 }
 
+// ── Celda expandible ─────────────────────────────────────────
+
+function ExpandableCell({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!text || text === "—") return <span className="text-slate-400">—</span>;
+  const isLong = text.length > 140;
+  return (
+    <div>
+      <p className={`text-slate-600 text-xs leading-relaxed${!expanded && isLong ? " line-clamp-3" : ""}`}>
+        {text}
+      </p>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-[10px] text-brand-primary hover:underline mt-0.5 focus:outline-none"
+        >
+          {expanded ? "Ver menos" : "Ver más"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Lookup fuzzy en comparison ────────────────────────────────
+
+function lookupComparisonValue(
+  comparison: Record<string, Record<string, string>>,
+  fieldKey: string,
+  companyName: string,
+): string {
+  const fieldMap = comparison[fieldKey] ?? {};
+  return (
+    fieldMap[companyName] ??
+    Object.entries(fieldMap).find(
+      ([k]) => companyName.startsWith(k) || k.startsWith(companyName.split(" ")[0]!)
+    )?.[1] ??
+    "—"
+  );
+}
+
 // ── Etapa 1: Contexto ────────────────────────────────────────
 
 function ContextoSection({
@@ -176,6 +217,10 @@ function BenchmarkSection({
   const { push } = useToast();
   const [proposing, setProposing] = useState(false);
   const [confirmRepropose, setConfirmRepropose] = useState(false);
+  const [fieldsExpanded, setFieldsExpanded] = useState(false);
+  const hasDone = latestResult?.status === "done";
+  // Colapsar configuración por default cuando ya existe un resultado
+  const [configExpanded, setConfigExpanded] = useState(() => latestResult?.status !== "done");
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(companies.filter((c) => c.validated).map((c) => c.id))
   );
@@ -222,7 +267,6 @@ function BenchmarkSection({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error al ejecutar benchmark");
-      // El POST retorna pending inmediatamente — el padre inicia polling del GET
       onStartPolling();
     } catch (e) {
       push("error", e instanceof Error ? e.message : "Error al ejecutar benchmark");
@@ -236,127 +280,198 @@ function BenchmarkSection({
   }, {});
 
   const hasComparisonData =
-    latestResult?.status === "done" &&
-    latestResult.companies_snapshot?.length > 0 &&
-    latestResult.fields_snapshot?.length > 0 &&
-    Object.keys(latestResult.comparison ?? {}).length > 0;
+    hasDone &&
+    latestResult!.companies_snapshot?.length > 0 &&
+    latestResult!.fields_snapshot?.length > 0 &&
+    Object.keys(latestResult!.comparison ?? {}).length > 0;
 
   return (
     <div className="space-y-4">
-      {/* Campos que se compararán */}
-      <div className="bg-slate-50 rounded p-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-          Campos del benchmark
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {BENCHMARK_FIELDS.map((f) => (
-            <span key={f.key} className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-sm">
-              {f.label}
+      {/* ── Configuración: colapsada cuando hay resultado ── */}
+      {hasDone && !configExpanded ? (
+        // Fila resumen colapsada
+        <div className="flex items-center justify-between border border-slate-200 rounded px-3 py-2 bg-slate-50/60">
+          <div className="flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+              <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.354-9.354a.5.5 0 00-.708 0L7 9.293 5.354 7.646a.5.5 0 00-.708.708l2 2a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" clipRule="evenodd" />
+            </svg>
+            <span className="text-xs text-slate-600">
+              Benchmark ejecutado el{" "}
+              {new Date(latestResult!.created_at).toLocaleDateString("es-MX", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}{" "}
+              con {latestResult!.companies_snapshot.length} empresa
+              {latestResult!.companies_snapshot.length !== 1 ? "s" : ""}
             </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Botón proponer */}
-      <div className="flex items-center gap-3">
-        <Button
-          size="sm"
-          variant={companies.length > 0 ? "secondary" : "primary"}
-          loading={proposing}
-          onClick={companies.length > 0 ? () => setConfirmRepropose(true) : handlePropose}
-        >
-          {companies.length > 0 ? "Volver a proponer" : "Proponer empresas con IA"}
-        </Button>
-        {companies.length > 0 && (
-          <span className="text-xs text-slate-500">{companies.length} empresas propuestas</span>
-        )}
-      </div>
-
-      {/* Selección masiva */}
-      {companies.length > 0 && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSelected(new Set(companies.map((c) => c.id)))}
-            className="text-[11px] font-semibold text-brand-primary-dark border border-brand-primary/40 rounded px-2 py-1 hover:bg-brand-primary/5"
-          >
-            Seleccionar todas
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="text-[11px] font-semibold text-slate-600 border border-slate-300 rounded px-2 py-1 hover:bg-slate-50"
-          >
-            Limpiar selección
-          </button>
-          <span className="text-[11px] text-slate-400">{selected.size} seleccionadas</span>
-        </div>
-      )}
-
-      {/* Lista de empresas por categoría */}
-      {Object.entries(groupedByRelation).map(([relation, group]) => (
-        <div key={relation}>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
-            {RELATION_LABELS[relation as CompanyRelation] ?? relation}
-          </p>
-          <div className="space-y-1">
-            {group.map((company) => (
-              <label
-                key={company.id}
-                className="flex items-start gap-2.5 p-2.5 border border-slate-200 rounded cursor-pointer hover:bg-slate-50 transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.has(company.id)}
-                  onChange={() => handleToggle(company.id)}
-                  className="mt-0.5 accent-brand-primary"
-                />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-slate-800">{company.name}</span>
-                  {company.country && (
-                    <span className="text-xs text-slate-500 ml-1.5">{company.country}</span>
-                  )}
-                  {company.sector && (
-                    <p className="text-xs text-slate-500 truncate">{company.sector}</p>
-                  )}
-                </div>
-                {company.proposed_by === "ia" && (
-                  <span className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded-sm shrink-0">
-                    IA
-                  </span>
-                )}
-              </label>
-            ))}
           </div>
-        </div>
-      ))}
-
-      {/* Botón ejecutar benchmark */}
-      {companies.length > 0 && (
-        <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
-          <Button
-            size="md"
-            variant="primary"
-            loading={isPolling}
-            onClick={handleCompare}
-            disabled={isPolling || selected.size < 2}
+          <button
+            type="button"
+            onClick={() => setConfigExpanded(true)}
+            className="text-xs text-brand-primary hover:underline flex items-center gap-0.5"
           >
-            Ejecutar benchmark ({selected.size} empresas + {clientName})
-          </Button>
-          {latestResult?.status === "done" && !isPolling && (
-            <span className="text-xs text-emerald-600 flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
-                <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.354-9.354a.5.5 0 00-.708 0L7 9.293 5.354 7.646a.5.5 0 00-.708.708l2 2a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" clipRule="evenodd" />
+            Editar
+            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" d="M3 4.5l3 3 3-3" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        // Configuración expandida
+        <div className="space-y-4">
+          {/* Campos del benchmark — colapsable */}
+          <div className="bg-slate-50 rounded p-3">
+            <button
+              type="button"
+              onClick={() => setFieldsExpanded((v) => !v)}
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 w-full text-left"
+            >
+              Campos del benchmark ({BENCHMARK_FIELDS.length})
+              <svg
+                className={`w-3 h-3 transition-transform ${fieldsExpanded ? "rotate-180" : ""}`}
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path strokeLinecap="round" d="M3 4.5l3 3 3-3" />
               </svg>
-              Benchmark anterior disponible
-            </span>
+            </button>
+            {fieldsExpanded && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {BENCHMARK_FIELDS.map((f) => (
+                  <span
+                    key={f.key}
+                    className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-sm"
+                  >
+                    {f.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Botón proponer */}
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant={companies.length > 0 ? "secondary" : "primary"}
+              loading={proposing}
+              onClick={companies.length > 0 ? () => setConfirmRepropose(true) : handlePropose}
+            >
+              {companies.length > 0 ? "Regenerar lista IA" : "Proponer empresas con IA"}
+            </Button>
+            {companies.length > 0 && (
+              <span className="text-xs text-slate-500">{companies.length} empresas propuestas</span>
+            )}
+          </div>
+
+          {/* Selección masiva — links inline, no botones */}
+          {companies.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelected(new Set(companies.map((c) => c.id)))}
+                className="text-[11px] text-brand-primary hover:underline"
+              >
+                Seleccionar todas
+              </button>
+              <span className="text-slate-300 text-[11px]">·</span>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className="text-[11px] text-slate-500 hover:underline"
+              >
+                Limpiar
+              </button>
+              <span className="text-[11px] text-slate-400">{selected.size} seleccionadas</span>
+            </div>
+          )}
+
+          {/* Lista de empresas por categoría */}
+          {Object.entries(groupedByRelation).map(([relation, group]) => (
+            <div key={relation}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+                {RELATION_LABELS[relation as CompanyRelation] ?? relation}
+              </p>
+              <div className="space-y-1">
+                {group.map((company) => (
+                  <label
+                    key={company.id}
+                    className="flex items-start gap-2.5 p-2.5 border border-slate-200 rounded cursor-pointer hover:bg-slate-50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.has(company.id)}
+                      onChange={() => handleToggle(company.id)}
+                      className="mt-0.5 accent-brand-primary"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-slate-800">{company.name}</span>
+                      {company.country && (
+                        <span className="text-xs text-slate-500 ml-1.5">{company.country}</span>
+                      )}
+                      {company.sector && (
+                        <p className="text-xs text-slate-500 truncate">{company.sector}</p>
+                      )}
+                    </div>
+                    {company.proposed_by === "ia" && (
+                      <span className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded-sm shrink-0">
+                        IA
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Botón ejecutar benchmark — sin paréntesis */}
+          {companies.length > 0 && (
+            <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+              <Button
+                size="md"
+                variant="primary"
+                loading={isPolling}
+                onClick={handleCompare}
+                disabled={isPolling || selected.size < 2}
+                title={selected.size < 2 ? "Selecciona al menos 2 empresas para ejecutar" : undefined}
+              >
+                Ejecutar benchmark
+              </Button>
+              {selected.size > 0 && !isPolling && (
+                <span className="text-xs text-slate-500">
+                  {selected.size} empresa{selected.size !== 1 ? "s" : ""} + {clientName}
+                </span>
+              )}
+              {hasDone && !isPolling && (
+                <span className="text-xs text-emerald-600 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                    <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.354-9.354a.5.5 0 00-.708 0L7 9.293 5.354 7.646a.5.5 0 00-.708.708l2 2a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" clipRule="evenodd" />
+                  </svg>
+                  Benchmark anterior disponible
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Colapsar cuando hay resultado */}
+          {hasDone && (
+            <button
+              type="button"
+              onClick={() => setConfigExpanded(false)}
+              className="text-[11px] text-slate-400 hover:text-slate-600 hover:underline"
+            >
+              ↑ Colapsar configuración
+            </button>
           )}
         </div>
       )}
 
-      {/* Progreso durante ejecución async */}
+      {/* ── Progreso durante ejecución async ── */}
       {isPolling && (
-        <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+        <div className="flex items-center gap-2 text-xs text-slate-500 py-2 border-l-4 border-l-amber-400 pl-4">
           <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -365,26 +480,31 @@ function BenchmarkSection({
         </div>
       )}
 
-      {/* Resultado narrativo del último benchmark */}
-      {latestResult?.status === "done" && latestResult.narrative && (
+      {/* ── Resultado narrativo del último benchmark ── */}
+      {hasDone && latestResult!.narrative && (
         <div className="border-l-4 border-l-brand-primary pl-4 py-2 bg-white">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
             Síntesis del benchmark
           </p>
-          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{latestResult.narrative}</p>
+          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+            {latestResult!.narrative}
+          </p>
           <p className="text-[10px] text-slate-400 mt-2">
-            {new Date(latestResult.created_at).toLocaleDateString("es-MX", {
-              day: "numeric", month: "long", year: "numeric",
+            {new Date(latestResult!.created_at).toLocaleDateString("es-MX", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
             })}
           </p>
         </div>
       )}
 
-      {/* Tabla comparativa */}
+      {/* ── Tabla comparativa — con columna cliente highlight ── */}
       {hasComparisonData && (
         <div className="mt-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-            Tabla comparativa
+            {clientName} vs {latestResult!.companies_snapshot.length} empresa
+            {latestResult!.companies_snapshot.length !== 1 ? "s" : ""} — posición por dimensión ESG
           </p>
           <div className="overflow-x-auto">
             <table className="min-w-full w-max text-xs border-collapse">
@@ -393,6 +513,12 @@ function BenchmarkSection({
                   <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap">
                     Dimensión
                   </th>
+                  {/* Columna cliente — highlight */}
+                  <th className="text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light/30 px-3 rounded-t text-brand-primary-dark">
+                    {clientName}
+                    <span className="ml-1 font-normal normal-case text-brand-primary/60">· Cliente</span>
+                  </th>
+                  {/* Columnas competidores */}
                   {latestResult!.companies_snapshot.map((company) => (
                     <th
                       key={company.name}
@@ -410,26 +536,27 @@ function BenchmarkSection({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {latestResult!.fields_snapshot.map((field) => (
-                  <tr key={field.key} className="even:bg-slate-50/60 hover:bg-brand-primary-light/30 transition-colors">
-                    <td className="py-2 pr-6 font-medium text-slate-700 whitespace-nowrap">{field.label}</td>
-                    {latestResult!.companies_snapshot.map((company) => {
-                      // comparison = { fieldKey: { companyName: value } }
-                      // Intenta match exacto primero; si falla, busca la clave cuyo
-                      // inicio coincide con el nombre completo de la empresa (el AI
-                      // a veces abrevia "Pemex (Petróleos Mexicanos)" → "Pemex").
-                      const fieldMap = latestResult!.comparison[field.key] ?? {};
-                      const value =
-                        fieldMap[company.name] ??
-                        Object.entries(fieldMap).find(
-                          ([k]) => company.name.startsWith(k) || k.startsWith(company.name.split(" ")[0]!)
-                        )?.[1] ??
-                        "—";
-                      return (
-                        <td key={company.name} className="py-2 pr-6 text-slate-600 max-w-[220px]">
-                          {value}
-                        </td>
-                      );
-                    })}
+                  <tr
+                    key={field.key}
+                    className="even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
+                  >
+                    <td className="py-3 pr-6 font-medium text-slate-700 whitespace-nowrap align-top">
+                      {field.label}
+                    </td>
+                    {/* Celda cliente — highlight */}
+                    <td className="py-3 pr-6 max-w-[220px] align-top bg-brand-primary-light/20 px-3">
+                      <ExpandableCell
+                        text={lookupComparisonValue(latestResult!.comparison, field.key, clientName)}
+                      />
+                    </td>
+                    {/* Celdas competidores */}
+                    {latestResult!.companies_snapshot.map((company) => (
+                      <td key={company.name} className="py-3 pr-6 max-w-[220px] align-top">
+                        <ExpandableCell
+                          text={lookupComparisonValue(latestResult!.comparison, field.key, company.name)}
+                        />
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -446,9 +573,9 @@ function BenchmarkSection({
 
       <ConfirmModal
         open={confirmRepropose}
-        title="¿Volver a proponer empresas?"
+        title="¿Regenerar lista de empresas?"
         description="Se eliminarán las empresas actuales y la IA generará una nueva lista. El benchmark anterior se conserva hasta que ejecutes uno nuevo."
-        confirmLabel="Volver a proponer"
+        confirmLabel="Regenerar lista"
         cancelLabel="Cancelar"
         tone="destructive"
         onConfirm={() => {
@@ -528,6 +655,15 @@ function ReporteSection({
     }
   }, [clientId, clientName, latestResult, push]);
 
+  // Nombre de display legible (slug → título humano)
+  const reportDisplayName = latestReport
+    ? `Reporte DM — ${clientName} — ${new Date(latestReport.created_at).toLocaleDateString("es-MX", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })}`
+    : "";
+
   return (
     <div className="space-y-4">
       {!canGenerate && (
@@ -556,7 +692,7 @@ function ReporteSection({
         </div>
       )}
 
-      {/* Batch en proceso — spinner (activo) */}
+      {/* Batch en proceso — spinner activo */}
       {canGenerate && latestReport?.parse_status === "pending" && isReportPolling && (
         <div className="flex items-center gap-2 text-xs text-slate-500 py-2 border-l-4 border-l-amber-400 pl-4">
           <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
@@ -567,15 +703,11 @@ function ReporteSection({
         </div>
       )}
 
-      {/* Batch pendiente pero polling inactivo (posible stale) — botón de verificar */}
+      {/* Batch pendiente pero polling inactivo (posible stale) */}
       {canGenerate && latestReport?.parse_status === "pending" && !isReportPolling && (
         <div className="border-l-4 border-l-amber-400 pl-4 py-2 space-y-2">
           <p className="text-xs text-slate-500">Reporte en proceso. Verifica el estado actual.</p>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={onReportMutate}
-          >
+          <Button size="sm" variant="secondary" onClick={onReportMutate}>
             Verificar estado
           </Button>
         </div>
@@ -585,12 +717,7 @@ function ReporteSection({
       {canGenerate && latestReport?.parse_status === "failed" && (
         <div className="border-l-4 border-l-rose-500 pl-4 py-2 bg-rose-50 rounded-r space-y-2">
           <p className="text-xs text-rose-700">El último reporte falló. Intenta de nuevo.</p>
-          <Button
-            size="sm"
-            variant="primary"
-            loading={generating}
-            onClick={handleGenerate}
-          >
+          <Button size="sm" variant="primary" loading={generating} onClick={handleGenerate}>
             Reintentar
           </Button>
         </div>
@@ -599,27 +726,30 @@ function ReporteSection({
       {/* Reporte listo */}
       {canGenerate && latestReport?.parse_status === "ok" && (
         <div className="border-l-4 border-l-emerald-600 pl-4 py-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-            Último reporte generado
-          </p>
-          <p className="text-sm font-medium text-slate-800 mb-0.5">{latestReport.file_name.replace(/\.md$/i, "")}</p>
+          <p className="text-sm font-medium text-slate-800 mb-0.5">{reportDisplayName}</p>
           <p className="text-xs text-slate-500 mb-3">
             {new Date(latestReport.created_at).toLocaleDateString("es-MX", {
-              day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
             })}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              size="sm"
-              variant="primary"
-              loading={downloading}
-              onClick={handleDownloadPdf}
-            >
-              <svg className="w-3.5 h-3.5 mr-1.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <Button size="sm" variant="primary" loading={downloading} onClick={handleDownloadPdf}>
+              <svg
+                className="w-3.5 h-3.5 mr-1.5"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" />
               </svg>
               Descargar PDF
             </Button>
+            {/* Regenerar — destructivo, requiere confirmación */}
             <Button
               size="sm"
               variant="secondary"
@@ -635,7 +765,7 @@ function ReporteSection({
       <ConfirmModal
         open={confirmRegenerate}
         title="¿Regenerar reporte?"
-        description="Se generará un nuevo reporte con el benchmark actual. El reporte anterior quedará reemplazado y no podrá recuperarse."
+        description="Se generará un nuevo reporte con el benchmark actual. El reporte anterior quedará reemplazado y no podrá recuperarse. Esta operación puede tardar 2-5 minutos."
         confirmLabel="Regenerar"
         cancelLabel="Cancelar"
         tone="destructive"
@@ -660,15 +790,11 @@ export function DoubleMaterialidadTab({
   const benchmarkKey = `/api/clients/${clientId}/dm-benchmark`;
   const reportKey = `/api/clients/${clientId}/dm-report`;
 
-  // Polling benchmark batch
   const [isPolling, setIsPolling] = useState(false);
   const { push } = useToast();
   const pollingNotified = useRef(false);
-  // Guarda el id del resultado que YA existía al arrancar el polling.
-  // El effect solo para cuando llega un resultado con id DIFERENTE (el nuevo).
   const pollingStartId = useRef<string | null>(null);
 
-  // Polling reporte batch
   const [isReportPolling, setIsReportPolling] = useState(false);
   const pollingNotifiedReport = useRef(false);
   const pollingStartReportId = useRef<string | null>(null);
@@ -691,9 +817,7 @@ export function DoubleMaterialidadTab({
   const latestResult = benchmarkResp?.data.latest_result ?? null;
   const latestReport = reportResp?.data ?? null;
 
-  // Detectar cuando el batch del benchmark termina.
-  // Solo para cuando llega un resultado con id DISTINTO al que había al arrancar
-  // (evita falso-positivo con datos cacheados del benchmark anterior).
+  // Detectar cuando el batch del benchmark termina
   useEffect(() => {
     if (!isPolling) {
       pollingNotified.current = false;
@@ -713,8 +837,7 @@ export function DoubleMaterialidadTab({
     }
   }, [latestResult?.id, latestResult?.status, isPolling, push]);
 
-  // Detectar cuando el batch del reporte termina.
-  // Mismo patrón anti-stale que el benchmark.
+  // Detectar cuando el batch del reporte termina
   useEffect(() => {
     if (!isReportPolling) {
       pollingNotifiedReport.current = false;
@@ -744,21 +867,20 @@ export function DoubleMaterialidadTab({
   const hasBenchmark = latestResult?.status === "done";
   const hasReport = latestReport?.parse_status === "ok";
 
-  // "done" solo si el paso anterior también está completo — evita checkmark verde
-  // cuando hay benchmark viejo pero el contexto está incompleto.
-  const stage2Status: StageStatus =
-    hasBenchmark && stage1Status === "done"
-      ? "done"
-      : stage1Status === "done" || hasBenchmark
-      ? "active"
-      : "pending";
+  // Fix: benchmark muestra "done" siempre que exista resultado,
+  // independientemente de si el contexto está completo.
+  const stage2Status: StageStatus = hasBenchmark
+    ? "done"
+    : stage1Status === "done"
+    ? "active"
+    : "pending";
 
-  const stage3Status: StageStatus =
-    hasReport && hasBenchmark
-      ? "done"
-      : hasBenchmark
-      ? "active"
-      : "pending";
+  // Reporte muestra "done" siempre que exista reporte ok
+  const stage3Status: StageStatus = hasReport
+    ? "done"
+    : hasBenchmark
+    ? "active"
+    : "pending";
 
   if (loadingBenchmark) {
     return (
@@ -805,7 +927,7 @@ export function DoubleMaterialidadTab({
           onStartPolling={() => {
             pollingStartId.current = latestResult?.id ?? null;
             setIsPolling(true);
-            void mutateBenchmark(); // Invalida caché para recibir status pending
+            void mutateBenchmark();
           }}
         />
       </section>
@@ -825,7 +947,7 @@ export function DoubleMaterialidadTab({
           onStartReportPolling={() => {
             pollingStartReportId.current = latestReport?.id ?? null;
             setIsReportPolling(true);
-            void mutateReport(); // Invalida caché para recibir parse_status pending
+            void mutateReport();
           }}
         />
       </section>

@@ -68,6 +68,12 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // ── Cleanup: purgar rate_limit_hits >1h (fire-and-forget, no bloquea QA)
+  void admin.rpc("cleanup_rate_limit_hits").then(
+    () => null,
+    (e: unknown) => console.error("[daily-qa] cleanup_rate_limit_hits failed:", e)
+  );
+
   if (failures.length > 0) {
     console.error("[cron/daily-qa] FAILURES", JSON.stringify(failures));
     await sendAlertEmail(failures);

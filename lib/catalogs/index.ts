@@ -168,7 +168,14 @@ export async function deleteCatalogItem(id: string): Promise<void> {
     throw new Error("Supabase no configurado (dev mode).");
   }
   const admin = createAdminClient();
-  const { error } = await admin.from("catalog_items").delete().eq("id", id);
+  const { data, error: fetchError } = await admin
+    .from("catalog_items")
+    .select("is_system")
+    .eq("id", id)
+    .single() as { data: { is_system: boolean } | null; error: { message: string } | null };
+  if (fetchError) throw new Error(`deleteCatalogItem: ${fetchError.message}`);
+  if (data?.is_system) throw new Error("No se pueden eliminar ítems del sistema.");
+  const { error } = await admin.from("catalog_items").delete().eq("id", id) as { error: { message: string } | null };
   if (error) throw new Error(`deleteCatalogItem: ${error.message}`);
 }
 

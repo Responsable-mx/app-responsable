@@ -761,10 +761,12 @@ function MultiCombobox({
   options,
   value,
   onChange,
+  placeholder = "Buscar…",
 }: {
   options: { value: string; label: string }[];
   value: string[];
   onChange: (v: string[]) => void;
+  placeholder?: string;
 }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -823,7 +825,7 @@ function MultiCombobox({
         <input
           type="text"
           className="w-full text-sm border border-slate-200 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 placeholder:text-slate-400"
-          placeholder="Buscar empresa…"
+          placeholder={placeholder}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -1044,6 +1046,7 @@ function FieldRow({
           options={resolvedOptions}
           value={Array.isArray(value) ? value : (typeof value === "string" && value ? [value] : [])}
           onChange={(v) => handleChange(v.length ? v : null)}
+          placeholder={field.placeholder ?? "Buscar…"}
         />
       ) : (
         <AutoResizeTextarea

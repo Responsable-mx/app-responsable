@@ -104,11 +104,11 @@ ${companiesList}
 CAMPOS DE COMPARACIÓN:
 ${fieldsList}
 
-Tu tarea: compara a ${clientName} contra cada una de las empresas listadas en los campos de comparación indicados. Usa tu conocimiento de información pública (reportes ESG, GRI, SASB, páginas de sustentabilidad).
+Tu tarea: compara a ${clientName} contra cada empresa en los campos indicados. Usa información pública (reportes ESG, GRI, SASB).
 
-Para cada campo, describe en 1-2 oraciones la situación de ${clientName} y de cada empresa. Sé específico, cita estándares o compromisos concretos cuando los conozcas. Si no tienes datos de una empresa en un campo, indica "Sin información pública disponible".
+Para cada campo, escribe UNA oración concisa por empresa. Si no tienes datos, escribe "Sin información pública".
 
-Al final, escribe un párrafo narrativo (máx. 150 palabras) que sintetice la posición de ${clientName} frente al grupo de referencia: fortalezas, brechas críticas y oportunidades de mejora.
+Al final, un párrafo narrativo (máx. 80 palabras) con las fortalezas, brechas y oportunidades clave de ${clientName}.
 
 Responde ÚNICAMENTE con JSON válido, sin texto adicional:
 {
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const msg = await anthropic.messages.create(
       {
         model,
-        max_tokens: 2000,
+        max_tokens: 800,
         system: [{
           type: "text",
           text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         }],
         messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(50_000) }
+      { signal: AbortSignal.timeout(20_000) }
     );
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;

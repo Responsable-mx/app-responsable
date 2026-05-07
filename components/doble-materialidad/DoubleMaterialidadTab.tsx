@@ -6,7 +6,8 @@ import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonList } from "@/components/ui/Skeleton";
-import { BENCHMARK_FIELDS, RELATION_LABELS, type CompanyRelation } from "@/lib/dm/fields";
+import { RELATION_LABELS, type CompanyRelation } from "@/lib/dm/fields";
+import type { DmIroConfig } from "@/lib/dm/iros";
 
 // ── Tipos ────────────────────────────────────────────────────
 
@@ -215,6 +216,9 @@ function BenchmarkSection({
   onStartPolling: () => void;
 }) {
   const { push } = useToast();
+  const { data: irosData } = useSWR<{ data: DmIroConfig[] }>("/api/iros", fetcher);
+  const iros = irosData?.data ?? [];
+
   const [proposing, setProposing] = useState(false);
   const [confirmRepropose, setConfirmRepropose] = useState(false);
   const [fieldsExpanded, setFieldsExpanded] = useState(false);
@@ -327,7 +331,7 @@ function BenchmarkSection({
               onClick={() => setFieldsExpanded((v) => !v)}
               className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 w-full text-left"
             >
-              Campos del benchmark ({BENCHMARK_FIELDS.length})
+              Estándares ESRS ({iros.length > 0 ? iros.length : 10} · 2 dimensiones c/u)
               <svg
                 className={`w-3 h-3 transition-transform ${fieldsExpanded ? "rotate-180" : ""}`}
                 viewBox="0 0 12 12"
@@ -340,12 +344,13 @@ function BenchmarkSection({
             </button>
             {fieldsExpanded && (
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {BENCHMARK_FIELDS.map((f) => (
+                {(iros.length > 0 ? iros : []).map((iro) => (
                   <span
-                    key={f.key}
+                    key={iro.id}
                     className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-sm"
+                    title={`Impacto: ${iro.impact_desc}\nRiesgo: ${iro.risk_desc}`}
                   >
-                    {f.label}
+                    {iro.esrs_standard} · {iro.label}
                   </span>
                 ))}
               </div>

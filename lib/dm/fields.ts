@@ -1,6 +1,9 @@
+import type { DmIroConfig } from "@/lib/dm/iros";
+
 /**
  * Campos de comparación para el benchmark de Doble Materialidad IA.
- * Agregar/quitar campos aquí — sin migración de DB (se guardan en JSONB).
+ * Los campos dinámicos vienen de dm_iro_config (IROs ESRS).
+ * BENCHMARK_FIELDS se conserva para compatibilidad con resultados históricos.
  */
 export type BenchmarkField = {
   key: string;
@@ -48,3 +51,22 @@ export const RELATION_LABELS: Record<CompanyRelation, string> = {
   sector:                   "Empresa del sector",
   cadena_valor:             "Cadena de valor",
 };
+
+/**
+ * Convierte IROs activos a BenchmarkFields para almacenar en fields_snapshot.
+ * Cada estándar ESRS genera 2 campos: impacto + riesgo/oportunidad.
+ */
+export function irosToBenchmarkFields(iros: DmIroConfig[]): BenchmarkField[] {
+  return iros.flatMap((iro) => [
+    {
+      key:         `${iro.esrs_standard}_impact`,
+      label:       `${iro.label} — Impacto`,
+      description: iro.impact_desc,
+    },
+    {
+      key:         `${iro.esrs_standard}_risk_opp`,
+      label:       `${iro.label} — Riesgo / Oportunidad`,
+      description: `${iro.risk_desc} | ${iro.opportunity_desc}`,
+    },
+  ]);
+}

@@ -21,7 +21,8 @@ export type AuditEntityType =
   | "service_stage"
   | "stage_activity"
   | "stage_template"
-  | "client_document";
+  | "client_document"
+  | "dm_iro_config";
 
 export type AuditAction = "create" | "update" | "delete" | "restore";
 

@@ -9,7 +9,7 @@ import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
-import { BENCHMARK_FIELDS } from "@/lib/dm/fields";
+import { listActiveIros } from "@/lib/dm/iros";
 import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import type { Client } from "@/lib/clients";
 
@@ -61,7 +61,7 @@ const ReportNarrativeSchema = z.object({
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function buildReportPrompt(
+async function buildReportPrompt(
   client: Client,
   clientContext: string,
   benchmarkResult: {
@@ -70,12 +70,22 @@ function buildReportPrompt(
     comparison: unknown;
     narrative: string;
   },
-): string {
+): Promise<string> {
+  // Incluir descripciones IRO en el prompt para que el reporte referencie ambas dimensiones
+  const iros = await listActiveIros().catch(() => []);
+  const iroContext = iros.length
+    ? `\nESTÁNDARES ESRS ANALIZADOS (referencia para el reporte):\n${iros
+        .map((iro) =>
+          `${iro.esrs_standard} — ${iro.label}:\n  Impacto: ${iro.impact_desc}\n  Riesgo: ${iro.risk_desc}\n  Oportunidad: ${iro.opportunity_desc}`
+        )
+        .join("\n\n")}`
+    : "";
+
   return `Eres un consultor senior de Doble Materialidad (ESRS/GRI) redactando un reporte ejecutivo para una empresa.
 
 CONTEXTO DEL CLIENTE:
 ${clientContext}
-
+${iroContext}
 RESULTADO DEL BENCHMARK:
 Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
 Campos analizados: ${JSON.stringify(benchmarkResult.fields_snapshot, null, 2)}
@@ -304,7 +314,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const clientContext = buildClientContext(client);
-  const prompt = buildReportPrompt(client, clientContext, benchmarkResult as {
+  const prompt = await buildReportPrompt(client, clientContext, benchmarkResult as {
     companies_snapshot: unknown;
     fields_snapshot: unknown;
     comparison: unknown;
@@ -405,7 +415,10 @@ function buildMarkdownReport(
 
   const comparisonTable = Object.entries(comparison)
     .map(([fieldKey, values]) => {
-      const fieldLabel = BENCHMARK_FIELDS.find((f) => f.key === fieldKey)?.label ?? fieldKey;
+      // El key ya contiene el label legible (ej: E1_impact → "E1 Cambio Climático — Impacto")
+      // Se busca en fields_snapshot si se pasa; si no, formatea el key
+      const fieldLabel = fields.find((f) => f === fieldKey)
+        ?? fieldKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       const rows = Object.entries(values)
         .map(([company, value]) => `| ${company} | ${value} |`)
         .join("\n");

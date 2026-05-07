@@ -12,6 +12,7 @@ import {
   IconGrid,
   IconShield,
   IconClipboard,
+  IconLayers,
 } from "@/components/ui/Icons";
 
 const TABS = [
@@ -20,6 +21,7 @@ const TABS = [
   { href: "/configuracion/catalogos", label: "Catálogos", Icon: IconBookOpen },
   { href: "/configuracion/plantillas", label: "Plantillas", Icon: IconGrid },
   { href: "/configuracion/prompts", label: "Prompts IA", Icon: IconBrain },
+  { href: "/configuracion/iros", label: "IROs ESRS", Icon: IconLayers },
   { href: "/configuracion/uso-ia", label: "Uso IA", Icon: IconTarget },
   { href: "/configuracion/auditoria", label: "Auditoría", Icon: IconClipboard },
   { href: "/configuracion/preferencias", label: "Preferencias", Icon: IconSliders },

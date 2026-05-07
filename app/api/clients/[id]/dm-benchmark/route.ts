@@ -10,7 +10,8 @@ import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { BENCHMARK_FIELDS, RELATION_LABELS } from "@/lib/dm/fields";
+import { RELATION_LABELS, irosToBenchmarkFields } from "@/lib/dm/fields";
+import { listActiveIros, getIroQuestionnaireContext, type DmIroConfig } from "@/lib/dm/iros";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -62,43 +63,63 @@ async function buildProposePrompt(client: Client): Promise<string> {
     .replace(/\{\{countries\}\}/g, (client.countries as string[] | null)?.join(", ") ?? "México");
 }
 
-function buildComparePrompt(
+async function buildComparePrompt(
+  clientId: string,
   clientName: string,
   clientSector: string | null,
   clientCountry: string | null,
   companies: Array<{ name: string; country: string | null; relation: string }>,
-): string {
-  const fieldsList = BENCHMARK_FIELDS.map(
-    (f) => `- ${f.key}: ${f.label}${f.description ? ` (${f.description})` : ""}`
-  ).join("\n");
-
+  iros: DmIroConfig[],
+): Promise<string> {
   const companiesList = companies
     .map((c) => `- ${c.name} (${c.country ?? "país desconocido"}, ${RELATION_LABELS[c.relation as keyof typeof RELATION_LABELS] ?? c.relation})`)
     .join("\n");
 
-  return `Analista ESG senior. Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas en campos de Doble Materialidad.
+  // Construir sección de IROs: 2 dimensiones por estándar + contexto del cuestionario
+  const iroSections = await Promise.all(
+    iros.map(async (iro) => {
+      const ctx = await getIroQuestionnaireContext(clientId, iro);
+      const ctxLine = ctx ? `\n  ▸ Datos del cuestionario de ${clientName}:\n${ctx}` : "";
+      return `[${iro.esrs_standard} — ${iro.label}]
+  Impacto (${clientName} → Sociedad): ${iro.impact_desc}
+  Riesgo/Oportunidad (Entorno → ${clientName}): Riesgo: ${iro.risk_desc} | Oportunidad: ${iro.opportunity_desc}${ctxLine}`;
+    })
+  );
+
+  const fieldKeys = iros.flatMap((iro) => [
+    `"${iro.esrs_standard}_impact"`,
+    `"${iro.esrs_standard}_risk_opp"`,
+  ]).join(", ");
+
+  return `Eres un analista ESG senior especializado en Doble Materialidad (ESRS/GRI/CSRD).
+Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas.
 
 EMPRESAS A COMPARAR:
 ${companiesList}
 
-CAMPOS DE ANÁLISIS:
-${fieldsList}
+ESTÁNDARES ESRS A ANALIZAR (2 dimensiones por estándar):
+${iroSections.join("\n\n")}
 
-Instrucciones:
-- Por cada campo: 2-3 oraciones por empresa (incluye a ${clientName}). Cita datos concretos cuando existan (toneladas CO₂, %, iniciativas específicas).
-- Si no hay datos públicos verificables, escribe "Sin datos públicos disponibles" y explica brevemente por qué es relevante el campo para ese actor.
-- Cierra con párrafo narrativo de 80-100 palabras: posición de ${clientName} en el benchmark, fortalezas claras, brechas materiales y recomendación de priorización.
-- CRÍTICO: usa EXACTAMENTE los nombres de empresa tal como aparecen en la lista EMPRESAS A COMPARAR como claves del JSON (no los abrevies).
+INSTRUCCIONES:
+- Por cada dimensión (impacto + riesgo/oportunidad): 2-3 oraciones por empresa (incluye a ${clientName}).
+- Si en "Datos del cuestionario" hay información del cliente, úsala como evidencia concreta en el análisis de ${clientName}.
+- Si no hay datos públicos verificables para una empresa en una dimensión, escribe "Sin datos públicos disponibles" y explica brevemente la relevancia.
+- CRÍTICO: usa EXACTAMENTE los nombres de empresa tal como aparecen en EMPRESAS A COMPARAR como claves del JSON.
+- Cierra con párrafo narrativo de 80-120 palabras: posición de ${clientName}, fortalezas clave, brechas por dimensión y recomendación de priorización.
 
-JSON únicamente:
+JSON únicamente — usa estas claves exactas: ${fieldKeys}
 {
   "comparison": {
-    "campo_key": {
-      "${clientName}": "descripción detallada",
-      "Empresa A (nombre completo exacto)": "descripción detallada"
+    "E1_impact": {
+      "${clientName}": "análisis impacto ambiental del cliente",
+      "Empresa A (nombre exacto)": "análisis impacto"
+    },
+    "E1_risk_opp": {
+      "${clientName}": "análisis riesgo y oportunidad del cliente",
+      "Empresa A (nombre exacto)": "análisis riesgo/oportunidad"
     }
   },
-  "narrative": "síntesis ejecutiva"
+  "narrative": "síntesis ejecutiva 80-120 palabras"
 }`;
 }
 
@@ -379,11 +400,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Usar Sonnet (aurora) en Batch API — sin restricción de 60s de Vercel Hobby.
   // 50% descuento en tokens vs llamada síncrona.
   const model = getModelConfig("aurora").model;
-  const prompt = buildComparePrompt(
+
+  // Cargar IROs activos y construir prompt + fields_snapshot
+  const iros = await listActiveIros();
+  const fieldsSnapshot = irosToBenchmarkFields(iros);
+  const prompt = await buildComparePrompt(
+    id,
     client.name,
     client.sector ?? null,
     (client.countries as string[] | null)?.[0] ?? null,
     companies,
+    iros,
   );
 
   // Crear fila pending primero para obtener ID como custom_id del batch
@@ -392,7 +419,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     .insert({
       client_id: id,
       companies_snapshot: companies,
-      fields_snapshot: BENCHMARK_FIELDS,
+      fields_snapshot: fieldsSnapshot,
       comparison: {},
       status: "pending",
       created_by: user,

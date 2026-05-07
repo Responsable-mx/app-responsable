@@ -72,6 +72,7 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
   );
 
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
   const [now] = useState(() => Date.now());
 
   const humanizeSeniority = (val: string | null) => {
@@ -141,7 +142,61 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
             </span>
           )}
         </div>
+        <button
+          onClick={() => setShowLegend((v) => !v)}
+          className={`inline-flex items-center gap-1.5 text-[11px] font-medium transition-colors ${showLegend ? "text-brand-primary-dark" : "text-slate-400 hover:text-slate-700"}`}
+          aria-expanded={showLegend}
+          title="Cómo interpretar esta tabla"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          ¿Cómo leer esta tabla?
+        </button>
       </div>
+
+      {showLegend && (
+        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Guía de interpretación</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white border border-slate-200 rounded p-3 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Carga</p>
+              <p className="text-xs text-slate-700">Actividades que el consultor tiene <strong>en curso o retrasadas ahora</strong>.</p>
+              <div className="space-y-1 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-100 text-emerald-700">↓ 1–2</span>
+                  <span className="text-[10px] text-slate-500">Carga ligera</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-amber-100 text-amber-700">↑ 3–4</span>
+                  <span className="text-[10px] text-slate-500">Carga alta</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700">⚠ 5+</span>
+                  <span className="text-[10px] text-slate-500">Sobrecargado</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded p-3 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Atrasadas</p>
+              <p className="text-xs text-slate-700">Actividades cuya <strong>fecha plan ya venció</strong> y aún no tienen fecha real de fin.</p>
+              <p className="text-[10px] text-slate-500 pt-1">Si es &gt; 0 el consultor tiene compromisos vencidos. Requiere atención inmediata.</p>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700">2</span>
+            </div>
+            <div className="bg-white border border-slate-200 rounded p-3 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Próximas 30d</p>
+              <p className="text-xs text-slate-700">Actividades <strong>pendientes que arrancan en los próximos 30 días</strong>.</p>
+              <p className="text-[10px] text-slate-500 pt-1">Permite anticipar picos de trabajo antes de que se conviertan en retrasos.</p>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">3</span>
+            </div>
+            <div className="bg-white border border-slate-200 rounded p-3 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Proyectos</p>
+              <p className="text-xs text-slate-700">Clientes activos asignados al consultor. Clic en un chip → ficha del cliente.</p>
+              <p className="text-[10px] text-slate-500 pt-1">Clic en la fila del consultor para ver el detalle de todas sus actividades.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {members.length === 0 ? (
         <div className="px-6 py-12 text-center text-sm text-slate-500">

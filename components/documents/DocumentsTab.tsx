@@ -45,10 +45,11 @@ const TYPE_BADGE: Record<DocMeta["file_type"], string> = {
   md: "MD",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<{ data: DocMeta[] }>;
+    return r.json() as Promise<any>;
   });
 
 export function DocumentsTab({
@@ -330,7 +331,7 @@ export function DocumentsTab({
 function PreviewModal({ clientId, doc, onClose }: { clientId: string; doc: DocMeta; onClose: () => void }) {
   const { data, error, isLoading } = useSWR<{ data: { markdown_content: string | null } }>(
     `/api/clients/${clientId}/documents/${doc.id}?mode=content`,
-    fetcher as unknown as (url: string) => Promise<{ data: { markdown_content: string | null } }>
+    fetcher
   );
   return (
     <Modal open onClose={onClose} title={`Vista previa: ${doc.file_name}`}>

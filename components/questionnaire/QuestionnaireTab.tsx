@@ -637,6 +637,7 @@ function WizardEditor({
                   sectionComplete={isStepComplete}
                   hideSource={step.key === "informacion-base"}
                   skipValidationGuard={step.key === "informacion-base"}
+                  selfClientId={clientId}
                   onChange={(v) => setFieldValue(step.key, field.key, v)}
                   onToggleValidated={() => toggleValidated(step.key, field.key)}
                   onOpenDrawer={() => setDrawerField({ stepKey: step.key, fieldKey: field.key })}
@@ -771,6 +772,7 @@ function FieldRow({
   onOpenDrawer,
   hideSource = false,
   skipValidationGuard = false,
+  selfClientId,
 }: {
   field: WizardField;
   value: FieldValue;
@@ -784,14 +786,21 @@ function FieldRow({
   sectionComplete?: boolean;
   hideSource?: boolean;
   skipValidationGuard?: boolean;
+  selfClientId?: string;
   onChange: (v: FieldValue) => void;
   onToggleValidated: () => void;
   onOpenDrawer: () => void;
 }) {
   const [pendingEdit, setPendingEdit] = useState<{ v: FieldValue } | null>(null);
   // Opciones dinámicas desde catálogo (cuando field.catalog está definido)
+  // catalog="clients" usa /api/clients?catalog=1 (excluyendo el cliente actual)
+  const catalogUrl = field.catalog
+    ? field.catalog === "clients"
+      ? `/api/clients?catalog=1${selfClientId ? `&exclude=${selfClientId}` : ""}`
+      : `/api/catalogs?category=${field.catalog}`
+    : null;
   const { data: catalogItems } = useSWR<{ value: string; label: string }[]>(
-    field.catalog ? `/api/catalogs?category=${field.catalog}` : null,
+    catalogUrl,
     catalogFetcher,
     { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
   );

@@ -13,9 +13,24 @@ export async function GET(req: NextRequest) {
   const search = url.searchParams.get("q") ?? undefined;
   const rawLimit = Number(url.searchParams.get("limit"));
   const limit = rawLimit > 0 && rawLimit <= 1000 ? rawLimit : 500;
+  const catalog = url.searchParams.get("catalog") === "1";
+  const exclude = url.searchParams.get("exclude") ?? undefined;
 
   try {
     const data = await listClients({ search, limit });
+
+    // Modo catálogo: devuelve {value: id, label: name} excluyendo el cliente actual
+    if (catalog) {
+      const items = data
+        .filter((c) => c.id !== exclude)
+        .map((c) => ({ value: c.id, label: c.name }))
+        .sort((a, b) => a.label.localeCompare(b.label, "es"));
+      return NextResponse.json(
+        { data: items },
+        { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=300" } }
+      );
+    }
+
     return NextResponse.json(
       { data },
       {

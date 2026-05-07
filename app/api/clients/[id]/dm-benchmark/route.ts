@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
@@ -214,16 +213,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             cache_control: { type: "ephemeral" } as any,
           }],
-          tools: [{
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            type: "web_search_20250305" as any,
-            name: "web_search",
-            max_uses: 4,
-          }],
           messages: [{ role: "user", content: prompt }],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-        { signal: AbortSignal.timeout(120_000) }
+        },
+        { signal: AbortSignal.timeout(60_000) }
       );
       inputTokens = msg.usage?.input_tokens ?? 0;
       outputTokens = msg.usage?.output_tokens ?? 0;

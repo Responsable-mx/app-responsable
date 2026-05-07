@@ -140,6 +140,21 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+## Deuda resuelta (sesión 14 — may-2026, D-99–D-108)
+
+| ID | Estado | Descripción | Resuelto |
+|----|--------|-------------|---------|
+| D-99 | ✅ | CARGA: mini barra de utilización (0–6 max recomendado) | may-2026 |
+| D-100 | ✅ | Divergencia retrasadas Por Consultor vs Por Proyecto: tooltip explicativo | may-2026 |
+| D-101 | ✅ | 5 tabs vista → 2 primary (texto+icono) + 3 icon-only con tooltip | may-2026 |
+| D-102 | ✅ | Instrucción textual permanente bajo tabs eliminada | may-2026 |
+| D-103 | ✅ | "Real: — → —" oculto cuando sin fechas reales | may-2026 |
+| D-104 | ✅ | Assignee @email → nombre humanizado | may-2026 |
+| D-105 | ✅ | Unificar "Atrasadas" / "retrasadas" → "Retrasadas" | may-2026 |
+| D-106 | ✅ | ViewToggle LISTA/GANTT padding aumentado a min 32px | may-2026 |
+| D-107 | ✅ | Chips de status en Por Proyecto son botones que aplican filtro global | may-2026 |
+| D-108 | ✅ | Quick reassign inline en actividades de Por Proyecto | may-2026 |
+
 ## Deuda resuelta (sesión 13 — may-2026, auditoría IA)
 
 | ID | Descripción | Resuelto |

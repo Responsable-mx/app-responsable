@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireConsultorOrAdmin, requireAdmin } from "@/lib/auth";
+import { requireConsultorForClient, requireAdmin } from "@/lib/auth";
 import { deleteDocument, getDocument, getSignedUrl } from "@/lib/documents/queries";
 import { logChange } from "@/lib/audit-log";
 
@@ -9,10 +9,9 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string; docId: string }> };
 
 export async function GET(req: NextRequest, { params }: Ctx) {
-  const user = await requireConsultorOrAdmin();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
   const { id, docId } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const doc = await getDocument(docId);
   if (!doc || doc.client_id !== id) {
     return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireConsultorOrAdmin } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { listDocumentsByClient, uploadAndParseDocument } from "@/lib/documents/queries";
 import { DOCUMENT_KIND_SCHEMA } from "@/lib/documents/types";
@@ -26,10 +26,9 @@ const ALLOWED_MIMES = new Set([
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireConsultorOrAdmin();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
@@ -55,10 +54,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const user = await requireConsultorOrAdmin();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 

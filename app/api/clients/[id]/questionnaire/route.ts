@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import {
   getQuestionnaireBundle,
   upsertQuestionnaireResponse,
@@ -20,10 +20,9 @@ type Ctx = { params: Promise<{ id: string }> };
 const DEFAULT_SERVICE = "doble-materialidad";
 
 export async function GET(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const url = new URL(req.url);
   const serviceKey = url.searchParams.get("service") ?? DEFAULT_SERVICE;
 
@@ -43,10 +42,9 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   let body: {
     service?: string;

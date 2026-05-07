@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import {
   listMaterialityTopics,
   initMaterialityFromTemplate,
@@ -14,9 +14,9 @@ const VALID_COLORS: TopicColor[] = ["rose", "amber", "teal", "slate"];
 const VALID_SIZES: TopicSize[] = ["sm", "md", "lg"];
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   try {
     const topics = await listMaterialityTopics(id);
     return NextResponse.json({ data: topics });
@@ -27,9 +27,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   let body: { action?: "init" } | (Partial<MaterialityTopicInput> & { action?: never });
   try {

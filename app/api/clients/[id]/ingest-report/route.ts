@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireConsultorOrAdmin } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { uploadAndParseDocument } from "@/lib/documents/queries";
 import { isPublicHttpUrl } from "@/lib/documents/ssrf";
@@ -44,10 +44,9 @@ function fileNameFromUrl(u: string, contentType: string): string {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const user = await requireConsultorOrAdmin();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 

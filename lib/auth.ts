@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthorized, isAdmin, isConsultor, isClient, getUserClientId } from "@/lib/users";
 import type { NextRequest } from "next/server";
 
@@ -78,6 +79,29 @@ export async function requireClient(): Promise<{ email: string; clientId: string
   const clientId = await getUserClientId(email);
   if (!clientId) return null;
   return { email, clientId };
+}
+
+/**
+ * Requiere consultor asignado al cliente O admin.
+ * Previene IDOR: un consultor no asignado no puede leer/mutar datos del cliente.
+ * Admins exentos (acceso a todos los clientes).
+ * Returns: email del usuario autenticado, null si sin acceso.
+ */
+export async function requireConsultorForClient(clientId: string): Promise<string | null> {
+  const email = await requireUser();
+  if (!email) return null;
+  if (email === "dev@localhost") return email;
+  // Admins tienen acceso a cualquier cliente
+  if (await isAdmin(email)) return email;
+  // Consultor: verificar asignación en client_consultors
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("client_consultors")
+    .select("client_id")
+    .eq("client_id", clientId)
+    .eq("user_email", email)
+    .maybeSingle();
+  return data ? email : null;
 }
 
 /** Valida `Authorization: Bearer CRON_SECRET`. */

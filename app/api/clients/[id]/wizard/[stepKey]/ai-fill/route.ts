@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { requireConsultorOrAdmin } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import {
@@ -47,14 +47,13 @@ const AiFieldSchema = z.object({
 const AiResponseSchema = z.record(z.string(), AiFieldSchema);
 
 export async function POST(_req: NextRequest, { params }: Ctx) {
-  const user = await requireConsultorOrAdmin();
+  const { id, stepKey } = await params;
+  const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });
   }
-
-  const { id, stepKey } = await params;
 
   // D-13: validar formato de stepKey antes de cualquier DB call.
   if (!VALID_STEP_KEY.test(stepKey)) {

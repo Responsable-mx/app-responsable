@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { requireConsultorOrAdmin } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
@@ -35,14 +35,13 @@ const KIND_LABEL = {
 
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const user = await requireConsultorOrAdmin();
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });
   }
-
-  const { id } = await params;
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 

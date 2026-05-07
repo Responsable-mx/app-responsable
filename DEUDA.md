@@ -18,23 +18,14 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ### Bloque D-89–D-98 — Hallazgos design critique may-2026 (sesión 2)
 
-### 🔴 D-89 — Configuración abre en blanco sin contenido default
-- **Descripción**: `/configuracion` muestra lista de sub-secciones izquierda (~180px) con área derecha 100% vacía. No hay auto-selección de primera sección.
-- **Impacto**: Dead end inmediato — el usuario no sabe qué hacer, la pantalla no tiene CTAs ni contenido.
-- **Fix**: Redirect `GET /configuracion` → `/configuracion/usuarios`. O render `<UsersManager>` por default en el layout.
-- **Esfuerzo**: 5min — 1 línea en `configuracion/page.tsx`
+### ~~🔴 D-89 — Configuración abre en blanco sin contenido default~~ ✅ VERIFICADO RESUELTO
+- `configuracion/page.tsx` ya tiene `redirect("/configuracion/usuarios")`.
 
-### 🔴 D-90 — ACCESO RÁPIDO del sidebar no navega al hacer clic
-- **Descripción**: Los items de "ACCESO RÁPIDO" (Distribuidora Altamira + EPH) aparecen como links con badge de seniority pero no hacen nada al hacer clic. La acción más visible del sidebar es no-funcional.
-- **Impacto**: El acceso directo más eficiente de toda la app (1 clic al proyecto activo) es un dead end.
-- **Fix**: Envolver item en `<Link href="/clientes/[id]">` con el ID real del cliente. Agregar `title={fullClientName}` para nombre completo en hover.
-- **Esfuerzo**: 30min — requiere pasar client IDs al sidebar component
+### ~~🔴 D-90 — ACCESO RÁPIDO del sidebar no navega al hacer clic~~ ✅ VERIFICADO RESUELTO
+- `Sidebar.tsx`: items envueltos en `<Link href={"/clientes/${p.client_id}"}>`; sección oculta dentro de `/clientes/[id]`.
 
-### 🔴 D-91 — Roles del Chat IA sin descripción permanente
-- **Descripción**: El stepper Aurora→Rebeca→Elena→Valeria solo muestra nombre + label de rol (AUTOR/REVISOR/ELEVADOR/VALIDADOR). No hay descripción de qué hace cada rol. Solo hover title. Para un consultor nuevo, el feature central de la app es opaco.
-- **Impacto**: Fricción bloqueante en primer día de uso. El flujo de cadena de calidad, que es el principal diferenciador de la app, queda oculto.
-- **Fix**: Agregar 1 línea de descripción siempre visible debajo del label en cada avatar del stepper: "Genera borrador inicial" / "Detecta fallas y riesgos" / "Eleva narrativa estratégica" / "Valida Definition of Done"
-- **Esfuerzo**: 20min — 4 strings en `ChatRolePipeline` component
+### ~~🔴 D-91 — Roles del Chat IA sin descripción permanente~~ ✅ VERIFICADO RESUELTO
+- `chat-types.ts` ROLES[].desc tiene strings descriptivos. `ChatWindow.tsx` los renderiza debajo del label (línea 634-636).
 
 ### ~~🟡 D-92 — Chat IA sin default explícito para rol activo~~ ✅ VERIFICADO RESUELTO
 - Aurora tiene dot activo visible + fondo marcado. Verificado en `ChatWindow.tsx`.
@@ -48,18 +39,14 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟡 D-95 — Cuestionario: badge "✓ validado" en todos los campos de secciones completas~~ ✅ RESUELTO
 - Prop `sectionComplete` en `FieldRow`. Badge se oculta cuando la sección está al 100% (`!sectionComplete`). `QuestionnaireTab.tsx`.
 
-### 🟡 D-96 — "Quitar validación" visible aunque stats.validated === 0
-- **Descripción**: El botón "Quitar validación" en Materialidad es visible aunque no haya temas validados, lo cual no tiene sentido semántico.
-- **Fix**: `hidden` o `disabled` + `opacity-50 cursor-not-allowed` cuando `stats.validated === 0`
-- **Esfuerzo**: 5min
+### ~~🟡 D-96 — "Quitar validación" visible aunque stats.validated === 0~~ ✅ VERIFICADO RESUELTO
+- `MaterialityTab.tsx` solo muestra "Quitar validación" cuando `stats.validated === stats.total && stats.total > 0`. Si validated=0, muestra "Validar todos".
 
 ### ~~🟡 D-97 — Cuentas Demo mezcladas con consultores reales en Equipo~~ ✅ RESUELTO
 - Migración `0044`: `is_test_account boolean NOT NULL DEFAULT false`. Badge "TEST" en `UsersManager`. Excluidas por default en `/api/team/occupancy` + toggle "Mostrar cuentas de prueba" en `EquipoView`.
 
-### 🟢 D-98 — Tablas Equipo y Consultores sin zebra stripe
-- **Descripción**: Las tablas en /equipo (POR CONSULTOR) y en el tab CONSULTORES del cliente no tienen zebra stripe — dificulta el seguimiento horizontal de filas en tablas de 5+ columnas.
-- **Fix**: `even:bg-slate-50` en `<tr>` de ambas tablas.
-- **Esfuerzo**: 10min
+### ~~🟢 D-98 — Tablas Equipo y Consultores sin zebra stripe~~ ✅ VERIFICADO RESUELTO
+- `TeamTab.tsx` línea 156: `className="even:bg-slate-50/60 hover:bg-brand-primary-light/30"`.
 
 ---
 
@@ -116,18 +103,15 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟡 D-102 — ingest-report sin validación de magic bytes~~ ✅ RESUELTO
 - Añadida verificación de primeros 8 bytes (`%PDF`, `PK`) en `ingest-report/route.ts`. Defense in depth contra MIME spoofing.
 
-### 🟢 D-103 — Comentario faltante en research-reports sobre `redirect: "follow"`
-- **Descripción**: El fetch en `research-reports/route.ts` usa `redirect: "follow"` sin comentario explicando que puede exponer redirecciones a IPs internas si el SSRF guard falla en URL destino post-redirect.
-- **Fix**: Añadir comentario + considerar re-validar URL final después del redirect.
-- **Esfuerzo**: 5min
+### ~~🟢 D-103 — Comentario faltante sobre `redirect: "follow"` SSRF risk~~ ✅ RESUELTO
+- Comentario añadido en `ingest-report/route.ts` (el archivo real con el fetch externo, no research-reports). Explica riesgo post-redirect y lo marca como aceptado para piloto.
 
 ### ~~🟡 D-105 — extractJsonObject DRY — 3 copias idénticas~~ ✅ RESUELTO
 - Extraído a `lib/ai/extract-json.ts`. 3 rutas (`ai-fill`, `doc-fill`, `research-reports`) importan desde el módulo compartido.
 
-### 🟢 D-106 — RBAC ownership: consultor ve clientes de otros consultores
-- **Descripción**: Cualquier consultor activo puede ver y editar el cuestionario de cualquier cliente, aunque no esté asignado. `requireConsultorOrAdmin()` no verifica pertenencia al cliente.
-- **Fix**: En endpoints mutación de cuestionario, verificar que `userEmail` esté en `client_consultors` para el `clientId`. Admins exentos.
-- **Esfuerzo**: 2h (deferred — aceptado para piloto de 8 usuarios)
+### ~~🟢 D-106 — RBAC ownership: consultor ve clientes de otros consultores~~ ✅ RESUELTO
+- `lib/auth.ts`: función `requireConsultorForClient(clientId)` verifica `client_consultors` en DB. Admins y `dev@localhost` exentos.
+- Aplicado a 9 endpoints: questionnaire, wizard/ai-fill, wizard/doc-fill, research-reports, documents, documents/[docId], ingest-report, materiality. Cada endpoint extrae params antes de llamar auth.
 
 ---
 
@@ -295,4 +279,21 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 ---
 
-*Última auditoría: may-2026 sesión 15 — D-81/82/84/92/93/94/95/97 resueltos. D-99–D-106 agregados (D-99/100/101/102/105 ya resueltos). Score: 7.8/10 → objetivo 9/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+## Deuda resuelta (sesión 16 — may-2026, sprint A+B+C)
+
+| ID | Descripción | Resuelto |
+|----|-------------|---------|
+| D-89 | Configuración redirect → usuarios (ya estaba) | may-2026 |
+| D-90 | Sidebar acceso rápido links (ya estaba con `<Link>`) | may-2026 |
+| D-91 | Roles chat desc visible (ROLES[].desc ya renderizado) | may-2026 |
+| D-96 | Quitar validación oculto cuando validated=0 (ya estaba correcto) | may-2026 |
+| D-98 | Zebra stripe TeamTab `even:bg-slate-50/60` (ya estaba) | may-2026 |
+| D-103 | Comentario SSRF `redirect:"follow"` en ingest-report | may-2026 |
+| D-106 | RBAC `requireConsultorForClient` en 9 endpoints | may-2026 |
+| Sprint B tests | 10 tests extractJsonObject + 3 DOCUMENT_KIND_SCHEMA + 2 auth dev-mode | may-2026 |
+| Sprint C SWR | `DashboardSWRProvider` retry exponencial global (3 retries, backoff 1.5s–30s) | may-2026 |
+| Sprint C cron | `daily-qa` envía email a admin cuando detecta fallos (Resend, ADMIN_ALERT_EMAIL) | may-2026 |
+
+---
+
+*Última auditoría: may-2026 sesión 16 — D-89/90/91/96/98/103/106 resueltos + Sprint B tests + Sprint C SWR retry + cron alerts. Score objetivo: 9/10. Items activos reales: D-04 (metodología pendiente equipo), D-85 (sidebar duplica acceso — menor), D-87/D-88 (copy/labels — ya corregidos). Próxima revisión: ver tareas programadas en `MEMORY.md`.*

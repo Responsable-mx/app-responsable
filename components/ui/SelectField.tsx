@@ -68,7 +68,7 @@ export function SelectField({
         setFocusedIdx(i => Math.max(i - 1, 0));
       } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        if (focusedIdx >= 0) onChange(allOptions[focusedIdx].value);
+        if (focusedIdx >= 0) onChange(allOptions[focusedIdx]!.value);
         setOpen(false); setFocusedIdx(-1);
       } else if (e.key === "Escape") {
         setOpen(false); setFocusedIdx(-1);

@@ -73,7 +73,7 @@ describe("users CRUD con Supabase mock", () => {
     const { listUsers } = await import("@/lib/users");
     const out = await listUsers();
     expect(out).toHaveLength(1);
-    expect(out[0].email).toBe("x@y.com");
+    expect(out[0]!.email).toBe("x@y.com");
   });
 
   it("listUsers cae a SEED si DB error", async () => {

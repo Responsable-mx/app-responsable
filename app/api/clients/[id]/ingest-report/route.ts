@@ -32,9 +32,9 @@ type Ctx = { params: Promise<{ id: string }> };
 
 function fileNameFromUrl(u: string, contentType: string): string {
   const url = new URL(u);
-  let name = url.pathname.split("/").filter(Boolean).pop() ?? "informe";
+  let name = (url.pathname.split("/").filter(Boolean).pop() ?? "informe");
   // Quita query strings residuales
-  name = name.split("?")[0].split("#")[0];
+  name = name.split("?")[0]!.split("#")[0]!;
   if (!name.includes(".")) {
     if (contentType.includes("pdf")) name += ".pdf";
     else if (contentType.includes("html")) name += ".html";
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: `Servidor remoto retornó ${response.status}` }, { status: 502 });
   }
 
-  const contentType = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  const contentType = ((response.headers.get("content-type") ?? "").split(";")[0] ?? "").trim().toLowerCase();
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return NextResponse.json({ error: `Tipo no soportado: ${contentType}` }, { status: 415 });
   }

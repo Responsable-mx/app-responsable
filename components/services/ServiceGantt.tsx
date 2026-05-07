@@ -393,13 +393,13 @@ export function ServiceGantt({
       case "=": {
         e.preventDefault();
         const idx = ZOOM_ORDER.indexOf(zoom);
-        if (idx < ZOOM_ORDER.length - 1) setZoom(ZOOM_ORDER[idx + 1]);
+        if (idx < ZOOM_ORDER.length - 1) setZoom(ZOOM_ORDER[idx + 1]!);
         break;
       }
       case "-": {
         e.preventDefault();
         const idx = ZOOM_ORDER.indexOf(zoom);
-        if (idx > 0) setZoom(ZOOM_ORDER[idx - 1]);
+        if (idx > 0) setZoom(ZOOM_ORDER[idx - 1]!);
         break;
       }
     }
@@ -893,7 +893,7 @@ export function ServiceGantt({
                 {/* Fila 1: meses */}
                 {visibleMonths.map((m, i) => {
                   const left = ((m.getTime() - effectiveMin) / totalMs) * 100;
-                  const next = i + 1 < visibleMonths.length ? visibleMonths[i + 1] : new Date(effectiveMax);
+                  const next = i + 1 < visibleMonths.length ? visibleMonths[i + 1]! : new Date(effectiveMax);
                   const width = ((next.getTime() - m.getTime()) / totalMs) * 100;
                   return (
                     <div key={i} className="absolute border-r border-slate-200 px-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate flex items-center" style={{ left: `${left}%`, width: `${width}%`, top: 0, height: monthRowH }}>
@@ -903,7 +903,7 @@ export function ServiceGantt({
                 })}
                 {hasSubRow && <div className="absolute left-0 right-0 border-t border-slate-100" style={{ top: monthRowH }} />}
                 {(zoom === "quarter" || zoom === "semana") && weeks.map((wt, i) => {
-                  const nextWt = i + 1 < weeks.length ? weeks[i + 1] : range.max;
+                  const nextWt = i + 1 < weeks.length ? weeks[i + 1]! : range.max;
                   const left = ((wt - range.min) / totalMs) * 100;
                   const width = ((nextWt - wt) / totalMs) * 100;
                   return (
@@ -1113,11 +1113,11 @@ export function ServiceGantt({
                         {actsWithPlan.length > 0 && (() => {
                           const minStart = actsWithPlan.reduce((m, a) =>
                             a.planned_start! < m ? a.planned_start! : m,
-                            actsWithPlan[0].planned_start!
+                            actsWithPlan[0]!.planned_start!
                           );
                           const maxEnd = actsWithPlan.reduce((m, a) =>
                             a.planned_end! > m ? a.planned_end! : m,
-                            actsWithPlan[0].planned_end!
+                            actsWithPlan[0]!.planned_end!
                           );
                           const spanStyle = barStyle(minStart, maxEnd);
                           if (!spanStyle) return null;

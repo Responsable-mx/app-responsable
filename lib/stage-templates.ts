@@ -224,7 +224,7 @@ export async function applyTemplate(input: {
   const pendingDeps: { activityId: string; dependsOnPath: string }[] = [];
 
   for (let sIdx = 0; sIdx < tpl.data.stages.length; sIdx++) {
-    const tplStage = tpl.data.stages[sIdx];
+    const tplStage = tpl.data.stages[sIdx]!;
     const { data: stage, error: e2 } = await admin
       .from("service_stages")
       .insert({
@@ -238,7 +238,7 @@ export async function applyTemplate(input: {
     stagesCreated++;
 
     for (let aIdx = 0; aIdx < tplStage.activities.length; aIdx++) {
-      const a = tplStage.activities[aIdx];
+      const a = tplStage.activities[aIdx]!;
       const { data: act, error: e3 } = await admin
         .from("stage_activities")
         .insert({

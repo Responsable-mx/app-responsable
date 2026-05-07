@@ -154,11 +154,11 @@ export function WorkloadHeatmap() {
 
   // Totales por semana (suma de todos los consultores)
   const weekTotals = weeks.map((_, wi) =>
-    consultors.reduce((s, c) => s + heatmap[c][wi], 0)
+    consultors.reduce((s, c) => s + (heatmap[c]![wi] ?? 0), 0)
   );
 
   // Badge: semanas donde algún consultor tiene ≥5 actividades
-  const criticalWeeks = weeks.filter((_, wi) => consultors.some((c) => heatmap[c][wi] >= 5)).length;
+  const criticalWeeks = weeks.filter((_, wi) => consultors.some((c) => (heatmap[c]![wi] ?? 0) >= 5)).length;
 
   function toggleCollapsed() {
     setCollapsed((v) => {
@@ -187,7 +187,7 @@ export function WorkloadHeatmap() {
     : [];
 
   const selectedName = selectedCell
-    ? (() => { const n = selectedCell.email.split("@")[0]; return n.charAt(0).toUpperCase() + n.slice(1); })()
+    ? (() => { const n = selectedCell.email.split("@")[0]!; return n.charAt(0).toUpperCase() + n.slice(1); })()
     : "";
 
   return (
@@ -255,9 +255,9 @@ export function WorkloadHeatmap() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {consultors.map((c) => {
-                  const peakLoad = Math.max(...heatmap[c]);
-                  const peakWeekIdx = heatmap[c].indexOf(peakLoad);
-                  const displayName = (() => { const n = c.split("@")[0]; return n.charAt(0).toUpperCase() + n.slice(1); })();
+                  const peakLoad = Math.max(...heatmap[c]!);
+                  const peakWeekIdx = heatmap[c]!.indexOf(peakLoad);
+                  const displayName = (() => { const n = c.split("@")[0]!; return n.charAt(0).toUpperCase() + n.slice(1); })();
                   return (
                     <tr key={c} className="hover:bg-slate-50/50 transition-colors">
                       <td
@@ -266,18 +266,18 @@ export function WorkloadHeatmap() {
                       >
                         {displayName}
                       </td>
-                      {heatmap[c].map((n, wi) => {
-                        const isSelected = selectedCell?.email === c && selectedCell?.weekTs === weeks[wi];
+                      {heatmap[c]!.map((n, wi) => {
+                        const isSelected = selectedCell?.email === c && selectedCell?.weekTs === weeks[wi]!
                         return (
                           <td
                             key={wi}
-                            onClick={() => handleCellClick(c, weeks[wi], n)}
+                            onClick={() => handleCellClick(c, weeks[wi]!, n)}
                             className={`px-1 py-1.5 text-center tabular-nums border-r border-slate-100 transition-all ${
                               n > 0 ? "cursor-pointer hover:ring-2 hover:ring-inset hover:ring-slate-400/40" : ""
                             } ${cellBg(n)} ${cellText(n)} ${
                               wi === peakWeekIdx && peakLoad >= 5 ? "ring-1 ring-inset ring-rose-300" : ""
                             } ${isSelected ? "ring-2 ring-inset ring-brand-primary/60" : ""}`}
-                            title={n > 0 ? `${displayName} · semana del ${fmtWeek(weeks[wi])}: ${n} actividad${n !== 1 ? "es" : ""} — click para ver detalle` : undefined}
+                            title={n > 0 ? `${displayName} · semana del ${fmtWeek(weeks[wi]!)}: ${n} actividad${n !== 1 ? "es" : ""} — click para ver detalle` : undefined}
                           >
                             {n > 0 ? n : "·"}
                           </td>
@@ -296,7 +296,7 @@ export function WorkloadHeatmap() {
                     <td
                       key={wi}
                       className={`px-1 py-1.5 text-center tabular-nums border-r border-slate-100 text-[10px] font-bold ${totalBg(n, consultorCount)}`}
-                      title={`Total equipo · semana del ${fmtWeek(weeks[wi])}: ${n} actividades en curso`}
+                      title={`Total equipo · semana del ${fmtWeek(weeks[wi]!)}: ${n} actividades en curso`}
                     >
                       {n > 0 ? n : "·"}
                     </td>

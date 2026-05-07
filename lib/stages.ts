@@ -235,7 +235,7 @@ export async function deleteStage(stageId: string): Promise<void> {
     const idx = _devStages.findIndex((s) => s.id === stageId);
     if (idx >= 0) _devStages.splice(idx, 1);
     let i = _devActs.length;
-    while (i--) { if (_devActs[i].stage_id === stageId) _devActs.splice(i, 1); }
+    while (i--) { if (_devActs[i]!.stage_id === stageId) _devActs.splice(i, 1); }
     return;
   }
   const admin = createAdminClient();

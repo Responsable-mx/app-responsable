@@ -118,8 +118,8 @@ describe("Modal — focus trap branches", () => {
     );
     const buttons = screen.getAllByRole("button");
     // orden DOM: ✕ (Cerrar), A, B
-    const firstBtn = buttons[0];
-    const lastBtn = buttons[buttons.length - 1];
+    const firstBtn = buttons[0]!;
+    const lastBtn = buttons[buttons.length - 1]!;
     lastBtn.focus();
     fireEvent.keyDown(document, { key: "Tab", shiftKey: false });
     expect(document.activeElement).toBe(firstBtn);
@@ -137,8 +137,8 @@ describe("Modal — focus trap branches", () => {
       </Modal>,
     );
     const buttons = screen.getAllByRole("button");
-    const firstBtn = buttons[0];
-    const lastBtn = buttons[buttons.length - 1];
+    const firstBtn = buttons[0]!;
+    const lastBtn = buttons[buttons.length - 1]!;
     firstBtn.focus();
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(lastBtn);

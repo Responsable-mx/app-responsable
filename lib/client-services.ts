@@ -217,7 +217,7 @@ export async function updateClientService(
       const idx = list.findIndex((s) => s.id === id);
       if (idx >= 0) {
         const updated: ClientService = {
-          ...list[idx],
+          ...list[idx]!,
           data: patch.data,
           updated_by: updatedBy,
           updated_at: new Date().toISOString(),

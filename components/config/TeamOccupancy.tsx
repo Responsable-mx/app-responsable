@@ -36,7 +36,7 @@ function loadLevel(activeCount: number, delayedCount: number): LoadLevel {
 function initials(name: string | null, email: string) {
   if (name) {
     const parts = name.trim().split(/\s+/);
-    return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+    return (parts[0]![0]! + (parts[1]?.[0] ?? "")).toUpperCase();
   }
   return email.slice(0, 2).toUpperCase();
 }
@@ -58,7 +58,7 @@ const PROJECT_PALETTE = [
 function clientColor(clientId: string): string {
   let h = 0;
   for (let i = 0; i < clientId.length; i++) h = (h * 31 + clientId.charCodeAt(i)) & 0xffff;
-  return PROJECT_PALETTE[h % PROJECT_PALETTE.length];
+  return PROJECT_PALETTE[h % PROJECT_PALETTE.length]!;
 }
 
 const STATUS_COLOR: Record<string, string> = {

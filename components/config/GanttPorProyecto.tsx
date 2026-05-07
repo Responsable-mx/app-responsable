@@ -91,8 +91,8 @@ export function GanttPorProyecto({ filters }: { filters?: EquipoFilters } = {}) 
           for (const a of st.activities) {
             if (!a.assignee_email) continue;
             if (!loadMap[a.assignee_email]) loadMap[a.assignee_email] = { active: 0, delayed: 0 };
-            if (a.status === "in_progress") loadMap[a.assignee_email].active++;
-            if (a.status === "delayed") loadMap[a.assignee_email].delayed++;
+            if (a.status === "in_progress") loadMap[a.assignee_email]!.active++;
+            if (a.status === "delayed") loadMap[a.assignee_email]!.delayed++;
           }
         }
       }

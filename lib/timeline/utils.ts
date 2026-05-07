@@ -146,8 +146,8 @@ export function computeOverlapBands(
   const bands: OverlapBand[] = [];
   for (let i = 0; i < intervals.length; i++) {
     for (let j = i + 1; j < intervals.length; j++) {
-      const oS = Math.max(intervals[i].s, intervals[j].s);
-      const oE = Math.min(intervals[i].e, intervals[j].e);
+      const oS = Math.max(intervals[i]!.s, intervals[j]!.s);
+      const oE = Math.min(intervals[i]!.e, intervals[j]!.e);
       if (oS < oE) {
         bands.push({
           leftPx: ((oS - rangeMin) / totalMs) * chartW,

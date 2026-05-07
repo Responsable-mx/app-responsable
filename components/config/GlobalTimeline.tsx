@@ -51,7 +51,7 @@ export function GlobalTimeline({
   const panStartScrollLeft = useRef(0);
   const didPan = useRef(false);
 
-  const zoom = ZOOM_STEPS[zoomIdx];
+  const zoom = ZOOM_STEPS[zoomIdx]!;
   const chartW = Math.round(CHART_BASE * zoom);
 
   // Aplanar + filtrar por filtros de panel — base para KPIs y vista filtrada
@@ -137,7 +137,7 @@ export function GlobalTimeline({
 
   const clientColorMap = useMemo(() => {
     const ids = Array.from(new Set(activities.map((a) => a.client_id)));
-    return new Map(ids.map((id, i) => [id, PROJECT_PALETTE[i % PROJECT_PALETTE.length]]));
+    return new Map(ids.map((id, i) => [id, PROJECT_PALETTE[i % PROJECT_PALETTE.length]!]));
   }, [activities]);
 
   // Agrupar por consultor + sort por riesgo
@@ -550,7 +550,7 @@ export function GlobalTimeline({
               const isUnassigned = key === "__unassigned__";
               const display = isUnassigned
                 ? "Sin asignar"
-                : (consultorNames?.get(key) ?? key.split("@")[0]);
+                : (consultorNames?.get(key) ?? key.split("@")[0]!);
               const completed = acts.filter((a) => a.status === "completed").length;
               const subtitle = isUnassigned
                 ? `${acts.length} sin owner`
@@ -565,7 +565,7 @@ export function GlobalTimeline({
               } as const;
               const initials = isUnassigned
                 ? "?"
-                : display.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+                : display.split(" ").map((w) => w[0]!).slice(0, 2).join("").toUpperCase();
               return (
                 <div
                   key={key}
@@ -622,7 +622,7 @@ export function GlobalTimeline({
                 {range.months.map((m, i) => {
                   const leftPx = ((m.getTime() - range.min) / totalMs) * chartW;
                   const nextMs = i + 1 < range.months.length
-                    ? range.months[i + 1].getTime()
+                    ? range.months[i + 1]!.getTime()
                     : range.max;
                   const widthPx = ((nextMs - m.getTime()) / totalMs) * chartW;
                   return (

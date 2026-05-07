@@ -332,7 +332,7 @@ function ApplyTemplatePrompt({
   onApplied: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<string>(
-    templates.length === 1 ? templates[0].id : ""
+    templates.length === 1 ? templates[0]!.id : ""
   );
   const [startDate, setStartDate] = useState<string>(
     () => new Date().toISOString().slice(0, 10)

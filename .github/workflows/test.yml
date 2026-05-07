@@ -50,3 +50,39 @@ jobs:
           ANTHROPIC_API_KEY: dummy-key
           CRON_SECRET: dummy-secret
           AUTHORIZED_EMAILS: dev@localhost
+
+  e2e-smoke:
+    # Smoke tests contra producción — se ejecutan solo en push a main
+    # (no en PRs para no consumir Supabase en cada feature branch)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [test, build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Instalar Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Smoke tests E2E (producción)
+        run: npx playwright test e2e/smoke.spec.ts --reporter=github
+        env:
+          # Auth setup contra Supabase real — secrets configurados en repo
+          E2E_BASE_URL: https://app.responsable.net
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Subir reporte Playwright si falla
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

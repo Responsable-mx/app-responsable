@@ -222,7 +222,7 @@ function BenchmarkSection({
 
   const groupedByRelation = companies.reduce<Record<string, BenchmarkCompany[]>>((acc, c) => {
     if (!acc[c.relation]) acc[c.relation] = [];
-    acc[c.relation].push(c);
+    acc[c.relation]!.push(c);
     return acc;
   }, {});
 

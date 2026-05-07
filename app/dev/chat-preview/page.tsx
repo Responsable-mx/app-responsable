@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Dev preview ChatWindow rediseño enterprise. Solo non-prod (middleware bypass).
 import { ChatWindow } from "@/components/chat/ChatWindow";
 

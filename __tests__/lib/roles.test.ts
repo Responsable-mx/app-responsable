@@ -311,14 +311,14 @@ describe("buildSystemBlocks (async)", () => {
   it("devuelve 2 bloques con cache_control en AMBOS (DRSP-6)", async () => {
     const blocks = await buildSystemBlocks("aurora", null);
     expect(blocks).toHaveLength(2);
-    expect(blocks[0].type).toBe("text");
-    expect(blocks[1].type).toBe("text");
+    expect(blocks[0]!.type).toBe("text");
+    expect(blocks[1]!.type).toBe("text");
     // contextBlock cacheado → al cambiar de rol con mismo cliente, hit
-    expect((blocks[0] as { cache_control?: unknown }).cache_control).toEqual({
+    expect((blocks[0]! as { cache_control?: unknown }).cache_control).toEqual({
       type: "ephemeral",
     });
     // roleBlock cacheado → turnos subsecuentes con mismo (cliente, rol), hit
-    expect((blocks[1] as { cache_control?: unknown }).cache_control).toEqual({
+    expect((blocks[1]! as { cache_control?: unknown }).cache_control).toEqual({
       type: "ephemeral",
     });
   });
@@ -326,14 +326,14 @@ describe("buildSystemBlocks (async)", () => {
   it("el segundo bloque contiene el prompt del rol pedido", async () => {
     const aurora = await buildSystemBlocks("aurora", null);
     const rebeca = await buildSystemBlocks("rebeca", null);
-    expect(aurora[1].text).toContain("Aurora");
-    expect(rebeca[1].text).toContain("Rebeca");
+    expect(aurora[1]!.text).toContain("Aurora");
+    expect(rebeca[1]!.text).toContain("Rebeca");
   });
 
   it("el prefix combinado incluye navegación y reglas base", async () => {
     const blocks = await buildSystemBlocks("aurora", null);
-    expect(blocks[1].text).toContain("<app_navigation>");
-    expect(blocks[1].text).toContain("<rules>");
+    expect(blocks[1]!.text).toContain("<app_navigation>");
+    expect(blocks[1]!.text).toContain("<rules>");
   });
 });
 

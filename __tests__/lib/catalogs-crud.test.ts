@@ -95,7 +95,7 @@ describe("catalogs CRUD", () => {
     };
     const { listCatalog } = await import("@/lib/catalogs");
     const out = await listCatalog("frameworks");
-    expect(out[0].value).toBe("custom");
+    expect(out[0]!.value).toBe("custom");
   });
 
   it("createCatalogItem rechaza valor canónico vacío", async () => {

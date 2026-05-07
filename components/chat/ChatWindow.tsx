@@ -323,10 +323,10 @@ export function ChatWindow({
               const outputTokens = raw.usage.output_tokens ?? 0;
               const cacheReadTokens = raw.usage.cache_read_input_tokens ?? 0;
               const turnCost =
-                inputTokens * (PRICE_INPUT_PER_TOKEN[modelKey] ?? PRICE_INPUT_PER_TOKEN.Sonnet) +
-                outputTokens * (PRICE_OUTPUT_PER_TOKEN[modelKey] ?? PRICE_OUTPUT_PER_TOKEN.Sonnet) +
+                inputTokens * (PRICE_INPUT_PER_TOKEN[modelKey] ?? PRICE_INPUT_PER_TOKEN["Sonnet"]!) +
+                outputTokens * (PRICE_OUTPUT_PER_TOKEN[modelKey] ?? PRICE_OUTPUT_PER_TOKEN["Sonnet"]!) +
                 cacheReadTokens *
-                  (PRICE_CACHE_READ_PER_TOKEN[modelKey] ?? PRICE_CACHE_READ_PER_TOKEN.Sonnet);
+                  (PRICE_CACHE_READ_PER_TOKEN[modelKey] ?? PRICE_CACHE_READ_PER_TOKEN["Sonnet"]!);
               setUsageAcc((prev) => ({
                 inputTokens: prev.inputTokens + inputTokens,
                 outputTokens: prev.outputTokens + outputTokens,
@@ -485,7 +485,7 @@ export function ChatWindow({
       .filter((i) => i >= 0)
       .at(-1);
     if (lastUserIdx === undefined) return;
-    const lastUser = messages[lastUserIdx];
+    const lastUser = messages[lastUserIdx]!;
     setMessages(messages.slice(0, lastUserIdx));
     void send(lastUser.content);
   }

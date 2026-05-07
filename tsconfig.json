@@ -5,8 +5,9 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
-    // noUncheckedIndexedAccess: requiere ~200 fixes en codebase existente.
-    // Activar en sprint dedicado cuando se haga refactor de array accesses.
+    // noUncheckedIndexedAccess: activo. Array indexing arr[i] retorna T|undefined.
+    // app/dev/ excluido — dev previews no necesitan esta cobertura.
+    "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -28,5 +29,8 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "app/dev/**"
+  ]
 }

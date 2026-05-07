@@ -59,7 +59,7 @@ describe("clients CRUD con Supabase mock", () => {
     const { listClients } = await import("@/lib/clients");
     const out = await listClients();
     expect(out).toHaveLength(1);
-    expect(out[0].name).toBe("Cliente X");
+    expect(out[0]!.name).toBe("Cliente X");
   });
 
   it("listClients propaga error", async () => {

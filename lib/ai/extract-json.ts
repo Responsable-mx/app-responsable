@@ -5,14 +5,14 @@
  */
 export function extractJsonObject(text: string): string | null {
   const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const searchText = codeBlockMatch ? codeBlockMatch[1] : text;
+  const searchText = codeBlockMatch ? codeBlockMatch[1]! : text;
   const start = searchText.indexOf("{");
   if (start < 0) return null;
   let depth = 0;
   let inString = false;
   let escape = false;
   for (let i = start; i < searchText.length; i++) {
-    const ch = searchText[i];
+    const ch = searchText[i]!;
     if (escape) { escape = false; continue; }
     if (ch === "\\" && inString) { escape = true; continue; }
     if (ch === '"') { inString = !inString; continue; }

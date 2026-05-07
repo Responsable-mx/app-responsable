@@ -64,8 +64,8 @@ export function Modal({
         e.preventDefault();
         return;
       }
-      const firstEl = focusables[0];
-      const lastEl = focusables[focusables.length - 1];
+      const firstEl = focusables[0]!;
+      const lastEl = focusables[focusables.length - 1]!;
       const active = document.activeElement as HTMLElement | null;
       if (e.shiftKey && active === firstEl) {
         e.preventDefault();

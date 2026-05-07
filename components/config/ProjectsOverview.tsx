@@ -83,7 +83,7 @@ export function ProjectsOverview({
   function formatAssignee(email: string): string {
     if (consultorMap.has(email)) return consultorMap.get(email)!;
     return email
-      .split("@")[0]
+      .split("@")[0]!
       .split(".")
       .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
       .join(" ");
@@ -328,7 +328,7 @@ export function ProjectsOverview({
                               ) : (
                                 <div className="space-y-1">
                                   {s.activities.map((a) => {
-                                    const chip = STATUS_CHIP[a.status] ?? STATUS_CHIP.pending;
+                                    const chip = STATUS_CHIP[a.status] ?? STATUS_CHIP["pending"]!;
                                     return (
                                       <Link
                                         key={a.id}

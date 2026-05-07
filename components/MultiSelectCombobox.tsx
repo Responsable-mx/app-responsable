@@ -135,7 +135,7 @@ export function MultiSelectCombobox({
       if (it) select(it.value);
     } else if (e.key === "Backspace" && query === "" && mode === "multi") {
       if (selectedValues.length > 0) {
-        removeChip(selectedValues[selectedValues.length - 1]);
+        removeChip(selectedValues[selectedValues.length - 1]!);
       }
     } else if (e.key === "Escape") {
       setOpen(false);

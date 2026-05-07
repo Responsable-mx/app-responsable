@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 import { ChatRequestSchema } from "@/lib/validation";
 import type { ChatStreamEvent } from "@/lib/ai/stream-types";
+import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 
 export const maxDuration = 60;
 
@@ -115,6 +116,21 @@ export async function POST(req: NextRequest) {
   const config = getModelConfig(role);
   const systemBlocks = await buildSystemBlocks(role, client, questionnaire);
 
+  // Circuit breaker: rechazar inmediatamente si Anthropic está en cascada de fallos
+  if (anthropicBreaker.isOpen) {
+    const enc = new TextEncoder();
+    const errStream = new ReadableStream({
+      start(controller) {
+        const ev: ChatStreamEvent = { type: "error", error: anthropicBreaker.userMessage };
+        controller.enqueue(enc.encode(`data: ${JSON.stringify(ev)}\n\n`));
+        controller.close();
+      },
+    });
+    return new Response(errStream, {
+      headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache" },
+    });
+  }
+
   const anthropic = createAnthropicClient();
   const encoder = new TextEncoder();
   const startedAt = Date.now();
@@ -183,6 +199,7 @@ export async function POST(req: NextRequest) {
           cache_read_tokens: finalMessage.usage.cache_read_input_tokens ?? 0,
         });
         logUsage(finalMessage.usage, finalMessage.stop_reason);
+        anthropicBreaker.recordSuccess();
       };
 
       try {
@@ -196,6 +213,7 @@ export async function POST(req: NextRequest) {
 
         // Retry ÚNICO ante 529 (overloaded) de Anthropic
         if (e.status === 529) {
+          anthropicBreaker.recordFailure();
           await new Promise((r) =>
             setTimeout(r, OVERLOADED_RETRY_DELAY_MS)
           );
@@ -208,6 +226,7 @@ export async function POST(req: NextRequest) {
               message?: string;
               status?: number;
             };
+            anthropicBreaker.recordFailure();
             const msg2 =
               "La IA está saturada. Espera un momento e intenta de nuevo.";
             console.error(
@@ -221,6 +240,11 @@ export async function POST(req: NextRequest) {
             logUsage(null, null, `529-retry-failed: ${e2.message}`);
             return;
           }
+        }
+
+        // 503 / timeout — registrar en breaker
+        if (e.status === 503 || e.name === "AbortError" || e.name === "TimeoutError") {
+          anthropicBreaker.recordFailure();
         }
 
         console.error(

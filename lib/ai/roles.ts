@@ -18,7 +18,7 @@ const CATALOG_LABELS: Record<CatalogCategory, Record<string, string>> = (() => {
   const out: Record<string, Record<string, string>> = {};
   for (const item of CATALOG_SEEDS) {
     if (!out[item.category]) out[item.category] = {};
-    out[item.category][item.value] = item.label;
+    out[item.category]![item.value] = item.label;
   }
   return out as Record<CatalogCategory, Record<string, string>>;
 })();

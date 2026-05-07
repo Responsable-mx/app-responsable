@@ -72,7 +72,7 @@ const BLOCKED_HOSTNAMES = new Set([
 function isPrivateIPv4(host: string): boolean {
   const parts = host.split(".");
   if (parts.length !== 4) return false;
-  const [a, b] = parts.map(Number);
+  const [a = 0, b = 0] = parts.map(Number);
   if (a === 10) return true;
   if (a === 127) return true;
   if (a === 169 && b === 254) return true;

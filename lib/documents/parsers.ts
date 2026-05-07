@@ -82,12 +82,12 @@ async function parseXlsx(buffer: Buffer): Promise<string> {
     });
     if (rows.length === 0) return;
     const cols = Math.max(...rows.map((r) => r.length));
-    const header = rows[0];
+    const header = rows[0]!;
     const headerRow = Array.from({ length: cols }, (_, i) => header[i] ?? `Col${i + 1}`);
     out.push("| " + headerRow.join(" | ") + " |");
     out.push("| " + headerRow.map(() => "---").join(" | ") + " |");
     for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
+      const r = rows[i]!;
       const padded = Array.from({ length: cols }, (_, j) => r[j] ?? "");
       out.push("| " + padded.join(" | ") + " |");
     }
@@ -109,7 +109,7 @@ async function parsePptx(buffer: Buffer): Promise<string> {
     return na - nb;
   });
   for (const path of slidePaths) {
-    const xml = await zip.files[path].async("string");
+    const xml = await zip.files[path]!.async("string");
     const idx = parseInt(path.match(/slide(\d+)\.xml$/i)?.[1] ?? "0", 10);
     // Match texto entre <a:t>...</a:t>
     const matches = xml.match(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g) ?? [];

@@ -40,7 +40,7 @@ const GROUPS: Array<{
 ];
 
 export function CatalogsManager({ categories }: { categories: Category[] }) {
-  const [active, setActive] = useState<CatalogCategory>(GROUPS[0].members[0]);
+  const [active, setActive] = useState<CatalogCategory>(GROUPS[0]!.members[0]!);
 
   const groupCats = (g: (typeof GROUPS)[number]) =>
     g.members

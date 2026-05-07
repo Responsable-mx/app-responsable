@@ -71,7 +71,7 @@ export function TemplateStructureEditor({
       const j = i + dir;
       if (j < 0 || j >= prev.length) return prev;
       const next = [...prev];
-      [next[i], next[j]] = [next[j], next[i]];
+      [next[i], next[j]] = [next[j]!, next[i]!];
       return reindexStages(next);
     });
   }
@@ -82,7 +82,7 @@ export function TemplateStructureEditor({
     setStages((prev) => {
       const next = [...prev];
       const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
+      next.splice(to, 0, moved!);
       return reindexStages(next);
     });
   }
@@ -93,7 +93,7 @@ export function TemplateStructureEditor({
         if (idx !== stageIdx) return s;
         const next = [...s.activities];
         const [moved] = next.splice(from, 1);
-        next.splice(to, 0, moved);
+        next.splice(to, 0, moved!);
         return { ...s, activities: reindexActivities(next) };
       })
     );
@@ -143,7 +143,7 @@ export function TemplateStructureEditor({
         const j = actIdx + dir;
         if (j < 0 || j >= s.activities.length) return s;
         const next = [...s.activities];
-        [next[actIdx], next[j]] = [next[j], next[actIdx]];
+        [next[actIdx], next[j]] = [next[j]!, next[actIdx]!];
         return { ...s, activities: reindexActivities(next) };
       })
     );

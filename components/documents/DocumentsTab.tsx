@@ -45,11 +45,10 @@ const TYPE_BADGE: Record<DocMeta["file_type"], string> = {
   md: "MD",
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<any>;
+    return r.json() as Promise<{ data: DocMeta[] }>;
   });
 
 export function DocumentsTab({

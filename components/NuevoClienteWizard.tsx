@@ -2,19 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 
-const SERVICIOS = [
-  "Estudio de Doble Materialidad",
-  "Materialidad simple",
-  "Reporte GRI",
-  "Diagnóstico RSE",
-  "Carbono y huella climática",
-  "Estrategia de sustentabilidad",
-];
+const catalogFetcher = (url: string) =>
+  fetch(url)
+    .then((r) => r.json())
+    .then((j) => (j.data ?? []) as { value: string; label: string }[]);
 
 type FormState = {
   nombre: string;
@@ -31,12 +28,18 @@ export function NuevoClienteWizard() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<FormState>({
     nombre: "",
-    servicio: SERVICIOS[0],
+    servicio: "",
     alcance: "",
     pagina_web: "",
     propuesta_url: "",
     relacion: "",
   });
+
+  const { data: servicios = [], isLoading: loadingServicios } = useSWR<{ value: string; label: string }[]>(
+    "/api/catalogs?category=services",
+    catalogFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
+  );
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -115,8 +118,8 @@ export function NuevoClienteWizard() {
           <SelectField
             value={form.servicio}
             onChange={(v) => set("servicio", v)}
-            options={SERVICIOS.map((s) => ({ value: s, label: s }))}
-            placeholder="Seleccionar servicio"
+            options={servicios.map((s) => ({ value: s.value, label: s.label }))}
+            placeholder={loadingServicios ? "Cargando servicios…" : "Seleccionar servicio"}
           />
         </div>
 

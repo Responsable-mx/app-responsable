@@ -20,6 +20,7 @@ export type WizardField = {
   type: FieldType;
   required?: boolean;
   options?: string[] | SelectOption[]; // simple strings or full options
+  catalog?: string;                    // clave de catálogo (/api/catalogs?category=X) — reemplaza options cuando presente
   placeholder?: string;
   helper?: string;
   hint?: string;

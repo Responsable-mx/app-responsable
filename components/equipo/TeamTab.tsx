@@ -111,7 +111,7 @@ export function TeamTab({
       </div>
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3 mb-4">
+        <div className="text-sm text-brand-berry bg-brand-berry/5 border border-brand-berry/20 rounded p-3 mb-4">
           Error al cargar equipo: {(error as Error).message}
         </div>
       )}
@@ -358,7 +358,7 @@ function AssignModal({
           </p>
         </div>
         {error && (
-          <div role="alert" className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded p-2">
+          <div role="alert" className="text-sm text-brand-berry bg-brand-berry/5 border border-brand-berry/20 rounded p-2">
             {error}
           </div>
         )}
@@ -447,7 +447,7 @@ function EditSeniorityModal({
           </p>
         </div>
         {error && (
-          <div role="alert" className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded p-2">
+          <div role="alert" className="text-sm text-brand-berry bg-brand-berry/5 border border-brand-berry/20 rounded p-2">
             {error}
           </div>
         )}

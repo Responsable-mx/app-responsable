@@ -64,7 +64,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={isInteractionBlocked}
       aria-busy={loading || undefined}
       data-loading={loading || undefined}
-      className={`inline-flex items-center justify-center rounded-lg font-semibold transition-colors ${isInteractionBlocked ? "cursor-not-allowed" : ""} ${showFadedOut ? "opacity-50" : ""} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded font-semibold transition-colors ${isInteractionBlocked ? "cursor-not-allowed" : ""} ${showFadedOut ? "opacity-50" : ""} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}
     >
       {loading ? (

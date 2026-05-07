@@ -145,7 +145,8 @@ export function ClientTabs({
     <div>
       {/* Tabs — border-b full-width, botones alineados con max-w-6xl del header */}
       <div className="border-b border-slate-200 mb-5">
-      <div role="tablist" aria-label="Secciones del cliente" className="max-w-6xl mx-auto flex items-center gap-2 overflow-x-auto">
+      <div className="max-w-6xl mx-auto relative">
+      <div role="tablist" aria-label="Secciones del cliente" className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <TabButton
           active={tab === "resumen"}
           tabId="resumen"
@@ -177,10 +178,10 @@ export function ClientTabs({
             </svg>
           }
           label="Cuestionario"
-          badge={questionnaireProgress === null ? null : `${questionnaireProgress.filled}/${questionnaireProgress.total}`}
+          badge={questionnaireResp?.data ? `${completedMacro}/${totalMacro}` : null}
           badgeTitle={
-            questionnaireProgress !== null
-              ? `${questionnaireProgress.filled} de ${questionnaireProgress.total} campos del cuestionario respondidos`
+            questionnaireResp?.data
+              ? `${completedMacro} de ${totalMacro} secciones con todas sus preguntas respondidas`
               : undefined
           }
         />
@@ -231,7 +232,7 @@ export function ClientTabs({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           }
-          label="Consultores"
+          label="Equipo"
           badge={null}
         />
         <TabButton
@@ -247,6 +248,9 @@ export function ClientTabs({
           badge={null}
         />
       </div>
+      {/* Fade gradient — indica scroll horizontal disponible */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent" />
+      </div>{/* /relative wrapper */}
       </div>{/* /border-b wrapper */}
 
       {/* Panels: cronograma sin max-w (gantt full-width), resto con max-w-6xl */}

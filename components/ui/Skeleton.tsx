@@ -36,7 +36,7 @@ export function SkeletonCard() {
   return (
     <div className="bg-white rounded shadow-sm p-5 border border-slate-100 animate-pulse">
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 bg-slate-200 rounded-lg shrink-0" />
+        <div className="w-10 h-10 bg-slate-200 rounded shrink-0" />
         <div className="flex-1 space-y-2">
           <div className="h-4 bg-slate-200 rounded w-1/2" />
           <div className="h-3 bg-slate-100 rounded w-3/4" />
@@ -80,7 +80,7 @@ export function SkeletonDashboard() {
     <div className="space-y-6 animate-pulse">
       <div className="flex gap-4 flex-wrap">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-10 bg-slate-100 rounded-lg w-40" />
+          <div key={i} className="h-10 bg-slate-100 rounded w-40" />
         ))}
       </div>
       <div className="bg-white rounded shadow-sm p-4 border border-slate-100 space-y-3">

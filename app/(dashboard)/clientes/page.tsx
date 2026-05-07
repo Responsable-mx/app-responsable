@@ -16,7 +16,7 @@ export default function ClientesPage() {
         </div>
         <Link
           href="/clientes/nuevo"
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-primary-hover text-white text-sm font-medium rounded hover:bg-brand-primary-dark transition-colors shadow-sm"
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-primary text-white text-sm font-medium rounded hover:bg-brand-primary-hover transition-colors shadow-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

@@ -87,7 +87,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => dismiss(t.id)}
               aria-label="Cerrar notificación"
-              className="shrink-0 min-h-8 min-w-8 inline-flex items-center justify-center rounded-md hover:bg-black/10"
+              className="shrink-0 min-h-10 min-w-10 inline-flex items-center justify-center rounded hover:bg-black/10"
             >
               ✕
             </button>

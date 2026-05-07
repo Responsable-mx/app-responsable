@@ -177,7 +177,7 @@ export function ClientResumen({
             key={card.key}
             type="button"
             onClick={() => onJumpToCuestionario(card.stepKeys[0])}
-            className={`group bg-white border border-slate-200 ${card.accentBorder} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:border-brand-primary/40 transition-all${isOrphan ? " lg:col-span-2" : ""}`}
+            className={`group bg-white border border-slate-200 ${card.accentBorder} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:border-brand-primary/40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/60 focus-visible:ring-offset-2${isOrphan ? " lg:col-span-2" : ""}`}
           >
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
               <div className={`w-10 h-10 rounded ${card.iconBg} flex items-center justify-center shrink-0`}>

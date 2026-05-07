@@ -110,7 +110,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="text-slate-600 hover:text-brand-primary-dark min-h-8 min-w-8 inline-flex items-center justify-center rounded-md"
+            className="text-slate-600 hover:text-brand-primary-dark min-h-10 min-w-10 inline-flex items-center justify-center rounded"
           >
             ✕
           </button>

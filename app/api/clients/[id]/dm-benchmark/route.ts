@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Body inválido" }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = createAnthropicClient();
   const admin = createAdminClient();
 
   // ── PROPOSE: IA investiga y propone empresas ─────────────────────────────

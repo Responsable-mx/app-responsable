@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient } from "@/lib/ai/client";
 import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
   const config = getModelConfig(role);
   const systemBlocks = await buildSystemBlocks(role, client, questionnaire);
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = createAnthropicClient();
   const encoder = new TextEncoder();
   const startedAt = Date.now();
 

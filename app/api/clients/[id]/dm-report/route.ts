@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
@@ -162,7 +163,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     narrative: string;
   });
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = createAnthropicClient();
   const model = getModelConfig("elena").model;
 
   let textOut = "";

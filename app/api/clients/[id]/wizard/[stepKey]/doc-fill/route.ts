@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
@@ -136,7 +137,7 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
 
   // Usar Aurora (mismo modelo que ai-fill) para consistencia de calidad y costo.
   const modelCfg = getModelConfig("aurora");
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = createAnthropicClient();
 
   let textOut = "";
   let inputTokens = 0;

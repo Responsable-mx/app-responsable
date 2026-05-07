@@ -4,178 +4,27 @@
 // 8 mejoras: KPIs header · RAG badge · sort por riesgo · heatmap solapamiento ·
 // milestones por etapa · cascade alert · stage-gate progress · tooltip rico.
 // v2.1: zoom (0.5×–4×) + scroll horizontal + scroll-to-today automático.
+// Constantes, tipos y helpers puros → lib/timeline/utils.ts
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
-import type { ActivityStatus } from "@/lib/stages";
 import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { SkeletonTable } from "@/components/ui/Skeleton";
+import {
+  MS_DAY, LABEL_W, CHART_BASE, ZOOM_STEPS, ZOOM_DEFAULT, PROJECT_PALETTE,
+  STATUS_INLINE, hexAlpha, estimateProgress,
+  parseDate, startOfMonth, addMonths, fmtMonth, fmt,
+  assignLanes, computeOverlapBands, computeMilestones,
+  type ColorMode, type FlatActivity, type Milestone, type OverlapBand,
+} from "@/lib/timeline/utils";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json() as Promise<{ data: ProjectOverview[] }>;
   });
-
-
-const MS_DAY = 86_400_000;
-const LABEL_W = 220;
-const CHART_BASE = 1200; // px de ancho del chart a zoom 1×
-const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
-const ZOOM_DEFAULT = 2; // índice → 1×
-
-const PROJECT_PALETTE = [
-  '#0d9488','#4f46e5','#d97706','#ea580c',
-  '#db2777','#7c3aed','#0284c7','#059669',
-  '#dc2626','#9333ea','#c2410c','#0891b2',
-] as const;
-
-type ColorMode = 'estado' | 'proyecto';
-
-const STATUS_INLINE: Record<ActivityStatus, { bg: string; fill: string; text: string }> = {
-  pending:     { bg: '#f1f5f9', fill: '#94a3b8', text: '#475569' },
-  in_progress: { bg: '#ccfbf1', fill: '#0d9488', text: '#0f766e' },
-  completed:   { bg: '#d1fae5', fill: '#059669', text: '#065f46' },
-  delayed:     { bg: '#fee2e2', fill: '#ef4444', text: '#991b1b' },
-};
-
-function hexAlpha(hex: string, a: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-function estimateProgress(a: FlatActivity, now: number): number {
-  if (a.status === 'completed') return 100;
-  if (a.status === 'pending') return 0;
-  const s = a.planned_start ? new Date(a.planned_start + 'T00:00:00').getTime() : null;
-  const e = a.planned_end   ? new Date(a.planned_end   + 'T00:00:00').getTime() : null;
-  if (!s || !e || e <= s) return 20;
-  return Math.min(100, Math.max(5, Math.round((now - s) / (e - s) * 100)));
-}
-
-type FlatActivity = {
-  id: string;
-  name: string;
-  client_id: string;
-  client_name: string;
-  stage_name: string;
-  service: string;
-  assignee_email: string | null;
-  planned_start: string | null;
-  planned_end: string | null;
-  actual_start: string | null;
-  actual_end: string | null;
-  status: ActivityStatus;
-  depends_on_activity_id: string | null;
-};
-
-type Milestone = { date: string; label: string; client: string; progress: string };
-type OverlapBand = { leftPx: number; widthPx: number };
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function parseDate(s: string | null): Date | null {
-  if (!s) return null;
-  return new Date(s + "T00:00:00");
-}
-function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-function addMonths(d: Date, n: number): Date {
-  return new Date(d.getFullYear(), d.getMonth() + n, 1);
-}
-function fmtMonth(d: Date): string {
-  return d.toLocaleDateString("es-MX", { month: "short", year: "2-digit" });
-}
-function fmt(d: string | null) {
-  if (!d) return "—";
-  return new Date(d + "T00:00:00").toLocaleDateString("es-MX", {
-    day: "2-digit",
-    month: "short",
-  });
-}
-
-// Asigna carriles evitando superposición visual por fechas reales
-function assignLanes(acts: FlatActivity[]): number[] {
-  type Interval = { s: number; e: number; lane: number };
-  const occupied: Interval[] = [];
-  return acts.map((a) => {
-    const s =
-      parseDate(a.planned_start)?.getTime() ??
-      parseDate(a.actual_start)?.getTime() ??
-      null;
-    const e =
-      parseDate(a.planned_end)?.getTime() ??
-      parseDate(a.actual_end)?.getTime() ??
-      null;
-    if (!s || !e) return 0;
-    let lane = 0;
-    while (occupied.some((o) => o.lane === lane && o.s < e && o.e > s)) lane++;
-    occupied.push({ s, e, lane });
-    return lane;
-  });
-}
-
-// Detecta zonas donde ≥2 actividades se solapan → heatmap de carga (px)
-function computeOverlapBands(
-  acts: FlatActivity[],
-  rangeMin: number,
-  totalMs: number,
-  chartW: number
-): OverlapBand[] {
-  const intervals = acts
-    .map((a) => ({
-      s: parseDate(a.planned_start)?.getTime() ?? null,
-      e: parseDate(a.planned_end)?.getTime() ?? null,
-    }))
-    .filter((x): x is { s: number; e: number } => x.s !== null && x.e !== null);
-
-  const bands: OverlapBand[] = [];
-  for (let i = 0; i < intervals.length; i++) {
-    for (let j = i + 1; j < intervals.length; j++) {
-      const oS = Math.max(intervals[i].s, intervals[j].s);
-      const oE = Math.min(intervals[i].e, intervals[j].e);
-      if (oS < oE) {
-        bands.push({
-          leftPx: ((oS - rangeMin) / totalMs) * chartW,
-          widthPx: Math.max(((oE - oS) / totalMs) * chartW, 2),
-        });
-      }
-    }
-  }
-  return bands;
-}
-
-// Último milestone (◆) por (client + stage)
-function computeMilestones(acts: FlatActivity[]): Milestone[] {
-  const byStage = new Map<string, FlatActivity[]>();
-  for (const a of acts) {
-    const key = `${a.client_id}::${a.stage_name}`;
-    const list = byStage.get(key) ?? [];
-    list.push(a);
-    byStage.set(key, list);
-  }
-  const result: Milestone[] = [];
-  for (const [, group] of byStage) {
-    const withEnd = group
-      .filter((a) => a.planned_end)
-      .sort((a, b) => (b.planned_end! > a.planned_end! ? 1 : -1));
-    if (withEnd[0]?.planned_end) {
-      const completed = group.filter((a) => a.status === "completed").length;
-      result.push({
-        date: withEnd[0].planned_end,
-        label: withEnd[0].stage_name,
-        client: withEnd[0].client_name,
-        progress: `${completed}/${group.length}`,
-      });
-    }
-  }
-  return result;
-}
 
 // ── Componente ────────────────────────────────────────────────────────────────
 

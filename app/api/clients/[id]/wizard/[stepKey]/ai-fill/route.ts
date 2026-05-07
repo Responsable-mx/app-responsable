@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
@@ -208,7 +209,7 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
 
   // Modelo desde config centralizada (Aurora = autor, mismo rol que llena cuestionarios).
   const modelCfg = getModelConfig("aurora");
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = createAnthropicClient();
 
   let textOut = "";
   const citationsCollected: { url: string; title: string }[] = [];

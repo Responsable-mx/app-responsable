@@ -52,6 +52,9 @@ export type Client = {
   has_sustainability_report: boolean | null;
   has_sustainability_strategy: boolean | null;
 
+  // Sitio web corporativo (fuente primaria para IA)
+  website_url?: string | null;
+
   // URLs de documentos clave (opcionales)
   sustainability_strategy_url: string | null;
   sustainability_report_url: string | null;
@@ -112,7 +115,7 @@ const JSON_BLOCKS = [
 ] as const;
 
 const ALL_COLUMNS = [
-  "id,name,sector,subsector,countries,size,logo_url,services",
+  "id,name,sector,subsector,countries,size,logo_url,website_url,services",
   "business_segments,frameworks,applicable_regulations,policies_in_place",
   "certifications,material_topics,maturity_level",
   "has_double_materiality,has_sustainability_report,has_sustainability_strategy",
@@ -423,6 +426,7 @@ function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
     "has_double_materiality",
     "has_sustainability_report",
     "has_sustainability_strategy",
+    "website_url",
     "sustainability_strategy_url",
     "sustainability_report_url",
     "financial_report_url",

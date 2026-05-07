@@ -113,6 +113,9 @@ export const ClientInputSchema = z.object({
   has_sustainability_report: z.boolean().optional().nullable(),
   has_sustainability_strategy: z.boolean().optional().nullable(),
 
+  // Sitio web corporativo — acepta dominios simples (responsable.net, sin https://)
+  website_url: z.string().trim().max(500).optional().nullable(),
+
   // Logo del cliente (URL pública https://)
   logo_url: z.string().trim().url("URL inválida").max(500).optional().nullable(),
 

@@ -13,11 +13,17 @@ const catalogFetcher = (url: string) =>
     .then((r) => r.json())
     .then((j) => (j.data ?? []) as { value: string; label: string }[]);
 
+function normalizeUrl(url: string): string {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
+}
+
 type FormState = {
   nombre: string;
   servicio: string;
   alcance: string;
-  pagina_web: string;
+  website_url: string;
   propuesta_url: string;
   relacion: string;
 };
@@ -30,7 +36,7 @@ export function NuevoClienteWizard() {
     nombre: "",
     servicio: "",
     alcance: "",
-    pagina_web: "",
+    website_url: "",
     propuesta_url: "",
     relacion: "",
   });
@@ -68,12 +74,12 @@ export function NuevoClienteWizard() {
           name: form.nombre,
           services: [form.servicio],
           countries: [],
+          website_url: normalizeUrl(form.website_url),
           // paso 1 del wizard llenado por el consultor
           wizardStep1: {
             nombre_empresa: form.nombre,
             servicio_contratado: form.servicio,
             alcance_geografico: form.alcance,
-            pagina_web: form.pagina_web || null,
             propuesta_comercial_url: form.propuesta_url || null,
             relacion_empresas: form.relacion || null,
           },
@@ -147,11 +153,10 @@ export function NuevoClienteWizard() {
         />
 
         <Input
-          label="Página web corporativa"
-          type="url"
-          value={form.pagina_web}
-          onChange={(e) => set("pagina_web", e.target.value)}
-          placeholder="https://empresa.com.mx"
+          label="Sitio web corporativo"
+          value={form.website_url}
+          onChange={(e) => set("website_url", e.target.value)}
+          placeholder="responsable.net"
           helper="Dominio que usará la IA como fuente primaria para los pasos 2-9"
         />
 

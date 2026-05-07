@@ -159,6 +159,7 @@ No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
   const contextLines: string[] = [];
   if (client) {
     contextLines.push(`Nombre: ${client.name}`);
+    if (client.website_url) contextLines.push(`Sitio web corporativo: ${client.website_url}`);
     if (client.sector) contextLines.push(`Sector: ${client.sector}`);
     if (client.subsector) contextLines.push(`Subsector: ${client.subsector}`);
     if (client.countries?.length) contextLines.push(`Países: ${client.countries.join(", ")}`);

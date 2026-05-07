@@ -25,6 +25,7 @@ type BlockValue = Record<string, unknown>;
 type FormState = {
   // Identificación
   name: string;
+  website_url: string;
   sector: string;
   subsector: string;
   countries: string[];
@@ -84,6 +85,7 @@ export function ClientForm(props: Props) {
 
   const [form, setForm] = useState<FormState>({
     name: props.initial?.name ?? "",
+    website_url: props.initial?.website_url ?? "",
     sector: props.initial?.sector ?? "",
     subsector: props.initial?.subsector ?? "",
     countries: props.initial?.countries ?? [],
@@ -124,6 +126,7 @@ export function ClientForm(props: Props) {
     try {
       const payload = {
         name: form.name.trim(),
+        website_url: normalizeUrl(form.website_url.trim()) || null,
         sector: form.sector || null,
         subsector: form.subsector.trim() || null,
         countries: form.countries,
@@ -262,6 +265,20 @@ export function ClientForm(props: Props) {
           hasGroups
           placeholder="México, Colombia, España…"
         />
+
+        {/* Sitio web corporativo */}
+        <Field label="Sitio web corporativo">
+          <input
+            type="text"
+            value={form.website_url}
+            onChange={(e) => update("website_url", e.target.value)}
+            className={inputCls}
+            placeholder="responsable.net"
+          />
+          <p className="text-[10px] text-slate-400 mt-1">
+            La IA usará este sitio como fuente primaria para llenar el cuestionario automáticamente.
+          </p>
+        </Field>
 
         {/* Logo URL */}
         <div>
@@ -547,6 +564,12 @@ export function ClientForm(props: Props) {
       )}
     </form>
   );
+}
+
+function normalizeUrl(url: string): string {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
 }
 
 const inputCls =

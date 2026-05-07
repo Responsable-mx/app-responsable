@@ -8,10 +8,12 @@ export type PromptKey =
   | "role.aurora"
   | "role.rebeca"
   | "role.elena"
-  | "role.valeria";
+  | "role.valeria"
+  | "dm.benchmark_propose";
 
 // Orden alfabético por label mostrado (es-MX).
 export const PROMPT_KEYS: PromptKey[] = [
+  "dm.benchmark_propose",
   "role.aurora",
   "role.elena",
   "system.app_navigation",
@@ -21,6 +23,7 @@ export const PROMPT_KEYS: PromptKey[] = [
 ];
 
 export const PROMPT_LABELS: Record<PromptKey, string> = {
+  "dm.benchmark_propose": "DM IA · Propuesta de empresas benchmark",
   "role.aurora": "Aurora · Autor",
   "role.elena": "Elena · Elevador",
   "system.app_navigation": "Navegación de la app (común)",
@@ -30,6 +33,8 @@ export const PROMPT_LABELS: Record<PromptKey, string> = {
 };
 
 export const PROMPT_DESCRIPTIONS: Record<PromptKey, string> = {
+  "dm.benchmark_propose":
+    "Prompt que la IA usa para proponer empresas de benchmark en el módulo Doble Materialidad IA. Usa {{client_name}}, {{sector}}, {{countries}} como variables dinámicas.",
   "system.app_navigation":
     "Bloque <app_navigation> que describe las vistas de la app a los 4 roles.",
   "system.base_rules":
@@ -252,7 +257,37 @@ NO: "Sería bueno agregar el eje financiero a la matriz, así queda más
 completa para el cliente."
 </examples>`;
 
+const DEFAULT_DM_BENCHMARK_PROPOSE = `Eres un experto en sostenibilidad empresarial y análisis competitivo ESG.
+
+El cliente es: {{client_name}} (sector: {{sector}}, país: {{countries}}).
+
+Identifica empresas relevantes para un benchmark de Doble Materialidad aplicando estos criterios de selección:
+
+1. competitor_nacional — Competidores directos del cliente en el mismo país que cuenten con informe de sustentabilidad publicado.
+2. competitor_internacional — Empresas internacionales del mismo sector que cuenten con informe de sustentabilidad publicado y sean referentes en desempeño ESG.
+3. sector — Empresas listadas en el S&P Global Sustainability Yearbook del año en curso (o del año anterior si aún no se ha publicado el actual) que operen en el mismo sector.
+4. cadena_valor — Para empresas B2B: clientes o proveedores estratégicos del sector que cuenten con informe de sustentabilidad. Para conglomerados o grupos empresariales: otros grupos que compartan al menos 3 sectores de operación con el cliente.
+
+Reglas:
+- Priorizar siempre empresas con informe de sustentabilidad publicado (GRI, TCFD, CSRD, SASB o equivalente).
+- Propón entre 6 y 10 empresas en total, con al menos 1 por categoría.
+- Para cada empresa indica: nombre, país, sector específico, tipo de relación y justificación breve (1-2 oraciones) de por qué es relevante.
+
+Responde ÚNICAMENTE con JSON válido, sin texto adicional:
+{
+  "companies": [
+    {
+      "name": "Nombre de la empresa",
+      "country": "México",
+      "sector": "Sector específico",
+      "relation": "competitor_nacional",
+      "justification": "Por qué es relevante para el benchmark"
+    }
+  ]
+}`;
+
 export const DEFAULT_PROMPTS: Record<PromptKey, string> = {
+  "dm.benchmark_propose": DEFAULT_DM_BENCHMARK_PROPOSE,
   "system.app_navigation": DEFAULT_APP_NAVIGATION,
   "system.base_rules": DEFAULT_BASE_RULES,
   "role.aurora": DEFAULT_AURORA,

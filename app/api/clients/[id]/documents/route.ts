@@ -4,6 +4,7 @@ import { getClient } from "@/lib/clients";
 import { listDocumentsByClient, uploadAndParseDocument } from "@/lib/documents/queries";
 import { DOCUMENT_KIND_SCHEMA } from "@/lib/documents/types";
 import { logChange } from "@/lib/audit-log";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -49,6 +50,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     parse_status: d.parse_status,
     parse_error: d.parse_error,
     has_content: !!d.markdown_content,
+    service_tag: (d as Record<string, unknown>).service_tag as string | null ?? null,
     created_at: d.created_at,
     updated_at: d.updated_at,
   }));
@@ -86,6 +88,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const kindParsed = DOCUMENT_KIND_SCHEMA.safeParse(formData.get("kind"));
   const kind = kindParsed.success ? kindParsed.data : "general";
 
+  const rawServiceTag = formData.get("service_tag");
+  const serviceTag = typeof rawServiceTag === "string" && rawServiceTag.trim() ? rawServiceTag.trim() : null;
+
   const buffer = Buffer.from(await file.arrayBuffer());
 
   let doc;
@@ -103,13 +108,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
+  // Actualiza service_tag si se envió (columna opcional, additive migration 0059)
+  if (serviceTag) {
+    const admin = createAdminClient();
+    await admin.from("client_documents").update({ service_tag: serviceTag }).eq("id", doc.id);
+  }
+
   void logChange({
     actorEmail: user,
     entityType: "client_document",
     entityId: doc.id,
     action: "create",
     before: null,
-    after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes },
+    after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_tag: serviceTag },
   });
 
   return NextResponse.json({
@@ -122,6 +133,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       parse_status: doc.parse_status,
       parse_error: doc.parse_error,
       has_content: !!doc.markdown_content,
+      service_tag: serviceTag,
       created_at: doc.created_at,
     },
   });

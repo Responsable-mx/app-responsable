@@ -215,20 +215,20 @@ export function ClientTabs({
               : undefined
           }
         />
-        <TabButton
-          active={tab === "materialidad"}
-          tabId="materialidad"
-          onClick={() => goToTab("materialidad")}
-          icon={
-            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-            </svg>
-          }
-          label="Materialidad"
-          badge={materialityCount === null ? null : `${materialityCount}`}
-          badgeTitle={materialityCount !== null ? `${materialityCount} temas de materialidad` : undefined}
-        />
+        {hasDmService && (
+          <TabButton
+            active={tab === "doble-materialidad-ia"}
+            tabId="doble-materialidad-ia"
+            onClick={() => goToTab("doble-materialidad-ia")}
+            icon={
+              <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+            }
+            label="D. Materialidad IA"
+            badge={null}
+          />
+        )}
         <TabButton
           active={tab === "chat"}
           tabId="chat"
@@ -277,20 +277,20 @@ export function ClientTabs({
           label="Documentos"
           badge={null}
         />
-        {hasDmService && (
-          <TabButton
-            active={tab === "doble-materialidad-ia"}
-            tabId="doble-materialidad-ia"
-            onClick={() => goToTab("doble-materialidad-ia")}
-            icon={
-              <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
-            }
-            label="D. Materialidad IA"
-            badge={null}
-          />
-        )}
+        <TabButton
+          active={tab === "materialidad"}
+          tabId="materialidad"
+          onClick={() => goToTab("materialidad")}
+          icon={
+            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+            </svg>
+          }
+          label="Materialidad"
+          badge={materialityCount === null ? null : `${materialityCount}`}
+          badgeTitle={materialityCount !== null ? `${materialityCount} temas de materialidad` : undefined}
+        />
       </div>
       {/* Fade gradient — indica scroll horizontal disponible */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent" />

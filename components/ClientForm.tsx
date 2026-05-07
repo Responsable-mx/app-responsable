@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { mutate as globalMutate } from "swr";
 import { useToast } from "@/components/ui/Toast";
 import type { Client } from "@/lib/clients";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -187,6 +188,8 @@ export function ClientForm(props: Props) {
       method: "DELETE",
     });
     if (res.ok) {
+      // Invalida cache SWR de la lista para que desaparezca sin reload manual
+      await globalMutate((key: unknown) => typeof key === "string" && key.startsWith("/api/clients"), undefined, { revalidate: true });
       router.push("/clientes");
       router.refresh();
     } else {

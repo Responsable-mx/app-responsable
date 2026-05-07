@@ -21,9 +21,21 @@ type DocMeta = {
   parse_status: "pending" | "ok" | "failed";
   parse_error: string | null;
   has_content: boolean;
+  service_tag: string | null;
   created_at: string;
   updated_at: string;
 };
+
+// Etiquetas de servicio — se muestran como badge secundario cuando está asignado
+const SERVICE_TAG_OPTIONS: { value: string; label: string }[] = [
+  { value: "doble_materialidad_ia", label: "Doble Materialidad IA" },
+  { value: "reporte_gri",           label: "Reporte GRI" },
+  { value: "diagnostico_rse",       label: "Diagnóstico RSE" },
+  { value: "estrategia_rse",        label: "Estrategia RSE" },
+];
+const SERVICE_TAG_LABEL: Record<string, string> = Object.fromEntries(
+  SERVICE_TAG_OPTIONS.map((o) => [o.value, o.label])
+);
 
 const KIND_LABEL: Record<DocMeta["kind"], string> = {
   general: "General",
@@ -67,6 +79,7 @@ export function DocumentsTab({
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<DocMeta | null>(null);
   const [previewing, setPreviewing] = useState<DocMeta | null>(null);
+  const [uploadServiceTag, setUploadServiceTag] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -88,6 +101,7 @@ export function DocumentsTab({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("kind", "general");
+      if (uploadServiceTag) fd.append("service_tag", uploadServiceTag);
       try {
         const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
         if (!res.ok) {
@@ -172,7 +186,19 @@ export function DocumentsTab({
             PDF, DOCX, XLSX, PPTX, TXT · Máx. 25 MB por archivo
           </p>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          {/* Selector de servicio (opcional) — aplica al próximo archivo subido */}
+          <select
+            value={uploadServiceTag}
+            onChange={(e) => setUploadServiceTag(e.target.value)}
+            className="text-xs border border-slate-200 rounded px-2 py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+            title="Servicio al que aplica el documento (opcional)"
+          >
+            <option value="">Sin servicio</option>
+            {SERVICE_TAG_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
           <Button
             variant="primary"
             size="sm"
@@ -234,6 +260,7 @@ export function DocumentsTab({
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tipo</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Nombre</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Categoría</th>
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Servicio</th>
                 <th className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tamaño</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Fecha</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Estado</th>
@@ -266,6 +293,15 @@ export function DocumentsTab({
                       <span className={`text-[10px] font-bold uppercase rounded-sm px-1.5 py-0.5 ${KIND_COLOR[d.kind]}`}>
                         {KIND_LABEL[d.kind]}
                       </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {d.service_tag ? (
+                        <span className="text-[10px] font-semibold rounded-sm px-1.5 py-0.5 bg-brand-primary-light/40 text-brand-primary-dark whitespace-nowrap">
+                          {SERVICE_TAG_LABEL[d.service_tag] ?? d.service_tag}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-300">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-slate-600 text-right tabular-nums">
                       {formatSize(d.size_bytes)}

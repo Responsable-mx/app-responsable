@@ -8,6 +8,7 @@ import type { Client } from "@/lib/clients";
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
+import { getPrompt } from "@/lib/ai/prompts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BENCHMARK_FIELDS, RELATION_LABELS } from "@/lib/dm/fields";
 
@@ -53,31 +54,12 @@ type Ctx = { params: Promise<{ id: string }> };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildProposePrompt(client: Client): string {
-  return `Eres un experto en sostenibilidad empresarial y análisis competitivo ESG.
-
-El cliente es: ${client.name} (sector: ${client.sector ?? "no especificado"}, país: ${(client.countries as string[] | null)?.join(", ") ?? "México"}).
-
-Identifica empresas relevantes para un benchmark de Doble Materialidad. Necesito empresas en estas 4 categorías:
-1. competitor_nacional — competidores directos en el mismo país
-2. competitor_internacional — competidores internacionales de referencia
-3. sector — empresas del mismo sector que ya son líderes en sostenibilidad
-4. cadena_valor — proveedores clave o clientes estratégicos conocidos del sector
-
-Propón entre 6 y 10 empresas en total. Para cada una indica: nombre, país, sector específico, tipo de relación y una justificación breve (1-2 oraciones) de por qué es relevante para el benchmark.
-
-Responde ÚNICAMENTE con JSON válido, sin texto adicional:
-{
-  "companies": [
-    {
-      "name": "Nombre de la empresa",
-      "country": "México",
-      "sector": "Sector específico",
-      "relation": "competitor_nacional",
-      "justification": "Por qué es relevante para el benchmark"
-    }
-  ]
-}`;
+async function buildProposePrompt(client: Client): Promise<string> {
+  const template = await getPrompt("dm.benchmark_propose");
+  return template
+    .replace(/\{\{client_name\}\}/g, client.name)
+    .replace(/\{\{sector\}\}/g, client.sector ?? "no especificado")
+    .replace(/\{\{countries\}\}/g, (client.countries as string[] | null)?.join(", ") ?? "México");
 }
 
 function buildComparePrompt(
@@ -301,7 +283,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // ── PROPOSE: IA investiga y propone empresas (síncrono — Sonnet, 45s) ─────
   if (parsed.data.action === "propose") {
     const model = getModelConfig("aurora").model;
-    const prompt = buildProposePrompt(client);
+    const prompt = await buildProposePrompt(client);
     let textOut = "";
     let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
     const startedAt = Date.now();

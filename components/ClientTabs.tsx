@@ -86,11 +86,43 @@ export function ClientTabs({
 }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // SWR declarados ANTES de hasDmService para que el tab DM-IA sea reactivo:
+  // cuando QuestionnaireTab llama mutate() tras guardar, el SWR global se actualiza,
+  // hasDmService recomputa y el tab aparece sin reload.
+  // fallbackData garantiza que el primer render use datos server-side (sin waterfall).
+  const { data: questionnaireResp, error: questionnaireError } = useSWR(
+    `/api/clients/${client.id}/questionnaire`,
+    questionnaireFetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnMount: !initialQuestionnaire,
+      fallbackData: initialQuestionnaire ? { data: initialQuestionnaire } : undefined,
+      onError: (e: unknown) => console.warn("[ClientTabs] questionnaire revalidation failed:", e),
+    }
+  );
+  const { data: materialityResp, error: materialityError } = useSWR(
+    `/api/clients/${client.id}/materiality`,
+    materialityFetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnMount: !initialMateriality,
+      fallbackData: initialMateriality ? { data: initialMateriality } : undefined,
+      onError: (e: unknown) => console.warn("[ClientTabs] materiality revalidation failed:", e),
+    }
+  );
+  // D-74: fallbackData garantiza la carga inicial. Si revalidación falla, los badges
+  // quedan con datos del servidor (aceptable). El console.warn permite detectar en logs.
+  void questionnaireError;
+  void materialityError;
+
   // Tab DM-IA visible si client.services lo incluye (campo legado) O si el cuestionario
   // tiene doble_materialidad_ia en servicio_contratado (fuente de verdad operativa).
+  // Usa questionnaireResp?.data (SWR reactivo) para que el tab aparezca sin reload
+  // cuando el consultor guarda el servicio desde el tab Cuestionario.
   const hasDmService =
     (client.services?.includes("doble_materialidad_ia") ?? false) ||
-    bundleHasDmIa(initialQuestionnaire);
+    bundleHasDmIa(questionnaireResp?.data ?? initialQuestionnaire);
   const VALID_TABS: Tab[] = ["resumen", "cuestionario", "chat", "materialidad", "cronograma", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(
@@ -125,32 +157,6 @@ export function ClientTabs({
 
   // Override de step desde Resumen (click en card macro → paso específico)
   const [jumpToStep, setJumpToStep] = useState<number | null>(null);
-  // Ambos fetches inmediatos: KPIs los necesitan para count.
-  // revalidateOnFocus: false evita spam si el usuario alterna tabs.
-  const { data: questionnaireResp, error: questionnaireError } = useSWR(
-    `/api/clients/${client.id}/questionnaire`,
-    questionnaireFetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnMount: !initialQuestionnaire,
-      fallbackData: initialQuestionnaire ? { data: initialQuestionnaire } : undefined,
-      onError: (e: unknown) => console.warn("[ClientTabs] questionnaire revalidation failed:", e),
-    }
-  );
-  const { data: materialityResp, error: materialityError } = useSWR(
-    `/api/clients/${client.id}/materiality`,
-    materialityFetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnMount: !initialMateriality,
-      fallbackData: initialMateriality ? { data: initialMateriality } : undefined,
-      onError: (e: unknown) => console.warn("[ClientTabs] materiality revalidation failed:", e),
-    }
-  );
-  // D-74: fallbackData garantiza la carga inicial. Si revalidación falla, los badges
-  // quedan con datos del servidor (aceptable). El console.warn permite detectar en logs.
-  void questionnaireError;
-  void materialityError;
 
   const questionnaireProgress = questionnaireResp?.data.progress
     ? {

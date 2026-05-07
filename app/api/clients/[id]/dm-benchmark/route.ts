@@ -192,6 +192,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           }
         }
 
+        if (batchError) {
+          console.error("[dm-benchmark batch]", batchError);
+        }
+
         const model = getModelConfig("aurora").model;
         const newStatus = batchError ? "failed" : "done";
 
@@ -425,7 +429,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: resultRow.id,
           params: {
             model,
-            max_tokens: 3000,
+            max_tokens: 6000, // 10 empresas × 5 campos × 2-3 oraciones ≈ 4500 tokens mínimo
             system: [{
               type: "text",
               text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",

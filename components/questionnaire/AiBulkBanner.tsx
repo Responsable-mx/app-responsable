@@ -47,7 +47,7 @@ export function AiBulkBanner({
         </div>
       </div>
       <Button
-        variant="primary"
+        variant="secondary"
         size="sm"
         loading={!!progress}
         onClick={onFillAll}

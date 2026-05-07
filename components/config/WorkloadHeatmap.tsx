@@ -166,10 +166,12 @@ export function WorkloadHeatmap() {
                   {fmtWeek(w)}
                 </th>
               ))}
-              <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-16">
+              <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-16"
+                  title="Pico de carga: máximo de actividades activas en una sola semana (barra proporcional)">
                 Pico
               </th>
-              <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-10">
+              <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-10"
+                  title="Tendencia: compara promedio de primeras 4 semanas vs siguientes 4. ↑ carga creciente · ↓ decreciente · → estable">
                 Tend.
               </th>
             </tr>
@@ -185,7 +187,7 @@ export function WorkloadHeatmap() {
                     className="sticky left-0 z-10 bg-white px-3 py-1.5 border-r border-slate-200 font-medium text-slate-700 truncate max-w-[144px]"
                     title={c}
                   >
-                    {c.split("@")[0]}
+                    {(() => { const n = c.split("@")[0]; return n.charAt(0).toUpperCase() + n.slice(1); })()}
                   </td>
                   {heatmap[c].map((n, wi) => (
                     <td

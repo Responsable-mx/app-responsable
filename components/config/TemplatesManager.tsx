@@ -88,7 +88,7 @@ export function TemplatesManager() {
       <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-4">
         <span className="text-sm font-semibold text-slate-900">
           {templates.length}{" "}
-          {templates.length === 1 ? "plantilla" : "plantillas"} guardadas
+          {templates.length === 1 ? "plantilla guardada" : "plantillas guardadas"}
         </span>
         <button
           onClick={() => setCreatingNew(true)}

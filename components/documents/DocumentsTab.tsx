@@ -179,28 +179,30 @@ export function DocumentsTab({
         </div>
       </div>
 
-      {/* Filtros por kind */}
-      <div className="flex gap-1.5 mb-3">
-        {([
-          { k: "all" as const, label: `Todos (${counts.all})` },
-          { k: "general" as const, label: `General (${counts.general})` },
-          { k: "sustainability_report" as const, label: `Sustentabilidad (${counts.sustainability_report})` },
-          { k: "financial_report" as const, label: `Financiero (${counts.financial_report})` },
-        ]).map((f) => (
-          <button
-            key={f.k}
-            type="button"
-            onClick={() => setFilter(f.k)}
-            className={`text-[11px] font-medium rounded-sm border px-2 py-1 transition-colors ${
-              filter === f.k
-                ? "bg-brand-primary border-brand-primary text-white"
-                : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {/* Filtros por kind — solo si hay documentos */}
+      {docs.length > 0 && (
+        <div className="flex gap-1.5 mb-3">
+          {([
+            { k: "all" as const, label: `Todos (${counts.all})` },
+            { k: "general" as const, label: `General (${counts.general})` },
+            { k: "sustainability_report" as const, label: `Sustentabilidad (${counts.sustainability_report})` },
+            { k: "financial_report" as const, label: `Financiero (${counts.financial_report})` },
+          ]).map((f) => (
+            <button
+              key={f.k}
+              type="button"
+              onClick={() => setFilter(f.k)}
+              className={`text-[11px] font-medium rounded-sm border px-2 py-1 transition-colors ${
+                filter === f.k
+                  ? "bg-brand-primary border-brand-primary text-white"
+                  : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="border border-dashed border-slate-300 rounded p-8 text-center">

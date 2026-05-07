@@ -187,7 +187,8 @@ export function Sidebar({
       {!isClient && projects.length > 0 && !pathname.startsWith('/clientes/') && (
         <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200`}>
           {!collapsed && (
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1.5"
+             title="Clientes donde estás asignado — tu nivel en cada proyecto aparece junto al nombre">
               Acceso rápido
             </p>
           )}

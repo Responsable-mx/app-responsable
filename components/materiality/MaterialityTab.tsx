@@ -268,7 +268,7 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
             <button
               onClick={() => setConfirmUnvalidate(true)}
               disabled={busyBulk}
-              className="text-[10px] font-semibold text-slate-600 hover:text-slate-900 hover:underline shrink-0 disabled:opacity-40 disabled:no-underline"
+              className="text-[10px] font-semibold text-rose-700 hover:text-rose-900 hover:underline shrink-0 disabled:opacity-40 disabled:no-underline"
               title="Quitar validación a todos los temas"
             >
               {busyBulk ? "…" : "Quitar validación"}

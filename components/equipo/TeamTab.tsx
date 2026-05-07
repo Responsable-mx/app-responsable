@@ -141,7 +141,7 @@ export function TeamTab({
               <tr className="text-left text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                 <th className="pb-2 pr-6">Consultor</th>
                 <th className="pb-2 pr-6">Email</th>
-                <th className="pb-2 pr-6">Nivel en proyecto</th>
+                <th className="pb-2 pr-6" title="Nivel del consultor para este proyecto específico (sobreescribe el nivel global cuando está definido)">Nivel en proyecto</th>
                 {hasAnyOverride && hasAnyGlobalSeniority && (
                   <th className="pb-2 pr-6" title="Nivel del consultor en todos los proyectos (default cuando no hay override)">
                     Nivel global

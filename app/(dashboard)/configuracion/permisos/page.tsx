@@ -87,8 +87,10 @@ export default function PermisosPage() {
               <th className="px-4 py-3 text-center text-[10px] uppercase tracking-widest font-bold text-slate-600 bg-slate-50">
                 Consultor
               </th>
-              <th className="px-4 py-3 text-center text-[10px] uppercase tracking-widest font-bold text-teal-700 bg-teal-50/40">
+              <th className="px-4 py-3 text-center text-[10px] uppercase tracking-widest font-bold text-teal-700 bg-teal-50/40"
+                  title="Solo aplica sobre los datos de su propia empresa">
                 Cliente
+                <span className="block text-[9px] font-normal normal-case tracking-normal text-teal-600/70">solo propio</span>
               </th>
             </tr>
           </thead>

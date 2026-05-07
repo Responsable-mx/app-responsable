@@ -36,6 +36,25 @@
 
 ---
 
+## Observabilidad activa (2026-05-07)
+
+Sentry completamente integrado y en producción (`app.responsable.net`):
+
+| Componente | Cobertura |
+|------------|-----------|
+| `ErrorBoundary` | crashes React globales → `captureException` |
+| `TabErrorBoundary` | crashes por tab → `captureException` con tag `tab` |
+| Server-side (Node.js) | excepciones en API routes vía `instrumentation.ts` |
+| Performance | 10% de transacciones trackeadas (`tracesSampleRate: 0.1`) |
+| Release tracking | `VERCEL_GIT_COMMIT_SHA` → correlación error↔deploy |
+| Source maps | activos cuando `SENTRY_AUTH_TOKEN` presente |
+
+**Ignorados** (flujo normal): 401, 404, Unauthorized, Not Found.
+
+**Cuota free**: 5k errores/mes, 10k performance units/mes. Con 8 usuarios internos, margen amplio.
+
+---
+
 ## Resueltos en sesión 18 (confirmados)
 
 | ID | Descripción |

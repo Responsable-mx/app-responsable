@@ -89,6 +89,19 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 - `POST/PATCH/DELETE` → `requireAdmin` + `logChange()` con audit log
 - Patrón extrapolable a cualquier sub-recurso de cliente donde lectura es pública para consultores pero mutación es solo admin.
 
+## Observabilidad
+
+- **Sentry** (`@sentry/nextjs` ^9) — error tracking cliente + servidor
+- Proyecto: `app-responsable` en org `proactive-strategies` (sentry.io)
+- DSN: `NEXT_PUBLIC_SENTRY_DSN` en Vercel env vars
+- Config: `sentry.client.config.ts` + `sentry.server.config.ts` + `instrumentation.ts`
+- `next.config.ts`: `withSentryConfig(nextConfig)` + Sentry ingest en CSP `connect-src`
+- `ErrorBoundary.componentDidCatch` → `Sentry.captureException`
+- `TabErrorBoundary.componentDidCatch` → `Sentry.captureException` con tag `tab`
+- `tracesSampleRate: 0.1` (10% — cuota free 5k/mes)
+- `ignoreErrors: [/40[14]/, /Unauthorized/, /Not Found/]`
+- `sourcemaps: { disable: !SENTRY_AUTH_TOKEN }` — sourcemaps solo con token configurado
+
 ## Caché
 
 | Dato | Frecuencia cambio | Estrategia |

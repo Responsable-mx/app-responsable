@@ -14,6 +14,7 @@ import {
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
 import { extractJsonObject } from "@/lib/ai/extract-json";
+import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 
 // Timeout serverless: hasta 5 min (web_search tarda ~30-90s por paso)
 export const maxDuration = 300;
@@ -60,23 +61,9 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "stepKey inválido" }, { status: 400 });
   }
 
-  // D-14: rate limit DB (cross-instancias serverless).
-  {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createAdminClient();
-    const windowStart = new Date(Date.now() - WINDOW_MS).toISOString();
-    const { count } = await admin
-      .from("ai_calls")
-      .select("id", { count: "exact", head: true })
-      .eq("user_email", user)
-      .gte("created_at", windowStart);
-    if ((count ?? 0) >= MAX_CALLS_PER_WINDOW) {
-      return NextResponse.json(
-        { error: "Demasiadas solicitudes. Espera 1 minuto antes de reintentar." },
-        { status: 429 }
-      );
-    }
-  }
+  // D-14: rate limit DB cross-instancias.
+  const rl = await checkAiRateLimit(user, { max: MAX_CALLS_PER_WINDOW, windowMs: WINDOW_MS });
+  if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
 
   let bundle;
   try {

@@ -19,7 +19,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   try {
     const topics = await listMaterialityTopics(id);
-    return NextResponse.json({ data: topics });
+    return NextResponse.json(
+      { data: topics },
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" } }
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al leer matriz";
     return NextResponse.json({ error: msg }, { status: 500 });

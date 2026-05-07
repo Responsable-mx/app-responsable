@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import useSWR from "swr";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SelectField } from "@/components/ui/SelectField";
 import { isChatStreamEvent } from "@/lib/ai/stream-types";

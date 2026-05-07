@@ -16,15 +16,6 @@ import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 
 type View = "consultor" | "proyecto" | "timeline" | "gantt";
 
-const INTRO: Record<View, string> = {
-  consultor:
-    "Carga del equipo derivada de actividades activas. Clic en un consultor para ver el detalle.",
-  proyecto: "Tus proyectos con etapas, actividades y fechas. Clic en un proyecto para expandir.",
-  timeline:
-    "Timeline cross-project: 1 fila por consultor. Alterna entre Estado (RAG) y Proyecto para cambiar la lectura.",
-  gantt:
-    "Gantt por proyecto: cada cliente con su cronograma plan vs real. Clic en barra → ficha del cliente.",
-};
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {

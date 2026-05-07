@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import useSWR, { mutate } from "swr";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { SkeletonList } from "@/components/ui/Skeleton";

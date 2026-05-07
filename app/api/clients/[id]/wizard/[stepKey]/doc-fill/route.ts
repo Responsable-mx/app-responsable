@@ -12,6 +12,7 @@ import {
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
 import { extractJsonObject } from "@/lib/ai/extract-json";
+import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -19,9 +20,7 @@ export const dynamic = "force-dynamic";
 // Mismo patrón de validación de stepKey que ai-fill.
 const VALID_STEP_KEY = /^[a-z0-9-]{1,64}$/;
 
-// D-76: rate limit idéntico a ai-fill (misma tabla ai_calls, misma ventana).
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_CALLS = 15;
+// D-76: rate limit 15 calls/min (misma ventana que ai-fill)
 
 // Límite de texto para no inflar el prompt más allá de lo útil.
 // ~50k chars ≈ 12k tokens — suficiente para un documento de entrevista o un Excel.
@@ -81,23 +80,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
   const { text } = parsed.data;
 
-  // D-76: rate limit DB (cross-instancias serverless) — mismo patrón que ai-fill.
-  {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createAdminClient();
-    const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
-    const { count } = await admin
-      .from("ai_calls")
-      .select("id", { count: "exact", head: true })
-      .eq("user_email", user)
-      .gte("created_at", windowStart);
-    if ((count ?? 0) >= RATE_LIMIT_MAX_CALLS) {
-      return NextResponse.json(
-        { error: "Demasiadas solicitudes. Espera 1 minuto antes de reintentar." },
-        { status: 429 }
-      );
-    }
-  }
+  // D-76: rate limit DB cross-instancias.
+  const rl = await checkAiRateLimit(user, { max: 15, windowMs: 60_000 });
+  if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
 
   let bundle;
   try {

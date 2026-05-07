@@ -434,7 +434,7 @@ function UserEditor({
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium text-slate-700">Acceso a módulos</p>
             <p className="text-xs text-slate-500 -mt-1">
-              Deja en "Default" para usar los permisos estándar del rol.
+              Deja en &quot;Default&quot; para usar los permisos estándar del rol.
             </p>
             {[
               {

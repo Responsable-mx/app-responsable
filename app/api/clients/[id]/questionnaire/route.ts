@@ -34,7 +34,10 @@ export async function GET(req: NextRequest, { params }: Ctx) {
         { status: 404 }
       );
     }
-    return NextResponse.json({ data: bundle });
+    return NextResponse.json(
+      { data: bundle },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al leer cuestionario";
     return NextResponse.json({ error: msg }, { status: 500 });

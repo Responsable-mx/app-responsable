@@ -19,12 +19,6 @@ const fetcher = (url: string) =>
     return r.json() as Promise<{ data: ProjectOverview[] }>;
   });
 
-const STATUS_BAR: Record<ActivityStatus, string> = {
-  pending: "bg-slate-300 hover:bg-slate-400",
-  in_progress: "bg-brand-primary hover:bg-brand-primary-dark",
-  completed: "bg-teal-600 hover:bg-teal-700",
-  delayed: "bg-rose-500 hover:bg-rose-600",
-};
 
 const MS_DAY = 86_400_000;
 const LABEL_W = 220;

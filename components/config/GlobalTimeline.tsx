@@ -390,7 +390,7 @@ export function GlobalTimeline({
       const milestones = computeMilestones(acts);
       const lanes = assignLanes(acts);
       const maxLane = acts.length > 0 ? Math.max(0, ...lanes) : 0;
-      const rowH = Math.max(64, 14 + (maxLane + 1) * 20 + 14);
+      const rowH = Math.max(80, 14 + (maxLane + 1) * 20 + 14);
       return { key, acts, delayed, active, rag, overlapBands, milestones, lanes, rowH };
     });
   }, [byConsultor, range, chartW]);
@@ -606,12 +606,28 @@ export function GlobalTimeline({
           [
             { label: "Consultores", value: globalStats.consultores, tone: "neutral" as const, hint: "con actividades visibles" },
             { label: "En curso", value: globalStats.activas, tone: "primary" as const, hint: "activas o retrasadas" },
-            { label: "Retrasadas", value: globalStats.retrasadas, tone: "red" as const, hint: `${globalStats.clientesConRetraso} proyecto${globalStats.clientesConRetraso !== 1 ? "s" : ""} afectado${globalStats.clientesConRetraso !== 1 ? "s" : ""}` },
+            {
+              label: "Retrasadas",
+              value: globalStats.retrasadas,
+              tone: "red" as const,
+              hint: `${globalStats.clientesConRetraso} proyecto${globalStats.clientesConRetraso !== 1 ? "s" : ""} afectado${globalStats.clientesConRetraso !== 1 ? "s" : ""}`,
+              hintActive: "× clic para ver todas",
+              onClick: () => setDelayedOnly((v) => !v),
+              active: delayedOnly,
+            },
             { label: "Próximas 30d", value: globalStats.proximas, tone: "amber" as const, hint: "inician pronto" },
             { label: "Completado", value: `${globalStats.pctComplete}%`, tone: "green" as const, hint: `${globalStats.completadas} de ${allActivities.length} actividades` },
-          ] as const
-        ).map(({ label, value, tone, hint }) => (
-          <div key={label} className="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm">
+          ] as { label: string; value: string | number; tone: "neutral"|"primary"|"red"|"amber"|"green"; hint: string; hintActive?: string; onClick?: () => void; active?: boolean }[]
+        ).map(({ label, value, tone, hint, hintActive, onClick, active }) => (
+          <div
+            key={label}
+            onClick={onClick}
+            className={`bg-white border rounded px-4 py-3 shadow-sm transition-all ${
+              onClick ? "cursor-pointer hover:shadow-md hover:border-slate-300 select-none" : ""
+            } ${
+              active ? "border-rose-400 ring-2 ring-rose-100" : "border-slate-200"
+            }`}
+          >
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
             <p className={`text-2xl font-bold tabular-nums mt-0.5 ${
               tone === "red" ? "text-rose-600"
@@ -620,7 +636,7 @@ export function GlobalTimeline({
               : tone === "green" ? "text-emerald-600"
               : "text-slate-900"
             }`}>{value}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">{hint}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{active && hintActive ? hintActive : hint}</p>
           </div>
         ))}
       </div>

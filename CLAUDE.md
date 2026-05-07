@@ -270,6 +270,35 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
   `allowed_mime_types`
 - Nuevo endpoint que descarga URL externa → SIEMPRE pasar por `isPublicHttpUrl`
 
+## Módulo /equipo — arquitectura (may-2026)
+
+4 vistas en `EquipoView`: Por consultor · Por proyecto · Timeline · Gantt.
+- **ConsultorSwimlane eliminado** — valor absorbido por `GlobalTimeline` con toggle de color.
+- Timeline + Gantt usan ancho completo (viewport). Consultor + Proyecto: `max-w-6xl`.
+
+### GlobalTimeline — patrones canónicos
+
+- **Color toggle** `ColorMode = 'estado' | 'proyecto'`:
+  - `estado`: `STATUS_INLINE[a.status].{bg, fill, text}` — hex objects, no Tailwind classes
+  - `proyecto`: `PROJECT_PALETTE` 12-color array + `clientColorMap` useMemo asigna hex por `client_id`
+- **Progress fill**: `estimateProgress(a, now)` calcula 0-100% desde fechas planificadas vs now; `completed=100`, `pending=0`, in_progress proporcional. Se renderiza como `<div>` interno con `opacity: 0.55`.
+- **`hexAlpha(hex, alpha)`**: util para fondos semitransparentes (rgba) sin Tailwind dinámico.
+- **`STATUS_INLINE`**: objetos `{bg, fill, text}` hex en lugar de Tailwind classes. Necesario para estilos dinámicos inline.
+- **Razón de no usar Tailwind**: los valores de color en Timeline dependen de datos (status/client_id) — no se pueden expresar como clases estáticas de Tailwind.
+
+### ClientTabs — lazy loading (may-2026)
+
+6 tabs pesados usan `next/dynamic` con fallback `<Skeleton>`:
+- `QuestionnaireTab`, `MaterialityTab`, `ChatWindow`, `ClientCronogramaTab`, `TeamTab`, `DocumentsTab`
+- Solo `ClientResumen` es eager (tab por defecto).
+- Patrón canónico: `components/ClientTabs.tsx`.
+
+## Deploy — app-responsable (may-2026)
+
+**Push a `main` → auto-deploy automático** a `https://app.responsable.net`.  
+GitHub `Responsable-mx/app-responsable` conectado a Vercel (integración GitHub App, may-2026).  
+`vercel --prod` ya no es necesario para este proyecto.
+
 ## Cache breakpoints IA
 
 `buildSystemBlocks` de `lib/ai/roles.ts` emite **2** cache breakpoints `ephemeral`:

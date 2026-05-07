@@ -49,6 +49,18 @@ function fmtDate(d: string | null) {
   });
 }
 
+const PROJECT_PALETTE = [
+  '#0d9488','#4f46e5','#d97706','#ea580c',
+  '#db2777','#7c3aed','#0284c7','#059669',
+  '#dc2626','#9333ea','#c2410c','#0891b2',
+] as const;
+
+function clientColor(clientId: string): string {
+  let h = 0;
+  for (let i = 0; i < clientId.length; i++) h = (h * 31 + clientId.charCodeAt(i)) & 0xffff;
+  return PROJECT_PALETTE[h % PROJECT_PALETTE.length];
+}
+
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-slate-100 text-slate-600 border-slate-200",
   in_progress: "bg-brand-primary-light text-brand-primary-dark border-brand-primary/20",
@@ -346,20 +358,24 @@ export function TeamOccupancy({
                           <span className="text-[11px] text-slate-400 italic">Sin proyectos</span>
                         ) : (
                           <div className="flex flex-wrap gap-1.5">
-                            {m.projects.slice(0, 3).map((p) => (
+                            {m.projects.slice(0, 2).map((p) => (
                               <Link
                                 key={p.client_id}
                                 href={`/clientes/${p.client_id}`}
                                 onClick={(e) => e.stopPropagation()}
                                 title={p.client_name}
-                                className="inline-flex items-center max-w-[18ch] px-2 py-0.5 rounded-sm border border-slate-200 bg-white text-[11px] text-slate-700 hover:border-brand-primary hover:text-brand-primary-dark transition-colors truncate"
+                                className="inline-flex items-center gap-1 max-w-[26ch] px-2 py-0.5 rounded-sm border border-slate-200 bg-white text-[11px] text-slate-700 hover:border-brand-primary hover:text-brand-primary-dark transition-colors"
                               >
-                                {p.client_name}
+                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: clientColor(p.client_id) }} />
+                                <span className="truncate">{p.client_name}</span>
                               </Link>
                             ))}
-                            {m.projects.length > 3 && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-slate-100 text-[11px] text-slate-500 font-medium">
-                                +{m.projects.length - 3}
+                            {m.projects.length > 2 && (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-sm bg-slate-100 text-[11px] text-slate-500 font-medium cursor-help"
+                                title={m.projects.slice(2).map((p) => p.client_name).join(" · ")}
+                              >
+                                +{m.projects.length - 2}
                               </span>
                             )}
                           </div>

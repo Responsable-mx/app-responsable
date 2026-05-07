@@ -150,7 +150,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const t0 = Date.now();
-  console.log("[bm] POST start");
+  console.log("[bm] POST v2 start");
   const { id } = await params;
   const user = await requireConsultorForClient(id);
   console.log(`[bm] auth done ${Date.now()-t0}ms user=${user ? "ok" : "null"}`);

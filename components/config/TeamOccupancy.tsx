@@ -273,7 +273,8 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
                                 key={p.client_id}
                                 href={`/clientes/${p.client_id}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center px-2 py-0.5 rounded-sm border border-slate-200 bg-white text-[11px] text-slate-700 hover:border-brand-primary hover:text-brand-primary-dark transition-colors"
+                                title={p.client_name}
+                                className="inline-flex items-center max-w-[18ch] px-2 py-0.5 rounded-sm border border-slate-200 bg-white text-[11px] text-slate-700 hover:border-brand-primary hover:text-brand-primary-dark transition-colors truncate"
                               >
                                 {p.client_name}
                               </Link>

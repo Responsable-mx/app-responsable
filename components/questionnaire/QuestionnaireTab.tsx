@@ -636,6 +636,7 @@ function WizardEditor({
                   updatedAt={resp?.updated_at}
                   sectionComplete={isStepComplete}
                   hideSource={step.key === "informacion-base"}
+                  skipValidationGuard={step.key === "informacion-base"}
                   onChange={(v) => setFieldValue(step.key, field.key, v)}
                   onToggleValidated={() => toggleValidated(step.key, field.key)}
                   onOpenDrawer={() => setDrawerField({ stepKey: step.key, fieldKey: field.key })}
@@ -769,6 +770,7 @@ function FieldRow({
   onToggleValidated,
   onOpenDrawer,
   hideSource = false,
+  skipValidationGuard = false,
 }: {
   field: WizardField;
   value: FieldValue;
@@ -781,6 +783,7 @@ function FieldRow({
   updatedAt?: string;
   sectionComplete?: boolean;
   hideSource?: boolean;
+  skipValidationGuard?: boolean;
   onChange: (v: FieldValue) => void;
   onToggleValidated: () => void;
   onOpenDrawer: () => void;
@@ -803,7 +806,7 @@ function FieldRow({
   const baseInput = "font-sans w-full border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary";
 
   function handleChange(newValue: FieldValue) {
-    if (validated) {
+    if (validated && !skipValidationGuard) {
       setPendingEdit({ v: newValue });
       return;
     }
@@ -928,7 +931,8 @@ function FieldRow({
       ) : field.type === "multiselect" ? (
         <div className="flex flex-wrap gap-1.5">
           {resolvedOptions.map((opt, i) => {
-            const arr = Array.isArray(value) ? value : [];
+            // Normalizar: valor guardado puede ser string (wizard legacy) o string[]
+            const arr = Array.isArray(value) ? value : (typeof value === "string" && value ? [value] : []);
             const active = arr.includes(opt.value);
             return (
               <button

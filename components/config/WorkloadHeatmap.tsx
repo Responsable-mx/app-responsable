@@ -81,15 +81,6 @@ export function WorkloadHeatmap() {
     });
   }
 
-  // Tendencia: compara primera mitad vs segunda mitad de las 12 semanas
-  function trendOf(loads: number[]): { arrow: string; color: string; label: string } {
-    const a = (loads[0] + loads[1] + loads[2] + loads[3]) / 4;
-    const b = (loads[4] + loads[5] + loads[6] + loads[7]) / 4;
-    if (b > a + 0.5) return { arrow: "↑", color: "text-rose-600", label: "Carga creciente" };
-    if (b < a - 0.5) return { arrow: "↓", color: "text-emerald-600", label: "Carga decreciente" };
-    return { arrow: "→", color: "text-slate-400", label: "Carga estable" };
-  }
-
   function cellBg(n: number): string {
     if (n === 0) return "bg-white";
     if (n <= 2) return "bg-emerald-50";
@@ -103,9 +94,6 @@ export function WorkloadHeatmap() {
     if (n <= 4) return "text-amber-700";
     return "text-rose-700 font-extrabold";
   }
-
-  // Máximo por consultor para mini sparkbar
-  const maxLoad = Math.max(...consultors.map((c) => Math.max(...heatmap[c])), 1);
 
   function toggleCollapsed() {
     setCollapsed((v) => {
@@ -166,21 +154,12 @@ export function WorkloadHeatmap() {
                   {fmtWeek(w)}
                 </th>
               ))}
-              <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-16"
-                  title="Pico de carga: máximo de actividades activas en una sola semana (barra proporcional)">
-                Pico
-              </th>
-              <th className="px-2 py-1.5 text-center font-bold text-slate-400 whitespace-nowrap w-10"
-                  title="Tendencia: compara promedio de primeras 4 semanas vs siguientes 4. ↑ carga creciente · ↓ decreciente · → estable">
-                Tend.
-              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {consultors.map((c) => {
               const peakLoad = Math.max(...heatmap[c]);
               const peakWeekIdx = heatmap[c].indexOf(peakLoad);
-              const trend = trendOf(heatmap[c]);
               return (
                 <tr key={c} className="hover:bg-slate-50/50 transition-colors">
                   <td
@@ -200,29 +179,6 @@ export function WorkloadHeatmap() {
                       {n > 0 ? n : "·"}
                     </td>
                   ))}
-                  <td className="px-2 py-1.5 text-center">
-                    {/* Mini spark: barra de carga máxima */}
-                    <div className="flex items-center justify-center gap-0.5">
-                      {heatmap[c].map((n, wi) => (
-                        <div
-                          key={wi}
-                          className={`w-0.5 rounded-sm transition-all ${
-                            n === 0 ? "bg-slate-100" :
-                            n <= 2 ? "bg-emerald-300" :
-                            n <= 4 ? "bg-amber-400" :
-                            "bg-rose-400"
-                          }`}
-                          style={{ height: Math.max(2, (n / maxLoad) * 14) }}
-                        />
-                      ))}
-                    </div>
-                  </td>
-                  <td
-                    className="px-2 py-1.5 text-center text-sm font-bold"
-                    title={trend.label}
-                  >
-                    <span className={trend.color}>{trend.arrow}</span>
-                  </td>
                 </tr>
               );
             })}

@@ -14,9 +14,18 @@ import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
+import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
+
+// Campos de cache del SDK de Anthropic (beta — no incluidos en el tipo oficial)
+interface UsageWithCache {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
 
 // Mismo patrón de validación de stepKey que ai-fill.
 const VALID_STEP_KEY = /^[a-z0-9-]{1,64}$/;
@@ -84,6 +93,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // D-76: rate limit DB cross-instancias.
   const rl = await checkAiRateLimit(user, { max: 15, windowMs: 60_000 });
   if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
+
+  if (anthropicBreaker.isOpen) {
+    return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
+  }
 
   let bundle;
   try {
@@ -170,15 +183,15 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
     );
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cacheCreationTokens = (msg.usage as any)?.cache_creation_input_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cacheReadTokens = (msg.usage as any)?.cache_read_input_tokens ?? 0;
+    cacheCreationTokens = (msg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
+    cacheReadTokens = (msg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
     stopReason = msg.stop_reason ?? null;
     for (const block of msg.content) {
       if (block.type === "text") textOut += block.text;
     }
+    anthropicBreaker.recordSuccess();
   } catch (e) {
+    anthropicBreaker.recordFailure();
     const isTimeout = e instanceof Error && e.name === "AbortError";
     const errorMsg = isTimeout
       ? "La extracción tardó demasiado. Inténtalo de nuevo."

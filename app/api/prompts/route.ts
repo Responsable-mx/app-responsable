@@ -12,7 +12,9 @@ export async function GET() {
   }
   try {
     const data = await listPromptsMeta();
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
+    });
   } catch (e) {
     console.error("[GET /api/prompts]", e);
     return NextResponse.json({ error: "Error al listar" }, { status: 500 });

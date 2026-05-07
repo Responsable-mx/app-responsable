@@ -8,6 +8,11 @@
 import { useMemo, useState, useRef, useId } from "react";
 import type { ActivityStatus, ServiceStage, StageActivity } from "@/lib/stages";
 import { QuickActionPopover, type QuickPatch } from "./QuickActionPopover";
+import { GanttToolbar } from "./GanttToolbar";
+import { GanttHeader } from "./GanttHeader";
+import { GanttEvm, type EvmMetrics } from "./GanttEvm";
+import { GanttLegend } from "./GanttLegend";
+import { RichTooltip } from "./GanttTooltip";
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 
@@ -25,13 +30,6 @@ const STATUS_LABEL: Record<ActivityStatus, string> = {
   delayed: "Retrasada",
 };
 
-const STATUS_TEXT: Record<ActivityStatus, string> = {
-  pending: "text-slate-500",
-  in_progress: "text-brand-primary-dark",
-  completed: "text-emerald-700",
-  delayed: "text-rose-700",
-};
-
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
 const MS_DAY = 86_400_000;
@@ -39,10 +37,6 @@ const MS_DAY = 86_400_000;
 function parseDate(s: string | null): Date | null {
   if (!s) return null;
   return new Date(s + "T00:00:00");
-}
-
-function fmtMonth(d: Date): string {
-  return d.toLocaleDateString("es-MX", { month: "short", year: "2-digit" });
 }
 
 function startOfMonth(d: Date): Date {
@@ -91,9 +85,6 @@ function dayBoundaries(min: number, max: number): number[] {
   }
   return out;
 }
-
-// Dom=0→"D", Lun=1→"L", Mar=2→"M", Mié=3→"X", Jue=4→"J", Vie=5→"V", Sáb=6→"S"
-const DOW = ["D", "L", "M", "X", "J", "V", "S"];
 
 // ─── Zoom ─────────────────────────────────────────────────────────────────────
 
@@ -579,362 +570,68 @@ export function ServiceGantt({
             transform en lugar de scrollLeft). */}
         <div className="flex-none bg-white border-b border-slate-100 shadow-sm">
 
-          {/* Toolbar — 3 grupos: [Zoom] · [Capas] · [Acciones] */}
-          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-200 bg-slate-50 flex-wrap">
-            {/* Grupo 1: Zoom */}
-            <div className="flex items-center gap-0.5">
-              {([
-                { v: "fit", label: "Completa" },
-                { v: "mes", label: "Mes" },
-                { v: "quarter", label: "Trim." },
-                { v: "semana", label: "Sem." },
-                { v: "dia", label: "Día" },
-              ] as { v: Zoom; label: string }[]).map(({ v, label }) => (
-                <button
-                  key={v}
-                  onClick={() => setZoom(v)}
-                  className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${
-                    zoom === v ? "bg-white border border-slate-200 text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {timelineWidth && (
-              <span
-                className="text-[9px] text-slate-300 select-none font-mono"
-                title="Navegar: ← → (pan) · Shift+← → (salto) · +/− (zoom) · Home/End · Arrastra el timeline con el mouse"
-              >
-                ← → · drag
-              </span>
-            )}
-            {timelineWidth !== null && timelineWidth > 5000 && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded-sm text-[9px] text-amber-700 font-medium select-none">
-                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.539-1.333-3.308 0L3.732 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Vista Día muy amplia — considera Sem.
-              </span>
-            )}
-            {/* Separador */}
-            <div className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden />
-            {/* Grupo 2: Capas — dropdown colapsado */}
-            <div className="relative">
-              {(() => {
-                const activeCount = [
-                  hasBaseline && showBaseline,
-                  showFloat,
-                  showDeps,
-                  showCriticalPath,
-                  showEvm,
-                  clientView,
-                ].filter(Boolean).length;
-                return (
-                  <button
-                    onClick={() => setShowLayersMenu((v) => !v)}
-                    className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showLayersMenu ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
-                    title="Capas de visualización"
-                    aria-haspopup="true"
-                    aria-expanded={showLayersMenu}
-                  >
-                    Capas
-                    {activeCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[14px] h-3.5 px-0.5 text-[8px] font-bold bg-brand-primary text-white rounded-full leading-none tabular-nums">
-                        {activeCount}
-                      </span>
-                    )}
-                    <svg className={`w-2.5 h-2.5 transition-transform ${showLayersMenu ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                );
-              })()}
-              {showLayersMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowLayersMenu(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded shadow-md py-1 w-48">
-                    {hasBaseline && (
-                      <button
-                        onClick={() => setShowBaseline((v) => !v)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showBaseline ? "text-orange-700" : "text-slate-500"}`}
-                        title="Baseline — línea base congelada (naranja punteada)."
-                      >
-                        <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showBaseline ? "bg-orange-100 border-orange-400" : "border-slate-300"}`}>
-                          {showBaseline && <svg className="w-2 h-2 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                        </span>
-                        Baseline
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setShowFloat((v) => !v)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showFloat ? "text-slate-700" : "text-slate-500"}`}
-                      title="Holgura — días libres antes de impactar al siguiente paso."
-                    >
-                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showFloat ? "bg-slate-200 border-slate-400" : "border-slate-300"}`}>
-                        {showFloat && <svg className="w-2 h-2 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      Holgura
-                    </button>
-                    <button
-                      onClick={() => setShowDeps((v) => !v)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showDeps ? "text-slate-700" : "text-slate-500"}`}
-                      title="Dependencias — flechas de relación entre actividades."
-                    >
-                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showDeps ? "bg-slate-200 border-slate-400" : "border-slate-300"}`}>
-                        {showDeps && <svg className="w-2 h-2 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      Dependencias
-                    </button>
-                    <button
-                      onClick={() => setShowCriticalPath((v) => !v)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showCriticalPath ? "text-amber-700" : "text-slate-500"}`}
-                      title="Ruta crítica — secuencia sin holgura que define la duración mínima."
-                    >
-                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showCriticalPath ? "bg-amber-100 border-amber-400" : "border-slate-300"}`}>
-                        {showCriticalPath && <svg className="w-2 h-2 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      Ruta crítica
-                    </button>
-                    <button
-                      onClick={() => setShowEvm((v) => !v)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showEvm ? "text-brand-primary-dark" : "text-slate-500"}`}
-                      title="EVM — métricas de rendimiento del proyecto."
-                    >
-                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showEvm ? "bg-brand-primary/10 border-brand-primary/40" : "border-slate-300"}`}>
-                        {showEvm && <svg className="w-2 h-2 text-brand-primary-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      EVM
-                    </button>
-                    <div className="my-1 border-t border-slate-100" />
-                    <button
-                      onClick={() => setClientView((v) => !v)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${clientView ? "text-brand-primary-dark" : "text-slate-500"}`}
-                      title="Vista cliente — solo hitos contractuales."
-                    >
-                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${clientView ? "bg-brand-primary/10 border-brand-primary/40" : "border-slate-300"}`}>
-                        {clientView && <svg className="w-2 h-2 text-brand-primary-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      Vista cliente
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-            {/* Grupo 3: Acciones — ml-auto */}
-            <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-              {/* Sprint Q: rango personalizado */}
-              <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span className="font-bold uppercase tracking-widest hidden sm:inline">Rango</span>
-                <input
-                  type="date"
-                  value={customMinDate}
-                  onChange={(e) => setCustomMinDate(e.target.value)}
-                  title="Inicio del rango visible (vacío = auto)"
-                  className="text-[10px] border border-slate-200 rounded px-1 py-0.5 font-sans text-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 w-28"
-                />
-                <span>—</span>
-                <input
-                  type="date"
-                  value={customMaxDate}
-                  onChange={(e) => setCustomMaxDate(e.target.value)}
-                  title="Fin del rango visible (vacío = auto)"
-                  className="text-[10px] border border-slate-200 rounded px-1 py-0.5 font-sans text-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-primary/50 w-28"
-                />
-                {(customMinDate || customMaxDate) && (
-                  <button
-                    onClick={() => { setCustomMinDate(""); setCustomMaxDate(""); }}
-                    className="text-[9px] text-rose-500 hover:text-rose-700 font-bold"
-                    title="Restablecer rango automático"
-                  >✕</button>
-                )}
-              </div>
-              <div className="w-px h-4 bg-slate-200" aria-hidden />
-              {todayInRange && (
-                <button onClick={scrollToToday} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-brand-primary-dark transition-colors">
-                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="4" /></svg>
-                  Hoy
-                </button>
-              )}
-              {/* Exportar dropdown (PNG + CSV) */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowExportMenu((v) => !v)}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                  </svg>
-                  {exporting ? "..." : "Exportar"}
-                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {showExportMenu && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded shadow-md py-1 w-36">
-                      <button
-                        onClick={() => { void exportPng(); setShowExportMenu(false); }}
-                        disabled={exporting}
-                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        PNG (imagen)
-                      </button>
-                      <button
-                        onClick={() => { exportCsv(); setShowExportMenu(false); }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
-                      >
-                        CSV (Excel)
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-              {isAdmin && onFreezeBaseline && !confirmFreeze && (
-                <>
-                <div className="w-px h-4 bg-slate-200" aria-hidden />
-                <button onClick={() => setConfirmFreeze(true)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:text-amber-700 transition-colors" title={hasBaseline ? "Ya existe baseline — actualizará el de referencia." : "Congelar fechas plan como baseline de referencia"}>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  {hasBaseline ? "Actualizar baseline" : "Baseline"}
-                </button>
-                </>
-              )}
-              {confirmFreeze && (
-                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded text-[10px]">
-                  <span className="text-amber-700 font-medium">{hasBaseline ? "Sobrescribir baseline?" : "Congelar plan actual como baseline?"}</span>
-                  <button onClick={doFreeze} disabled={freezing} className="px-1.5 py-0.5 bg-amber-500 text-white rounded-sm font-bold hover:bg-amber-600 disabled:opacity-50">{freezing ? "..." : "Sí"}</button>
-                  <button onClick={() => setConfirmFreeze(false)} className="px-1.5 py-0.5 text-slate-500 hover:text-slate-700">No</button>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Toolbar */}
+          <GanttToolbar
+            zoom={zoom}
+            setZoom={setZoom}
+            timelineWidth={timelineWidth}
+            hasBaseline={hasBaseline}
+            showBaseline={showBaseline}
+            setShowBaseline={setShowBaseline}
+            showFloat={showFloat}
+            setShowFloat={setShowFloat}
+            showDeps={showDeps}
+            setShowDeps={setShowDeps}
+            showCriticalPath={showCriticalPath}
+            setShowCriticalPath={setShowCriticalPath}
+            showEvm={showEvm}
+            setShowEvm={setShowEvm}
+            clientView={clientView}
+            setClientView={setClientView}
+            showLayersMenu={showLayersMenu}
+            setShowLayersMenu={setShowLayersMenu}
+            customMinDate={customMinDate}
+            setCustomMinDate={setCustomMinDate}
+            customMaxDate={customMaxDate}
+            setCustomMaxDate={setCustomMaxDate}
+            todayInRange={todayInRange}
+            onScrollToToday={scrollToToday}
+            exporting={exporting}
+            onExportPng={() => { void exportPng(); }}
+            onExportCsv={exportCsv}
+            showExportMenu={showExportMenu}
+            setShowExportMenu={setShowExportMenu}
+            isAdmin={isAdmin}
+            hasOnFreezeBaseline={!!onFreezeBaseline}
+            hasBaselineData={hasBaseline}
+            confirmFreeze={confirmFreeze}
+            setConfirmFreeze={setConfirmFreeze}
+            freezing={freezing}
+            onFreeze={doFreeze}
+          />
 
           {/* Panel EVM — colapsable, entre toolbar y header de fechas */}
-          {showEvm && evmMetrics && (
-            <div className="flex items-center gap-5 px-4 py-2.5 bg-slate-50/80 border-b border-slate-200 flex-wrap">
-              {/* Dual progress bar: real vs planeado */}
-              <div className="flex-1 min-w-[140px] max-w-xs space-y-0.5">
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Avance real</span>
-                  <span className="text-[9px] font-bold tabular-nums text-slate-600">{evmMetrics.pcDone}%</span>
-                </div>
-                <div className="h-2 bg-slate-200 rounded-sm overflow-hidden relative">
-                  {/* Tiempo transcurrido (planeado) */}
-                  <div
-                    className="absolute top-0 bottom-0 left-0 bg-slate-400/30"
-                    style={{ width: `${evmMetrics.pcElapsed}%` }}
-                    title={`Tiempo plan transcurrido: ${evmMetrics.pcElapsed}%`}
-                  />
-                  {/* Avance real */}
-                  <div
-                    className={`absolute top-0 bottom-0 left-0 transition-all ${evmMetrics.pcDone >= evmMetrics.pcElapsed ? "bg-emerald-500" : "bg-amber-500"}`}
-                    style={{ width: `${evmMetrics.pcDone}%` }}
-                  />
-                </div>
-                <div className="text-[8px] text-slate-400 tabular-nums">
-                  Plan: {evmMetrics.pcElapsed}% tiempo · Real: {evmMetrics.pcDone}% avance
-                </div>
-              </div>
-              {/* SPI */}
-              <div className="shrink-0 text-center" title="SPI (Schedule Performance Index) — índice de eficiencia de tiempo. SPI = avance real ÷ avance esperado. SPI ≥ 1.0 = adelantado o en tiempo · 0.8–0.99 = leve retraso · <0.8 = riesgo alto de no entregar a tiempo.">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">SPI</p>
-                <p className={`text-base font-bold tabular-nums leading-none ${
-                  evmMetrics.spi >= 1 ? "text-emerald-600" :
-                  evmMetrics.spi >= 0.8 ? "text-amber-600" : "text-rose-600"
-                }`}>{evmMetrics.spi.toFixed(2)}</p>
-                <p className="text-[8px] text-slate-400 mt-0.5">
-                  {evmMetrics.spi >= 1 ? "en tiempo" : evmMetrics.spi >= 0.8 ? "leve retraso" : "riesgo alto"}
-                </p>
-              </div>
-              {/* Pronóstico cierre */}
-              {evmMetrics.forecastEnd && (
-                <div className="shrink-0" title="Est. Cierre — fecha proyectada de terminación basada en el ritmo actual de avance. Si el SPI < 1 (retraso), la fecha se desplaza hacia adelante. Compara contra 'plan' para ver cuánto se ha extendido el proyecto.">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Est. cierre</p>
-                  <p className="text-xs font-bold text-slate-700 tabular-nums leading-snug">
-                    {evmMetrics.forecastEnd.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
-                  </p>
-                  <p className="text-[8px] text-slate-400">
-                    plan: {evmMetrics.planEndDate.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
-                  </p>
-                </div>
-              )}
-              {/* Varianza días */}
-              {evmMetrics.varianceDays !== null && (
-                <div className="shrink-0 text-center" title="Varianza — diferencia en días entre la fecha estimada de cierre y la fecha plan original. Valor negativo = retraso (ej: -23d = llegarás 23 días tarde). Valor positivo = adelanto. Útil para estimar impacto de penalizaciones o ventanas de entrega.">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Varianza</p>
-                  <p className={`text-base font-bold tabular-nums leading-none ${evmMetrics.varianceDays >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                    {evmMetrics.varianceDays > 0 ? `+${evmMetrics.varianceDays}` : evmMetrics.varianceDays}d
-                  </p>
-                  <p className="text-[8px] text-slate-400 mt-0.5">
-                    {evmMetrics.varianceDays >= 0 ? "adelantado" : "retrasado"}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-          {showEvm && !evmMetrics && (
-            <div className="px-4 py-2 text-[10px] text-slate-400 border-b border-slate-200 bg-slate-50/80">
-              EVM disponible cuando hay actividades completadas y fechas plan definidas.
-            </div>
-          )}
+          {showEvm && <GanttEvm metrics={evmMetrics} />}
 
           {/* Header de fechas */}
-          <div className="flex border-b border-slate-200 bg-slate-50">
-            {/* Columna label — siempre visible */}
-            <div style={{ width: LABEL_W, height: headerH }} className="shrink-0 bg-slate-50 px-3 border-r border-slate-200 flex items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Actividad
-            </div>
-            {/* Timeline header: overflow:hidden + translateX sync (no scrollbar propio) */}
-            <div style={{ flex: 1, overflow: "hidden", height: headerH }}>
-              <div ref={headerTimelineInnerRef} className="relative h-full" style={{ width: timelineWidth ?? "100%" }}>
-                {/* Fila 1: meses */}
-                {visibleMonths.map((m, i) => {
-                  const left = ((m.getTime() - effectiveMin) / totalMs) * 100;
-                  const next = i + 1 < visibleMonths.length ? visibleMonths[i + 1]! : new Date(effectiveMax);
-                  const width = ((next.getTime() - m.getTime()) / totalMs) * 100;
-                  return (
-                    <div key={i} className="absolute border-r border-slate-200 px-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 truncate flex items-center" style={{ left: `${left}%`, width: `${width}%`, top: 0, height: monthRowH }}>
-                      {fmtMonth(m)}
-                    </div>
-                  );
-                })}
-                {hasSubRow && <div className="absolute left-0 right-0 border-t border-slate-100" style={{ top: monthRowH }} />}
-                {(zoom === "quarter" || zoom === "semana") && weeks.map((wt, i) => {
-                  const nextWt = i + 1 < weeks.length ? weeks[i + 1]! : range.max;
-                  const left = ((wt - range.min) / totalMs) * 100;
-                  const width = ((nextWt - wt) / totalMs) * 100;
-                  return (
-                    <div key={i} className="absolute border-r border-slate-100 px-1 text-[9px] text-slate-500 font-medium flex items-center truncate" style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}>
-                      {new Date(wt).toLocaleDateString("es-MX", { day: "2-digit", month: "numeric" })}
-                    </div>
-                  );
-                })}
-                {zoom === "dia" && days.map((dt, i) => {
-                  const left = ((dt - range.min) / totalMs) * 100;
-                  const width = (MS_DAY / totalMs) * 100;
-                  const d = new Date(dt);
-                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                  return (
-                    <div key={i} className={`absolute border-r border-slate-100 flex flex-col items-center justify-center ${isWeekend ? "bg-slate-100/60 text-slate-400" : "text-slate-600"}`} style={{ left: `${left}%`, width: `${width}%`, top: monthRowH, bottom: 0 }}>
-                      <span className="text-[9px] font-bold leading-tight">{DOW[d.getDay()]}</span>
-                      <span className="text-[9px] leading-tight">{String(d.getDate()).padStart(2, "0")}</span>
-                    </div>
-                  );
-                })}
-                {todayInRange && (
-                  <div className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${todayPct}%` }}>
-                    <div className="absolute top-0 bottom-0 border-l-2 border-rose-500/70" />
-                    <div className="absolute -translate-x-1/2 px-1 rounded-sm bg-rose-50 border border-rose-200 text-[9px] font-bold text-rose-600 whitespace-nowrap z-10 leading-4" style={{ top: 3 }}>
-                      {new Date(now).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <GanttHeader
+            ref={headerTimelineInnerRef}
+            zoom={zoom}
+            visibleMonths={visibleMonths}
+            weeks={weeks}
+            days={days}
+            effectiveMin={effectiveMin}
+            effectiveMax={effectiveMax}
+            totalMs={totalMs}
+            timelineWidth={timelineWidth}
+            headerH={headerH}
+            monthRowH={monthRowH}
+            hasSubRow={hasSubRow}
+            todayPct={todayPct}
+            todayInRange={todayInRange}
+            now={now}
+            rangeMin={range.min}
+          />
 
         </div>{/* /sticky */}
 
@@ -1349,43 +1046,14 @@ export function ServiceGantt({
             </div>
 
             {/* ─── Leyenda ─── */}
-            <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-slate-600">
-              {hasBaseline && showBaseline && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-4 h-1.5 rounded" style={{ background: "repeating-linear-gradient(90deg,#f97316 0,#f97316 4px,transparent 4px,transparent 8px)" }} />
-                  Baseline
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 border-2 border-slate-400 bg-white rounded-sm" />Plan</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-slate-300 rounded-sm" />Pendiente</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-brand-primary rounded-sm" />En curso</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-emerald-500 rounded-sm" />Completada</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-4 h-2.5 bg-rose-500 rounded-sm" />Retrasada</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rotate-45 bg-amber-400 border-2 border-amber-600 inline-block" />Hito</span>
-              <span className="inline-flex items-center gap-1.5">
-                <svg className="w-3 h-3 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-                Ruta crítica
-              </span>
-              {todayInRange && <span className="inline-flex items-center gap-1.5"><span className="w-px h-3 bg-rose-400/60" />Hoy</span>}
-              {showFloat && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-4 h-1.5 inline-block" style={{ background: "repeating-linear-gradient(90deg,rgba(148,163,184,0.5) 0,rgba(148,163,184,0.5) 3px,transparent 3px,transparent 6px)" }} />
-                  Holgura
-                </span>
-              )}
-              {showDeps && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-4 h-0 inline-block border-b border-dashed border-slate-400" />
-                  Dependencia
-                </span>
-              )}
-              {showCriticalPath && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-4 h-2.5 border-2 border-amber-500 bg-amber-50/80 rounded-sm" />
-                  Ruta crítica
-                </span>
-              )}
-            </div>
+            <GanttLegend
+              hasBaseline={hasBaseline}
+              showBaseline={showBaseline}
+              showFloat={showFloat}
+              showDeps={showDeps}
+              showCriticalPath={showCriticalPath}
+              todayInRange={todayInRange}
+            />
           </div>
         </div>{/* /scrollRef */}
 
@@ -1406,47 +1074,3 @@ export function ServiceGantt({
   );
 }
 
-// ─── Tooltip ─────────────────────────────────────────────────────────────────
-
-function RichTooltip({ activity: a, anchor }: { activity: StageActivity; anchor: { x: number; y: number } }) {
-  const x = Math.min(anchor.x, window.innerWidth - 220);
-  const y = Math.min(anchor.y, window.innerHeight - 210);
-  return (
-    <div className="fixed z-50 bg-white border border-slate-200 rounded shadow-md p-3 w-56 pointer-events-none" style={{ top: y, left: x }}>
-      <p className="text-[10px] font-bold text-slate-800 mb-2 truncate">{a.name}</p>
-      <div className="space-y-1 text-[10px] text-slate-600">
-        {a.baseline_start && <><TRow label="Baseline inicio" value={fmtShort(a.baseline_start)} /><TRow label="Baseline fin" value={fmtShort(a.baseline_end)} /></>}
-        <TRow label="Plan inicio" value={fmtShort(a.planned_start)} />
-        <TRow label="Plan fin" value={fmtShort(a.planned_end)} />
-        <TRow label="Real inicio" value={fmtShort(a.actual_start)} />
-        <TRow label="Real fin" value={fmtShort(a.actual_end)} />
-        {a.actual_progress != null && (
-          <div className="pt-1">
-            <div className="flex justify-between mb-0.5"><span>Progreso</span><span className="font-bold text-slate-700">{a.actual_progress}%</span></div>
-            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-brand-primary rounded-full" style={{ width: `${a.actual_progress}%` }} />
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
-        <span className="text-slate-500">Status</span>
-        <span className={`font-bold ${STATUS_TEXT[a.status]}`}>{STATUS_LABEL[a.status]}</span>
-      </div>
-      {a.assignee_email && <div className="mt-1 pt-1 border-t border-slate-100 text-[10px] text-slate-500 truncate">@ {a.assignee_email}</div>}
-      {a.blocker_note && (
-        <div className="mt-1.5 pt-1.5 border-t border-rose-100 text-[10px] text-rose-700 leading-snug">
-          <span className="font-bold">🚫 Bloqueo:</span> {a.blocker_note}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span>{label}</span><span className="font-medium text-slate-700">{value}</span>
-    </div>
-  );
-}

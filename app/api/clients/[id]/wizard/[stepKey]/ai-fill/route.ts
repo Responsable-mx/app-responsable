@@ -16,10 +16,19 @@ import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
+import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 
 // Timeout serverless: hasta 5 min (web_search tarda ~30-90s por paso)
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
+
+// Campos de cache del SDK de Anthropic (beta — no incluidos en el tipo oficial)
+interface UsageWithCache {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
 
 // D-14: Rate limit por usuario — capa única DB (cross-instance).
 // D-61: capa 1 in-memory eliminada — era engañosa en Vercel multi-instancia
@@ -65,6 +74,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   // D-14: rate limit DB cross-instancias.
   const rl = await checkAiRateLimit(user, { max: MAX_CALLS_PER_WINDOW, windowMs: WINDOW_MS });
   if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
+
+  if (anthropicBreaker.isOpen) {
+    return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
+  }
 
   let bundle;
   try {
@@ -254,10 +267,8 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
     } as any, { signal: timeoutSignal });
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cacheCreationTokens = (msg.usage as any)?.cache_creation_input_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cacheReadTokens = (msg.usage as any)?.cache_read_input_tokens ?? 0;
+    cacheCreationTokens = (msg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
+    cacheReadTokens = (msg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
     stopReason = msg.stop_reason ?? null;
     for (const block of msg.content) {
       if (block.type === "text") {
@@ -272,7 +283,9 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
         }
       }
     }
+    anthropicBreaker.recordSuccess();
   } catch (e) {
+    anthropicBreaker.recordFailure();
     const isTimeout = e instanceof Error && e.name === "AbortError";
     const errorMsg = isTimeout
       ? "La búsqueda tardó demasiado. Inténtalo de nuevo en unos segundos."

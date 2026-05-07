@@ -18,7 +18,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const data = await listTemplates(service);
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
+    });
   } catch (e) {
     console.error("[GET /api/stage-templates]", e);
     return NextResponse.json({ error: "Error al listar" }, { status: 500 });

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
+import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
 import { extractJsonObject } from "@/lib/ai/extract-json";
@@ -12,6 +13,14 @@ import { extractJsonObject } from "@/lib/ai/extract-json";
 export const runtime = "nodejs";
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
+
+// Campos de cache del SDK de Anthropic (beta — no incluidos en el tipo oficial)
+interface UsageWithCache {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
 
 // Rate limit: 5 búsquedas por 5 min (Aurora + web_search × 3)
 
@@ -53,6 +62,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });
   }
+  if (anthropicBreaker.isOpen) {
+    return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
+  }
+
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
@@ -126,15 +139,15 @@ Busca el ${reportLabel} más reciente y devuelve hasta 5 candidatos como JSON.`;
     );
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cacheCreationTokens = (msg.usage as any)?.cache_creation_input_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cacheReadTokens = (msg.usage as any)?.cache_read_input_tokens ?? 0;
+    cacheCreationTokens = (msg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
+    cacheReadTokens = (msg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
     stopReason = msg.stop_reason ?? null;
     for (const block of msg.content) {
       if (block.type === "text") textOut += block.text;
     }
+    anthropicBreaker.recordSuccess();
   } catch (e) {
+    anthropicBreaker.recordFailure();
     const isTimeout = e instanceof Error && e.name === "AbortError";
     const errorMsg = isTimeout
       ? "Búsqueda IA tardó demasiado"

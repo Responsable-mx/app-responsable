@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
 import { SkeletonTable } from "@/components/ui/Skeleton";
@@ -60,6 +61,7 @@ const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ data: Row[] }>);
 
 export function ClientsList() {
+  const router = useRouter();
   const { push: pushToast } = useToast();
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -384,7 +386,7 @@ export function ClientsList() {
           <p className="text-sm text-slate-600">
             {clients.length === 0 && !debouncedQ
               ? "Aún no hay clientes registrados."
-              : "Sin resultados para ese filtro."}
+              : `Sin resultados para "${sectorFilter || debouncedQ}".`}
           </p>
           {clients.length === 0 && !debouncedQ && (
             <Link
@@ -433,11 +435,15 @@ export function ClientsList() {
                     ...(c.certifications ?? []).map((f) => ({ label: f, cls: "bg-amber-50 text-amber-700" })),
                   ].slice(0, 3);
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50/60 group">
+                    <tr
+                      key={c.id}
+                      className="hover:bg-slate-50/60 group cursor-pointer"
+                      onClick={() => router.push(`/clientes/${c.id}`)}
+                    >
                       <td className="px-4 py-2.5">
-                        <Link href={`/clientes/${c.id}`} className="font-semibold text-slate-900 hover:text-brand-primary-hover transition-colors">
+                        <span className="font-semibold text-slate-900 group-hover:text-brand-primary-hover transition-colors">
                           {c.name}
-                        </Link>
+                        </span>
                       </td>
                       <td className="px-4 py-2.5 text-slate-600 text-xs">
                         {c.sector ?? <span className="text-slate-400">—</span>}
@@ -456,7 +462,7 @@ export function ClientsList() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs tabular-nums text-slate-500">{updatedLabel}</td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <Link
                           href={`/clientes/${c.id}?tab=chat`}
                           title="Chat IA"

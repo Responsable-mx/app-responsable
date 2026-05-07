@@ -22,6 +22,11 @@ vi.mock("next/link", () => ({
   }) => <a href={href} {...rest}>{children}</a>,
 }));
 
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 // SWR mock: simula filtrado server-side basado en ?q= del key.
 // D-05: la búsqueda es server-side (debounce 300ms → SWR key → /api/clients?q=...).
 // El mock replicate la lógica ilike de Supabase para que los tests sean deterministas.

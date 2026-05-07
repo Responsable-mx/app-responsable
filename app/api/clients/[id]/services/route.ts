@@ -14,7 +14,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
   const data = await listClientServices(id);
-  return NextResponse.json({ data });
+  return NextResponse.json({ data }, {
+    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
+  });
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {

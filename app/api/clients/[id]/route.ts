@@ -18,7 +18,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     const data = await getClient(id);
     if (!data)
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
+    });
   } catch (e) {
     console.error("[GET /api/clients/:id]", e);
     return NextResponse.json({ error: "Error al leer cliente" }, { status: 500 });

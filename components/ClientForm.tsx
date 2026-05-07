@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/Toast";
 import type { Client } from "@/lib/clients";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ClientAvatar } from "@/components/ClientAvatar";
@@ -76,8 +77,8 @@ function initialBlocks(
 
 export function ClientForm(props: Props) {
   const router = useRouter();
+  const { push } = useToast();
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [sectorAiOpen, setSectorAiOpen] = useState(false);
 
@@ -119,7 +120,6 @@ export function ClientForm(props: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
     setSaving(true);
     try {
       const payload = {
@@ -164,7 +164,7 @@ export function ClientForm(props: Props) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Error al guardar");
+        push("error", data.error ?? "Error al guardar");
         setSaving(false);
         return;
       }
@@ -172,7 +172,7 @@ export function ClientForm(props: Props) {
       router.refresh();
     } catch (err) {
       console.error(err);
-      setError("Error de conexión");
+      push("error", "Error de conexión");
       setSaving(false);
     }
   }
@@ -188,7 +188,7 @@ export function ClientForm(props: Props) {
       router.refresh();
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Error al eliminar");
+      push("error", data.error ?? "Error al eliminar");
     }
   }
 
@@ -225,10 +225,13 @@ export function ClientForm(props: Props) {
               <button
                 type="button"
                 onClick={() => setSectorAiOpen(true)}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-brand-primary-light text-brand-primary-dark border border-brand-primary-light hover:bg-brand-primary-light"
-                title="POC: rellenar con IA desde URL o transcripción"
+                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20 hover:bg-brand-primary/20 transition-colors"
+                title="Rellenar con IA desde URL o transcripción"
               >
-                🤖 Rellenar con IA
+                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                </svg>
+                Rellenar con IA
               </button>
             </div>
             <MultiSelectCombobox
@@ -491,15 +494,9 @@ export function ClientForm(props: Props) {
         ))}
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded p-3">
-          {error}
-        </div>
-      )}
-
       {/* ═══ Footer sticky ══════════════════════════════════ */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-slate-200">
-        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
           <button
             type="submit"
             disabled={saving || !form.name.trim()}
@@ -511,12 +508,18 @@ export function ClientForm(props: Props) {
               ? "Crear cliente"
               : "Guardar cambios"}
           </button>
-
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="px-3 py-2.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded transition-colors"
+          >
+            Descartar
+          </button>
           {props.mode === "edit" && (
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded transition-colors"
+              className="ml-auto px-3 py-2 text-sm text-rose-700 hover:bg-rose-50 rounded transition-colors"
             >
               Eliminar
             </button>

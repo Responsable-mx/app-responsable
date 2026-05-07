@@ -163,5 +163,7 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  return NextResponse.json({ data: members });
+  return NextResponse.json({ data: members }, {
+    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
+  });
 }

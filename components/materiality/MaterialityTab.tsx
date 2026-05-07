@@ -58,7 +58,6 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterQuadrant, setFilterQuadrant] = useState<TopicColor | null>(null);
   const [editingTopic, setEditingTopic] = useState<MaterialityTopic | null>(null);
-  const [confirmInit, setConfirmInit] = useState(false);
   const [busyInit, setBusyInit] = useState(false);
 
   const topics = useMemo(() => data?.data ?? [], [data]);
@@ -139,7 +138,6 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error");
       await mutate();
-      setConfirmInit(false);
       toast.push("success", "Plantilla cargada (20 temas)");
     } catch (e) {
       toast.push("error", e instanceof Error ? e.message : "Error al inicializar");
@@ -202,42 +200,29 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
 
   if (topics.length === 0) {
     return (
-      <>
-        <div className="border border-slate-200 rounded bg-slate-50/50 p-8 text-center">
-          <h3 className="text-sm font-bold text-slate-700 mb-1">
-            Matriz de materialidad sin iniciar
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mb-4">
-            Carga la plantilla con 20 temas pre-clasificados (5 doble material,
-            5 impacto, 5 financiero, 5 seguimiento). Editables después.
-          </p>
-          {/* D-22: la plantilla default contiene temas de distribución de alimentos refrigerados.
-              El disclaimer advierte al consultor que los temas son un punto de partida y
-              deben adaptarse al sector real del cliente. */}
-          <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 max-w-md mx-auto mb-4">
-            La plantilla usa temas de referencia (GHG, agua, cadena de suministro, etc.).
-            Revisa y adapta al sector real del cliente antes de validar.
-          </p>
-          {/* D-30: deshabilitar botón mientras busyInit para evitar doble submit. */}
-          <Button
-            variant="primary"
-            size="md"
-            disabled={busyInit}
-            onClick={() => setConfirmInit(true)}
-          >
-            Cargar plantilla (20 temas)
-          </Button>
-        </div>
-        <ConfirmModal
-          open={confirmInit}
-          onCancel={() => setConfirmInit(false)}
-          onConfirm={initFromTemplate}
-          title="Cargar plantilla de materialidad"
-          description="Se crearán 20 temas pre-clasificados editables. Puedes modificar posiciones, colores, etiquetas y eliminar/agregar después."
-          confirmLabel={busyInit ? "Cargando…" : "Cargar 20 temas"}
-          tone="primary"
-        />
-      </>
+      <div className="border border-slate-200 rounded bg-slate-50/50 p-8 text-center">
+        <h3 className="text-sm font-bold text-slate-700 mb-1">
+          Matriz de materialidad sin iniciar
+        </h3>
+        <p className="text-xs text-slate-500 max-w-md mx-auto mb-4">
+          Carga la plantilla con 20 temas pre-clasificados (5 doble material,
+          5 impacto, 5 financiero, 5 seguimiento). Editables después.
+        </p>
+        {/* D-22: plantilla usa temas de referencia — adaptar al sector real antes de validar. */}
+        <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 max-w-md mx-auto mb-4">
+          La plantilla usa temas de referencia (GHG, agua, cadena de suministro, etc.).
+          Revisa y adapta al sector real del cliente antes de validar.
+        </p>
+        <Button
+          variant="primary"
+          size="md"
+          loading={busyInit}
+          disabled={busyInit}
+          onClick={initFromTemplate}
+        >
+          Cargar plantilla (20 temas)
+        </Button>
+      </div>
     );
   }
 
@@ -438,13 +423,13 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
               {topics.map((t, i) => {
                 const isSelected = selectedId === t.id;
                 const dimmed = filterQuadrant !== null && t.color !== filterQuadrant;
-                if (dimmed) return null;
                 return (
                   <button
                     key={t.id}
                     onClick={() => setSelectedId(isSelected ? null : t.id)}
+                    disabled={dimmed}
                     className={`w-full flex items-center gap-1.5 px-2 py-1 rounded text-left transition-colors ${
-                      isSelected ? COLOR_BG[t.color] : "hover:bg-slate-50"
+                      dimmed ? "opacity-25 pointer-events-none" : isSelected ? COLOR_BG[t.color] : "hover:bg-slate-50"
                     }`}
                   >
                     <span className={`text-[9px] tabular-nums shrink-0 w-4 text-right font-medium ${
@@ -536,8 +521,10 @@ function TopicPopover({
           {COLOR_META[topic.color].label}
         </span>
       </span>
-      <p className="text-[11px] text-slate-500 mb-1 tabular-nums">
-        Posición: x={topic.x_pos}, y={topic.y_pos}
+      <p className="text-[11px] text-slate-500 mb-1">
+        Materialidad financiera: {topic.x_pos > 66 ? "Alta" : topic.x_pos > 33 ? "Media" : "Baja"}
+        {" · "}
+        Impacto: {topic.y_pos < 33 ? "Alto" : topic.y_pos < 66 ? "Medio" : "Bajo"}
       </p>
       <p className="text-[11px] mb-3">
         {topic.validated ? (
@@ -551,7 +538,7 @@ function TopicPopover({
       )}
       <button
         onClick={onEdit}
-        className="w-full text-xs font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/30 rounded-lg px-3 py-2 hover:bg-brand-primary/20 transition-colors text-left"
+        className="w-full text-xs font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/30 rounded px-3 py-2 hover:bg-brand-primary/20 transition-colors text-left"
       >
         Editar tema →
       </button>
@@ -640,7 +627,7 @@ function TopicEditor({
                 <span className="text-[10px] text-slate-400">100</span>
               </div>
             </Field>
-            <Field label="Y · Impacto (invertido)">
+            <Field label="Y · Impacto">
               <input
                 type="range"
                 min={0}

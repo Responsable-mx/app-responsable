@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
   else if (clientIdParam) filter.clientId = clientIdParam;
   try {
     const data = await listChatSessions(user, filter);
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, {
+      headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=120" },
+    });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Error" },

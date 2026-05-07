@@ -218,7 +218,7 @@ export function ClientResumen({
 
             <div className="px-4 py-2 border-t border-slate-100 flex items-center gap-3">
               <span className="text-[11px] text-slate-600 tabular-nums shrink-0">
-                {filled}/{total} campos
+                {filled}/{total} preguntas
               </span>
               <div className="flex-1 h-1 bg-slate-100 rounded-sm overflow-hidden">
                 <div

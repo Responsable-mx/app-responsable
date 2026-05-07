@@ -103,7 +103,7 @@ export function NuevoClienteWizard() {
         </div>
       </div>
 
-      <Section title="Información base" subtitle="Captura del asesor — 5 campos" stepLabel="1 / 9">
+      <Section title="Información base" subtitle="Captura del asesor — 5 campos" stepLabel="Paso 1 · Datos del asesor">
         <Input
           label="Nombre de la empresa *"
           value={form.nombre}

@@ -8,6 +8,7 @@ import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { requireAdmin } from "@/lib/auth";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import { listMaterialityTopics } from "@/lib/materiality/queries";
+import { listCatalog } from "@/lib/catalogs";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +20,16 @@ export default async function EditarClientePage({ params }: Props) {
   // Antes ClientTabs hacía 2 fetches client-side en cascada al montar tabs (cuestionario,
   // materialidad), causando spinners visibles. Ahora SWR arranca con datos en memoria
   // y solo revalida en background.
-  const [client, allClients, questionnaireBundle, materialityTopics, adminEmail] =
+  const [client, allClients, questionnaireBundle, materialityTopics, adminEmail, serviceCatalog] =
     await Promise.all([
       getClient(id).catch(() => null),
       listClientsLight().catch(() => []),
       getQuestionnaireBundle(id, "doble-materialidad").catch(() => null),
       listMaterialityTopics(id).catch(() => []),
       requireAdmin(),
+      listCatalog("services").catch(() => []),
     ]);
+  const serviceLabels = new Map(serviceCatalog.map((i) => [i.value, i.label]));
   const isAdmin = !!adminEmail;
   if (!client) notFound();
 
@@ -106,7 +109,7 @@ export default async function EditarClientePage({ params }: Props) {
                 key={s}
                 className="inline-flex items-center text-[10px] font-medium bg-brand-primary-light text-brand-primary-dark rounded-sm px-2 py-0.5"
               >
-                {s}
+                {serviceLabels.get(s) ?? s}
               </span>
             ))}
             {client.services.length > 2 && (

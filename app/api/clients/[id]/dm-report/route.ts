@@ -11,6 +11,7 @@ import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 import { BENCHMARK_FIELDS } from "@/lib/dm/fields";
+import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import type { Client } from "@/lib/clients";
 
 export const runtime = "nodejs";
@@ -155,6 +156,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Resultado de benchmark no encontrado o aún no completado" }, { status: 404 });
   }
 
+  if (anthropicBreaker.isOpen) {
+    return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
+  }
+
   const clientContext = buildClientContext(client);
   const prompt = buildReportPrompt(client, clientContext, benchmarkResult as {
     companies_snapshot: unknown;
@@ -192,7 +197,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     for (const block of msg.content) {
       if (block.type === "text") textOut += block.text;
     }
+    anthropicBreaker.recordSuccess();
   } catch (e) {
+    anthropicBreaker.recordFailure();
     const errMsg = e instanceof Error ? e.message : "Error Anthropic";
     void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: errMsg });
     return NextResponse.json({ error: errMsg }, { status: 500 });

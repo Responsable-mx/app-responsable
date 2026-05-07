@@ -20,7 +20,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id: clientId } = await params;
   try {
     const data = await listStagesByClient(clientId);
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
+    });
   } catch (e) {
     console.error("[GET /api/clients/:id/stages]", e);
     return NextResponse.json({ error: "Error al listar etapas" }, { status: 500 });

@@ -118,6 +118,7 @@ export function ClientTabs({
     questionnaireFetcher,
     {
       revalidateOnFocus: false,
+      revalidateOnMount: !initialQuestionnaire,
       fallbackData: initialQuestionnaire ? { data: initialQuestionnaire } : undefined,
       onError: (e: unknown) => console.warn("[ClientTabs] questionnaire revalidation failed:", e),
     }
@@ -127,6 +128,7 @@ export function ClientTabs({
     materialityFetcher,
     {
       revalidateOnFocus: false,
+      revalidateOnMount: !initialMateriality,
       fallbackData: initialMateriality ? { data: initialMateriality } : undefined,
       onError: (e: unknown) => console.warn("[ClientTabs] materiality revalidation failed:", e),
     }

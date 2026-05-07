@@ -277,7 +277,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       file_name: fileName,
       file_type: "md",
       mime_type: "text/markdown",
-      size_bytes: 0,
+      size_bytes: 1, // placeholder — el contenido real llega cuando el batch termina
       storage_path: `dm-reports/${id}/report-${Date.now()}.md`,
       markdown_content: "",
       parse_status: "pending",

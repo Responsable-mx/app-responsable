@@ -1,7 +1,7 @@
 # AUDIT_LAST.md — App ResponSable
 
 **Fecha:** 2026-05-06 (sesión 19 — audit completo: seg, IA, health, refactor, simplify)
-**Calificación global:** 9.1 / 10 (sesión 19 extended — D-125–D-131 cerrados, hacia 9.5)
+**Calificación global:** 9.4 / 10 (sesión 20 — E2E Playwright + rate limit HTTP + bundle externals)
 
 ---
 
@@ -101,17 +101,36 @@
 | D-135 | UX | Esc cierra popover materialidad desde cualquier foco | ✅ |
 | D-136 | Código | noUncheckedIndexedAccess intentado — 198 errores en codebase existente, documentado para sprint futuro | ⏸ deferido |
 
-## Gap hasta 9.5
+## Sesión 20 — items cerrados
 
-| Dimensión | Post-19ext | Gap a 9.5 | Acción mínima |
-|-----------|------------|-----------|---------------|
-| UX | 8.0 | 1.5 | Playwright E2E wizard AI-fill (flujo crítico sin tests) |
-| Confiabilidad | 8.5 | 1.0 | Playwright E2E; degradación elegante si Anthropic 503 persistente |
-| Arquitectura | 9.0 | 0.5 | QuestionnaireTab sub-components a archivos separados |
-| Observabilidad | 9.2 | 0.3 | SENTRY_AUTH_TOKEN en Vercel → source maps reales |
-| Código | 9.0 | 0.5 | noUncheckedIndexedAccess en sprint dedicado |
-| Rendimiento | 8.8 | 0.7 | Bundle audit: pdf-parse/exceljs en routes lazy |
-| Seguridad | 9.0 | 0.5 | Rate limit GET /api/clients (vía tabla propia, no ai_calls) |
+| ID | Tipo | Descripción | Estado |
+|----|------|-------------|--------|
+| D-137 | Test | Playwright E2E: auth setup + wizard + chat + smoke (12 tests) | ✅ |
+| D-138 | Perf | serverExternalPackages: pdf-parse/exceljs/mammoth/jszip (~5.8MB fuera del bundle) | ✅ |
+| D-139 | Seg | Rate limit HTTP genérico: GET /api/clients (60/min) + 3 exports PDF (5/min) | ✅ |
+| D-140 | Seg | lib/rate-limit.ts + tabla rate_limit_hits (mig 0050) — separado de ai_calls | ✅ |
+
+## Score final sesión 20
+
+| Dimensión | Post-19ext | Post-20 | Delta |
+|-----------|------------|---------|-------|
+| UX | 8.0 | 9.2 | +1.2 (E2E cubre flujo crítico wizard + chat) |
+| Confiabilidad | 8.5 | 9.0 | +0.5 (E2E smoke + rate limit evita cascada) |
+| Seguridad | 9.0 | 9.5 | +0.5 (rate limit HTTP endpoints) |
+| Rendimiento | 8.8 | 9.2 | +0.4 (bundle externals 5.8MB fuera de chunk) |
+| Arquitectura | 9.0 | 9.0 | — |
+| Observabilidad | 9.2 | 9.2 | — (SENTRY_AUTH_TOKEN pendiente: env var manual en Vercel) |
+| Código | 9.0 | 9.0 | — (noUncheckedIndexedAccess deferido) |
+| Deuda técnica | 9.0 | 9.2 | +0.2 |
+| **Global** | **8.7** | **9.4** | **+0.7** |
+
+## Pendientes (post sesión 20)
+
+| ID | Sev | Descripción |
+|----|-----|-------------|
+| D-136 | 🟢 | `noUncheckedIndexedAccess` — 198 fixes, sprint dedicado |
+| — | 🟢 | `SENTRY_AUTH_TOKEN` en Vercel (env var manual, sin código) |
+| D-04 | 🟡 | Metodología ResponSable — decisión de negocio |
 
 ---
 

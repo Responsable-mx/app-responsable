@@ -11,22 +11,19 @@ import { TeamOccupancy } from "./TeamOccupancy";
 import { ProjectsOverview } from "./ProjectsOverview";
 import { GlobalTimeline } from "./GlobalTimeline";
 import { GanttPorProyecto } from "./GanttPorProyecto";
-import { ConsultorSwimlane } from "./ConsultorSwimlane";
 import { FiltersBar, emptyFilters, type EquipoFilters } from "./EquipoFilters";
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 
-type View = "consultor" | "proyecto" | "timeline" | "gantt" | "swimlane";
+type View = "consultor" | "proyecto" | "timeline" | "gantt";
 
 const INTRO: Record<View, string> = {
   consultor:
     "Carga del equipo derivada de actividades activas. Clic en un consultor para ver el detalle.",
   proyecto: "Tus proyectos con etapas, actividades y fechas. Clic en un proyecto para expandir.",
   timeline:
-    "Timeline cross-project: 1 fila por consultor, todas sus actividades en una línea.",
+    "Timeline cross-project: 1 fila por consultor. Alterna entre Estado (RAG) y Proyecto para cambiar la lectura.",
   gantt:
     "Gantt por proyecto: cada cliente con su cronograma plan vs real. Clic en barra → ficha del cliente.",
-  swimlane:
-    "Swimlane por consultor: todas las actividades de cada consultor en una línea, coloreadas por proyecto.",
 };
 
 const fetcher = (url: string) =>
@@ -142,11 +139,6 @@ export function EquipoView() {
               <rect x="5" y="15" width="11" height="2.5" rx="1" />
             </svg>
           </IconToggleButton>
-          <IconToggleButton active={view === "swimlane"} onClick={() => setView("swimlane")} label="Swimlane">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-          </IconToggleButton>
         </div>
       </div>
       <FiltersBar
@@ -161,11 +153,6 @@ export function EquipoView() {
       {view === "gantt" && (
         <TabErrorBoundary tabName="Gantt">
           <GanttPorProyecto filters={filters} />
-        </TabErrorBoundary>
-      )}
-      {view === "swimlane" && (
-        <TabErrorBoundary tabName="Swimlane">
-          <ConsultorSwimlane filters={filters} />
         </TabErrorBoundary>
       )}
       {view === "timeline" && (

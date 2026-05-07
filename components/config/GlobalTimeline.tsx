@@ -32,6 +32,37 @@ const CHART_BASE = 1200; // px de ancho del chart a zoom 1×
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
 const ZOOM_DEFAULT = 2; // índice → 1×
 
+const PROJECT_PALETTE = [
+  '#0d9488','#4f46e5','#d97706','#ea580c',
+  '#db2777','#7c3aed','#0284c7','#059669',
+  '#dc2626','#9333ea','#c2410c','#0891b2',
+] as const;
+
+type ColorMode = 'estado' | 'proyecto';
+
+const STATUS_INLINE: Record<ActivityStatus, { bg: string; fill: string; text: string }> = {
+  pending:     { bg: '#f1f5f9', fill: '#94a3b8', text: '#475569' },
+  in_progress: { bg: '#ccfbf1', fill: '#0d9488', text: '#0f766e' },
+  completed:   { bg: '#d1fae5', fill: '#059669', text: '#065f46' },
+  delayed:     { bg: '#fee2e2', fill: '#ef4444', text: '#991b1b' },
+};
+
+function hexAlpha(hex: string, a: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function estimateProgress(a: FlatActivity, now: number): number {
+  if (a.status === 'completed') return 100;
+  if (a.status === 'pending') return 0;
+  const s = a.planned_start ? new Date(a.planned_start + 'T00:00:00').getTime() : null;
+  const e = a.planned_end   ? new Date(a.planned_end   + 'T00:00:00').getTime() : null;
+  if (!s || !e || e <= s) return 20;
+  return Math.min(100, Math.max(5, Math.round((now - s) / (e - s) * 100)));
+}
+
 type FlatActivity = {
   id: string;
   name: string;
@@ -167,6 +198,7 @@ export function GlobalTimeline({
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
   // Filtro interno "solo retrasadas" — quick toggle para el gerente
   const [delayedOnly, setDelayedOnly] = useState(false);
+  const [colorMode, setColorMode] = useState<ColorMode>('estado');
   const scrollRef = useRef<HTMLDivElement>(null);
   // Drag-to-pan: refs (no state) para evitar re-renders en cada mousemove
   const isPanning = useRef(false);
@@ -298,6 +330,11 @@ export function GlobalTimeline({
       map.set(key, cur);
     }
     return map;
+  }, [activities]);
+
+  const clientColorMap = useMemo(() => {
+    const ids = Array.from(new Set(activities.map((a) => a.client_id)));
+    return new Map(ids.map((id, i) => [id, PROJECT_PALETTE[i % PROJECT_PALETTE.length]]));
   }, [activities]);
 
   // Agrupar por consultor + sort por riesgo
@@ -626,6 +663,27 @@ export function GlobalTimeline({
               ↔ Hoy
             </button>
           )}
+          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2 ml-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Color</span>
+            <div className="inline-flex bg-slate-100 rounded p-0.5 gap-0.5">
+              <button
+                onClick={() => setColorMode('estado')}
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded transition-colors ${
+                  colorMode === 'estado'
+                    ? 'bg-white text-brand-primary-dark shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >Estado</button>
+              <button
+                onClick={() => setColorMode('proyecto')}
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded transition-colors ${
+                  colorMode === 'proyecto'
+                    ? 'bg-white text-brand-primary-dark shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >Proyecto</button>
+            </div>
+          </div>
           <span className="ml-auto text-[10px] text-slate-400" title="← → pan · Shift+← → salto · Home/End · +/− zoom · Arrastra con mouse">← → · drag · Ctrl+rueda</span>
         </div>
 
@@ -816,7 +874,6 @@ export function GlobalTimeline({
                     const style = realStyle ?? planStyle;
                     if (!style) return null;
 
-                    const colorClass = STATUS_BAR[a.status];
                     const lane = lanes[idx];
                     const top = 14 + lane * 20;
                     const isCascade = a.status === "delayed" && activitiesWithDependents.has(a.id);
@@ -825,7 +882,6 @@ export function GlobalTimeline({
                     const sp = stageProgress.get(stageKey);
                     const spLabel = sp ? `${sp.completed}/${sp.total} completas` : "";
 
-                    // Días de retraso — clave para priorizar atención gerencial
                     const daysOverdue = (() => {
                       if (a.status !== "delayed" || !a.planned_end) return null;
                       const endMs = parseDate(a.planned_end)?.getTime();
@@ -844,20 +900,43 @@ export function GlobalTimeline({
                       `Status: ${a.status}`,
                     ].filter(Boolean).join("\n");
 
+                    const progress = estimateProgress(a, now);
+                    const barStyle = colorMode === 'estado'
+                      ? STATUS_INLINE[a.status]
+                      : (() => {
+                          const c = clientColorMap.get(a.client_id) ?? '#64748b';
+                          return { bg: hexAlpha(c, 0.12), fill: c, text: c };
+                        })();
+
                     return (
                       <Link
                         key={a.id}
                         href={`/clientes/${a.client_id}?tab=cronograma`}
-                        className={`absolute h-4 rounded ${colorClass} transition-colors flex items-center px-1 overflow-hidden gap-0.5 ${
-                          isCascade ? "ring-1 ring-rose-300 ring-offset-0" : ""
+                        className={`absolute h-4 rounded overflow-hidden flex items-center px-1 gap-0.5 ${
+                          isCascade ? "ring-1 ring-rose-300" : ""
                         }`}
-                        style={{ left: style.left, width: style.width, top }}
+                        style={{
+                          left: style.left,
+                          width: style.width,
+                          top,
+                          background: barStyle.bg,
+                          border: `1px solid ${barStyle.fill}55`,
+                        }}
                         title={tooltip}
                       >
+                        <div
+                          className="absolute left-0 top-0 bottom-0 pointer-events-none"
+                          style={{
+                            width: `${progress}%`,
+                            background: barStyle.fill,
+                            opacity: 0.55,
+                            borderRadius: '3px 0 0 3px',
+                          }}
+                        />
                         {isCascade && (
-                          <span className="text-[8px] shrink-0 leading-none">⚡</span>
+                          <span className="relative z-10 text-[8px] shrink-0 leading-none" style={{ color: barStyle.text }}>⚡</span>
                         )}
-                        <span className="text-[9px] text-white font-semibold truncate leading-none">
+                        <span className="relative z-10 text-[9px] font-semibold truncate leading-none" style={{ color: barStyle.text }}>
                           {a.name}
                         </span>
                       </Link>
@@ -889,20 +968,37 @@ export function GlobalTimeline({
 
         {/* Leyenda */}
         <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-600">
-          <span className="font-semibold text-slate-500">Status:</span>
-          {(
-            [
-              { color: "bg-slate-300", label: "Pendiente" },
-              { color: "bg-brand-primary", label: "En curso" },
-              { color: "bg-teal-600", label: "Completada" },
-              { color: "bg-rose-500", label: "Retrasada" },
-            ] as const
-          ).map(({ color, label }) => (
-            <span key={label} className="inline-flex items-center gap-1.5">
-              <span className={`w-4 h-2.5 ${color} rounded-sm`} />
-              {label}
-            </span>
-          ))}
+          {colorMode === 'estado' ? (
+            <>
+              <span className="font-semibold text-slate-500">Estado:</span>
+              {(
+                [
+                  { bg: STATUS_INLINE.pending.fill,     label: "Pendiente" },
+                  { bg: STATUS_INLINE.in_progress.fill, label: "En curso"  },
+                  { bg: STATUS_INLINE.completed.fill,   label: "Completada"},
+                  { bg: STATUS_INLINE.delayed.fill,     label: "Retrasada" },
+                ] as const
+              ).map(({ bg, label }) => (
+                <span key={label} className="inline-flex items-center gap-1.5">
+                  <span className="w-4 h-2.5 rounded-sm" style={{ background: bg }} />
+                  {label}
+                </span>
+              ))}
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-slate-500">Proyecto:</span>
+              {Array.from(clientColorMap.entries()).map(([clientId, color]) => {
+                const name = activities.find((a) => a.client_id === clientId)?.client_name ?? clientId;
+                return (
+                  <span key={clientId} className="inline-flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: color }} />
+                    {name}
+                  </span>
+                );
+              })}
+            </>
+          )}
           <span className="inline-flex items-center gap-1.5 border-l border-slate-200 pl-4">
             <svg width="8" height="8" viewBox="0 0 10 10" className="fill-slate-500 shrink-0">
               <polygon points="5,0 10,5 5,10 0,5" />

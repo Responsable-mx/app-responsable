@@ -2,18 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
-import { QuestionnaireTab } from "@/components/questionnaire/QuestionnaireTab";
-import { MaterialityTab } from "@/components/materiality/MaterialityTab";
+// ClientResumen es el tab default → eager (no lazy) para evitar skeleton en primera carga.
 import { ClientResumen } from "@/components/ClientResumen";
-import { ChatWindow } from "@/components/chat/ChatWindow";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 import type { MaterialityTopic } from "@/lib/materiality/types";
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
-import { TeamTab } from "@/components/equipo/TeamTab";
-import { ClientCronogramaTab } from "@/components/services/ClientCronogramaTab";
-import { DocumentsTab } from "@/components/documents/DocumentsTab";
+import { SkeletonDetail, SkeletonTable } from "@/components/ui/Skeleton";
+
+// Los 6 tabs restantes son lazy: su JS (incluyendo react-markdown, swr fetchers,
+// scatter plot) solo descarga cuando el usuario abre el tab por primera vez.
+const QuestionnaireTab = dynamic(
+  () => import("@/components/questionnaire/QuestionnaireTab").then((m) => m.QuestionnaireTab),
+  { loading: () => <SkeletonDetail />, ssr: false }
+);
+const MaterialityTab = dynamic(
+  () => import("@/components/materiality/MaterialityTab").then((m) => m.MaterialityTab),
+  { loading: () => <SkeletonDetail />, ssr: false }
+);
+const ChatWindow = dynamic(
+  () => import("@/components/chat/ChatWindow").then((m) => m.ChatWindow),
+  { loading: () => <SkeletonDetail />, ssr: false }
+);
+const ClientCronogramaTab = dynamic(
+  () => import("@/components/services/ClientCronogramaTab").then((m) => m.ClientCronogramaTab),
+  { loading: () => <SkeletonTable />, ssr: false }
+);
+const TeamTab = dynamic(
+  () => import("@/components/equipo/TeamTab").then((m) => m.TeamTab),
+  { loading: () => <SkeletonTable />, ssr: false }
+);
+const DocumentsTab = dynamic(
+  () => import("@/components/documents/DocumentsTab").then((m) => m.DocumentsTab),
+  { loading: () => <SkeletonTable />, ssr: false }
+);
 
 type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "cronograma" | "equipo" | "documentos";
 

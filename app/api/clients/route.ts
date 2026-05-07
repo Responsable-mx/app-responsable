@@ -4,6 +4,7 @@ import { listClientsLight, listClientsForTable, createClientRow, deleteClientRow
 import { ClientInputSchema } from "@/lib/validation";
 import { upsertQuestionnaireResponse } from "@/lib/questionnaires/queries";
 import type { FieldResponse, QuestionnaireResponseData, SourceItem } from "@/lib/questionnaires/types";
+import { logChange } from "@/lib/audit-log";
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();
@@ -115,6 +116,16 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+
+    // D-128: audit trail para creación de cliente.
+    await logChange({
+      actorEmail: user,
+      entityType: "clients",
+      entityId: data.id,
+      action: "create",
+      before: null,
+      after: { name: data.name, sector: data.sector, size: data.size },
+    });
 
     return NextResponse.json({ data }, { status: 201 });
   } catch (e) {

@@ -81,6 +81,25 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-125–D-129 — Hallazgos auditoría sesión 19 (may-2026)
+
+### ~~🟡 D-127 — PATCH /api/clients/[id] logChange sin snapshot `before`~~ ✅ RESUELTO
+- `getClient(id)` antes de `updateClientRow`. Snapshot `before` proyectado en mismos campos que `after`. Sesión 19.
+
+### ~~🟡 D-129 — CSP `unsafe-eval` en producción~~ ✅ RESUELTO
+- `'unsafe-eval'` eliminado de `script-src` en `next.config.ts`. Solo `'unsafe-inline'` (necesario para Next.js App Router). Sesión 19.
+
+### ~~🟢 D-125 — ConsultorSwimlane.tsx dead code (355 líneas)~~ ✅ RESUELTO
+- Archivo eliminado. 0 consumidores confirmados. Sesión 19.
+
+### ~~🟢 D-126 — mockup-timeline-swimlane.html en raíz del repo~~ ✅ RESUELTO
+- Archivo eliminado (untracked — no requería git rm). Sesión 19.
+
+### ~~🟢 D-128 — POST /api/clients sin logChange~~ ✅ RESUELTO
+- `logChange` importado y llamado tras `createClientRow` con `action: "create"`. Sesión 19.
+
+---
+
 ### ~~🟡 D-85 — "MIS PROYECTOS" en sidebar duplica acceso ya dado por nav "Clientes"~~ ✅ RESUELTO
 - Sección "Acceso rápido" eliminada de `Sidebar.tsx`. `useSWR`, `projectsFetcher`, `ProjectsResponse`, `ConsultorProject` — todo dead code removido. Sesión 18.
 

@@ -47,14 +47,28 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   try {
+    // D-127: capturar before antes de mutar para audit trail completo.
+    // Solo atributos estructurados; bloques narrativos pueden ser >1KB.
+    const existing = await getClient(id).catch(() => null);
+    const before = existing
+      ? {
+          name: existing.name,
+          sector: existing.sector,
+          size: existing.size,
+          maturity_level: existing.maturity_level,
+          services: existing.services,
+          frameworks: existing.frameworks,
+          certifications: existing.certifications,
+          material_topics: existing.material_topics,
+        }
+      : null;
     const data = await updateClientRow(id, parsed.data, user);
     await logChange({
       actorEmail: user,
       entityType: "clients",
       entityId: id,
       action: "update",
-      // Solo nombre + atributos estructurados al log; bloques narrativos
-      // pueden ser >1KB y van a impactar tamaño del audit_log.
+      before,
       after: {
         name: data.name,
         sector: data.sector,

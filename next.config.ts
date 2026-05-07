@@ -17,7 +17,9 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
           // connect-src incluye Sentry ingest para captura de errores
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src 'self' *.supabase.co wss://*.supabase.co *.ingest.sentry.io *.ingest.us.sentry.io; font-src 'self'; frame-src 'none'; object-src 'none';" },
+          // D-129: 'unsafe-eval' eliminado — habilitaba eval-based XSS en prod.
+          // 'unsafe-inline' necesario para Next.js inline scripts (App Router).
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src 'self' *.supabase.co wss://*.supabase.co *.ingest.sentry.io *.ingest.us.sentry.io; font-src 'self'; frame-src 'none'; object-src 'none';" },
         ],
       },
       {

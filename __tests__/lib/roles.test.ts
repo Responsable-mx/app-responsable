@@ -305,6 +305,104 @@ describe("buildClientContext", () => {
     const out = buildClientContext(FULL_CLIENT, questionnaire);
     expect(out).not.toContain("<questionnaire_data>");
   });
+
+  it("client con business_segments null → no aparece <business_segments>", () => {
+    const c = { ...FULL_CLIENT, business_segments: null };
+    const out = buildClientContext(c);
+    expect(out).not.toContain("<business_segments>");
+  });
+
+  it("client con applicable_regulations null → no aparece <applicable_regulations>", () => {
+    const c = { ...FULL_CLIENT, applicable_regulations: null };
+    const out = buildClientContext(c);
+    expect(out).not.toContain("<applicable_regulations>");
+  });
+
+  it("client con policies_in_place null → no aparece <policies_in_place>", () => {
+    const c = { ...FULL_CLIENT, policies_in_place: null };
+    const out = buildClientContext(c);
+    expect(out).not.toContain("<policies_in_place>");
+  });
+
+  it("client con certifications null → no aparece <certifications>", () => {
+    const c = { ...FULL_CLIENT, certifications: null };
+    const out = buildClientContext(c);
+    expect(out).not.toContain("<certifications>");
+  });
+
+  it("client con material_topics null → no aparece <material_topics>", () => {
+    const c = { ...FULL_CLIENT, material_topics: null };
+    const out = buildClientContext(c);
+    expect(out).not.toContain("<material_topics>");
+  });
+
+  it("todos los arrays null → output sigue teniendo <name> y bloque <context>", () => {
+    const c = {
+      ...FULL_CLIENT,
+      business_segments: null,
+      applicable_regulations: null,
+      policies_in_place: null,
+      certifications: null,
+      material_topics: null,
+    };
+    const out = buildClientContext(c);
+    expect(out).toContain("<name>Heineken México</name>");
+    expect(out).toContain("<context>");
+  });
+
+  it("buildQuestionnaireSection — value booleano se serializa como string 'true'", () => {
+    const questionnaire: QuestionnaireBundle = {
+      template: {
+        service_key: "doble_materialidad",
+        label: "Doble Materialidad",
+        schema: {
+          version: 2,
+          type: "wizard",
+          steps: [
+            {
+              step: 1,
+              key: "general",
+              title: "General",
+              subtitle: "",
+              ai_can_fill: true,
+              only_double_materialidad: false,
+              fields: [
+                { key: "tiene_reporte", label: "Tiene reporte", type: "text" },
+              ],
+            },
+          ],
+        },
+        version: 2,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      response: {
+        id: "resp-bool",
+        client_id: FULL_CLIENT.id,
+        service_key: "doble_materialidad",
+        responses: {
+          general: {
+            tiene_reporte: {
+              value: true as unknown as string, // boolean en un campo text
+              source_type: "public",
+              sources: [],
+              validated: true,
+              updated_at: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        completed_sections: [],
+        created_by: null,
+        updated_by: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      progress: { totalFields: 1, filledFields: 1, pct: 100, sectionProgress: {} },
+    };
+    const out = buildClientContext(FULL_CLIENT, questionnaire);
+    // String(true) = "true" → aparece en el questionnaire_data
+    expect(out).toContain("[tiene_reporte] Tiene reporte: true");
+  });
 });
 
 describe("buildSystemBlocks (async)", () => {

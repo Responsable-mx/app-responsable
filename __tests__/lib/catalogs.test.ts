@@ -122,3 +122,53 @@ describe("dev mode — mutaciones lanzan error descriptivo", () => {
     ).rejects.toThrow(/dev mode/);
   });
 });
+
+describe("slugify — edge cases adicionales", () => {
+  it('string vacío devuelve ""', () => {
+    expect(slugify("")).toBe("");
+  });
+
+  it('solo espacios devuelve ""', () => {
+    expect(slugify("   ")).toBe("");
+  });
+
+  it('solo caracteres especiales devuelve ""', () => {
+    expect(slugify("!@#$%^")).toBe("");
+  });
+
+  it("acento compuesto (NFD) se normaliza", () => {
+    // "Héroe" con vocal compuesta
+    expect(slugify("Héroe")).toBe("heroe");
+  });
+
+  it("recorta exactamente a 60 chars", () => {
+    const resultado = slugify("a".repeat(70));
+    expect(resultado).toHaveLength(60);
+  });
+});
+
+describe("dev mode — listCatalog categorías adicionales", () => {
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  });
+
+  it("listCatalog con opts no cambia resultado en dev mode (usa seeds)", async () => {
+    const sinOpts = await listCatalog("frameworks");
+    const conOpts = await listCatalog("frameworks", { includeInactive: false });
+    expect(conOpts).toEqual(sinOpts);
+  });
+
+  it("sectors y frameworks no comparten items (filter por categoría funciona)", async () => {
+    const sectors = await listCatalog("sectors");
+    const frameworks = await listCatalog("frameworks");
+    const sectorValues = new Set(sectors.map((s) => s.value));
+    const frameworkValues = new Set(frameworks.map((s) => s.value));
+    const intersect = [...sectorValues].filter((v) => frameworkValues.has(v));
+    expect(intersect).toHaveLength(0);
+  });
+
+  it("certifications tiene al menos 1 item", async () => {
+    const certs = await listCatalog("certifications");
+    expect(certs.length).toBeGreaterThanOrEqual(1);
+  });
+});

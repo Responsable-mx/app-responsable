@@ -105,6 +105,20 @@ describe("dev mode — mutaciones lanzan error", () => {
   it("deleteUser falla", async () => {
     await expect(deleteUser("x@y.com")).rejects.toThrow(/dev mode/);
   });
+
+  it("createUser con role cliente + client_id lanza dev mode (no llega al check de cliente)", async () => {
+    // El guard isDevMode() se dispara antes de llegar al check role=cliente+client_id.
+    await expect(
+      createUser({ email: "x@y.com", role: "cliente", client_id: "some-id" }, "admin@z.com")
+    ).rejects.toThrow(/dev mode/);
+  });
+
+  it("updateUser con role cliente + client_id null lanza dev mode (no llega al check de cliente)", async () => {
+    // Igual: el guard isDevMode() dispara antes del check role+client_id.
+    await expect(
+      updateUser("x@y.com", { role: "cliente", client_id: null })
+    ).rejects.toThrow(/dev mode/);
+  });
 });
 
 describe("isSystemAccount", () => {
@@ -168,6 +182,13 @@ describe("getUserRoles — dev mode", () => {
     const r = await getUserRoles("fallback@x.com");
     expect(r.isAdmin).toBe(true);
   });
+
+  it("admin seed nblondel@s-peak.com → featureFlags es {}", async () => {
+    // Los seeds de dev no tienen feature_flags → el helper devuelve {} por defecto
+    const r = await getUserRoles("nblondel@s-peak.com");
+    expect(r.isAdmin).toBe(true);
+    expect(r.featureFlags).toEqual({});
+  });
 });
 
 describe("recordLogin — dev mode (no-op)", () => {
@@ -177,5 +198,10 @@ describe("recordLogin — dev mode (no-op)", () => {
 
   it("resuelve sin error en dev mode", async () => {
     await expect(recordLogin("gwenaelle@responsable.net")).resolves.toBeUndefined();
+  });
+
+  it("resuelve sin error con email en mixed case (normalización conceptual)", async () => {
+    // recordLogin acepta cualquier string en dev mode (no-op), sin importar mayúsculas
+    await expect(recordLogin("GWENAELLE@RESPONSABLE.NET")).resolves.toBeUndefined();
   });
 });

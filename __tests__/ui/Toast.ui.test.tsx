@@ -84,4 +84,53 @@ describe("Toast system", () => {
     await user.click(screen.getByRole("button", { name: /disparar/i }));
     expect(screen.getByRole("status").className).toContain("bg-brand-berry");
   });
+
+  it("toast tone warning usa fondo amber", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(
+      <ToastProvider>
+        <Trigger tone="warning" />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: /disparar/i }));
+    expect(screen.getByRole("status").className).toContain("bg-amber-600");
+  });
+
+  it("toast tone info usa fondo brand-primary", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(
+      <ToastProvider>
+        <Trigger tone="info" />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: /disparar/i }));
+    expect(screen.getByRole("status").className).toContain("bg-brand-primary");
+  });
+
+  it("múltiples toasts coexisten (dos role=status presentes)", async () => {
+    function DoubleTrigger() {
+      const { push } = useToast();
+      return (
+        <button
+          onClick={() => {
+            push("success", "Primero");
+            push("info", "Segundo");
+          }}
+        >
+          disparar doble
+        </button>
+      );
+    }
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(
+      <ToastProvider>
+        <DoubleTrigger />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: /disparar doble/i }));
+    const toasts = screen.getAllByRole("status");
+    expect(toasts).toHaveLength(2);
+    expect(toasts[0]).toHaveTextContent("Primero");
+    expect(toasts[1]).toHaveTextContent("Segundo");
+  });
 });

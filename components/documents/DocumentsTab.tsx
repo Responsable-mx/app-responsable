@@ -330,7 +330,7 @@ export function DocumentsTab({
 const previewFetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<{ data: { markdown_content: string | null } }>;
+    return r.json() as { data: { markdown_content: string | null } };
   });
 
 function PreviewModal({ clientId, doc, onClose }: { clientId: string; doc: DocMeta; onClose: () => void }) {

@@ -75,6 +75,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     response = await fetch(url, {
       method: "GET",
+      // "follow" es necesario para CDNs y repositorios (ej. BMV). La URL ya pasó
+      // isPublicHttpUrl() arriba, pero si el servidor redirige a una IP interna,
+      // el SSRF guard NO re-valida la URL destino. Riesgo aceptado para piloto;
+      // mitigación futura: resolver DNS del destino final y validar de nuevo.
       redirect: "follow",
       signal: controller.signal,
       headers: {

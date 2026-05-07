@@ -75,15 +75,12 @@ function cellText(n: number): string {
   return "text-rose-700 font-extrabold";
 }
 
-function totalBg(n: number): string {
+function totalBg(n: number, count: number): string {
   if (n === 0) return "bg-slate-50 text-slate-300";
-  if (n <= consultorCount * 2) return "bg-emerald-50 text-emerald-700";
-  if (n <= consultorCount * 4) return "bg-amber-50 text-amber-700";
+  if (n <= count * 2) return "bg-emerald-50 text-emerald-700";
+  if (n <= count * 4) return "bg-amber-50 text-amber-700";
   return "bg-rose-50 text-rose-700 font-extrabold";
 }
-
-// Se asigna en el módulo porque la función totalBg lo necesita
-let consultorCount = 1;
 
 export function WorkloadHeatmap() {
   const [collapsed, setCollapsed] = useState(() => {
@@ -133,7 +130,7 @@ export function WorkloadHeatmap() {
 
   const consultors = [...new Set(acts.map((a) => a.assignee))].sort();
   if (consultors.length === 0) return null;
-  consultorCount = consultors.length;
+  const consultorCount = consultors.length;
 
   // Próximas 12 semanas desde el lunes actual
   const weeks = Array.from({ length: 12 }, (_, i) => todayMonday + i * MS_WEEK);
@@ -290,7 +287,7 @@ export function WorkloadHeatmap() {
                   {weekTotals.map((n, wi) => (
                     <td
                       key={wi}
-                      className={`px-1 py-1.5 text-center tabular-nums border-r border-slate-100 text-[10px] font-bold ${totalBg(n)}`}
+                      className={`px-1 py-1.5 text-center tabular-nums border-r border-slate-100 text-[10px] font-bold ${totalBg(n, consultorCount)}`}
                       title={`Total equipo · semana del ${fmtWeek(weeks[wi])}: ${n} actividades en curso`}
                     >
                       {n > 0 ? n : "·"}

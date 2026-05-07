@@ -267,6 +267,26 @@ export async function deleteUser(email: string): Promise<void> {
   if (error) throw new Error(`deleteUser: ${error.message}`);
 }
 
+export async function getUserRoles(email: string): Promise<{
+  isAdmin: boolean;
+  isClient: boolean;
+  clientId: string | null;
+}> {
+  const normalized = email.trim().toLowerCase();
+  if (isDevMode() && normalized === "dev@localhost") {
+    return { isAdmin: true, isClient: false, clientId: null };
+  }
+  const user = await getUser(normalized);
+  if (user && user.active) {
+    return {
+      isAdmin: user.role === "admin",
+      isClient: user.role === "cliente",
+      clientId: user.role === "cliente" ? user.client_id : null,
+    };
+  }
+  return { isAdmin: fallbackAdmins().includes(normalized), isClient: false, clientId: null };
+}
+
 export async function recordLogin(email: string): Promise<void> {
   if (isDevMode()) return;
   try {

@@ -12,7 +12,7 @@ import {
   isFieldFilled,
   type QuestionnaireResponseData,
 } from "@/lib/questionnaires/types";
-import { getClient } from "@/lib/clients";
+import { getClientMini } from "@/lib/clients";
 import { logChange } from "@/lib/audit-log";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       // only_double_materialidad: verificar flag del cliente. Si el paso solo aplica
       // a clientes con doble materialidad y el cliente NO la tiene, rechazar payload
       // que intente guardar respuestas en ese paso.
-      const client = await getClient(id).catch(() => null);
+      const client = await getClientMini(id).catch(() => null);
       const hasDoubleMat = client?.has_double_materiality === true;
 
       for (const step of schema.steps) {

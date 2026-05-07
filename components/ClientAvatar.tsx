@@ -63,6 +63,8 @@ export function ClientAvatar({ name, size = "md", logoUrl = null }: Props) {
       <img
         src={safeLogoUrl}
         alt={`${name} logo`}
+        width={size === "sm" ? 28 : size === "lg" ? 48 : 36}
+        height={size === "sm" ? 28 : size === "lg" ? 48 : 36}
         className={`${sizeClass} rounded shrink-0 object-cover bg-white border border-slate-200`}
         onError={(e) => {
           // Fallback al monogram si la URL rompe — evita broken image icon.

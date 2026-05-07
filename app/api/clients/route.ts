@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { listClients, createClientRow, deleteClientRow } from "@/lib/clients";
+import { listClients, listClientsLight, createClientRow, deleteClientRow } from "@/lib/clients";
 import { ClientInputSchema } from "@/lib/validation";
 import { upsertQuestionnaireResponse } from "@/lib/questionnaires/queries";
 import type { FieldResponse, QuestionnaireResponseData, SourceItem } from "@/lib/questionnaires/types";
@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
 
     // Modo catálogo: devuelve {value: id, label: name} excluyendo el cliente actual
     if (catalog) {
-      const items = data
+      const light = await listClientsLight({ search, limit });
+      const items = light
         .filter((c) => c.id !== exclude)
         .map((c) => ({ value: c.id, label: c.name }))
         .sort((a, b) => a.label.localeCompare(b.label, "es"));

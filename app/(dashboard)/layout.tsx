@@ -1,6 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { requireUser } from "@/lib/auth";
-import { isAdmin, isClient, getUserClientId } from "@/lib/users";
+import { getUserRoles } from "@/lib/users";
 import { ToastProvider } from "@/components/ui/Toast";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DashboardSWRProvider } from "@/components/DashboardSWRProvider";
@@ -11,11 +11,9 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const email = await requireUser();
-  const [admin, client] = await Promise.all([
-    email ? isAdmin(email) : Promise.resolve(false),
-    email ? isClient(email) : Promise.resolve(false),
-  ]);
-  const clientId = client && email ? await getUserClientId(email) : null;
+  const { isAdmin: admin, isClient: client, clientId } = email
+    ? await getUserRoles(email)
+    : { isAdmin: false, isClient: false, clientId: null };
 
   return (
     <ToastProvider>

@@ -210,68 +210,7 @@ export function GlobalTimeline({
   const zoom = ZOOM_STEPS[zoomIdx];
   const chartW = Math.round(CHART_BASE * zoom);
 
-  // Aplanar + filtrar (incluye depends_on_activity_id para cascade)
-  const activities = useMemo<FlatActivity[]>(() => {
-    const out: FlatActivity[] = [];
-    for (const p of data?.data ?? []) {
-      if (filters?.clientId && p.client_id !== filters.clientId) continue;
-      for (const sv of p.services) {
-        for (const st of sv.stages) {
-          for (const a of st.activities) {
-            if (
-              filters?.statuses &&
-              filters.statuses.size > 0 &&
-              !filters.statuses.has(a.status)
-            )
-              continue;
-            if (
-              filters?.consultorEmail &&
-              a.assignee_email !== filters.consultorEmail
-            )
-              continue;
-            if (filters?.dateRange && filters.dateRange !== "all") {
-              if (filters.dateRange === "overdue") {
-                if (a.status !== "delayed") continue;
-              } else if (
-                !activityInDateRange(
-                  filters.dateRange,
-                  a.planned_start,
-                  a.planned_end
-                )
-              )
-                continue;
-            }
-            out.push({
-              id: a.id,
-              name: a.name,
-              client_id: p.client_id,
-              client_name: p.client_name,
-              stage_name: st.name,
-              service: sv.service,
-              assignee_email: a.assignee_email,
-              planned_start: a.planned_start,
-              planned_end: a.planned_end,
-              actual_start: a.actual_start,
-              actual_end: a.actual_end,
-              status: a.status,
-              depends_on_activity_id: a.depends_on_activity_id,
-            });
-          }
-        }
-      }
-    }
-    if (quickFilter === 'delayed')   return out.filter((a) => a.status === 'delayed');
-    if (quickFilter === 'active')    return out.filter((a) => a.status === 'in_progress' || a.status === 'delayed');
-    if (quickFilter === 'completed') return out.filter((a) => a.status === 'completed');
-    if (quickFilter === 'upcoming')  return out.filter((a) => {
-      if (a.status !== 'pending' || !a.planned_start) return false;
-      const ts = new Date(a.planned_start + 'T00:00:00').getTime();
-      return ts >= now && ts <= now + 30 * MS_DAY;
-    });
-    return out;
-  }, [data, filters, quickFilter, now]);
-
-  // KPIs globales — calculados sobre el universo completo (sin delayedOnly) para no perder contexto
+  // Aplanar + filtrar por filtros de panel — base para KPIs y vista filtrada
   const allActivities = useMemo<FlatActivity[]>(() => {
     const out: FlatActivity[] = [];
     for (const p of data?.data ?? []) {
@@ -298,6 +237,19 @@ export function GlobalTimeline({
     }
     return out;
   }, [data, filters]);
+
+  // Vista filtrada — quickFilter sobre allActivities (sin re-loop de datos)
+  const activities = useMemo<FlatActivity[]>(() => {
+    if (quickFilter === 'delayed')   return allActivities.filter((a) => a.status === 'delayed');
+    if (quickFilter === 'active')    return allActivities.filter((a) => a.status === 'in_progress' || a.status === 'delayed');
+    if (quickFilter === 'completed') return allActivities.filter((a) => a.status === 'completed');
+    if (quickFilter === 'upcoming')  return allActivities.filter((a) => {
+      if (a.status !== 'pending' || !a.planned_start) return false;
+      const ts = new Date(a.planned_start + 'T00:00:00').getTime();
+      return ts >= now && ts <= now + 30 * MS_DAY;
+    });
+    return allActivities;
+  }, [allActivities, quickFilter, now]);
 
   const globalStats = useMemo(() => {
     const consultores = new Set(allActivities.map((a) => a.assignee_email).filter(Boolean)).size;

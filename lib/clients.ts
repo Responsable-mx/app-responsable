@@ -281,6 +281,52 @@ const DEV_SEED_CLIENTS: Client[] = [
   },
 ];
 
+const CATALOG_COLUMNS = "id,name";
+
+export type ClientMini = Pick<Client, "id" | "has_double_materiality">;
+
+export function getClientMini(id: string): Promise<ClientMini | null> {
+  const seed = DEV_SEED_CLIENTS.find((c) => c.id === id);
+  return withDevModeFallback<ClientMini | null>({
+    kind: "read",
+    fallback: seed ? { id: seed.id, has_double_materiality: seed.has_double_materiality } : null,
+    async run() {
+      const admin = createAdminClient();
+      const { data, error } = await admin
+        .from("clients")
+        .select(CATALOG_COLUMNS + ",has_double_materiality")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw new Error(`getClientMini: ${error.message}`);
+      return (data as ClientMini) ?? null;
+    },
+  });
+}
+
+export function listClientsLight(filter?: {
+  search?: string;
+  limit?: number;
+}): Promise<Pick<Client, "id" | "name">[]> {
+  return withDevModeFallback<Pick<Client, "id" | "name">[]>({
+    kind: "read",
+    fallback: DEV_SEED_CLIENTS.map(({ id, name }) => ({ id, name })),
+    async run() {
+      const admin = createAdminClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q: any = admin
+        .from("clients")
+        .select(CATALOG_COLUMNS)
+        .order("name")
+        .limit(filter?.limit ?? 500);
+      const term = filter?.search?.trim();
+      if (term) q = q.ilike("name", `%${term}%`);
+      const { data, error } = await q;
+      if (error) throw new Error(`listClientsLight: ${error.message}`);
+      return (data ?? []) as Pick<Client, "id" | "name">[];
+    },
+  });
+}
+
 export function listClients(filter?: {
   search?: string;
   limit?: number;

@@ -3,7 +3,7 @@
 // Vista por proyecto en /equipo. Muestra cliente → servicios → etapas → actividades
 // con fechas plan/real, status y assignee. Toggle Lista/Gantt por proyecto.
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
@@ -58,8 +58,10 @@ export function ProjectsOverview({
     { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
   );
 
-  const serviceLabel = (key: string) =>
-    serviceCat.find((c) => c.value === key)?.label ?? key;
+  const serviceLabel = useCallback(
+    (key: string) => serviceCat.find((c) => c.value === key)?.label ?? key,
+    [serviceCat]
+  );
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [viewMode, setViewMode] = useState<Record<string, "list" | "gantt">>({});
@@ -68,8 +70,9 @@ export function ProjectsOverview({
   const [reassigning, setReassigning] = useState<string | null>(null); // activityId en proceso
   const [reassignLoading, setReassignLoading] = useState(false);
 
-  const consultorMap = new Map(
-    consultors.filter((c) => c.name).map((c) => [c.email, c.name as string])
+  const consultorMap = useMemo(
+    () => new Map(consultors.filter((c) => c.name).map((c) => [c.email, c.name as string])),
+    [consultors]
   );
 
   function formatAssignee(email: string): string {

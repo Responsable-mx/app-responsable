@@ -32,8 +32,8 @@ export async function GET() {
   const [clientsRes, servicesRes, stagesRes, activitiesRes] = await Promise.all([
     admin.from("clients").select("id, name, sector").order("name"),
     admin.from("client_services").select("id, client_id, service"),
-    admin.from("service_stages").select("*").order("order_index"),
-    admin.from("stage_activities").select("*").order("order_index"),
+    admin.from("service_stages").select("id,client_service_id,name,order_index,created_at,updated_at").order("order_index"),
+    admin.from("stage_activities").select("id,stage_id,name,assignee_email,planned_start,planned_end,actual_start,actual_end,depends_on_activity_id,order_index").order("order_index"),
   ]);
 
   if (clientsRes.error) return NextResponse.json({ error: clientsRes.error.message }, { status: 500 });

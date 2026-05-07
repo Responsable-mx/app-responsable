@@ -1,7 +1,7 @@
 # AUDIT_LAST.md — App ResponSable
 
 **Fecha:** 2026-05-06 (sesión 19 — audit completo: seg, IA, health, refactor, simplify)
-**Calificación global:** 8.7 / 10 (post-fix sesión 19 — todos D-125–D-130 cerrados)
+**Calificación global:** 9.1 / 10 (sesión 19 extended — D-125–D-131 cerrados, hacia 9.5)
 
 ---
 
@@ -90,13 +90,28 @@
 
 ---
 
-## Gap hasta 9/10
+## Sesión 19 extended — items adicionales hacia 9.5
 
-| Dimensión | Score actual | Gap | Acción mínima |
-|-----------|-------------|-----|---------------|
-| UX | 7.5 | 1.5 | Empty states en Materialidad + Equipo; acciones destructivas en docs |
-| Confiabilidad | 8.5 | 0.5 | E2E tests (Playwright) para flujo crítico wizard AI |
-| Rendimiento | 8.0 | 1.0 | Virtual scroll GlobalTimeline (>200 actividades) |
+| ID | Tipo | Descripción | Estado |
+|----|------|-------------|--------|
+| D-131 | Obs | SentryUserContext: setUser(email) post-auth | ✅ |
+| D-132 | Obs | /configuracion/auditoria: tabla 200 mutaciones admin + diff | ✅ |
+| D-133 | Perf | content-visibility:auto en filas GlobalTimeline (virtual scroll nativo) | ✅ |
+| D-134 | Arq | TimelineChartRow extraído como React.memo (877L → 766L) | ✅ |
+| D-135 | UX | Esc cierra popover materialidad desde cualquier foco | ✅ |
+| D-136 | Código | noUncheckedIndexedAccess intentado — 198 errores en codebase existente, documentado para sprint futuro | ⏸ deferido |
+
+## Gap hasta 9.5
+
+| Dimensión | Post-19ext | Gap a 9.5 | Acción mínima |
+|-----------|------------|-----------|---------------|
+| UX | 8.0 | 1.5 | Playwright E2E wizard AI-fill (flujo crítico sin tests) |
+| Confiabilidad | 8.5 | 1.0 | Playwright E2E; degradación elegante si Anthropic 503 persistente |
+| Arquitectura | 9.0 | 0.5 | QuestionnaireTab sub-components a archivos separados |
+| Observabilidad | 9.2 | 0.3 | SENTRY_AUTH_TOKEN en Vercel → source maps reales |
+| Código | 9.0 | 0.5 | noUncheckedIndexedAccess en sprint dedicado |
+| Rendimiento | 8.8 | 0.7 | Bundle audit: pdf-parse/exceljs en routes lazy |
+| Seguridad | 9.0 | 0.5 | Rate limit GET /api/clients (vía tabla propia, no ai_calls) |
 
 ---
 

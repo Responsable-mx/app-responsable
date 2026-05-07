@@ -43,10 +43,11 @@
 - [B] ✅ Guided tour onboarding con driver.js para primer login — `components/GuidedTour.tsx` + `/api/settings/tour-version`, auto-bump via POST (admin), may-2026
 - [B] ✅ Cron `daily-qa-responsable` (operacional, solo reporta fallos) — `app/api/cron/daily-qa/route.ts` + `vercel.json`, may-2026
 - [B] ✅ Cron `audit-health` quincenal (cobertura + deuda + costo API) — schedule en `vercel.json`, may-2026
+- [A] ✅ Tab "Doble Materialidad IA" — `components/doble-materialidad/DoubleMaterialidadTab.tsx`, visible solo si `services` incluye `doble_materialidad_ia`. 3 etapas: (1) Contexto = link a cuestionario existente, (2) Benchmark: IA propone empresas (Sonnet Batch API) → consultor valida → IA compara vs cliente en campos ESG (Sonnet Batch); tabla comparativa con `ExpandableCell` + columna cliente destacada; collapsible config + fields. (3) Reporte PDF: Opus Batch genera narrativa ~8k chars → `lib/pdf/dm-report.tsx` con charts SVG (`@react-pdf/renderer`) → `export-dm-pdf` endpoint → descarga ~25KB. Migraciones `0045`–`0046`: `dm_benchmark_companies` + `dm_benchmark_results` + `dm_report_batches`. Rate limit DB (3 calls/5min benchmark, 3 calls/5min report). RBAC `requireConsultorForClient`. may-2026
 
 ## Pendiente de arranque
 
-- [A] 🔜 Tab "Doble Materialidad IA" en ficha cliente (visible solo si `services` incluye `doble_materialidad_ia`). 3 etapas: (1) Contexto = link a cuestionario existente, (2) Benchmark = IA propone empresas competidoras/sector/cadena de valor → consultor valida terna → IA compara vs cliente en campos específicos, (3) Reporte PDF = generación con narrativa + matrices. Migración `0045`: `dm_benchmark_companies` + `dm_benchmark_results`. PDF guardado en `client_documents` kind=`dm_report`. Semáforo 🟡 (requiere definir campos de comparación benchmark).
+_(sin ítems activos — revisar aquí antes de cada deploy)_
 
 ## En desarrollo (may-2026)
 

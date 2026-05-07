@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ReactNode } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 // ErrorBoundary scoped a un tab. A diferencia del global ErrorBoundary que
 // reemplaza toda la página por una pantalla de error, este solo aísla el
@@ -19,6 +20,7 @@ export class TabErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error) {
     console.error(`[TabErrorBoundary:${this.props.tabName}]`, error);
+    Sentry.captureException(error, { tags: { tab: this.props.tabName } });
   }
 
   reset = () => {

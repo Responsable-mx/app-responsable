@@ -532,7 +532,7 @@ export function ChatWindow({
                         ? "bg-brand-primary-light text-brand-primary-dark border-brand-primary/20"
                         : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}
-                  title={`Perfil del cliente: ${selectedClient.completeness.filled} de ${selectedClient.completeness.total} campos completos (sector, frameworks, certificaciones, riesgos, etc). Más contexto = mejor calidad de respuestas IA.`}
+                  title={`Contexto disponible para la IA: ${selectedClient.completeness.filled} de ${selectedClient.completeness.total} campos con datos (sector, frameworks, certificaciones, riesgos, etc.). Nota: el % del Cuestionario mide pasos completos; este % mide cuántos campos tienen datos reales para la IA.`}
                 >
                   <span>Perfil</span>
                   <span className="tabular-nums">{ctxPct}%</span>
@@ -661,7 +661,7 @@ export function ChatWindow({
               href={`/clientes/${selectedClient!.id}?tab=cuestionario`}
               className="underline hover:text-amber-700 font-medium"
             >
-              Completar ahora
+              Ir al Cuestionario →
             </a>
           </span>
         </div>
@@ -771,7 +771,7 @@ export function ChatWindow({
               <button
                 type="button"
                 onClick={stop}
-                className="px-4 py-2 bg-slate-700 text-white rounded text-sm font-medium hover:bg-slate-800"
+                className="px-4 py-2 bg-white text-slate-500 border border-slate-200 rounded text-sm font-medium hover:bg-slate-50 hover:text-slate-700 transition-colors"
               >
                 Cancelar
               </button>
@@ -812,7 +812,7 @@ export function ChatWindow({
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Exportar
+                  Exportar conversación
                 </button>
               )}
             </div>

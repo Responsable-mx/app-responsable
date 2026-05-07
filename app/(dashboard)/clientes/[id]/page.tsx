@@ -34,9 +34,8 @@ export default async function EditarClientePage({ params }: Props) {
   if (!client) notFound();
 
   const completeness = clientContextCompleteness(client);
-  const meta = [client.sector, client.subsector, client.size]
-    .filter(Boolean)
-    .join(" · ");
+  const metaTooltip = [client.sector, client.subsector, client.size].filter(Boolean).join(" · ");
+  const meta = [client.sector, client.size].filter(Boolean).join(" · ");
 
   // Nav prev/next por orden alfabético
   const sorted = [...allClients].sort((a, b) =>
@@ -100,18 +99,31 @@ export default async function EditarClientePage({ params }: Props) {
         <ClientAvatar name={client.name} logoUrl={client.logo_url} />
         <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
         {meta && <span className="text-slate-300">·</span>}
-        {meta && <span className="text-xs text-slate-600">{meta}</span>}
+        {meta && <span className="text-xs text-slate-600" title={metaTooltip}>{meta}</span>}
         {client.services && client.services.length > 0 && (
           <>
             <span className="text-slate-300">·</span>
-            {client.services.slice(0, 2).map((s) => (
-              <span
-                key={s}
-                className="inline-flex items-center text-[10px] font-medium bg-brand-primary-light text-brand-primary-dark rounded-sm px-2 py-0.5"
-              >
-                {serviceLabels.get(s) ?? s}
-              </span>
-            ))}
+            {client.services.slice(0, 2).map((s) => {
+              const tabMap: Record<string, string> = {
+                doble_materialidad: "materialidad",
+                doble_materialidad_ia: "doble-materialidad-ia",
+              };
+              const targetTab = tabMap[s];
+              const label = serviceLabels.get(s) ?? s;
+              const cls = "inline-flex items-center text-[10px] font-medium bg-brand-primary-light text-brand-primary-dark rounded-sm px-2 py-0.5";
+              return targetTab ? (
+                <Link
+                  key={s}
+                  href={`?tab=${targetTab}`}
+                  className={`${cls} hover:bg-brand-primary/20 transition-colors`}
+                  title={`Ir a ${label}`}
+                >
+                  {label}
+                </Link>
+              ) : (
+                <span key={s} className={cls}>{label}</span>
+              );
+            })}
             {client.services.length > 2 && (
               <span className="text-[10px] text-slate-500">
                 +{client.services.length - 2} más

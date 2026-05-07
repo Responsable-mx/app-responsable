@@ -4,7 +4,7 @@
 // 1) "Guardar como plantilla" — serializa stages+activities con offsets en días
 // 2) "Aplicar plantilla" — crea stages+activities desde una plantilla + fecha base
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -37,27 +37,50 @@ export function TemplateActions({
 }) {
   const [openSave, setOpenSave] = useState(false);
   const [openApply, setOpenApply] = useState(false);
+  const [openMenu, setOpenMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openMenu]);
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="relative" ref={menuRef}>
       <button
-        onClick={() => setOpenApply(true)}
-        className="text-[11px] text-brand-primary-dark hover:underline"
-        title="Aplicar una plantilla guardada a este servicio"
+        onClick={() => setOpenMenu((v) => !v)}
+        title="Acciones de plantilla"
+        aria-label="Acciones de plantilla"
+        className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
       >
-        Aplicar plantilla
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+        </svg>
       </button>
-      {hasStages && (
-        <>
-          <span className="text-slate-300 text-[11px]">·</span>
+
+      {openMenu && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded shadow-md py-1 min-w-[180px]">
           <button
-            onClick={() => setOpenSave(true)}
-            className="text-[11px] text-slate-600 hover:text-brand-primary-dark hover:underline"
-            title="Guardar la estructura actual como plantilla reutilizable"
+            onClick={() => { setOpenMenu(false); setOpenApply(true); }}
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            Guardar como plantilla
+            Aplicar plantilla
           </button>
-        </>
+          {hasStages && (
+            <button
+              onClick={() => { setOpenMenu(false); setOpenSave(true); }}
+              className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              Guardar como plantilla
+            </button>
+          )}
+        </div>
       )}
 
       {openSave && (

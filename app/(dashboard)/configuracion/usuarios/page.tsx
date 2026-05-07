@@ -8,10 +8,11 @@ export default function UsuariosPage() {
   return (
     <div className="px-8 py-6 max-w-5xl mx-auto">
       <p className="text-sm text-slate-600 mb-4">
-        Solo estos correos pueden iniciar sesión. Admins ven esta pantalla y
-        los catálogos; consultores solo usan el chat y los clientes.
-        Agregar a un usuario aquí lo habilita de inmediato — no se le envía
-        correo automático, tú le avisas por tu canal habitual.
+        Usuarios autorizados para acceder a la app. Admins gestionan configuración;
+        consultores solo tienen acceso al chat y clientes.{" "}
+        <span title="Al agregar un usuario se habilita de inmediato — no se envía correo automático, tú le avisas por tu canal habitual." className="underline decoration-dotted cursor-help text-slate-500">
+          ¿Cómo funciona?
+        </span>
       </p>
       <UsersManager />
     </div>

@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 
 type DocMeta = {
@@ -132,14 +133,29 @@ export function DocumentsTab({
     }
   }
 
-  if (isLoading) return <div className="p-6 text-sm text-slate-500">Cargando documentos…</div>;
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return "< 1 KB";
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (isLoading) return <SkeletonTable rows={5} cols={7} />;
   if (error) {
     return (
       <div className="p-6 border border-rose-200 bg-rose-50 rounded text-sm text-rose-700">
-        No se pudo cargar la lista. <button onClick={() => mutate()} className="underline">Reintentar</button>
+        No se pudo cargar la lista.{" "}
+        <button onClick={() => mutate()} className="underline">Reintentar</button>
       </div>
     );
   }
+
+  // Filtros de categoría — solo mostrar las que tienen al menos 1 documento
+  const filterOptions = [
+    { k: "all" as const, label: `Todos (${counts.all})` },
+    ...(counts.general > 0 ? [{ k: "general" as const, label: `General (${counts.general})` }] : []),
+    ...(counts.sustainability_report > 0 ? [{ k: "sustainability_report" as const, label: `Sustentabilidad (${counts.sustainability_report})` }] : []),
+    ...(counts.financial_report > 0 ? [{ k: "financial_report" as const, label: `Financiero (${counts.financial_report})` }] : []),
+  ];
 
   return (
     <div className="px-1">
@@ -151,6 +167,9 @@ export function DocumentsTab({
           </p>
           <p className="text-xs text-slate-600 mt-0.5">
             {docs.length} archivo{docs.length === 1 ? "" : "s"} · convertidos a Markdown como contexto IA
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            PDF, DOCX, XLSX, PPTX, TXT · Máx. 25 MB por archivo
           </p>
         </div>
         <div>
@@ -179,15 +198,10 @@ export function DocumentsTab({
         </div>
       </div>
 
-      {/* Filtros por kind — solo si hay documentos */}
-      {docs.length > 0 && (
+      {/* Filtros por kind — solo categorías con documentos */}
+      {docs.length > 0 && filterOptions.length > 1 && (
         <div className="flex gap-1.5 mb-3">
-          {([
-            { k: "all" as const, label: `Todos (${counts.all})` },
-            { k: "general" as const, label: `General (${counts.general})` },
-            { k: "sustainability_report" as const, label: `Sustentabilidad (${counts.sustainability_report})` },
-            { k: "financial_report" as const, label: `Financiero (${counts.financial_report})` },
-          ]).map((f) => (
+          {filterOptions.map((f) => (
             <button
               key={f.k}
               type="button"
@@ -208,12 +222,12 @@ export function DocumentsTab({
         <div className="border border-dashed border-slate-300 rounded p-8 text-center">
           <p className="text-sm text-slate-500">
             {docs.length === 0
-              ? 'Sin documentos. Sube tu primer archivo con el botón "Subir archivo".'
+              ? "Sube PDF, DOCX o XLSX del cliente para que la IA tenga contexto directo del negocio."
               : "Sin resultados para este filtro."}
           </p>
         </div>
       ) : (
-        <div className="border border-slate-200 rounded bg-white shadow-sm overflow-hidden">
+        <div className="border border-slate-200 rounded bg-white shadow-sm overflow-x-auto">
           <table className="min-w-full w-max">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
@@ -228,82 +242,108 @@ export function DocumentsTab({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-3 py-2.5">
-                    <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
-                      {TYPE_BADGE[d.file_type]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-800 font-medium max-w-[280px] truncate">
-                    {d.file_name}
-                    {d.source_url && (
-                      <a
-                        href={d.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-[10px] text-slate-400 hover:underline truncate"
-                      >
-                        ↗ {d.source_url}
-                      </a>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className={`text-[10px] font-bold uppercase rounded-sm px-1.5 py-0.5 ${KIND_COLOR[d.kind]}`}>
-                      {KIND_LABEL[d.kind]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600 text-right tabular-nums">
-                    {(d.size_bytes / 1024).toFixed(0)} KB
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600 tabular-nums">
-                    {new Date(d.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {d.parse_status === "ok" && (
-                      <span className="text-[10px] text-emerald-700 font-semibold">✓ Convertido</span>
-                    )}
-                    {d.parse_status === "pending" && (
-                      <span className="text-[10px] text-amber-700 font-semibold">… Procesando</span>
-                    )}
-                    {d.parse_status === "failed" && (
-                      <span title={d.parse_error ?? ""} className="text-[10px] text-rose-700 font-semibold">
-                        ⚠ Falló
+                <>
+                  <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-3 py-2.5">
+                      <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
+                        {TYPE_BADGE[d.file_type]}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {d.has_content && (
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-slate-800 font-medium max-w-[280px] truncate">
+                      {d.file_name}
+                      {d.source_url && (
+                        <a
+                          href={d.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-[10px] text-slate-400 hover:underline truncate"
+                        >
+                          ↗ {d.source_url}
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`text-[10px] font-bold uppercase rounded-sm px-1.5 py-0.5 ${KIND_COLOR[d.kind]}`}>
+                        {KIND_LABEL[d.kind]}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-slate-600 text-right tabular-nums">
+                      {formatSize(d.size_bytes)}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-slate-600 tabular-nums">
+                      {new Date(d.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {d.parse_status === "ok" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
+                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Convertido
+                        </span>
+                      )}
+                      {d.parse_status === "pending" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
+                          <svg className="w-3.5 h-3.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Procesando
+                        </span>
+                      )}
+                      {d.parse_status === "failed" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 font-semibold">
+                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          Falló
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          onClick={() => setPreviewing(d)}
-                          className="text-[11px] text-brand-primary-dark hover:underline px-1"
-                          title="Ver Markdown"
+                          onClick={() => d.has_content ? setPreviewing(d) : undefined}
+                          disabled={!d.has_content}
+                          className={`text-[11px] px-2 min-h-[40px] inline-flex items-center transition-colors rounded ${
+                            d.has_content
+                              ? "text-brand-primary-dark hover:underline"
+                              : "text-slate-300 cursor-default"
+                          }`}
+                          title={d.has_content ? "Ver Markdown" : "Sin contenido extraído"}
                         >
                           Ver
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => void handleDownload(d)}
-                        className="text-[11px] text-slate-600 hover:text-slate-900 hover:underline px-1"
-                        title="Descargar original"
-                      >
-                        Descargar
-                      </button>
-                      {isAdmin && (
                         <button
                           type="button"
-                          onClick={() => setDeleting(d)}
-                          className="text-[11px] text-rose-600 hover:underline px-1"
-                          title="Eliminar (solo admin)"
+                          onClick={() => void handleDownload(d)}
+                          className="text-[11px] text-slate-600 hover:text-slate-900 hover:underline px-2 min-h-[40px] inline-flex items-center rounded transition-colors"
+                          title="Descargar original"
                         >
-                          Borrar
+                          Descargar
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleting(d)}
+                            className="text-[11px] text-rose-600 hover:underline px-2 min-h-[40px] inline-flex items-center rounded transition-colors"
+                            title="Eliminar (solo admin)"
+                          >
+                            Borrar
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {/* Error expandido inline — visible cuando parse falló */}
+                  {d.parse_status === "failed" && d.parse_error && (
+                    <tr key={`${d.id}-error`} className="bg-rose-50/50">
+                      <td colSpan={7} className="px-3 py-2 text-[11px] text-rose-700">
+                        <span className="font-semibold">Error de conversión:</span> {d.parse_error}
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>
@@ -347,7 +387,7 @@ function PreviewModal({ clientId, doc, onClose }: { clientId: string; doc: DocMe
         {isLoading && <p className="text-sm text-slate-500">Cargando contenido…</p>}
         {error && <p className="text-sm text-rose-700">Error al cargar contenido</p>}
         {data && (
-          <pre className="font-mono text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded p-3 max-h-[450px] overflow-y-auto whitespace-pre-wrap break-words">
+          <pre className="font-mono text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded p-3 max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words">
             {data.data.markdown_content ?? "(sin contenido)"}
           </pre>
         )}

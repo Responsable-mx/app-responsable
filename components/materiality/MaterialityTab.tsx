@@ -44,7 +44,12 @@ const COLOR_SHAPE: Record<TopicColor, string> = {
   rose: "rounded-full",
   amber: "rotate-45 rounded-sm",
   teal: "rounded-sm",
-  slate: "rounded-full",
+  slate: "",
+};
+
+// Estilos inline para formas que no se pueden expresar en Tailwind (triángulo).
+const COLOR_STYLE: Partial<Record<TopicColor, React.CSSProperties>> = {
+  slate: { clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)" },
 };
 
 const SIZE_PX: Record<TopicSize, number> = { sm: 11, md: 15, lg: 20 };
@@ -342,7 +347,7 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
                       className={`ring-2 ring-white shadow-sm flex items-center justify-center transition-all select-none ${COLOR_DOT[t.color]} ${COLOR_SHAPE[t.color]} ${
                         isSelected ? "ring-[3px] ring-slate-800 shadow-lg scale-150" : "opacity-90 group-hover:opacity-100 group-hover:scale-125"
                       }`}
-                      style={{ width: sz, height: sz }}
+                      style={{ width: sz, height: sz, ...COLOR_STYLE[t.color] }}
                     >
                       {sz >= 15 && (
                         <span className={`text-[7px] font-bold text-white leading-none ${t.color === "amber" ? "-rotate-45" : ""}`}>
@@ -510,7 +515,10 @@ function TopicPopover({
         ×
       </button>
       <div className="flex items-start gap-2 mb-2 pr-5">
-        <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 ${COLOR_DOT[topic.color]}`} />
+        <div
+          className={`w-2.5 h-2.5 shrink-0 mt-0.5 ${COLOR_DOT[topic.color]} ${COLOR_SHAPE[topic.color]}`}
+          style={COLOR_STYLE[topic.color]}
+        />
         <div>
           <p className="text-[10px] text-slate-400 leading-none mb-1">#{index + 1}</p>
           <p className="text-sm font-bold text-slate-900 leading-tight">{topic.label}</p>

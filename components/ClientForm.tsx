@@ -36,6 +36,7 @@ type FormState = {
   policies_in_place: string[];
   certifications: string[];
   material_topics: string[];
+  services: string[];
   maturity_level: string;
   has_double_materiality: boolean | null;
   has_sustainability_report: boolean | null;
@@ -92,6 +93,7 @@ export function ClientForm(props: Props) {
     policies_in_place: props.initial?.policies_in_place ?? [],
     certifications: props.initial?.certifications ?? [],
     material_topics: props.initial?.material_topics ?? [],
+    services: props.initial?.services ?? [],
     maturity_level: props.initial?.maturity_level ?? "",
     has_double_materiality: toBool(props.initial?.has_double_materiality),
     has_sustainability_report: toBool(props.initial?.has_sustainability_report),
@@ -132,6 +134,7 @@ export function ClientForm(props: Props) {
         policies_in_place: form.policies_in_place,
         certifications: form.certifications,
         material_topics: form.material_topics,
+        services: form.services,
         maturity_level: form.maturity_level || null,
         has_double_materiality: form.has_double_materiality,
         has_sustainability_report: form.has_sustainability_report,
@@ -305,6 +308,17 @@ export function ClientForm(props: Props) {
             URL pública de la imagen (PNG, SVG, JPG). Si no se carga, se muestra el monograma.
           </p>
         </div>
+      </Section>
+
+      {/* ═══ Servicios contratados ════════════════════════════ */}
+      <Section title="Servicios contratados">
+        <MultiSelectCombobox
+          category="services"
+          label="Servicios ResponSable"
+          hint="Define qué tabs y funciones IA se habilitan para este cliente."
+          value={form.services}
+          onChange={(v) => update("services", (v as string[]) ?? [])}
+        />
       </Section>
 
       {/* ═══ Atributos de sostenibilidad ═════════════════════ */}

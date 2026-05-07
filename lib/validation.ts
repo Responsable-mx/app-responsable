@@ -107,6 +107,7 @@ export const ClientInputSchema = z.object({
   policies_in_place: catalogArray.optional(),
   certifications: catalogArray.optional(),
   material_topics: catalogArray.optional(),
+  services: catalogArray.optional(),
   maturity_level: z.string().trim().max(60).optional().nullable(),
   has_double_materiality: z.boolean().optional().nullable(),
   has_sustainability_report: z.boolean().optional().nullable(),

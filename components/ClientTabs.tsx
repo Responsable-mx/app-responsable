@@ -7,18 +7,10 @@ import useSWR from "swr";
 import type { Client } from "@/lib/clients";
 // ClientResumen es el tab default → eager (no lazy) para evitar skeleton en primera carga.
 import { ClientResumen } from "@/components/ClientResumen";
-import { getFieldValue, type QuestionnaireBundle } from "@/lib/questionnaires/types";
+import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 import type { MaterialityTopic } from "@/lib/materiality/types";
 
-/** Devuelve true si el cuestionario (informacion-base) incluye doble_materialidad_ia en servicio_contratado. */
-function bundleHasDmIa(bundle: QuestionnaireBundle | null | undefined): boolean {
-  const raw = bundle?.response?.responses?.["informacion-base"]?.["servicio_contratado"];
-  if (!raw) return false;
-  const val = getFieldValue(raw as unknown);
-  if (Array.isArray(val)) return val.includes("doble_materialidad_ia");
-  if (typeof val === "string") return val === "doble_materialidad_ia";
-  return false;
-}
+
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 import { SkeletonDetail, SkeletonTable } from "@/components/ui/Skeleton";
 
@@ -116,13 +108,9 @@ export function ClientTabs({
   void questionnaireError;
   void materialityError;
 
-  // Tab DM-IA visible si client.services lo incluye (campo legado) O si el cuestionario
-  // tiene doble_materialidad_ia en servicio_contratado (fuente de verdad operativa).
-  // Usa questionnaireResp?.data (SWR reactivo) para que el tab aparezca sin reload
-  // cuando el consultor guarda el servicio desde el tab Cuestionario.
-  const hasDmService =
-    (client.services?.includes("doble_materialidad_ia") ?? false) ||
-    bundleHasDmIa(questionnaireResp?.data ?? initialQuestionnaire);
+  // Tab DM-IA visible cuando client.services incluye "doble_materialidad_ia".
+  // Fuente de verdad única: perfil del cliente (editable desde /editar).
+  const hasDmService = client.services?.includes("doble_materialidad_ia") ?? false;
   const VALID_TABS: Tab[] = ["resumen", "cuestionario", "chat", "materialidad", "cronograma", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(

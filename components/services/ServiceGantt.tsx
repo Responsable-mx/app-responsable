@@ -159,6 +159,7 @@ export function ServiceGantt({
   const [freezing, setFreezing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showLayersMenu, setShowLayersMenu] = useState(false);
   const [showFloat, setShowFloat] = useState(false);
   const [showDeps, setShowDeps] = useState(false);
   const [showCriticalPath, setShowCriticalPath] = useState(false);
@@ -608,54 +609,117 @@ export function ServiceGantt({
                 ← → · drag
               </span>
             )}
+            {timelineWidth !== null && timelineWidth > 5000 && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded-sm text-[9px] text-amber-700 font-medium select-none">
+                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.539-1.333-3.308 0L3.732 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Vista Día muy amplia — considera Sem.
+              </span>
+            )}
             {/* Separador */}
             <div className="w-px h-4 bg-slate-200 mx-0.5" aria-hidden />
-            {/* Grupo 2: Capas de visualización */}
-            <div className="flex items-center gap-0.5 flex-wrap">
-              {hasBaseline && (
-                <button
-                  onClick={() => setShowBaseline((v) => !v)}
-                  className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showBaseline ? "bg-orange-100 text-orange-700" : "text-slate-400 hover:text-slate-700"}`}
-                  title="Baseline — muestra/oculta la barra de línea base congelada (naranja punteada). Permite ver cuánto se ha desviado el plan real vs el plan original."
-                >
-                  Baseline
-                </button>
+            {/* Grupo 2: Capas — dropdown colapsado */}
+            <div className="relative">
+              {(() => {
+                const activeCount = [
+                  hasBaseline && showBaseline,
+                  showFloat,
+                  showDeps,
+                  showCriticalPath,
+                  showEvm,
+                  clientView,
+                ].filter(Boolean).length;
+                return (
+                  <button
+                    onClick={() => setShowLayersMenu((v) => !v)}
+                    className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showLayersMenu ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
+                    title="Capas de visualización"
+                    aria-haspopup="true"
+                    aria-expanded={showLayersMenu}
+                  >
+                    Capas
+                    {activeCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[14px] h-3.5 px-0.5 text-[8px] font-bold bg-brand-primary text-white rounded-full leading-none tabular-nums">
+                        {activeCount}
+                      </span>
+                    )}
+                    <svg className={`w-2.5 h-2.5 transition-transform ${showLayersMenu ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                );
+              })()}
+              {showLayersMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowLayersMenu(false)} />
+                  <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded shadow-md py-1 w-48">
+                    {hasBaseline && (
+                      <button
+                        onClick={() => setShowBaseline((v) => !v)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showBaseline ? "text-orange-700" : "text-slate-500"}`}
+                        title="Baseline — línea base congelada (naranja punteada)."
+                      >
+                        <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showBaseline ? "bg-orange-100 border-orange-400" : "border-slate-300"}`}>
+                          {showBaseline && <svg className="w-2 h-2 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                        </span>
+                        Baseline
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowFloat((v) => !v)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showFloat ? "text-slate-700" : "text-slate-500"}`}
+                      title="Holgura — días libres antes de impactar al siguiente paso."
+                    >
+                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showFloat ? "bg-slate-200 border-slate-400" : "border-slate-300"}`}>
+                        {showFloat && <svg className="w-2 h-2 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      </span>
+                      Holgura
+                    </button>
+                    <button
+                      onClick={() => setShowDeps((v) => !v)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showDeps ? "text-slate-700" : "text-slate-500"}`}
+                      title="Dependencias — flechas de relación entre actividades."
+                    >
+                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showDeps ? "bg-slate-200 border-slate-400" : "border-slate-300"}`}>
+                        {showDeps && <svg className="w-2 h-2 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      </span>
+                      Dependencias
+                    </button>
+                    <button
+                      onClick={() => setShowCriticalPath((v) => !v)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showCriticalPath ? "text-amber-700" : "text-slate-500"}`}
+                      title="Ruta crítica — secuencia sin holgura que define la duración mínima."
+                    >
+                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showCriticalPath ? "bg-amber-100 border-amber-400" : "border-slate-300"}`}>
+                        {showCriticalPath && <svg className="w-2 h-2 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      </span>
+                      Ruta crítica
+                    </button>
+                    <button
+                      onClick={() => setShowEvm((v) => !v)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${showEvm ? "text-brand-primary-dark" : "text-slate-500"}`}
+                      title="EVM — métricas de rendimiento del proyecto."
+                    >
+                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${showEvm ? "bg-brand-primary/10 border-brand-primary/40" : "border-slate-300"}`}>
+                        {showEvm && <svg className="w-2 h-2 text-brand-primary-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      </span>
+                      EVM
+                    </button>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      onClick={() => setClientView((v) => !v)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition-colors ${clientView ? "text-brand-primary-dark" : "text-slate-500"}`}
+                      title="Vista cliente — solo hitos contractuales."
+                    >
+                      <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${clientView ? "bg-brand-primary/10 border-brand-primary/40" : "border-slate-300"}`}>
+                        {clientView && <svg className="w-2 h-2 text-brand-primary-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      </span>
+                      Vista cliente
+                    </button>
+                  </div>
+                </>
               )}
-              <button
-                onClick={() => setShowFloat((v) => !v)}
-                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showFloat ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
-                title="Holgura (Float) — días libres que tiene cada actividad antes de impactar al siguiente paso. Holgura=0 → está en la ruta crítica: cualquier retraso aquí retrasa todo el proyecto."
-              >
-                Holgura
-              </button>
-              <button
-                onClick={() => setShowDeps((v) => !v)}
-                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showDeps ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700"}`}
-                title="Dependencias — flechas que muestran qué actividades deben terminar antes de que otra pueda iniciar. Un retraso puede bloquear actividades en cascada."
-              >
-                Dep.
-              </button>
-              <button
-                onClick={() => setShowCriticalPath((v) => !v)}
-                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showCriticalPath ? "bg-amber-100 text-amber-700" : "text-slate-400 hover:text-slate-700"}`}
-                title="Ruta Crítica — secuencia de actividades sin holgura que define la duración mínima del proyecto (resaltadas en ámbar). Un retraso en cualquiera = retraso garantizado en entrega final."
-              >
-                Ruta
-              </button>
-              <button
-                onClick={() => setShowEvm((v) => !v)}
-                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${showEvm ? "bg-brand-primary/10 text-brand-primary-dark" : "text-slate-400 hover:text-slate-700"}`}
-                title="EVM (Earned Value Management) — métricas de rendimiento del proyecto. Compara avance real vs tiempo transcurrido para proyectar cuándo terminará y si va en riesgo."
-              >
-                EVM
-              </button>
-              <button
-                onClick={() => setClientView((v) => !v)}
-                className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${clientView ? "bg-brand-primary/10 text-brand-primary-dark" : "text-slate-400 hover:text-slate-700"}`}
-                title="Vista cliente — oculta actividades individuales; muestra solo hitos contractuales. Ideal para presentaciones al cliente."
-              >
-                Cliente
-              </button>
             </div>
             {/* Grupo 3: Acciones — ml-auto */}
             <div className="flex items-center gap-1.5 ml-auto flex-wrap">
@@ -728,12 +792,15 @@ export function ServiceGantt({
                 )}
               </div>
               {isAdmin && onFreezeBaseline && !confirmFreeze && (
-                <button onClick={() => setConfirmFreeze(true)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-amber-700 transition-colors" title={hasBaseline ? "Ya existe baseline — actualizará el de referencia." : "Congelar fechas plan como baseline de referencia"}>
+                <>
+                <div className="w-px h-4 bg-slate-200" aria-hidden />
+                <button onClick={() => setConfirmFreeze(true)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:text-amber-700 transition-colors" title={hasBaseline ? "Ya existe baseline — actualizará el de referencia." : "Congelar fechas plan como baseline de referencia"}>
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   {hasBaseline ? "Actualizar baseline" : "Baseline"}
                 </button>
+                </>
               )}
               {confirmFreeze && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded text-[10px]">
@@ -1229,6 +1296,7 @@ export function ServiceGantt({
                                 }`}
                                 style={{ ...planStyle, top: 10 }}
                                 title={`Plan: ${fmtShort(a.planned_start)} → ${fmtShort(a.planned_end)}${criticalPathIds.has(a.id) ? " · Ruta crítica" : ""}`}
+                                aria-label={`Plan: ${a.name} · ${fmtShort(a.planned_start)} → ${fmtShort(a.planned_end)}`}
                               />
                             )}
                             {showFloat && (() => {
@@ -1237,20 +1305,28 @@ export function ServiceGantt({
                               const floatEnd = new Date(parseDate(a.planned_end)!.getTime() + floatDays * MS_DAY);
                               const floatStyle = barStyle(a.planned_end, floatEnd.toISOString().slice(0, 10));
                               if (!floatStyle) return null;
+                              const floatWidthPx = timelineWidth ? parseFloat(floatStyle.width) / 100 * timelineWidth : 0;
+                              const showFloatLabel = floatWidthPx > 30;
                               return (
                                 <div
-                                  className="absolute h-1.5 pointer-events-none z-[9]"
+                                  className={`absolute pointer-events-none z-[9] overflow-hidden flex items-center ${showFloatLabel ? "h-2.5" : "h-1.5"}`}
                                   style={{
                                     ...floatStyle,
                                     top: 17,
                                     background: "repeating-linear-gradient(90deg,rgba(148,163,184,0.5) 0,rgba(148,163,184,0.5) 3px,transparent 3px,transparent 6px)",
                                   }}
                                   title={`Holgura: ${floatDays}d`}
-                                />
+                                >
+                                  {showFloatLabel && (
+                                    <span className="text-[7px] font-bold text-slate-500 leading-none tabular-nums pl-0.5 whitespace-nowrap">
+                                      +{floatDays}d
+                                    </span>
+                                  )}
+                                </div>
                               );
                             })()}
                             {realStyle ? (
-                              <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-3 rounded overflow-hidden ${barColor} hover:opacity-90 z-20`} style={{ ...realStyle, top: 13 }} title={`Real: ${fmtShort(a.actual_start)} → ${fmtShort(a.actual_end)} · ${STATUS_LABEL[a.status]}${a.actual_progress != null ? ` · ${a.actual_progress}%` : ""}`}>
+                              <button onClick={(e) => openPopover(e, s.id, a)} className={`absolute h-3 rounded overflow-hidden ${barColor} hover:opacity-90 z-20`} style={{ ...realStyle, top: 13 }} title={`Real: ${fmtShort(a.actual_start)} → ${fmtShort(a.actual_end)} · ${STATUS_LABEL[a.status]}${a.actual_progress != null ? ` · ${a.actual_progress}%` : ""}`} aria-label={`Real: ${a.name} · ${STATUS_LABEL[a.status]}${a.actual_progress != null ? ` · ${a.actual_progress}%` : ""}`}>
                                 {a.actual_progress != null && a.actual_progress < 100 && (
                                   <div className="absolute top-0 right-0 bottom-0 bg-white/40" style={{ width: `${100 - a.actual_progress}%` }} />
                                 )}
@@ -1261,7 +1337,7 @@ export function ServiceGantt({
                                 )}
                               </button>
                             ) : planStyle ? (
-                              <button onClick={(e) => openPopover(e, s.id, a)} className="absolute h-2 rounded border border-dashed border-slate-300 bg-transparent hover:border-brand-primary z-20" style={{ ...planStyle, top: 14 }} title="Sin fechas reales — click para registrar" />
+                              <button onClick={(e) => openPopover(e, s.id, a)} className="absolute h-2 rounded border border-dashed border-slate-300 bg-transparent hover:border-brand-primary z-20" style={{ ...planStyle, top: 14 }} title="Sin fechas reales — click para registrar" aria-label={`Sin fechas reales: ${a.name} — click para registrar`} />
                             ) : null}
                           </div>
                         </div>

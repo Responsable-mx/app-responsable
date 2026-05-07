@@ -42,6 +42,11 @@ yarn-error.log*
 .claude/
 next-env.d.ts
 
+# Playwright E2E — sesiones de auth (contienen tokens, no commitear)
+e2e/.auth/
+playwright-report/
+test-results/
+
 # IDE
 .vscode/
 .idea/

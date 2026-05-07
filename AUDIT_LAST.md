@@ -1,7 +1,7 @@
 # AUDIT_LAST.md — App ResponSable
 
 **Fecha:** 2026-05-06 (sesión 17 — auditoría completa: IA, seguridad, arquitectura, rendimiento, UX)
-**Calificación global:** 7.6 / 10
+**Calificación global:** 8.0 / 10 (post-limpieza completa)
 
 ---
 

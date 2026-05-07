@@ -53,18 +53,28 @@ export function TemplateActions({
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
-        onClick={() => setOpenMenu((v) => !v)}
-        title="Acciones de plantilla"
-        aria-label="Acciones de plantilla"
-        className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-      >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
-        </svg>
-      </button>
+      {/* Sin etapas — CTA directa, sin menú overhead */}
+      {!hasStages ? (
+        <button
+          onClick={() => setOpenApply(true)}
+          className="text-[11px] font-semibold text-brand-primary-dark border border-brand-primary/40 rounded px-2 py-1 hover:bg-brand-primary/5 transition-colors"
+        >
+          Aplicar plantilla
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpenMenu((v) => !v)}
+          title="Acciones de plantilla"
+          aria-label="Acciones de plantilla"
+          className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+          </svg>
+        </button>
+      )}
 
-      {openMenu && (
+      {openMenu && hasStages && (
         <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded shadow-md py-1 min-w-[180px]">
           <button
             onClick={() => { setOpenMenu(false); setOpenApply(true); }}
@@ -72,14 +82,12 @@ export function TemplateActions({
           >
             Aplicar plantilla
           </button>
-          {hasStages && (
-            <button
-              onClick={() => { setOpenMenu(false); setOpenSave(true); }}
-              className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
-            >
-              Guardar como plantilla
-            </button>
-          )}
+          <button
+            onClick={() => { setOpenMenu(false); setOpenSave(true); }}
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Guardar como plantilla
+          </button>
         </div>
       )}
 

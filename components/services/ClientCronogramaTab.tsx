@@ -81,7 +81,7 @@ export function ClientCronogramaTab({
   // En modo Gantt necesitamos las stages aplanadas. Reutiliza el mismo endpoint
   // que ServiceStagesPanel — SWR comparte cache, sin doble fetch.
   const { data: stagesData, mutate: mutateStages } = useSWR<{ data: ServiceStage[] }>(
-    view === "gantt" ? `/api/clients/${clientId}/stages` : null,
+    `/api/clients/${clientId}/stages`,
     fetcher
   );
 
@@ -94,6 +94,7 @@ export function ClientCronogramaTab({
       .map((c) => [c.user_email, c.full_name as string])
   );
   const allStages = stagesData?.data ?? [];
+  const hasAnyActivity = stagesData !== undefined && allStages.some((s) => s.activities.length > 0);
 
   async function handleQuickAction(activityId: string, patch: QuickPatch) {
     const res = await fetch(`/api/activities/${activityId}`, {
@@ -188,18 +189,24 @@ export function ClientCronogramaTab({
               + Servicio
             </button>
           )}
-          <a
-            href={`/api/clients/${clientId}/export-cronograma-pdf`}
-            target="_blank"
-            rel="noopener"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-            title="Descargar cronograma como PDF"
+          <button
+            onClick={() => {
+              if (!hasAnyActivity) return;
+              window.open(`/api/clients/${clientId}/export-cronograma-pdf`, "_blank", "noopener,noreferrer");
+            }}
+            disabled={!hasAnyActivity}
+            title={hasAnyActivity ? "Descargar cronograma como PDF" : "Sin actividades en el cronograma"}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded transition-colors ${
+              hasAnyActivity
+                ? "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                : "text-slate-300 cursor-not-allowed"
+            }`}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
             </svg>
             Exportar Gantt PDF
-          </a>
+          </button>
           {/* Separador visual acciones ↔ vistas */}
           <div className="w-px h-5 bg-slate-200 mx-0.5" aria-hidden />
           <ViewToggle value={view} onChange={setView} />

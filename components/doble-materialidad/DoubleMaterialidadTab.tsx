@@ -339,7 +339,7 @@ function BenchmarkSection({
             variant="primary"
             loading={isPolling}
             onClick={handleCompare}
-            disabled={isPolling}
+            disabled={isPolling || selected.size < 2}
           >
             Ejecutar benchmark ({selected.size} empresas + {clientName})
           </Button>
@@ -371,7 +371,7 @@ function BenchmarkSection({
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
             Síntesis del benchmark
           </p>
-          <p className="text-sm text-slate-700 leading-relaxed">{latestResult.narrative}</p>
+          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{latestResult.narrative}</p>
           <p className="text-[10px] text-slate-400 mt-2">
             {new Date(latestResult.created_at).toLocaleDateString("es-MX", {
               day: "numeric", month: "long", year: "numeric",
@@ -602,7 +602,7 @@ function ReporteSection({
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
             Último reporte generado
           </p>
-          <p className="text-sm font-medium text-slate-800 mb-0.5">{latestReport.file_name}</p>
+          <p className="text-sm font-medium text-slate-800 mb-0.5">{latestReport.file_name.replace(/\.md$/i, "")}</p>
           <p className="text-xs text-slate-500 mb-3">
             {new Date(latestReport.created_at).toLocaleDateString("es-MX", {
               day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -744,17 +744,21 @@ export function DoubleMaterialidadTab({
   const hasBenchmark = latestResult?.status === "done";
   const hasReport = latestReport?.parse_status === "ok";
 
-  const stage2Status: StageStatus = hasBenchmark
-    ? "done"
-    : stage1Status === "done"
-    ? "active"
-    : "pending";
+  // "done" solo si el paso anterior también está completo — evita checkmark verde
+  // cuando hay benchmark viejo pero el contexto está incompleto.
+  const stage2Status: StageStatus =
+    hasBenchmark && stage1Status === "done"
+      ? "done"
+      : stage1Status === "done" || hasBenchmark
+      ? "active"
+      : "pending";
 
-  const stage3Status: StageStatus = hasReport
-    ? "done"
-    : hasBenchmark
-    ? "active"
-    : "pending";
+  const stage3Status: StageStatus =
+    hasReport && hasBenchmark
+      ? "done"
+      : hasBenchmark
+      ? "active"
+      : "pending";
 
   if (loadingBenchmark) {
     return (

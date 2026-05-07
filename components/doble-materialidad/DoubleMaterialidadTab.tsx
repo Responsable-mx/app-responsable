@@ -41,6 +41,8 @@ type LatestReport = {
   id: string;
   file_name: string;
   created_at: string;
+  parse_status: "pending" | "ok" | "failed";
+  markdown_content?: string;
 } | null;
 
 type Props = {
@@ -433,12 +435,16 @@ function ReporteSection({
   latestResult,
   latestReport,
   onReportMutate,
+  isReportPolling,
+  onStartReportPolling,
 }: {
   clientId: string;
   clientName: string;
   latestResult: BenchmarkResult | null;
   latestReport: LatestReport;
   onReportMutate: () => void;
+  isReportPolling: boolean;
+  onStartReportPolling: () => void;
 }) {
   const { push } = useToast();
   const [generating, setGenerating] = useState(false);
@@ -458,14 +464,15 @@ function ReporteSection({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error al generar reporte");
-      push("success", "Reporte generado exitosamente.");
+      // POST retorna pending — inicia polling del GET cada 5s
+      onStartReportPolling();
       onReportMutate();
     } catch (e) {
       push("error", e instanceof Error ? e.message : "Error al generar reporte");
     } finally {
       setGenerating(false);
     }
-  }, [clientId, latestResult, push, onReportMutate]);
+  }, [clientId, latestResult, push, onReportMutate, onStartReportPolling]);
 
   const handleDownloadPdf = useCallback(async () => {
     if (!latestResult) return;
@@ -497,6 +504,7 @@ function ReporteSection({
         </div>
       )}
 
+      {/* Sin reporte todavía — mostrar botón generar */}
       {canGenerate && !latestReport && (
         <div className="border-l-4 border-l-amber-400 pl-4 py-2">
           <p className="text-xs text-slate-600 mb-3">
@@ -505,7 +513,8 @@ function ReporteSection({
           <Button
             size="md"
             variant="primary"
-            loading={generating}
+            loading={generating || isReportPolling}
+            disabled={isReportPolling}
             onClick={handleGenerate}
           >
             Generar reporte con IA
@@ -513,7 +522,34 @@ function ReporteSection({
         </div>
       )}
 
-      {canGenerate && latestReport && (
+      {/* Batch en proceso — spinner */}
+      {canGenerate && latestReport?.parse_status === "pending" && (
+        <div className="flex items-center gap-2 text-xs text-slate-500 py-2 border-l-4 border-l-amber-400 pl-4">
+          <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Generando reporte con Opus — puede tardar 2-5 minutos. No cierres esta página.
+        </div>
+      )}
+
+      {/* Batch fallido */}
+      {canGenerate && latestReport?.parse_status === "failed" && (
+        <div className="border-l-4 border-l-rose-500 pl-4 py-2 bg-rose-50 rounded-r space-y-2">
+          <p className="text-xs text-rose-700">El último reporte falló. Intenta de nuevo.</p>
+          <Button
+            size="sm"
+            variant="primary"
+            loading={generating}
+            onClick={handleGenerate}
+          >
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {/* Reporte listo */}
+      {canGenerate && latestReport?.parse_status === "ok" && (
         <div className="border-l-4 border-l-emerald-600 pl-4 py-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
             Último reporte generado
@@ -576,29 +612,34 @@ export function DoubleMaterialidadTab({
   const benchmarkKey = `/api/clients/${clientId}/dm-benchmark`;
   const reportKey = `/api/clients/${clientId}/dm-report`;
 
-  // isPolling=true activa SWR refreshInterval para detectar cuando el batch termina
+  // Polling benchmark batch
   const [isPolling, setIsPolling] = useState(false);
   const { push } = useToast();
-  // Evitar toast duplicado si el efecto dispara más de una vez
   const pollingNotified = useRef(false);
+
+  // Polling reporte batch
+  const [isReportPolling, setIsReportPolling] = useState(false);
+  const pollingNotifiedReport = useRef(false);
 
   const { data: benchmarkResp, isLoading: loadingBenchmark, mutate: mutateBenchmark } = useSWR<{
     data: BenchmarkData;
   }>(benchmarkKey, fetcher, {
     revalidateOnFocus: false,
-    // Polling cada 5s mientras el batch está en proceso
     refreshInterval: isPolling ? 5_000 : 0,
   });
 
   const { data: reportResp, mutate: mutateReport } = useSWR<{
     data: LatestReport;
-  }>(reportKey, fetcher, { revalidateOnFocus: false });
+  }>(reportKey, fetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: isReportPolling ? 5_000 : 0,
+  });
 
   const companies = benchmarkResp?.data.companies ?? [];
   const latestResult = benchmarkResp?.data.latest_result ?? null;
   const latestReport = reportResp?.data ?? null;
 
-  // Detectar cuando el batch termina y notificar al usuario
+  // Detectar cuando el batch del benchmark termina
   useEffect(() => {
     if (!isPolling) {
       pollingNotified.current = false;
@@ -616,6 +657,24 @@ export function DoubleMaterialidadTab({
     }
   }, [latestResult?.status, isPolling, push]);
 
+  // Detectar cuando el batch del reporte termina
+  useEffect(() => {
+    if (!isReportPolling) {
+      pollingNotifiedReport.current = false;
+      return;
+    }
+    if (latestReport?.parse_status === "ok" && !pollingNotifiedReport.current) {
+      pollingNotifiedReport.current = true;
+      setIsReportPolling(false);
+      push("success", "Reporte generado. Puedes descargarlo en PDF.");
+    }
+    if (latestReport?.parse_status === "failed" && !pollingNotifiedReport.current) {
+      pollingNotifiedReport.current = true;
+      setIsReportPolling(false);
+      push("error", "El reporte falló. Intenta de nuevo.");
+    }
+  }, [latestReport?.parse_status, isReportPolling, push]);
+
   const stage1Status: StageStatus =
     questionnaireProgress &&
     questionnaireProgress.filled >= questionnaireProgress.total &&
@@ -624,7 +683,7 @@ export function DoubleMaterialidadTab({
       : "active";
 
   const hasBenchmark = latestResult?.status === "done";
-  const hasReport = latestReport !== null;
+  const hasReport = latestReport?.parse_status === "ok";
 
   const stage2Status: StageStatus = hasBenchmark
     ? "done"
@@ -695,6 +754,8 @@ export function DoubleMaterialidadTab({
           latestResult={latestResult}
           latestReport={latestReport}
           onReportMutate={() => mutateReport()}
+          isReportPolling={isReportPolling}
+          onStartReportPolling={() => setIsReportPolling(true)}
         />
       </section>
     </div>

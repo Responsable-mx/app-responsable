@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
@@ -18,13 +17,12 @@ export const runtime = "nodejs";
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
 
-// Rate limit: 3 reportes DM por 5 min (Elena/Opus — ~$0.20-0.50/call)
+// Rate limit: 3 reportes DM por 5 min (Opus vía Batch — ~$0.20-0.50/call)
 
 const GenerateBody = z.object({
   result_id: z.string().uuid(),
 });
 
-// Estructura narrativa que la IA genera para el reporte
 const ReportNarrativeSchema = z.object({
   executive_summary: z.string().min(1),
   client_position: z.string().min(1),
@@ -92,7 +90,7 @@ Responde ÚNICAMENTE con JSON válido:
 }`;
 }
 
-// ── GET: retorna el último reporte DM generado ──────────────────────────────
+// ── GET: retorna el último reporte DM + verifica batch si pending ───────────
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
@@ -100,19 +98,114 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data: doc } = await admin
     .from("client_documents")
-    .select("id, file_name, created_at, markdown_content, parse_status")
+    .select("id, file_name, created_at, markdown_content, parse_status, batch_id")
     .eq("client_id", id)
     .eq("kind", "dm_report")
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
 
-  return NextResponse.json({ data: data ?? null });
+  // ── Chequeo de batch pendiente ──────────────────────────────────────────
+  if (doc?.parse_status === "pending" && doc?.batch_id) {
+    try {
+      const anthropic = createAnthropicClient();
+      const batch = await anthropic.beta.messages.batches.retrieve(doc.batch_id);
+
+      if (batch.processing_status === "ended") {
+        let narrative: z.infer<typeof ReportNarrativeSchema> | null = null;
+        let batchError: string | null = null;
+        let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
+
+        for await (const result of await anthropic.beta.messages.batches.results(doc.batch_id)) {
+          if (result.result.type === "succeeded") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = result.result.message as any;
+            inputTokens = msg.usage?.input_tokens ?? 0;
+            outputTokens = msg.usage?.output_tokens ?? 0;
+            cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
+            cacheReadTokens = msg.usage?.cache_read_input_tokens ?? 0;
+
+            const textOut = (msg.content as Array<{ type: string; text?: string }>)
+              .filter((b) => b.type === "text")
+              .map((b) => b.text ?? "")
+              .join("");
+
+            const jsonText = extractJsonObject(textOut);
+            if (jsonText) {
+              const parsed = ReportNarrativeSchema.safeParse(JSON.parse(jsonText));
+              if (parsed.success) {
+                narrative = parsed.data;
+              } else {
+                batchError = "Schema IA inválido";
+              }
+            } else {
+              batchError = "Respuesta IA sin JSON";
+            }
+          } else if (result.result.type === "errored") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            batchError = (result.result as any).error?.message ?? "Error en batch";
+          }
+        }
+
+        const model = getModelConfig("elena").model;
+        void logAiCall({
+          userEmail: user,
+          role: "elena",
+          clientId: id,
+          model,
+          inputTokens,
+          outputTokens,
+          cacheCreationTokens,
+          cacheReadTokens,
+          latencyMs: 0,
+          error: batchError,
+        });
+
+        if (narrative) {
+          // Reconstruir el nombre del cliente desde el doc o dejarlo genérico
+          const clientData = await getClient(id).catch(() => null);
+          const clientName = clientData?.name ?? "Cliente";
+          const markdown = buildMarkdownReport(clientName, narrative, [], [], {});
+
+          await admin
+            .from("client_documents")
+            .update({ markdown_content: markdown, parse_status: "ok", batch_id: null })
+            .eq("id", doc.id);
+
+          return NextResponse.json({
+            data: { ...doc, markdown_content: markdown, parse_status: "ok" },
+          });
+        } else {
+          await admin
+            .from("client_documents")
+            .update({ parse_status: "failed" })
+            .eq("id", doc.id);
+
+          return NextResponse.json({
+            data: { ...doc, parse_status: "failed" },
+          });
+        }
+      }
+      // Batch todavía en progreso — devolver estado actual
+    } catch {
+      // Si el check falla, no bloquear al usuario
+    }
+  }
+
+  return NextResponse.json({ data: doc ?? null });
 }
 
-// ── POST: genera reporte narrativo + guarda en client_documents ─────────────
+// ── POST: submite batch Opus para generar reporte (retorna en <3s) ──────────
+// Flujo:
+//   1. Valida benchmark result (status=done)
+//   2. Inserta client_document con parse_status=pending
+//   3. Submite batch Anthropic Batch API con Opus
+//   4. Guarda batch_id en el documento
+//   5. Retorna {status:"pending"} al frontend inmediatamente
+//   6. Frontend hace polling del GET cada 5s
+//   7. GET detecta batch ended → procesa → actualiza doc → retorna ok
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
@@ -170,62 +263,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const anthropic = createAnthropicClient();
   const model = getModelConfig("elena").model;
+  const fileName = `reporte-dm-${client.name.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.md`;
 
-  let textOut = "";
-  let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
-  const startedAt = Date.now();
-
-  try {
-    const msg = await anthropic.messages.create(
-      {
-        model,
-        max_tokens: 3000,
-        system: [{
-          type: "text",
-          text: "Eres un consultor senior de Doble Materialidad (ESRS/GRI/CSRD). Redactas reportes ejecutivos claros y accionables. Responde solo con JSON válido.",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          cache_control: { type: "ephemeral" } as any,
-        }],
-        messages: [{ role: "user", content: prompt }],
-      },
-      { signal: AbortSignal.timeout(150_000) }
-    );
-    inputTokens = msg.usage?.input_tokens ?? 0;
-    outputTokens = msg.usage?.output_tokens ?? 0;
-    cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
-    cacheReadTokens = msg.usage?.cache_read_input_tokens ?? 0;
-    for (const block of msg.content) {
-      if (block.type === "text") textOut += block.text;
-    }
-    anthropicBreaker.recordSuccess();
-  } catch (e) {
-    anthropicBreaker.recordFailure();
-    const errMsg = e instanceof Error ? e.message : "Error Anthropic";
-    void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: errMsg });
-    return NextResponse.json({ error: errMsg }, { status: 500 });
-  }
-
-  void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
-
-  const jsonText = extractJsonObject(textOut);
-  if (!jsonText) return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });
-
-  let narrative: z.infer<typeof ReportNarrativeSchema>;
-  try {
-    const result = ReportNarrativeSchema.safeParse(JSON.parse(jsonText));
-    if (!result.success) return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
-    narrative = result.data;
-  } catch {
-    return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
-  }
-
-  // Serializar contenido narrativo como markdown para client_documents
-  const companyNames = (benchmarkResult.companies_snapshot as Array<{ name: string }> ?? []).map((c) => c.name);
-  const fieldLabels = BENCHMARK_FIELDS.map((f) => f.label);
-
-  const markdown = buildMarkdownReport(client.name, narrative, companyNames, fieldLabels, benchmarkResult.comparison as Record<string, Record<string, string>>);
-
-  // Eliminar reporte anterior y guardar nuevo
+  // Eliminar reporte anterior e insertar nuevo en estado pending
   await admin.from("client_documents").delete().eq("client_id", id).eq("kind", "dm_report");
 
   const { data: docRow, error: insertErr } = await admin
@@ -234,19 +274,55 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       client_id: id,
       uploaded_by: user,
       kind: "dm_report",
-      file_name: `reporte-dm-${client.name.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.md`,
+      file_name: fileName,
       file_type: "md",
       mime_type: "text/markdown",
-      size_bytes: Buffer.byteLength(markdown, "utf8"),
+      size_bytes: 0,
       storage_path: `dm-reports/${id}/report-${Date.now()}.md`,
-      markdown_content: markdown,
-      parse_status: "ok",
+      markdown_content: "",
+      parse_status: "pending",
     })
     .select("id, file_name, created_at")
     .single();
 
   if (insertErr || !docRow) {
-    return NextResponse.json({ error: "Error al guardar reporte" }, { status: 500 });
+    return NextResponse.json({ error: "Error al crear registro de reporte" }, { status: 500 });
+  }
+
+  // Submeter batch con Opus — retorna en <3s, procesamiento 2-5 min
+  try {
+    const batch = await anthropic.beta.messages.batches.create(
+      {
+        requests: [{
+          custom_id: docRow.id,
+          params: {
+            model,
+            max_tokens: 4000,
+            system: [{
+              type: "text",
+              text: "Eres un consultor senior de Doble Materialidad (ESRS/GRI/CSRD). Redactas reportes ejecutivos claros y accionables. Responde solo con JSON válido.",
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              cache_control: { type: "ephemeral" } as any,
+            }],
+            messages: [{ role: "user", content: prompt }],
+          },
+        }],
+      },
+      { signal: AbortSignal.timeout(15_000) }
+    );
+
+    anthropicBreaker.recordSuccess();
+
+    await admin
+      .from("client_documents")
+      .update({ batch_id: batch.id })
+      .eq("id", docRow.id);
+
+  } catch (e) {
+    anthropicBreaker.recordFailure();
+    const errMsg = e instanceof Error ? e.message : "Error Anthropic";
+    await admin.from("client_documents").delete().eq("id", docRow.id);
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -254,7 +330,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       doc_id: docRow.id,
       file_name: docRow.file_name,
       created_at: docRow.created_at,
-      narrative,
+      parse_status: "pending",
     },
   });
 }
@@ -287,6 +363,9 @@ function buildMarkdownReport(
     })
     .join("\n\n");
 
+  const companiesLine = companies.length ? `*Empresas analizadas: ${companies.join(", ")}*\n\n` : "";
+  const fieldsLine = fields.length ? `*Campos analizados: ${fields.join(", ")}*\n\n` : "";
+
   return `# Reporte de Doble Materialidad — ${clientName}
 *Generado: ${new Date().toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" })}*
 
@@ -300,9 +379,7 @@ ${narrative.executive_summary}
 
 ## Posicionamiento vs Grupo de Referencia
 
-*Empresas analizadas: ${companies.join(", ")}*
-
-${narrative.client_position}
+${companiesLine}${narrative.client_position}
 
 ---
 
@@ -332,8 +409,6 @@ ${recoSection}
 
 ## Detalle del Benchmark
 
-*Campos analizados: ${fields.join(", ")}*
-
-${comparisonTable}
+${fieldsLine}${comparisonTable}
 `;
 }

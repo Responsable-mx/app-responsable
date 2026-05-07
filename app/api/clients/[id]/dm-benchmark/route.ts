@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
+import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import { getClient } from "@/lib/clients";
 import type { Client } from "@/lib/clients";
-import { buildClientContext } from "@/lib/ai/roles";
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
@@ -82,7 +82,8 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional:
 
 function buildComparePrompt(
   clientName: string,
-  clientContext: string,
+  clientSector: string | null,
+  clientCountry: string | null,
   companies: Array<{ name: string; country: string | null; relation: string }>,
 ): string {
   const fieldsList = BENCHMARK_FIELDS.map(
@@ -93,24 +94,18 @@ function buildComparePrompt(
     .map((c) => `- ${c.name} (${c.country ?? "país desconocido"}, ${RELATION_LABELS[c.relation as keyof typeof RELATION_LABELS] ?? c.relation})`)
     .join("\n");
 
-  return `Eres un analista senior de sostenibilidad especializado en Doble Materialidad (estándar ESRS/CSRD).
+  return `Analista ESG. Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas en campos de Doble Materialidad.
 
-CONTEXTO DEL CLIENTE:
-${clientContext}
-
-EMPRESAS A COMPARAR:
+EMPRESAS:
 ${companiesList}
 
-CAMPOS DE COMPARACIÓN:
+CAMPOS:
 ${fieldsList}
 
-Tu tarea: compara a ${clientName} contra cada empresa en los campos indicados. Usa información pública (reportes ESG, GRI, SASB).
+Por cada campo: UNA oración por empresa (incluye a ${clientName}). Si no tienes datos, escribe "Sin información pública".
+Cierra con párrafo narrativo ≤60 palabras: posición de ${clientName}, fortalezas, brechas clave.
 
-Para cada campo, escribe UNA oración concisa por empresa. Si no tienes datos, escribe "Sin información pública".
-
-Al final, un párrafo narrativo (máx. 80 palabras) con las fortalezas, brechas y oportunidades clave de ${clientName}.
-
-Responde ÚNICAMENTE con JSON válido, sin texto adicional:
+JSON únicamente:
 {
   "comparison": {
     "campo_key": {
@@ -118,7 +113,7 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional:
       "Empresa A": "descripción"
     }
   },
-  "narrative": "párrafo síntesis"
+  "narrative": "síntesis"
 }`;
 }
 
@@ -179,6 +174,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }
   }
 
+  if (anthropicBreaker.isOpen) {
+    return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
+  }
+
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
@@ -224,7 +223,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       for (const block of msg.content) {
         if (block.type === "text") textOut += block.text;
       }
+      anthropicBreaker.recordSuccess();
     } catch (e) {
+      anthropicBreaker.recordFailure();
       const msg = e instanceof Error ? e.message : "Error Anthropic";
       void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
       return NextResponse.json({ error: msg }, { status: 500 });
@@ -282,9 +283,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Empresas no encontradas" }, { status: 404 });
   }
 
-  const model = getModelConfig("aurora").model; // Sonnet: más rápido que Opus, suficiente para JSON comparativo
-  const clientContext = buildClientContext(client);
-  const prompt = buildComparePrompt(client.name, clientContext, companies);
+  const model = getModelConfig("valeria").model; // Haiku: 3-5s vs Sonnet 10-15s — suficiente para JSON comparativo estructurado
+  const prompt = buildComparePrompt(
+    client.name,
+    client.sector ?? null,
+    (client.countries as string[] | null)?.[0] ?? null,
+    companies,
+  );
 
   let textOut = "";
   let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
@@ -321,7 +326,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         }],
         messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(20_000) }
+      { signal: AbortSignal.timeout(10_000) }
     );
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
@@ -330,14 +335,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     for (const block of msg.content) {
       if (block.type === "text") textOut += block.text;
     }
+    anthropicBreaker.recordSuccess();
   } catch (e) {
+    anthropicBreaker.recordFailure();
     const msg = e instanceof Error ? e.message : "Error Anthropic";
-    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
+    void logAiCall({ userEmail: user, role: "valeria", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
     await admin.from("dm_benchmark_results").update({ status: "failed", error_message: msg }).eq("id", resultRow.id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
+  void logAiCall({ userEmail: user, role: "valeria", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
 
   const jsonText = extractJsonObject(textOut);
   if (!jsonText) {

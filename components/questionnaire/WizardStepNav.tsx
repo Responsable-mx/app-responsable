@@ -11,19 +11,17 @@ type StepProgress = {
 type WizardStepNavProps = {
   steps: WizardStep[];
   activeStep: number;
-  /** Mapa de key de paso → progreso calculado */
   sectionProgress: Record<string, StepProgress>;
+  /** Campos llenos pero aún no validados por paso. Si > 0 → badge ámbar. */
+  pendingValidation: Record<string, number>;
   onSelect: (index: number) => void;
 };
 
-/**
- * Panel lateral de navegación del wizard (stepper).
- * Muestra progreso por paso: ícono circular, título y métricas filled/total.
- */
 export function WizardStepNav({
   steps,
   activeStep,
   sectionProgress,
+  pendingValidation,
   onSelect,
 }: WizardStepNavProps) {
   return (
@@ -31,6 +29,7 @@ export function WizardStepNav({
       {steps.map((s, i) => {
         const sp = sectionProgress[s.key] ?? { filled: 0, total: s.fields.length, pct: 0 };
         const complete = sp.pct === 100 && s.fields.length > 0;
+        const pending = pendingValidation[s.key] ?? 0;
         return (
           <button
             key={s.key}
@@ -55,6 +54,14 @@ export function WizardStepNav({
                 {complete ? "✓" : s.step}
               </span>
               <span className="font-semibold leading-tight flex-1 truncate">{s.title}</span>
+              {pending > 0 && (
+                <span
+                  className="text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 shrink-0"
+                  title={`${pending} campo${pending > 1 ? "s" : ""} sin validar`}
+                >
+                  {pending}
+                </span>
+              )}
             </div>
             <div className="mt-1 ml-7 text-[10px] text-slate-500 tabular-nums">
               {sp.filled}/{sp.total} · {sp.pct}%

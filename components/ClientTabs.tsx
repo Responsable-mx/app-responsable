@@ -329,6 +329,10 @@ export function ClientTabs({
                 return isNaN(n) || n < 0 ? 0 : n;
               })()}
               autoFillOnMount={searchParams?.get("autoFill") === "1"}
+              reportUrls={{
+                sustainability: client.sustainability_report_url ?? null,
+                financial: client.financial_report_url ?? null,
+              }}
             />
           </TabErrorBoundary>
         </div>

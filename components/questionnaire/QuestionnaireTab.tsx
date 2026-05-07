@@ -17,6 +17,7 @@ import {
   type WizardStep,
 } from "@/lib/questionnaires/types";
 import { Button } from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { WizardStepNav } from "@/components/questionnaire/WizardStepNav";
@@ -40,11 +41,13 @@ export function QuestionnaireTab({
   clientServices = [],
   initialStepIndex = 0,
   autoFillOnMount = false,
+  reportUrls,
 }: {
   clientId: string;
   clientServices?: string[];
   initialStepIndex?: number;
   autoFillOnMount?: boolean;
+  reportUrls?: { sustainability: string | null; financial: string | null };
 }) {
   const { data, error, isLoading, mutate } = useSWR(
     `/api/clients/${clientId}/questionnaire`,
@@ -63,7 +66,7 @@ export function QuestionnaireTab({
     );
   }
 
-  return <WizardEditor clientId={clientId} clientServices={clientServices} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} />;
+  return <WizardEditor clientId={clientId} clientServices={clientServices} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} reportUrls={reportUrls} />;
 }
 
 function WizardEditor({
@@ -73,6 +76,7 @@ function WizardEditor({
   mutate,
   initialStepIndex = 0,
   autoFillOnMount = false,
+  reportUrls,
 }: {
   clientId: string;
   clientServices?: string[];
@@ -80,6 +84,7 @@ function WizardEditor({
   mutate: () => void;
   initialStepIndex?: number;
   autoFillOnMount?: boolean;
+  reportUrls?: { sustainability: string | null; financial: string | null };
 }) {
   const { template } = initial;
   const schema = template.schema;
@@ -97,6 +102,10 @@ function WizardEditor({
   const [aiBulkProgress, setAiBulkProgress] = useState<{ current: number; total: number; stepTitle: string } | null>(null);
   // Estado del modal "Importar" (tabs: pegar texto / subir archivo / mis docs).
   const [docFillOpen, setDocFillOpen] = useState(false);
+  const [confirmBulkFill, setConfirmBulkFill] = useState(false);
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  // Staging de AI fill por paso: guarda propuesta IA para que el consultor valide antes de aplicar.
+  const [stagedFill, setStagedFill] = useState<{ stepKey: string; stepTitle: string; data: Record<string, FieldResponse> } | null>(null);
   const toast = useToast();
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -115,6 +124,21 @@ function WizardEditor({
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progress = useMemo(() => computeProgress(schema, responses), [schema, responses]);
+
+  // Campos llenos pero no validados por paso → badge en WizardStepNav.
+  const pendingValidation = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const step of steps) {
+      const stepObj = (responses[step.key] as Record<string, unknown> | undefined) ?? {};
+      let count = 0;
+      for (const field of step.fields) {
+        const raw = stepObj[field.key];
+        if (isFieldResponse(raw) && isFieldFilled(raw.value) && !raw.validated) count++;
+      }
+      result[step.key] = count;
+    }
+    return result;
+  }, [responses, steps]);
 
   // D-38: mantener ref siempre actualizado para que save() y el flush de unmount
   // lean la versión más reciente sin depender del closure estale de useState.
@@ -319,19 +343,46 @@ function WizardEditor({
         throw new Error(json.error ?? `HTTP ${res.status}`);
       }
       const json = (await res.json()) as { data: Record<string, FieldResponse> };
-      // Computar el merged ANTES de setState para pasarlo a save() y evitar
-      // closure stale: si save() lee `responses` del closure, está vacío.
-      const merged: QuestionnaireResponseData = { ...responses, [stepKey]: json.data };
-      setResponses(merged);
-      dirty.current = true;
-      await save(merged);
-      toast.push("success", "IA llenó campos del paso");
-      mutate();
+      const stepHasExistingData = Object.keys((responses[stepKey] as object | undefined) ?? {}).length > 0;
+      if (stepHasExistingData) {
+        // Paso ya tiene datos → mostrar staging para que el consultor valide antes de aplicar.
+        const stepTitle = steps.find((s) => s.key === stepKey)?.title ?? stepKey;
+        setStagedFill({ stepKey, stepTitle, data: json.data });
+      } else {
+        // Paso vacío → aplicar directo sin staging.
+        const merged: QuestionnaireResponseData = { ...responses, [stepKey]: json.data };
+        setResponses(merged);
+        dirty.current = true;
+        await save(merged);
+        toast.push("success", "IA llenó campos del paso");
+        mutate();
+      }
     } catch (e) {
       toast.push("error", e instanceof Error ? e.message : "Error en AI fill");
     } finally {
       setAiFilling(null);
     }
+  }
+
+  // Aplica campos aceptados del staging. Quita validación de los campos que cambian.
+  async function applyStaged(accepted: Set<string>) {
+    if (!stagedFill) return;
+    const { stepKey, data } = stagedFill;
+    const prevStep = (responses[stepKey] as Record<string, FieldResponse> | undefined) ?? {};
+    const nextStep: Record<string, FieldResponse> = { ...prevStep };
+    for (const fieldKey of accepted) {
+      const proposed = data[fieldKey];
+      if (!proposed) continue;
+      // Quita validación porque el valor cambia.
+      nextStep[fieldKey] = { ...proposed, validated: false, updated_at: new Date().toISOString() };
+    }
+    const merged: QuestionnaireResponseData = { ...responses, [stepKey]: nextStep };
+    setResponses(merged);
+    dirty.current = true;
+    await save(merged);
+    toast.push("success", `${accepted.size} campo${accepted.size > 1 ? "s" : ""} actualizado${accepted.size > 1 ? "s" : ""}. Validación quitada para revisión.`);
+    mutate();
+    setStagedFill(null);
   }
 
   // Llena el paso activo con texto/markdown extraído (de paste o de docs subidos).
@@ -443,21 +494,59 @@ function WizardEditor({
 
   return (
     <div>
+      {/* Banner informes IA — visible solo cuando existen URLs */}
+      {(reportUrls?.sustainability || reportUrls?.financial) && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded text-xs">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Informes del cliente</span>
+          {reportUrls.sustainability && (
+            <a
+              href={reportUrls.sustainability}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-brand-primary-dark font-medium hover:underline"
+            >
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Informe sustentabilidad ↗
+            </a>
+          )}
+          {reportUrls.financial && (
+            <a
+              href={reportUrls.financial}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-brand-primary-dark font-medium hover:underline"
+            >
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Informe financiero ↗
+            </a>
+          )}
+          <span className="text-slate-400">·</span>
+          <a href={`/clientes/${clientId}/editar`} className="text-slate-500 hover:text-slate-700 hover:underline">
+            Editar URLs →
+          </a>
+        </div>
+      )}
+
       {/* Banner global AI fill */}
       <AiBulkBanner
         aiCapableCount={aiCapableCount}
         totalSteps={steps.length}
         someStepHasResponses={someStepHasResponses}
         progress={aiBulkProgress}
-        onFillAll={aiFillAll}
+        onFillAll={() => someStepHasResponses ? setConfirmBulkFill(true) : void aiFillAll()}
       />
 
-    <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-5">
+    <div className={`grid grid-cols-1 gap-5 ${drawerField ? "lg:grid-cols-[200px_1fr_280px]" : "lg:grid-cols-[200px_1fr]"}`}>
       {/* Stepper lateral */}
       <WizardStepNav
         steps={steps}
         activeStep={activeStep}
         sectionProgress={progress.sectionProgress}
+        pendingValidation={pendingValidation}
         onSelect={setActiveStep}
       />
 
@@ -497,13 +586,7 @@ function WizardEditor({
                     Recargar cuestionario
                   </Button>
                   <button
-                    onClick={() => {
-                      // Forzar reintento sobreescribiendo: limpia expectedUpdatedAt
-                      // para que el server acepte sin chequear lock.
-                      lastServerUpdatedAt.current = null;
-                      dirty.current = true;
-                      void save();
-                    }}
+                    onClick={() => setConfirmOverwrite(true)}
                     className="text-xs text-amber-700 hover:underline"
                   >
                     Sobrescribir igual
@@ -576,7 +659,7 @@ function WizardEditor({
                     onClick={() => aiFill(step.key)}
                     disabled={!!aiBulkProgress}
                   >
-                    {stepHasData ? "Refrescar este paso" : "Llenar con IA"}
+                    {stepHasData ? "Refrescar este paso con IA" : "Llenar este paso con IA"}
                   </Button>
                 );
               })()}
@@ -662,6 +745,7 @@ function WizardEditor({
           <SourceDrawer
             field={f}
             response={resp}
+            mode="panel"
             onClose={() => setDrawerField(null)}
             onUpdateSourceType={(type) => {
               setResponses((prev) => {
@@ -706,8 +790,204 @@ function WizardEditor({
         stepTitle={step.title}
         onExtract={(text) => docFill(step.key, text)}
       />
+
+      {/* Modal de staging: IA propone, consultor valida campo por campo antes de aplicar */}
+      {stagedFill && (() => {
+        const currentStep = steps.find((s) => s.key === stagedFill.stepKey);
+        if (!currentStep) return null;
+        return (
+          <AiFillStagingModal
+            stepTitle={stagedFill.stepTitle}
+            fields={currentStep.fields}
+            existing={(responses[stagedFill.stepKey] as Record<string, FieldResponse> | undefined) ?? {}}
+            proposed={stagedFill.data}
+            onApply={applyStaged}
+            onDiscard={() => setStagedFill(null)}
+          />
+        );
+      })()}
+
+      <ConfirmModal
+        open={confirmBulkFill}
+        title="¿Llenar todo con IA?"
+        description="La IA sobreescribirá las respuestas existentes en todos los pasos. Esta acción no se puede deshacer."
+        confirmLabel="Llenar todo con IA"
+        cancelLabel="Cancelar"
+        tone="destructive"
+        onConfirm={() => {
+          setConfirmBulkFill(false);
+          void aiFillAll();
+        }}
+        onCancel={() => setConfirmBulkFill(false)}
+      />
+
+      <ConfirmModal
+        open={confirmOverwrite}
+        title="¿Sobrescribir cambios remotos?"
+        description="Tus cambios locales reemplazarán lo que guardó el otro consultor. Esta acción no se puede deshacer."
+        confirmLabel="Sobrescribir"
+        cancelLabel="Cancelar"
+        tone="destructive"
+        onConfirm={() => {
+          setConfirmOverwrite(false);
+          lastServerUpdatedAt.current = null;
+          dirty.current = true;
+          void save();
+        }}
+        onCancel={() => setConfirmOverwrite(false)}
+      />
     </div>
     </div>
   );
 }
 
+// ── Modal de staging de AI fill ───────────────────────────────
+// Muestra propuesta de la IA vs. valor actual campo por campo.
+// Consultor acepta/rechaza individualmente antes de que se aplique.
+
+function formatFieldValue(v: FieldResponse["value"]): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Sí" : "No";
+  if (Array.isArray(v)) return v.join(", ");
+  return String(v);
+}
+
+function AiFillStagingModal({
+  stepTitle,
+  fields,
+  existing,
+  proposed,
+  onApply,
+  onDiscard,
+}: {
+  stepTitle: string;
+  fields: import("@/lib/questionnaires/types").WizardField[];
+  existing: Record<string, FieldResponse>;
+  proposed: Record<string, FieldResponse>;
+  onApply: (accepted: Set<string>) => Promise<void>;
+  onDiscard: () => void;
+}) {
+  const [accepted, setAccepted] = useState<Set<string>>(() => new Set(Object.keys(proposed)));
+  const [applying, setApplying] = useState(false);
+
+  function toggle(key: string) {
+    setAccepted((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  async function handleApply() {
+    if (accepted.size === 0) { onDiscard(); return; }
+    setApplying(true);
+    await onApply(accepted);
+    setApplying(false);
+  }
+
+  // Solo mostrar campos que la IA propone y que cambian respecto al valor actual.
+  const changedFields = fields.filter((f) => {
+    const prop = proposed[f.key];
+    if (!prop) return false;
+    const curr = existing[f.key];
+    return formatFieldValue(prop.value) !== formatFieldValue(curr?.value ?? null);
+  });
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onDiscard} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div className="bg-white rounded shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col">
+          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Propuesta de IA — revisar antes de aplicar</p>
+              <h3 className="text-sm font-bold text-slate-900">{stepTitle}</h3>
+            </div>
+            <button onClick={onDiscard} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-5">
+            {changedFields.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-8">La IA no propone cambios respecto al valor actual.</p>
+            ) : (
+              <>
+                <p className="text-xs text-slate-600 mb-4">
+                  La IA propone cambios en <strong>{changedFields.length} campo{changedFields.length > 1 ? "s" : ""}</strong>. Marca los que quieres aceptar. Los campos aceptados perderán su validación para que los revises.
+                </p>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setAccepted(new Set(changedFields.map((f) => f.key)))}
+                    className="text-[11px] font-semibold text-brand-primary-dark border border-brand-primary/40 rounded px-2 py-1 hover:bg-brand-primary/5"
+                  >
+                    Aceptar todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccepted(new Set())}
+                    className="text-[11px] font-semibold text-slate-600 border border-slate-300 rounded px-2 py-1 hover:bg-slate-50"
+                  >
+                    Rechazar todos
+                  </button>
+                </div>
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded">
+                  {changedFields.map((f) => {
+                    const curr = existing[f.key];
+                    const prop = proposed[f.key]!;
+                    const isAccepted = accepted.has(f.key);
+                    return (
+                      <label
+                        key={f.key}
+                        className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${isAccepted ? "bg-brand-primary-light/30" : "bg-white hover:bg-slate-50"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isAccepted}
+                          onChange={() => toggle(f.key)}
+                          className="mt-0.5 accent-brand-primary shrink-0"
+                        />
+                        <div className="flex-1 min-w-0 text-xs">
+                          <p className="font-semibold text-slate-800 mb-1">{f.label}</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-slate-50 rounded p-2">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Actual</p>
+                              <p className="text-slate-600 break-words">{formatFieldValue(curr?.value ?? null)}</p>
+                            </div>
+                            <div className="bg-emerald-50 rounded p-2">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-0.5">IA propone</p>
+                              <p className="text-slate-800 break-words">{formatFieldValue(prop.value)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="px-5 py-4 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+            <button onClick={onDiscard} className="text-xs text-slate-500 hover:text-slate-700">
+              Descartar propuesta
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 tabular-nums">{accepted.size} de {changedFields.length} aceptados</span>
+              <button
+                onClick={() => void handleApply()}
+                disabled={applying || changedFields.length === 0}
+                className="px-4 py-1.5 text-xs font-semibold bg-brand-primary text-white rounded hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
+              >
+                {applying ? "Aplicando…" : `Aplicar ${accepted.size} campo${accepted.size !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

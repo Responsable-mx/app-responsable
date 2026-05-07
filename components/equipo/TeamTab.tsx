@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SelectField } from "@/components/ui/SelectField";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 
 type Consultor = {
@@ -75,10 +76,7 @@ export function TeamTab({
   const { push } = useToast();
 
   const consultors = data?.data ?? [];
-  // Columna "Seniority global" solo es informativa cuando algún consultor
-  // tiene override de proyecto — sin overrides la columna repite el nivel global sin contraste.
   const hasAnyOverride = consultors.some((c) => c.seniority_level !== null);
-  // Solo mostrar columna "Seniority global" si hay overrides Y al menos un consultor tiene nivel global definido.
   const hasAnyGlobalSeniority = consultors.some((c) => c.user_seniority_level !== null);
 
   async function handleRemove() {
@@ -116,9 +114,7 @@ export function TeamTab({
         </div>
       )}
 
-      {isLoading && (
-        <div className="text-sm text-slate-500">Cargando…</div>
-      )}
+      {isLoading && <SkeletonTable rows={3} cols={4} />}
 
       {!isLoading && consultors.length === 0 && (
         <div className="text-sm text-slate-500 py-6 text-center border border-dashed border-slate-200 rounded">
@@ -138,17 +134,25 @@ export function TeamTab({
         <div className="overflow-x-auto">
           <table className="min-w-full w-max text-sm">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-                <th className="pb-2 pr-6">Consultor</th>
-                <th className="pb-2 pr-6">Email</th>
-                <th className="pb-2 pr-6" title="Nivel del consultor para este proyecto específico (sobreescribe el nivel global cuando está definido)">Nivel en proyecto</th>
+              <tr>
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6">Consultor</th>
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6">Email</th>
+                <th
+                  className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6"
+                  title="Nivel del consultor para este proyecto específico (sobreescribe el nivel global cuando está definido)"
+                >
+                  Nivel en proyecto
+                </th>
                 {hasAnyOverride && hasAnyGlobalSeniority && (
-                  <th className="pb-2 pr-6" title="Nivel del consultor en todos los proyectos (default cuando no hay override)">
+                  <th
+                    className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6"
+                    title="Nivel del consultor en todos los proyectos (default cuando no hay override)"
+                  >
                     Nivel global
                   </th>
                 )}
-                <th className="pb-2 pr-6">Asignado</th>
-                {isAdmin && <th className="pb-2 text-right">Acciones</th>}
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6">Asignado</th>
+                {isAdmin && <th className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2">Acciones</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -162,7 +166,7 @@ export function TeamTab({
                   </td>
                   <td className="py-2 pr-6">
                     {c.seniority_level ? (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm bg-brand-primary-light text-brand-primary-dark">
+                      <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm bg-brand-primary-light text-brand-primary-dark">
                         {seniorityLabel(c.seniority_level, seniorityItems)}
                       </span>
                     ) : (
@@ -176,7 +180,7 @@ export function TeamTab({
                       </span>
                     </td>
                   )}
-                  <td className="py-2 pr-6 text-xs text-slate-500">
+                  <td className="py-2 pr-6 text-xs text-slate-500 tabular-nums">
                     {new Date(c.assigned_at).toLocaleDateString("es-MX")}
                     {c.assigned_by && (
                       <span className="ml-1 text-slate-400">
@@ -314,7 +318,12 @@ function AssignModal({
           <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} loading={saving} disabled={!selectedEmail}>
+          <Button
+            onClick={handleSubmit}
+            loading={saving}
+            disabled={!selectedEmail || available.length === 0}
+            title={!selectedEmail ? "Selecciona un consultor para continuar" : undefined}
+          >
             Asignar
           </Button>
         </>
@@ -323,7 +332,7 @@ function AssignModal({
       <div className="space-y-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="assign-email-select" className="text-sm font-medium text-slate-700">
-            Consultor *
+            Consultor <span className="text-rose-500">*</span>
           </label>
           {available.length === 0 ? (
             <p className="text-sm text-slate-500">
@@ -344,7 +353,7 @@ function AssignModal({
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="assign-seniority-select" className="text-sm font-medium text-slate-700">
-            Seniority en este proyecto
+            Nivel en este proyecto
           </label>
           <SelectField
             id="assign-seniority-select"
@@ -415,7 +424,7 @@ function EditSeniorityModal({
     <Modal
       open
       onClose={saving ? () => {} : onClose}
-      title={`Seniority de ${consultor.full_name ?? consultor.user_email}`}
+      title={`Nivel de ${consultor.full_name ?? consultor.user_email}`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
@@ -430,7 +439,7 @@ function EditSeniorityModal({
       <div className="space-y-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="edit-seniority-select" className="text-sm font-medium text-slate-700">
-            Seniority en este proyecto
+            Nivel en este proyecto
           </label>
           <SelectField
             id="edit-seniority-select"

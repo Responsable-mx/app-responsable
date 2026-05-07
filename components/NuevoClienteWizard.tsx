@@ -34,6 +34,15 @@ export function NuevoClienteWizard() {
     propuesta_url: "",
     relacion: "",
   });
+  const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
+
+  function touch(key: keyof FormState) {
+    setTouched((t) => ({ ...t, [key]: true }));
+  }
+
+  const nombreError = touched.nombre && form.nombre.trim().length < 3 ? "Mínimo 3 caracteres" : undefined;
+  const servicioError = touched.servicio && !form.servicio ? "Selecciona un servicio" : undefined;
+  const alcanceError = touched.alcance && !form.alcance.trim() ? "Campo requerido" : undefined;
 
   const { data: servicios = [], isLoading: loadingServicios } = useSWR<{ value: string; label: string }[]>(
     "/api/catalogs?category=services",
@@ -108,7 +117,9 @@ export function NuevoClienteWizard() {
           label="Nombre de la empresa *"
           value={form.nombre}
           onChange={(e) => set("nombre", e.target.value)}
+          onBlur={() => touch("nombre")}
           placeholder="Razón social completa"
+          error={nombreError}
         />
 
         <div>
@@ -117,17 +128,22 @@ export function NuevoClienteWizard() {
           </label>
           <SelectField
             value={form.servicio}
-            onChange={(v) => set("servicio", v)}
+            onChange={(v) => { set("servicio", v); touch("servicio"); }}
             options={servicios.map((s) => ({ value: s.value, label: s.label }))}
             placeholder={loadingServicios ? "Cargando servicios…" : "Seleccionar servicio"}
           />
+          {servicioError && (
+            <p className="mt-1 text-xs text-rose-600">{servicioError}</p>
+          )}
         </div>
 
         <Input
           label="Alcance geográfico del proyecto *"
           value={form.alcance}
           onChange={(e) => set("alcance", e.target.value)}
+          onBlur={() => touch("alcance")}
           helper="País o región del estudio. Ej: México — Bajío y Centro-Norte"
+          error={alcanceError}
         />
 
         <Input

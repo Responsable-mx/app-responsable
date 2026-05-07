@@ -272,6 +272,27 @@ function BenchmarkSection({
         )}
       </div>
 
+      {/* Selección masiva */}
+      {companies.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelected(new Set(companies.map((c) => c.id)))}
+            className="text-[11px] font-semibold text-brand-primary-dark border border-brand-primary/40 rounded px-2 py-1 hover:bg-brand-primary/5"
+          >
+            Seleccionar todas
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="text-[11px] font-semibold text-slate-600 border border-slate-300 rounded px-2 py-1 hover:bg-slate-50"
+          >
+            Limpiar selección
+          </button>
+          <span className="text-[11px] text-slate-400">{selected.size} seleccionadas</span>
+        </div>
+      )}
+
       {/* Lista de empresas por categoría */}
       {Object.entries(groupedByRelation).map(([relation, group]) => (
         <div key={relation}>

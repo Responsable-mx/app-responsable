@@ -174,7 +174,7 @@ export function UsersManager() {
                     </td>
                     <td className="py-2 pr-4 text-xs text-slate-600 hidden sm:table-cell">
                       {u.last_login ? (
-                        new Date(u.last_login).toLocaleDateString("es-MX")
+                        new Date(u.last_login).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}

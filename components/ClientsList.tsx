@@ -555,8 +555,13 @@ function ClientCard({ client }: { client: Row }) {
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-slate-900 leading-tight truncate group-hover:text-brand-primary-hover transition-colors">
-              {client.name}
+            <h3 className="text-sm font-semibold text-slate-900 leading-tight group-hover:text-brand-primary-hover transition-colors flex items-center gap-1.5">
+              <span className="truncate">{client.name}</span>
+              {client.name.startsWith("DEMO_") && (
+                <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 border border-amber-200">
+                  TEST
+                </span>
+              )}
             </h3>
             <p className="text-[11px] text-slate-500 truncate mt-0.5">
               {client.sector ?? <span className="italic text-slate-400">Sin sector</span>}

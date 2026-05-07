@@ -192,7 +192,7 @@ export function ClientCronogramaTab({
             href={`/api/clients/${clientId}/export-cronograma-pdf`}
             target="_blank"
             rel="noopener"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-slate-200 bg-white text-slate-700 hover:border-brand-primary hover:text-brand-primary-dark transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
             title="Descargar cronograma como PDF"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

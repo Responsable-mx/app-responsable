@@ -50,16 +50,22 @@ const NAV_ADMIN: NavItem[] = [
   },
 ];
 
+function resolveFlag(flags: Record<string, boolean>, key: string, defaultVal: boolean): boolean {
+  return flags[key] !== undefined ? flags[key] : defaultVal;
+}
+
 export function Sidebar({
   isAdmin = false,
   isClient = false,
   clientId,
   userEmail,
+  featureFlags = {},
 }: {
   isAdmin?: boolean;
   isClient?: boolean;
   clientId?: string | null;
   userEmail?: string | null;
+  featureFlags?: Record<string, boolean>;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -68,11 +74,24 @@ export function Sidebar({
     ? [{ href: `/clientes/${clientId}`, label: "Mi empresa", tour: "nav-mi-empresa", icon: IconBuilding }]
     : [{ href: "/clientes", label: "Mi empresa", tour: "nav-mi-empresa", icon: IconBuilding }];
 
+  // Aplicar feature_flags: filtrar items según overrides por usuario
+  const showChatIA = resolveFlag(featureFlags, "chat_ia", true);
+  const showEquipo = resolveFlag(featureFlags, "equipo", isAdmin); // default: solo admins
+
+  const baseFiltered = NAV_BASE.filter((item) => {
+    if (item.href === "/chat") return showChatIA;
+    return true;
+  });
+  const adminFiltered = NAV_ADMIN.filter((item) => {
+    if (item.href === "/equipo") return showEquipo;
+    return true;
+  });
+
   const items = isClient
     ? NAV_CLIENT
     : isAdmin
-    ? [...NAV_BASE, ...NAV_ADMIN]
-    : NAV_BASE;
+    ? [...baseFiltered, ...adminFiltered]
+    : baseFiltered;
   const [collapsed, setCollapsed] = useState(false);
 
   // Mis proyectos: asignaciones del consultor actual. revalidate 1h (cambia poco).

@@ -19,6 +19,7 @@ type User = {
   seniority_level: string | null;
   client_id: string | null;
   is_test_account: boolean;
+  feature_flags: Record<string, boolean>;
   created_at: string;
 };
 
@@ -108,32 +109,34 @@ export function UsersManager() {
         const hasSeniority = users.some((u) => u.seniority_level !== null);
         return (
           <div className="overflow-x-auto">
-            <table className="min-w-full w-max text-sm">
+            <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-                  <th className="pb-2 pr-4">Email</th>
-                  <th className="pb-2 pr-4">Nombre</th>
+                  <th className="pb-2 pr-4 w-[220px]">Email</th>
+                  <th className="pb-2 pr-4 w-[140px]">Nombre</th>
                   <th className="pb-2 pr-4">Rol</th>
                   {hasSeniority && <th className="pb-2 pr-4">Seniority</th>}
                   <th className="pb-2 pr-4">Estado</th>
-                  <th className="pb-2 pr-4">Último login</th>
-                  <th className="pb-2 text-right sticky right-0 bg-white pl-4">Acciones</th>
+                  <th className="pb-2 pr-4 hidden sm:table-cell">Último login</th>
+                  <th className="pb-2 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {users.map((u) => (
                   <tr key={u.email} className="even:bg-slate-50 hover:bg-slate-100">
-                    <td className="py-2 pr-4 font-mono text-xs">
-                      <span className="inline-flex items-center gap-1.5">
-                        {u.email}
+                    <td className="py-2 pr-4 font-mono text-xs w-[220px] max-w-[220px]">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate" title={u.email}>{u.email}</span>
                         {u.is_test_account && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 border border-amber-200">
+                          <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 border border-amber-200">
                             TEST
                           </span>
                         )}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-slate-700">{u.full_name ?? "—"}</td>
+                    <td className="py-2 pr-4 text-slate-700 w-[140px] max-w-[140px]">
+                      <span className="block truncate" title={u.full_name ?? ""}>{u.full_name ?? "—"}</span>
+                    </td>
                     <td className="py-2 pr-4">
                       <span
                         className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm ${
@@ -169,14 +172,14 @@ export function UsersManager() {
                         {u.active ? "Activo" : "Inactivo"}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-xs text-slate-600">
+                    <td className="py-2 pr-4 text-xs text-slate-600 hidden sm:table-cell">
                       {u.last_login ? (
                         new Date(u.last_login).toLocaleDateString("es-MX")
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="py-2 text-right sticky right-0 bg-white pl-4">
+                    <td className="py-2 text-right">
                       <button
                         onClick={() => setEditing(u)}
                         title="Editar usuario"
@@ -252,8 +255,18 @@ function UserEditor({
   const [seniorityLevel, setSeniorityLevel] = useState(user?.seniority_level ?? "");
   const [clientId, setClientId] = useState(user?.client_id ?? "");
   const [isTestAccount, setIsTestAccount] = useState(user?.is_test_account ?? false);
+  const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>(user?.feature_flags ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function setFlag(key: string, val: boolean | null) {
+    setFeatureFlags((prev) => {
+      const next = { ...prev };
+      if (val === null) delete next[key];
+      else next[key] = val;
+      return next;
+    });
+  }
 
   const { data: clientsData } = useSWR<{ data: ClientOption[] }>(
     role === "cliente" ? "/api/clients?catalog=1&limit=200" : null,
@@ -279,6 +292,7 @@ function UserEditor({
             seniority_level: seniorityLevel || null,
             client_id: role === "cliente" ? clientId : null,
             is_test_account: isTestAccount,
+            feature_flags: featureFlags,
           }
         : {
             email,
@@ -288,6 +302,7 @@ function UserEditor({
             seniority_level: seniorityLevel || null,
             client_id: role === "cliente" ? clientId : null,
             is_test_account: isTestAccount,
+            feature_flags: featureFlags,
           };
       const url = user
         ? `/api/users/${encodeURIComponent(user.email)}`
@@ -413,6 +428,65 @@ function UserEditor({
             Cuenta de prueba — se excluye de métricas de equipo
           </label>
         </div>
+
+        {/* Acceso a módulos — solo relevante para admin/consultor */}
+        {role !== "cliente" && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium text-slate-700">Acceso a módulos</p>
+            <p className="text-xs text-slate-500 -mt-1">
+              Deja en "Default" para usar los permisos estándar del rol.
+            </p>
+            {[
+              {
+                key: "chat_ia",
+                label: "Chat IA",
+                desc: "Acceso a la pestaña Chat IA",
+                defaultFor: ["admin", "consultor"],
+              },
+              {
+                key: "equipo",
+                label: "Vista Equipo",
+                desc: "Acceso a /equipo con cronogramas y heatmap",
+                defaultFor: ["admin"],
+              },
+            ].map(({ key, label, desc, defaultFor }) => {
+              const isDefault = featureFlags[key] === undefined;
+              const val = isDefault ? defaultFor.includes(role) : featureFlags[key];
+              return (
+                <div key={key} className="flex items-start gap-3 p-2.5 rounded border border-slate-100 bg-slate-50">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-slate-700">{label}</p>
+                    <p className="text-[11px] text-slate-500">{desc}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {(["default", "on", "off"] as const).map((opt) => {
+                      const active =
+                        opt === "default" ? isDefault : opt === "on" ? (!isDefault && val === true) : (!isDefault && val === false);
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() =>
+                            setFlag(key, opt === "default" ? null : opt === "on" ? true : false)
+                          }
+                          className={`px-2 py-0.5 text-[10px] font-medium rounded-sm border transition-colors ${
+                            active
+                              ? opt === "off"
+                                ? "bg-red-50 border-red-300 text-red-700"
+                                : "bg-brand-primary-light border-brand-primary text-brand-primary-dark"
+                              : "bg-white border-slate-200 text-slate-500 hover:bg-slate-100"
+                          }`}
+                        >
+                          {opt === "default" ? "Default" : opt === "on" ? "Sí" : "No"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {error && (
           <div role="alert" className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded p-2">

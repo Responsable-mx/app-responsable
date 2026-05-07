@@ -11,9 +11,9 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const email = await requireUser();
-  const { isAdmin: admin, isClient: client, clientId } = email
+  const { isAdmin: admin, isClient: client, clientId, featureFlags } = email
     ? await getUserRoles(email)
-    : { isAdmin: false, isClient: false, clientId: null };
+    : { isAdmin: false, isClient: false, clientId: null, featureFlags: {} };
 
   return (
     <ToastProvider>
@@ -24,6 +24,7 @@ export default async function DashboardLayout({
             isClient={client}
             clientId={clientId}
             userEmail={email}
+            featureFlags={featureFlags}
           />
           <main id="main-content" className="flex-1 overflow-y-auto">
             {children}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import useSWR from "swr";
 import {
   COLOR_META,
@@ -63,6 +63,16 @@ export function MaterialityTab({ clientId }: { clientId: string }) {
 
   const topics = useMemo(() => data?.data ?? [], [data]);
   const selected = topics.find((t) => t.id === selectedId) ?? null;
+
+  // Esc cierra popover desde cualquier elemento que tenga el foco
+  useEffect(() => {
+    if (!selectedId) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedId(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedId]);
 
   const stats = useMemo(() => {
     const dm = topics.filter((t) => t.color === "rose").length;

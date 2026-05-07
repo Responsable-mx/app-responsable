@@ -4,6 +4,7 @@ import { getUserRoles } from "@/lib/users";
 import { ToastProvider } from "@/components/ui/Toast";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DashboardSWRProvider } from "@/components/DashboardSWRProvider";
+import { SentryUserContext } from "@/components/SentryUserContext";
 
 export default async function DashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
+      <SentryUserContext email={email ?? null} />
       <DashboardSWRProvider>
         <div className="h-screen bg-slate-50 flex overflow-hidden">
           <Sidebar

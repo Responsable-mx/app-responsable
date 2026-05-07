@@ -5,6 +5,8 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    // noUncheckedIndexedAccess: requiere ~200 fixes en codebase existente.
+    // Activar en sprint dedicado cuando se haga refactor de array accesses.
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",

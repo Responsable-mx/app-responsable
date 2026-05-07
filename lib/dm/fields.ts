@@ -10,14 +10,29 @@ export type BenchmarkField = {
 
 export const BENCHMARK_FIELDS: BenchmarkField[] = [
   {
-    key: "politica_sostenibilidad",
-    label: "Política de sostenibilidad",
-    description: "Existencia y alcance de política formal de sostenibilidad o RSE publicada",
+    key: "emisiones_ghg",
+    label: "Emisiones GHG (Scope 1, 2 y 3)",
+    description: "Nivel de medición, reporte y compromisos de reducción de emisiones de gases de efecto invernadero en los tres alcances",
   },
   {
-    key: "divulgacion_esg",
-    label: "Divulgación ESG",
-    description: "Estándar de reporte utilizado (GRI, SASB, TCFD, CSRD, ninguno)",
+    key: "gestion_agua",
+    label: "Gestión del agua",
+    description: "Consumo hídrico, eficiencia en uso, operaciones en zonas de estrés hídrico y metas de reducción",
+  },
+  {
+    key: "biodiversidad",
+    label: "Biodiversidad y ecosistemas",
+    description: "Impacto en áreas naturales, política de no-deforestación, uso de suelo y compromisos de restauración",
+  },
+  {
+    key: "derechos_laborales_cadena_valor",
+    label: "Derechos laborales y cadena de valor",
+    description: "Due diligence en derechos humanos, política de proveedores, prohibición de trabajo forzado e infantil, auditorías de cadena de suministro",
+  },
+  {
+    key: "gobierno_anticorrupcion",
+    label: "Gobierno corporativo y anticorrupción",
+    description: "Estructura del consejo, política anticorrupción publicada, mecanismo de denuncia, transparencia fiscal y remuneración ejecutiva vinculada a ESG",
   },
 ];
 

@@ -14,6 +14,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // Bypass de crons con CRON_SECRET — antes de cualquier round-trip Supabase
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    const cronSecret = process.env.CRON_SECRET;
+    if (
+      cronSecret &&
+      token === cronSecret &&
+      isCronBypassAllowed(request.nextUrl.pathname)
+    ) {
+      return NextResponse.next({ request });
+    }
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -40,20 +54,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // Bypass de crons con CRON_SECRET
-  const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-    const cronSecret = process.env.CRON_SECRET;
-    if (
-      cronSecret &&
-      token === cronSecret &&
-      isCronBypassAllowed(request.nextUrl.pathname)
-    ) {
-      return supabaseResponse;
-    }
-  }
 
   const { pathname } = request.nextUrl;
 

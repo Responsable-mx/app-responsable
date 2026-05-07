@@ -15,6 +15,11 @@ export const runtime = "nodejs";
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
 
+// Benchmark es más costoso que ai-fill (web_search + Opus comparison).
+// Ventana más estricta: 3 requests por 5 minutos por usuario.
+const BM_WINDOW_MS = 5 * 60_000;
+const BM_MAX_CALLS = 3;
+
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 const ProposeBody = z.object({ action: z.literal("propose") });
@@ -155,6 +160,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });
+  }
+
+  // Rate limit DB cross-instancias: 3 calls por 5 minutos por usuario.
+  {
+    const adminRl = createAdminClient();
+    const windowStart = new Date(Date.now() - BM_WINDOW_MS).toISOString();
+    const { count } = await adminRl
+      .from("ai_calls")
+      .select("id", { count: "exact", head: true })
+      .eq("user_email", user)
+      .gte("created_at", windowStart);
+    if ((count ?? 0) >= BM_MAX_CALLS) {
+      return NextResponse.json(
+        { error: "Demasiadas solicitudes de benchmark. Espera 5 minutos antes de reintentar." },
+        { status: 429 }
+      );
+    }
   }
 
   const client = await getClient(id).catch(() => null);

@@ -6,6 +6,7 @@ import { getClient } from "@/lib/clients";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DmReportDocument, type DmReportData } from "@/lib/pdf/dm-report";
 import { BENCHMARK_FIELDS } from "@/lib/dm/fields";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,15 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  // Rate limit: PDF generation es CPU-heavy — 5 exports/min por usuario
+  const limited = await checkRateLimit(
+    rateLimitKey("GET", "/api/clients/[id]/export-dm-pdf", user),
+    { max: 5, windowMs: 60_000, errorMessage: "Demasiadas exportaciones. Espera 1 minuto antes de generar otro PDF." }
+  );
+  if (limited) {
+    return NextResponse.json({ error: limited.message }, { status: 429 });
+  }
 
   const resultId = req.nextUrl.searchParams.get("result_id");
   if (!resultId) return NextResponse.json({ error: "result_id requerido" }, { status: 400 });

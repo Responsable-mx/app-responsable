@@ -3,6 +3,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   compress: true,
+  // Excluir libs pesadas de parseo del bundle Next.js — se cargan desde node_modules
+  // en runtime (cold start solo cuando se invoca la ruta de documentos, no siempre).
+  // pdf-parse: ~1.5MB; exceljs: ~3MB; mammoth: ~1MB; jszip: ~0.3MB
+  serverExternalPackages: ["pdf-parse", "exceljs", "mammoth", "jszip"],
   experimental: {
     optimizePackageImports: ["swr", "zod"],
   },

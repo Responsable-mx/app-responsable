@@ -8,6 +8,7 @@ import { listClientServices } from "@/lib/client-services";
 import { listStagesByService } from "@/lib/stages";
 import { CATALOG_SEEDS } from "@/lib/catalogs/seeds";
 import { CronogramaReport, type CronogramaService } from "@/lib/pdf/cronograma-report";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,15 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  // Rate limit: PDF generation es CPU-heavy — 5 exports/min por usuario
+  const limited = await checkRateLimit(
+    rateLimitKey("GET", "/api/clients/[id]/export-cronograma-pdf", user),
+    { max: 5, windowMs: 60_000, errorMessage: "Demasiadas exportaciones. Espera 1 minuto antes de generar otro PDF." }
+  );
+  if (limited) {
+    return NextResponse.json({ error: limited.message }, { status: 429 });
+  }
 
   const [client, services] = await Promise.all([
     getClient(id).catch(() => null),

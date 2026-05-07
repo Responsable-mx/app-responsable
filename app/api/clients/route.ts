@@ -5,10 +5,23 @@ import { ClientInputSchema } from "@/lib/validation";
 import { upsertQuestionnaireResponse } from "@/lib/questionnaires/queries";
 import type { FieldResponse, QuestionnaireResponseData, SourceItem } from "@/lib/questionnaires/types";
 import { logChange } from "@/lib/audit-log";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  // Rate limit: 60 requests/min por usuario (protección contra loops o scraping)
+  const limited = await checkRateLimit(
+    rateLimitKey("GET", "/api/clients", user),
+    { max: 60, windowMs: 60_000 }
+  );
+  if (limited) {
+    return NextResponse.json(
+      { error: limited.message },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(limited.retryAfterMs / 1_000)) } }
+    );
+  }
 
   const url = new URL(req.url);
   const search = url.searchParams.get("q") ?? undefined;

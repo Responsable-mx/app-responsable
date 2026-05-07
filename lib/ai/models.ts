@@ -24,13 +24,13 @@ type ModelConfig = {
  */
 export const MODEL_CONFIG: Record<RoleId, ModelConfig> = {
   aurora: {
-    model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-20250514",
+    model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6",
     maxTokens: 2000,
     useCache: true,
     description: "Aurora — Autor. Construye borrador alineado a metodología.",
   },
   rebeca: {
-    model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-20250514",
+    model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6",
     maxTokens: 2000,
     useCache: true,
     description: "Rebeca — Revisor. Detecta fallas, omisiones, riesgos.",

@@ -7,6 +7,7 @@ import type { Client } from "@/lib/clients";
 import { buildClientContext } from "@/lib/ai/roles";
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { logAiCall } from "@/lib/ai/logging";
+import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BENCHMARK_FIELDS, RELATION_LABELS } from "@/lib/dm/fields";
 
@@ -169,14 +170,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const model = process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-20250514";
   const admin = createAdminClient();
 
   // ── PROPOSE: IA investiga y propone empresas ─────────────────────────────
   if (parsed.data.action === "propose") {
+    const model = getModelConfig("aurora").model;
     const prompt = buildProposePrompt(client);
     let textOut = "";
-    let inputTokens = 0, outputTokens = 0;
+    let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
     const startedAt = Date.now();
 
     try {
@@ -203,16 +204,18 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       );
       inputTokens = msg.usage?.input_tokens ?? 0;
       outputTokens = msg.usage?.output_tokens ?? 0;
+      cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
+      cacheReadTokens = msg.usage?.cache_read_input_tokens ?? 0;
       for (const block of msg.content) {
         if (block.type === "text") textOut += block.text;
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error Anthropic";
-      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt, error: msg });
+      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
       return NextResponse.json({ error: msg }, { status: 500 });
     }
 
-    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt, error: null });
+    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
 
     const jsonText = extractJsonObject(textOut);
     if (!jsonText) return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });
@@ -264,11 +267,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Empresas no encontradas" }, { status: 404 });
   }
 
+  const model = getModelConfig("elena").model;
   const clientContext = buildClientContext(client);
   const prompt = buildComparePrompt(client.name, clientContext, companies);
 
   let textOut = "";
-  let inputTokens = 0, outputTokens = 0;
+  let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
   const startedAt = Date.now();
 
   // Insertar resultado en estado pending
@@ -306,17 +310,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
+    cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
+    cacheReadTokens = msg.usage?.cache_read_input_tokens ?? 0;
     for (const block of msg.content) {
       if (block.type === "text") textOut += block.text;
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error Anthropic";
-    void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt, error: msg });
+    void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
     await admin.from("dm_benchmark_results").update({ status: "failed", error_message: msg }).eq("id", resultRow.id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt, error: null });
+  void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
 
   const jsonText = extractJsonObject(textOut);
   if (!jsonText) {

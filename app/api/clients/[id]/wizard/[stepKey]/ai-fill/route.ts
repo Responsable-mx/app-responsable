@@ -93,12 +93,13 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   if (!step) return NextResponse.json({ error: "Paso no encontrado" }, { status: 404 });
   if (!step.ai_can_fill) return NextResponse.json({ error: "Paso no soporta AI fill" }, { status: 400 });
 
+  const client = await getClient(id).catch(() => null);
+
   // Guard only_double_materialidad: si el paso solo aplica a clientes con flag,
   // verificar antes de gastar tokens IA en datos que no se podrán guardar
   // (PATCH del cuestionario los rechaza con 422).
   if (step.only_double_materialidad) {
-    const clientForFlag = await getClient(id).catch(() => null);
-    if (clientForFlag && clientForFlag.has_double_materiality !== true) {
+    if (client && client.has_double_materiality !== true) {
       return NextResponse.json(
         {
           error:
@@ -154,7 +155,6 @@ No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
 { "campo_key": { "value": "...", "source_type": "...", "sources": [{"url":"...","title":"...","date":"YYYY-MM-DD"}] }, ... }`;
 
   // Contexto del cliente desde DB + pasos previos llenos
-  const client = await getClient(id).catch(() => null);
   const contextLines: string[] = [];
   if (client) {
     contextLines.push(`Nombre: ${client.name}`);

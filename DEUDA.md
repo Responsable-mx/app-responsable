@@ -71,21 +71,45 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Fix**: Si `/clientes` se vuelve home (D-80), MIS PROYECTOS puede ser un pin en la lista de clientes (star ★ que fija al top). Eliminar del sidebar.
 - **Esfuerzo**: 1h
 
-### 🟡 D-86 — Cronograma header redundante dentro del tab
-- **Descripción**: El tab "Cronograma" muestra dentro un h2 "CRONOGRAMA DEL CLIENTE" + descripción. El usuario ya sabe que está en Cronograma por el tab activo.
-- **Impacto**: ~80px de altura desperdiciada. El contenido real (servicios/actividades) se empuja hacia abajo.
-- **Fix**: Eliminar h2 y descripción. Mantener solo la barra de acciones (+ Servicio, PDF, Lista/Gantt).
-- **Esfuerzo**: 10min
+### ~~🟡 D-86 — Cronograma header redundante dentro del tab~~ ✅ VERIFICADO RESUELTO
+- `ClientCronogramaTab.tsx` — no hay h2 `CRONOGRAMA DEL CLIENTE`. Verificado sesión 17.
 
-### 🟢 D-87 — Copy inconsistente: "IA llena 7 pasos" vs "PASO 1 DE 9"
-- **Descripción**: El banner del Cuestionario dice "IA llena 7 pasos automáticamente" pero el wizard tiene 9 pasos.
-- **Fix**: "IA puede completar automáticamente hasta 7 de los 9 pasos con datos públicos verificables"
-- **Esfuerzo**: 2min
+### ~~🟢 D-87 — Copy inconsistente: "IA llena 7 pasos" vs "PASO 1 DE 9"~~ ✅ VERIFICADO RESUELTO
+- `AiBulkBanner.tsx:42` — copy dinámico `{aiCapableCount} de {totalSteps}`. Verificado sesión 17.
 
-### 🟢 D-88 — "ADMIN" label redundante en headers de Equipo y Configuración
-- **Descripción**: Ambas páginas muestran "ADMIN" como prefix del título de página. El rol ya aparece en el perfil del sidebar (nblondel / Admin). Repetido sin propósito.
-- **Fix**: Eliminar el label ADMIN de los page headers.
+### ~~🟢 D-88 — "ADMIN" label redundante en headers de Equipo y Configuración~~ ✅ VERIFICADO RESUELTO
+- `equipo/page.tsx:12`, `configuracion/layout.tsx:26` — label "ADMIN" eliminado. Verificado sesión 17.
+
+---
+
+### Bloque D-109–D-115 — Hallazgos auditoría sesión 17 (may-2026)
+
+### ~~🟡 D-109 — Sonnet fallback stale `claude-sonnet-4-20250514` en 5 lugares~~ ✅ RESUELTO
+- `lib/ai/models.ts` (aurora+rebeca), `lib/ai/extract-test.ts`, `env.example` — actualizados a `claude-sonnet-4-6`. `dm-benchmark/route.ts` y `dm-report/route.ts` resueltos via D-110 (usan `getModelConfig()`). Sesión 17.
+
+### ~~🟡 D-110 — `dm-benchmark` y `dm-report` hardcodean model lookup propio~~ ✅ RESUELTO
+- Ambas rutas ahora importan `getModelConfig` de `lib/ai/models.ts`. `dm-benchmark` usa `getModelConfig("aurora")` para propose y `getModelConfig("elena")` para compare. `dm-report` usa `getModelConfig("elena")`. Sesión 17.
+
+### 🟡 D-111 — `dm-benchmark` POST sin rate limit
+- **Descripción**: propose (4 web_search ~60s) y compare (Sonnet/Opus 150s timeout) sin conteo en `ai_calls`. Un solo usuario puede disparar múltiples propuestas costosas sin cota.
+- **Fix**: Añadir mismo guard DB que `ai-fill` — `ai_calls` count en ventana 5min por email.
+- **Esfuerzo**: 30min
+
+### ~~🟡 D-112 — `logAiCall` sin `cacheCreationTokens`/`cacheReadTokens` en dm-benchmark y dm-report~~ ✅ RESUELTO
+- 4 calls en `dm-benchmark` + 2 en `dm-report` actualizados para capturar y registrar `cache_creation_input_tokens` y `cache_read_input_tokens`. Dashboard uso-IA ahora reporta costos completos. Sesión 17.
+
+### ~~🟡 D-113 — `ai-fill` llama `getClient(id)` dos veces~~ ✅ RESUELTO
+- Un solo `getClient(id)` al inicio del handler, reutilizado en guard `only_double_materialidad` y en construcción de contexto. `wizard/[stepKey]/ai-fill/route.ts`. Sesión 17.
+
+### 🟢 D-114 — Middleware: cron bypass ocurre después de `auth.getUser()`
+- **Descripción**: `supabase.auth.getUser()` (round-trip Supabase) se ejecuta antes del check `CRON_SECRET` en `lib/supabase/middleware.ts:42-56`. En cada invocación de cron se paga un round-trip innecesario.
+- **Fix**: Mover el bloque de verificación CRON_SECRET antes de la llamada `auth.getUser()`.
 - **Esfuerzo**: 5min
+
+### 🟢 D-115 — DEUDA.md stale: D-86/D-87/D-88 resueltos pero no tachados
+- **Descripción**: Las tres entradas estaban activas en DEUDA.md pero el código ya las tenía resueltas.
+- **Fix**: Actualizado en sesión 17 (ver arriba).
+- **Estado**: ✅ Resuelto al actualizar este archivo.
 
 ---
 
@@ -296,4 +320,4 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 ---
 
-*Última auditoría: may-2026 sesión 16 — D-89/90/91/96/98/103/106 resueltos + Sprint B tests + Sprint C SWR retry + cron alerts. Score objetivo: 9/10. Items activos reales: D-04 (metodología pendiente equipo), D-85 (sidebar duplica acceso — menor), D-87/D-88 (copy/labels — ya corregidos). Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+*Última auditoría: may-2026 sesión 17 — D-86/87/88/109/110/112/113/115 resueltos en código. Items activos: D-04 (metodología), D-85 (sidebar), D-111 🟡 (dm-benchmark rate limit), D-114 🟢 (middleware cron). Score global: 7.6/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*

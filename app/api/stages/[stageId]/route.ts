@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
+// Next.js 16 types require 2 args but 1-arg call is valid for fetch-tag invalidation
+import { revalidateTag as _revalidateTag } from "next/cache";
+const revalidateTag = _revalidateTag as (tag: string) => void;
 import { requireAdmin } from "@/lib/auth";
 import { PROJECTS_OVERVIEW_TAG } from "@/app/api/projects/overview/route";
 import { updateStage, deleteStage, StageInputSchema } from "@/lib/stages";

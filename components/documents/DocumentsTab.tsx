@@ -327,10 +327,16 @@ export function DocumentsTab({
   );
 }
 
+const previewFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<{ data: { markdown_content: string | null } }>;
+  });
+
 function PreviewModal({ clientId, doc, onClose }: { clientId: string; doc: DocMeta; onClose: () => void }) {
   const { data, error, isLoading } = useSWR<{ data: { markdown_content: string | null } }>(
     `/api/clients/${clientId}/documents/${doc.id}?mode=content`,
-    fetcher
+    previewFetcher
   );
   return (
     <Modal open onClose={onClose} title={`Vista previa: ${doc.file_name}`}>

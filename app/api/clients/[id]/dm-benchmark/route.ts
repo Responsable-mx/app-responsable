@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
 
-// Benchmark: límite de seguridad para evitar abuso de costo.
+// Límite de seguridad para evitar abuso de costo.
 // 10 calls por 5 minutos cubre uso intensivo legítimo (8 consultores).
 const BM_WINDOW_MS = 5 * 60_000;
 const BM_MAX_CALLS = 10;
@@ -94,26 +94,28 @@ function buildComparePrompt(
     .map((c) => `- ${c.name} (${c.country ?? "país desconocido"}, ${RELATION_LABELS[c.relation as keyof typeof RELATION_LABELS] ?? c.relation})`)
     .join("\n");
 
-  return `Analista ESG. Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas en campos de Doble Materialidad.
+  return `Analista ESG senior. Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas en campos de Doble Materialidad.
 
-EMPRESAS:
+EMPRESAS A COMPARAR:
 ${companiesList}
 
-CAMPOS:
+CAMPOS DE ANÁLISIS:
 ${fieldsList}
 
-Por cada campo: UNA oración por empresa (incluye a ${clientName}). Si no tienes datos, escribe "Sin información pública".
-Cierra con párrafo narrativo ≤60 palabras: posición de ${clientName}, fortalezas, brechas clave.
+Instrucciones:
+- Por cada campo: 2-3 oraciones por empresa (incluye a ${clientName}). Cita datos concretos cuando existan (toneladas CO₂, %, iniciativas específicas).
+- Si no hay datos públicos verificables, escribe "Sin datos públicos disponibles" y explica brevemente por qué es relevante el campo para ese actor.
+- Cierra con párrafo narrativo de 80-100 palabras: posición de ${clientName} en el benchmark, fortalezas claras, brechas materiales y recomendación de priorización.
 
 JSON únicamente:
 {
   "comparison": {
     "campo_key": {
-      "${clientName}": "descripción",
-      "Empresa A": "descripción"
+      "${clientName}": "descripción detallada",
+      "Empresa A": "descripción detallada"
     }
   },
-  "narrative": "síntesis"
+  "narrative": "síntesis ejecutiva"
 }`;
 }
 
@@ -140,10 +142,108 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       .limit(1),
   ]);
 
+  const latestResult = resultsRes.data?.[0] ?? null;
+
+  // ── Chequeo de batch pendiente ──────────────────────────────────────────
+  // Si hay un resultado pendiente con batch_id, consultamos Anthropic Batch API.
+  // Esto permite que el frontend haga polling barato (GET) en lugar de esperar
+  // un POST síncrono de 60s+.
+  if (latestResult?.status === "pending" && latestResult?.batch_id) {
+    try {
+      const anthropic = createAnthropicClient();
+      const batch = await anthropic.beta.messages.batches.retrieve(latestResult.batch_id);
+
+      if (batch.processing_status === "ended") {
+        // Procesar resultados del batch
+        let comparison: Record<string, Record<string, string>> = {};
+        let narrative = "";
+        let batchError: string | null = null;
+        let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
+
+        for await (const result of await anthropic.beta.messages.batches.results(latestResult.batch_id)) {
+          if (result.result.type === "succeeded") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = result.result.message as any;
+            inputTokens = msg.usage?.input_tokens ?? 0;
+            outputTokens = msg.usage?.output_tokens ?? 0;
+            cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
+            cacheReadTokens = msg.usage?.cache_read_input_tokens ?? 0;
+
+            const textOut = (msg.content as Array<{ type: string; text?: string }>)
+              .filter((b) => b.type === "text")
+              .map((b) => b.text ?? "")
+              .join("");
+
+            const jsonText = extractJsonObject(textOut);
+            if (jsonText) {
+              const parsed = CompareResponseSchema.safeParse(JSON.parse(jsonText));
+              if (parsed.success) {
+                comparison = parsed.data.comparison;
+                narrative = parsed.data.narrative;
+              } else {
+                batchError = "Schema IA inválido";
+              }
+            } else {
+              batchError = "Respuesta IA sin JSON";
+            }
+          } else if (result.result.type === "errored") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            batchError = (result.result as any).error?.message ?? "Error en batch";
+          }
+        }
+
+        const model = getModelConfig("aurora").model;
+        const newStatus = batchError ? "failed" : "done";
+
+        await admin
+          .from("dm_benchmark_results")
+          .update({
+            comparison,
+            narrative,
+            status: newStatus,
+            ...(batchError ? { error_message: batchError } : {}),
+          })
+          .eq("id", latestResult.id);
+
+        void logAiCall({
+          userEmail: user,
+          role: "aurora",
+          clientId: id,
+          model,
+          inputTokens,
+          outputTokens,
+          cacheCreationTokens,
+          cacheReadTokens,
+          latencyMs: 0, // batch — latencia no aplica
+          error: batchError,
+        });
+
+        // Devolver resultado actualizado
+        const updatedResult = {
+          ...latestResult,
+          comparison,
+          narrative,
+          status: newStatus,
+        };
+
+        return NextResponse.json({
+          data: {
+            companies: companiesRes.data ?? [],
+            latest_result: updatedResult,
+          },
+        });
+      }
+
+      // Batch todavía en progreso — devolver tal cual
+    } catch {
+      // Si el check de batch falla, no bloquear al usuario — devolver estado actual
+    }
+  }
+
   return NextResponse.json({
     data: {
       companies: companiesRes.data ?? [],
-      latest_result: resultsRes.data?.[0] ?? null,
+      latest_result: latestResult,
     },
   });
 }
@@ -157,7 +257,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });
   }
 
-  // Rate limit DB cross-instancias: 3 calls por 5 minutos por usuario.
+  // Rate limit DB cross-instancias: 10 calls por 5 minutos por usuario.
   {
     const adminRl = createAdminClient();
     const windowStart = new Date(Date.now() - BM_WINDOW_MS).toISOString();
@@ -193,7 +293,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const anthropic = createAnthropicClient();
   const admin = createAdminClient();
 
-  // ── PROPOSE: IA investiga y propone empresas ─────────────────────────────
+  // ── PROPOSE: IA investiga y propone empresas (síncrono — Sonnet, 45s) ─────
   if (parsed.data.action === "propose") {
     const model = getModelConfig("aurora").model;
     const prompt = buildProposePrompt(client);
@@ -248,7 +348,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     // Eliminar propuestas anteriores de IA (no las del consultor)
     await admin.from("dm_benchmark_companies").delete().eq("client_id", id).eq("proposed_by", "ia");
 
-    // Insertar nuevas propuestas
     const rows = aiData.companies.map((c) => ({
       client_id: id,
       name: c.name,
@@ -270,7 +369,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ data: { companies: inserted } });
   }
 
-  // ── COMPARE: IA compara cliente vs empresas validadas ────────────────────
+  // ── COMPARE: Batch API asíncrono — Sonnet, sin límite de 60s ────────────
+  // Flujo:
+  //   1. Crea fila pending en dm_benchmark_results
+  //   2. Submite batch a Anthropic (retorna batch_id en <3s)
+  //   3. Guarda batch_id en la fila
+  //   4. Retorna {status:"pending"} al frontend inmediatamente
+  //   5. Frontend hace polling del GET cada 5s
+  //   6. GET detecta batch ended → procesa resultados → actualiza fila → retorna done
   const { company_ids } = parsed.data;
 
   const { data: companies, error: fetchErr } = await admin
@@ -283,7 +389,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Empresas no encontradas" }, { status: 404 });
   }
 
-  const model = getModelConfig("valeria").model; // Haiku: 3-5s vs Sonnet 10-15s — suficiente para JSON comparativo estructurado
+  // Usar Sonnet (aurora) en Batch API — sin restricción de 60s de Vercel Hobby.
+  // 50% descuento en tokens vs llamada síncrona.
+  const model = getModelConfig("aurora").model;
   const prompt = buildComparePrompt(
     client.name,
     client.sector ?? null,
@@ -291,11 +399,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     companies,
   );
 
-  let textOut = "";
-  let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
-  const startedAt = Date.now();
-
-  // Insertar resultado en estado pending
+  // Crear fila pending primero para obtener ID como custom_id del batch
   const { data: resultRow, error: insertResultErr } = await admin
     .from("dm_benchmark_results")
     .insert({
@@ -313,71 +417,51 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Error al crear registro de resultado" }, { status: 500 });
   }
 
+  // Submeter batch — retorna en <3s independientemente del tiempo de procesamiento
   try {
-    const msg = await anthropic.messages.create(
+    const batch = await anthropic.beta.messages.batches.create(
       {
-        model,
-        max_tokens: 800,
-        system: [{
-          type: "text",
-          text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          cache_control: { type: "ephemeral" } as any,
+        requests: [{
+          custom_id: resultRow.id,
+          params: {
+            model,
+            max_tokens: 3000,
+            system: [{
+              type: "text",
+              text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              cache_control: { type: "ephemeral" } as any,
+            }],
+            messages: [{ role: "user", content: prompt }],
+          },
         }],
-        messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(10_000) }
+      { signal: AbortSignal.timeout(15_000) }
     );
-    inputTokens = msg.usage?.input_tokens ?? 0;
-    outputTokens = msg.usage?.output_tokens ?? 0;
-    cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
-    cacheReadTokens = msg.usage?.cache_read_input_tokens ?? 0;
-    for (const block of msg.content) {
-      if (block.type === "text") textOut += block.text;
-    }
+
     anthropicBreaker.recordSuccess();
+
+    // Guardar batch_id — el GET handler lo usará para polling
+    await admin
+      .from("dm_benchmark_results")
+      .update({ batch_id: batch.id })
+      .eq("id", resultRow.id);
+
   } catch (e) {
     anthropicBreaker.recordFailure();
-    const msg = e instanceof Error ? e.message : "Error Anthropic";
-    void logAiCall({ userEmail: user, role: "valeria", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
-    await admin.from("dm_benchmark_results").update({ status: "failed", error_message: msg }).eq("id", resultRow.id);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const errMsg = e instanceof Error ? e.message : "Error Anthropic";
+    await admin
+      .from("dm_benchmark_results")
+      .update({ status: "failed", error_message: errMsg })
+      .eq("id", resultRow.id);
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 
-  void logAiCall({ userEmail: user, role: "valeria", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
-
-  const jsonText = extractJsonObject(textOut);
-  if (!jsonText) {
-    await admin.from("dm_benchmark_results").update({ status: "failed", error_message: "Respuesta IA sin JSON" }).eq("id", resultRow.id);
-    return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });
-  }
-
-  let aiData: z.infer<typeof CompareResponseSchema>;
-  try {
-    const result = CompareResponseSchema.safeParse(JSON.parse(jsonText));
-    if (!result.success) {
-      await admin.from("dm_benchmark_results").update({ status: "failed", error_message: "Schema IA inválido" }).eq("id", resultRow.id);
-      return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
-    }
-    aiData = result.data;
-  } catch {
-    await admin.from("dm_benchmark_results").update({ status: "failed", error_message: "JSON inválido" }).eq("id", resultRow.id);
-    return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
-  }
-
-  await admin.from("dm_benchmark_results").update({
-    comparison: aiData.comparison,
-    narrative: aiData.narrative,
-    status: "done",
-  }).eq("id", resultRow.id);
-
+  // Retornar pending — el frontend hace polling del GET hasta que status=done
   return NextResponse.json({
     data: {
       result_id: resultRow.id,
-      comparison: aiData.comparison,
-      narrative: aiData.narrative,
-      fields: BENCHMARK_FIELDS,
-      companies: companies.map((c) => ({ id: c.id, name: c.name, relation: c.relation })),
+      status: "pending",
     },
   });
 }

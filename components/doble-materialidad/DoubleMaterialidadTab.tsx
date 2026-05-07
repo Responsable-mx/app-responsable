@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { BENCHMARK_FIELDS, RELATION_LABELS, type CompanyRelation } from "@/lib/dm/fields";
 
@@ -133,10 +134,15 @@ function ContextoSection({
                 : "bg-slate-100 text-slate-500"
             }`}
           >
-            {isComplete ? "Completo" : `${progress.filled} / ${progress.total} campos`}
+            {isComplete ? "Completo" : `${progress.filled} / ${progress.total} preguntas`}
           </span>
         ) : (
-          <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">Sin datos</span>
+          <button
+            onClick={onGoToCuestionario}
+            className="text-xs text-brand-primary hover:underline"
+          >
+            El cuestionario está vacío. Complétalo primero →
+          </button>
         )}
         <Button size="sm" variant="secondary" onClick={onGoToCuestionario}>
           {isComplete ? "Ver cuestionario" : "Completar cuestionario"}
@@ -154,16 +160,20 @@ function BenchmarkSection({
   companies,
   latestResult,
   onDataMutate,
+  isPolling,
+  onStartPolling,
 }: {
   clientId: string;
   clientName: string;
   companies: BenchmarkCompany[];
   latestResult: BenchmarkResult | null;
   onDataMutate: () => void;
+  isPolling: boolean;
+  onStartPolling: () => void;
 }) {
   const { push } = useToast();
   const [proposing, setProposing] = useState(false);
-  const [comparing, setComparing] = useState(false);
+  const [confirmRepropose, setConfirmRepropose] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(companies.filter((c) => c.validated).map((c) => c.id))
   );
@@ -202,7 +212,6 @@ function BenchmarkSection({
       push("error", "Selecciona al menos 2 empresas para el benchmark");
       return;
     }
-    setComparing(true);
     try {
       const res = await fetch(`/api/clients/${clientId}/dm-benchmark`, {
         method: "POST",
@@ -211,20 +220,24 @@ function BenchmarkSection({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error al ejecutar benchmark");
-      push("success", "Benchmark completado. Revisa el análisis comparativo.");
-      onDataMutate();
+      // El POST retorna pending inmediatamente — el padre inicia polling del GET
+      onStartPolling();
     } catch (e) {
       push("error", e instanceof Error ? e.message : "Error al ejecutar benchmark");
-    } finally {
-      setComparing(false);
     }
-  }, [clientId, selected, push, onDataMutate]);
+  }, [clientId, selected, push, onStartPolling]);
 
   const groupedByRelation = companies.reduce<Record<string, BenchmarkCompany[]>>((acc, c) => {
     if (!acc[c.relation]) acc[c.relation] = [];
     acc[c.relation]!.push(c);
     return acc;
   }, {});
+
+  const hasComparisonData =
+    latestResult?.status === "done" &&
+    latestResult.companies_snapshot?.length > 0 &&
+    latestResult.fields_snapshot?.length > 0 &&
+    Object.keys(latestResult.comparison ?? {}).length > 0;
 
   return (
     <div className="space-y-4">
@@ -248,7 +261,7 @@ function BenchmarkSection({
           size="sm"
           variant={companies.length > 0 ? "secondary" : "primary"}
           loading={proposing}
-          onClick={handlePropose}
+          onClick={companies.length > 0 ? () => setConfirmRepropose(true) : handlePropose}
         >
           {companies.length > 0 ? "Volver a proponer" : "Proponer empresas con IA"}
         </Button>
@@ -301,19 +314,31 @@ function BenchmarkSection({
           <Button
             size="md"
             variant="primary"
-            loading={comparing}
+            loading={isPolling}
             onClick={handleCompare}
+            disabled={isPolling}
           >
             Ejecutar benchmark ({selected.size} empresas + {clientName})
           </Button>
-          {latestResult?.status === "done" && (
+          {latestResult?.status === "done" && !isPolling && (
             <span className="text-xs text-emerald-600 flex items-center gap-1">
               <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
-                <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.78-4.22a.75.75 0 01-1.06 0L8 8.06 5.28 10.78a.75.75 0 01-1.06-1.06L6.94 7 5.22 5.28a.75.75 0 011.06-1.06L8 5.94l2.72-2.72a.75.75 0 011.06 1.06L9.06 7l2.72 2.72a.75.75 0 010 1.06z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.354-9.354a.5.5 0 00-.708 0L7 9.293 5.354 7.646a.5.5 0 00-.708.708l2 2a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" clipRule="evenodd" />
               </svg>
               Benchmark anterior disponible
             </span>
           )}
+        </div>
+      )}
+
+      {/* Progreso durante ejecución async */}
+      {isPolling && (
+        <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+          <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Procesando con IA (Sonnet) — tarda 1-3 minutos. No cierres esta página.
         </div>
       )}
 
@@ -332,11 +357,70 @@ function BenchmarkSection({
         </div>
       )}
 
+      {/* Tabla comparativa */}
+      {hasComparisonData && (
+        <div className="mt-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+            Tabla comparativa
+          </p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full w-max text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap">
+                    Dimensión
+                  </th>
+                  {latestResult!.companies_snapshot.map((company) => (
+                    <th
+                      key={company.name}
+                      className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap"
+                    >
+                      {company.name}
+                      {company.relation && (
+                        <span className="ml-1 font-normal normal-case text-slate-400">
+                          · {RELATION_LABELS[company.relation as CompanyRelation] ?? company.relation}
+                        </span>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {latestResult!.fields_snapshot.map((field) => (
+                  <tr key={field.key} className="even:bg-slate-50/60 hover:bg-brand-primary-light/30 transition-colors">
+                    <td className="py-2 pr-6 font-medium text-slate-700 whitespace-nowrap">{field.label}</td>
+                    {latestResult!.companies_snapshot.map((company) => (
+                      <td key={company.name} className="py-2 pr-6 text-slate-600 max-w-[220px]">
+                        {latestResult!.comparison[company.name]?.[field.key] ?? "—"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {latestResult?.status === "failed" && (
         <div className="border-l-4 border-l-rose-500 pl-4 py-2 bg-rose-50 rounded-r">
           <p className="text-xs text-rose-700">El benchmark anterior falló. Intenta de nuevo.</p>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmRepropose}
+        title="¿Volver a proponer empresas?"
+        description="Se eliminarán las empresas actuales y la IA generará una nueva lista. El benchmark anterior se conserva hasta que ejecutes uno nuevo."
+        confirmLabel="Volver a proponer"
+        cancelLabel="Cancelar"
+        tone="destructive"
+        onConfirm={() => {
+          setConfirmRepropose(false);
+          handlePropose();
+        }}
+        onCancel={() => setConfirmRepropose(false)}
+      />
     </div>
   );
 }
@@ -359,6 +443,7 @@ function ReporteSection({
   const { push } = useToast();
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   const canGenerate = latestResult?.status === "done";
 
@@ -455,13 +540,27 @@ function ReporteSection({
               size="sm"
               variant="secondary"
               loading={generating}
-              onClick={handleGenerate}
+              onClick={() => setConfirmRegenerate(true)}
             >
               Regenerar reporte
             </Button>
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmRegenerate}
+        title="¿Regenerar reporte?"
+        description="Se generará un nuevo reporte con el benchmark actual. El reporte anterior quedará reemplazado y no podrá recuperarse."
+        confirmLabel="Regenerar"
+        cancelLabel="Cancelar"
+        tone="destructive"
+        onConfirm={() => {
+          setConfirmRegenerate(false);
+          handleGenerate();
+        }}
+        onCancel={() => setConfirmRegenerate(false)}
+      />
     </div>
   );
 }
@@ -477,9 +576,19 @@ export function DoubleMaterialidadTab({
   const benchmarkKey = `/api/clients/${clientId}/dm-benchmark`;
   const reportKey = `/api/clients/${clientId}/dm-report`;
 
+  // isPolling=true activa SWR refreshInterval para detectar cuando el batch termina
+  const [isPolling, setIsPolling] = useState(false);
+  const { push } = useToast();
+  // Evitar toast duplicado si el efecto dispara más de una vez
+  const pollingNotified = useRef(false);
+
   const { data: benchmarkResp, isLoading: loadingBenchmark, mutate: mutateBenchmark } = useSWR<{
     data: BenchmarkData;
-  }>(benchmarkKey, fetcher, { revalidateOnFocus: false });
+  }>(benchmarkKey, fetcher, {
+    revalidateOnFocus: false,
+    // Polling cada 5s mientras el batch está en proceso
+    refreshInterval: isPolling ? 5_000 : 0,
+  });
 
   const { data: reportResp, mutate: mutateReport } = useSWR<{
     data: LatestReport;
@@ -489,18 +598,40 @@ export function DoubleMaterialidadTab({
   const latestResult = benchmarkResp?.data.latest_result ?? null;
   const latestReport = reportResp?.data ?? null;
 
-  // Determinar estado de cada etapa para el stepper
-  const hasQuestionnaire =
-    questionnaireProgress && questionnaireProgress.filled > 0;
+  // Detectar cuando el batch termina y notificar al usuario
+  useEffect(() => {
+    if (!isPolling) {
+      pollingNotified.current = false;
+      return;
+    }
+    if (latestResult?.status === "done" && !pollingNotified.current) {
+      pollingNotified.current = true;
+      setIsPolling(false);
+      push("success", "Benchmark completado. Revisa el análisis comparativo.");
+    }
+    if (latestResult?.status === "failed" && !pollingNotified.current) {
+      pollingNotified.current = true;
+      setIsPolling(false);
+      push("error", "El benchmark falló. Intenta de nuevo.");
+    }
+  }, [latestResult?.status, isPolling, push]);
+
+  const stage1Status: StageStatus =
+    questionnaireProgress &&
+    questionnaireProgress.filled >= questionnaireProgress.total &&
+    questionnaireProgress.total > 0
+      ? "done"
+      : "active";
+
   const hasBenchmark = latestResult?.status === "done";
   const hasReport = latestReport !== null;
 
-  const stage1Status: StageStatus = hasQuestionnaire ? "done" : "active";
   const stage2Status: StageStatus = hasBenchmark
     ? "done"
-    : hasQuestionnaire
+    : stage1Status === "done"
     ? "active"
     : "pending";
+
   const stage3Status: StageStatus = hasReport
     ? "done"
     : hasBenchmark
@@ -528,11 +659,8 @@ export function DoubleMaterialidadTab({
 
       {/* ── Etapa 1 ── */}
       <section aria-labelledby="stage-contexto">
-        <h2
-          id="stage-contexto"
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3"
-        >
-          1 · Contexto del cliente
+        <h2 id="stage-contexto" className="sr-only">
+          Contexto del cliente
         </h2>
         <ContextoSection
           progress={questionnaireProgress}
@@ -542,11 +670,8 @@ export function DoubleMaterialidadTab({
 
       {/* ── Etapa 2 ── */}
       <section aria-labelledby="stage-benchmark">
-        <h2
-          id="stage-benchmark"
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3"
-        >
-          2 · Benchmark competitivo
+        <h2 id="stage-benchmark" className="sr-only">
+          Benchmark competitivo
         </h2>
         <BenchmarkSection
           clientId={clientId}
@@ -554,16 +679,15 @@ export function DoubleMaterialidadTab({
           companies={companies}
           latestResult={latestResult}
           onDataMutate={() => mutateBenchmark()}
+          isPolling={isPolling}
+          onStartPolling={() => setIsPolling(true)}
         />
       </section>
 
       {/* ── Etapa 3 ── */}
       <section aria-labelledby="stage-reporte">
-        <h2
-          id="stage-reporte"
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3"
-        >
-          3 · Reporte de Doble Materialidad
+        <h2 id="stage-reporte" className="sr-only">
+          Reporte de Doble Materialidad
         </h2>
         <ReporteSection
           clientId={clientId}

@@ -48,8 +48,9 @@ export async function parseToMarkdown(buffer: Buffer, fileType: FileType): Promi
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
-  // pdf-parse v1: export por defecto es función directa
-  const pdfParse = (await import("pdf-parse")).default;
+  // Importar desde /lib directamente — el entry point de pdf-parse carga archivos
+  // de test que no existen en producción (ENOENT ./test/data/05-versions-space.pdf).
+  const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
   const result = await pdfParse(buffer);
   return cleanText(result.text);
 }

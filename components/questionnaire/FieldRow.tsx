@@ -100,46 +100,21 @@ export function FieldRow({
           {field.required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Chip de origen: si hay exactamente 1 fuente → link directo; >1 → drawer */}
-          {!hideSource && (sourceType !== "consultor_only" || sources.length > 0) &&
-            (sources.length === 1 ? (
-              <a
-                href={sources[0]?.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text} hover:underline`}
-                title={sources[0]?.title}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
-                {chip.label}
-                <svg
-                  className="w-2.5 h-2.5 opacity-60"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </a>
-            ) : (
-              <button
-                type="button"
-                onClick={onOpenDrawer}
-                className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text}`}
-                title="Ver fuentes"
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
-                {chip.label}
-                {sources.length > 0 && (
-                  <span className="opacity-70">· {sources.length}</span>
-                )}
-              </button>
-            ))}
+          {/* Chip de origen: siempre abre panel (nunca link directo — evita perder contexto del panel) */}
+          {!hideSource && (sourceType !== "consultor_only" || sources.length > 0) && (
+            <button
+              type="button"
+              onClick={onOpenDrawer}
+              className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 ${chip.bg} ${chip.text}`}
+              title="Ver fuentes"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
+              {chip.label}
+              {sources.length > 0 && (
+                <span className="opacity-70">· {sources.length}</span>
+              )}
+            </button>
+          )}
           {/* Fuentes vacías: botón minimal para abrir drawer */}
           {!hideSource && sourceType === "consultor_only" && sources.length === 0 && (
             <button

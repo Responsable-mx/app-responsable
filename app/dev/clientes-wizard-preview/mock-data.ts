@@ -357,8 +357,9 @@ export const MOCK_STEPS: MockStep[] = [
       },
       {
         key: "tiene_informe",
-        label: "¿Publica informe de sostenibilidad?",
+        label: "¿Publica informe / reporte / memoria de sostenibilidad?",
         value: "No (solo informe interno, no público)",
+        hint: "Busca por variantes: Informe de Sostenibilidad, Reporte de Sustentabilidad, Memoria de Sostenibilidad, Reporte ESG, Reporte GRI, Reporte Integrado, Reporte de RSE, CDP Disclosure, Sustainability Report. Indica Sí (público), Sí (solo interno) o No publica.",
         sourceType: "public",
         validated: true,
         sources: [
@@ -387,11 +388,11 @@ export const MOCK_STEPS: MockStep[] = [
       },
       {
         key: "link_informe",
-        label: "Link del informe de sostenibilidad",
+        label: "URL del informe / reporte / memoria de sostenibilidad",
         value: "No aplica — informe interno no público",
         sourceType: "consultor_only",
         validated: true,
-        hint: "Solo aplica si el informe es público — adjuntar URL",
+        hint: "URL directa al documento público. Busca en: sitio web corporativo (sección Sostenibilidad / RSE), GRI Sustainability Disclosure Database, CDP, CEMEFI, SEC Edgar (si cotiza en bolsa).",
       },
       {
         key: "informe_interno_url",
@@ -424,6 +425,30 @@ export const MOCK_STEPS: MockStep[] = [
         sourceType: "consultor_only",
         validated: true,
         hint: "Sí / No / Verificación limitada — requiere informe del cliente",
+      },
+      {
+        key: "tiene_informe_financiero",
+        label: "¿Publica informe financiero o memoria anual?",
+        value: "No se encontró información",
+        sourceType: "public",
+        validated: false,
+        hint: "Busca por variantes: Memoria Anual, Reporte Anual, Informe Anual de Resultados, Estados Financieros Auditados, Informe de Gestión, Reporte Integrado, Annual Report, Reporte a Inversionistas, Dictamen Financiero, Reporte 20-F / 10-K (SEC), Informe Bursátil (BMV)",
+      },
+      {
+        key: "link_informe_financiero",
+        label: "URL del informe financiero / memoria anual",
+        value: null,
+        sourceType: "public",
+        validated: false,
+        hint: "URL directa al documento público. Busca en: sitio web (sección Inversionistas / Relación con Inversionistas), CNBV / BMV (si cotiza en México), SEC Edgar (si cotiza en NYSE/NASDAQ).",
+      },
+      {
+        key: "periodo_informe_financiero",
+        label: "Período del informe financiero",
+        value: null,
+        sourceType: "public",
+        validated: false,
+        hint: "Ej. Ejercicio fiscal 2023 (enero–diciembre). Puede diferir del período del informe de sostenibilidad.",
       },
       {
         key: "kpis_medidos",

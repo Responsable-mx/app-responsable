@@ -46,7 +46,8 @@ const buildProjectsOverview = unstable_cache(
 
     const actsByStage = new Map<string, StageActivity[]>();
     for (const raw of activitiesRes.data ?? []) {
-      const a: StageActivity = { ...raw, status: computeStatus(raw) };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const a = { ...raw, status: computeStatus(raw) } as any as StageActivity;
       const list = actsByStage.get(a.stage_id) ?? [];
       list.push(a);
       actsByStage.set(a.stage_id, list);

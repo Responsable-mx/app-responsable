@@ -49,7 +49,7 @@ export const UserInputSchema = z.object({
   active: z.boolean().optional(),
   seniority_level: z.string().trim().max(60).optional().nullable(),
   is_test_account: z.boolean().optional(),
-  feature_flags: z.record(z.boolean()).optional(),
+  feature_flags: z.record(z.string(), z.boolean()).optional(),
 });
 
 export const AssignConsultorSchema = z.object({

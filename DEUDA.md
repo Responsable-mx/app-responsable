@@ -134,10 +134,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-114 — Middleware: cron bypass ocurre después de `auth.getUser()`~~ ✅ RESUELTO
 - Bloque CRON_SECRET movido antes de `createServerClient`/`auth.getUser()`. Crons ya no pagan round-trip Supabase innecesario. `lib/supabase/middleware.ts`. Sesión 17.
 
-### 🟢 D-115 — DEUDA.md stale: D-86/D-87/D-88 resueltos pero no tachados
-- **Descripción**: Las tres entradas estaban activas en DEUDA.md pero el código ya las tenía resueltas.
-- **Fix**: Actualizado en sesión 17 (ver arriba).
-- **Estado**: ✅ Resuelto al actualizar este archivo.
+### ~~🟢 D-115 — DEUDA.md stale: D-86/D-87/D-88 resueltos pero no tachados~~ ✅ RESUELTO
+- Actualizado en sesión 17 (ver arriba).
 
 ---
 

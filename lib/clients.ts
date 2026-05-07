@@ -298,7 +298,7 @@ export function getClientMini(id: string): Promise<ClientMini | null> {
         .eq("id", id)
         .maybeSingle();
       if (error) throw new Error(`getClientMini: ${error.message}`);
-      return (data as ClientMini) ?? null;
+      return (data as unknown as ClientMini) ?? null;
     },
   });
 }

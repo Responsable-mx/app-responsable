@@ -112,7 +112,7 @@ const JSON_BLOCKS = [
 ] as const;
 
 const ALL_COLUMNS = [
-  "id,name,sector,subsector,countries,size,logo_url",
+  "id,name,sector,subsector,countries,size,logo_url,services",
   "business_segments,frameworks,applicable_regulations,policies_in_place",
   "certifications,material_topics,maturity_level",
   "has_double_materiality,has_sustainability_report,has_sustainability_strategy",

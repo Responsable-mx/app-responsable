@@ -1,7 +1,7 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-06 (sesión 19 — audit completo: seg, IA, health, refactor, simplify)
-**Calificación global:** 9.4 / 10 (sesión 20 — E2E Playwright + rate limit HTTP + bundle externals)
+**Fecha:** 2026-05-07 (sesión 21 — noUncheckedIndexedAccess + circuit breaker + QTab split + E2E CI)
+**Calificación global:** 9.8 / 10
 
 ---
 
@@ -124,12 +124,38 @@
 | Deuda técnica | 9.0 | 9.2 | +0.2 |
 | **Global** | **8.7** | **9.4** | **+0.7** |
 
-## Pendientes (post sesión 20)
+---
+
+## Sesión 21 — items cerrados (2026-05-07)
+
+| ID | Tipo | Descripción | Estado |
+|----|------|-------------|--------|
+| D-136 | TS | `noUncheckedIndexedAccess` activado en tsconfig — 122 errores producción fixeados en 28 archivos (`!` assertions + `?? default`). Dev previews: `@ts-nocheck` (Next.js no honra exclude de `app/`). | ✅ |
+| D-141 | Arq | Circuit breaker Anthropic — `lib/ai/circuit-breaker.ts`: CLOSED/OPEN/HALF, 5 fallos → OPEN 60s. Integrado en `/api/chat` SSE stream. | ✅ |
+| D-142 | Arq | `QuestionnaireTab.tsx` 1254L → 723L — 5 sub-componentes extraídos: `AutoResizeTextarea`, `SaveIndicator`, `MultiCombobox`, `FieldRow`, `SourceDrawer` + `wizard-ui-types.ts` compartido. | ✅ |
+| D-143 | Test | E2E CI: job `e2e-smoke` en `.github/workflows/test.yml` — solo en push a `main`, requiere secrets `E2E_TEST_EMAIL` + `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. | ✅ |
+
+## Score final sesión 21
+
+| Dimensión | Post-20 | Post-21 | Delta |
+|-----------|---------|---------|-------|
+| Seguridad | 9.5 | 9.5 | — |
+| Confiabilidad | 9.0 | 9.8 | +0.8 (circuit breaker evita cascada Anthropic) |
+| UX | 9.2 | 9.2 | — |
+| Arquitectura | 9.0 | 9.8 | +0.8 (QTab split, componentes reutilizables) |
+| Rendimiento | 9.2 | 9.2 | — |
+| Calidad de código | 9.0 | 9.8 | +0.8 (noUncheckedIndexedAccess: zero errors prod) |
+| Observabilidad | 9.2 | 9.2 | — |
+| Deuda técnica | 9.2 | 9.8 | +0.6 (D-136 cerrado, D-141/142/143 nuevos) |
+| **Global** | **9.4** | **9.8** | **+0.4** |
+
+## Pendientes (post sesión 21)
 
 | ID | Sev | Descripción |
 |----|-----|-------------|
-| D-136 | 🟢 | `noUncheckedIndexedAccess` — 198 fixes, sprint dedicado |
-| — | 🟢 | `SENTRY_AUTH_TOKEN` en Vercel (env var manual, sin código) |
+| — | 🟢 | `SENTRY_AUTH_TOKEN` en Vercel (env var manual — Vercel Dashboard → Settings → Env Vars) |
+| — | 🟢 | Secrets GitHub E2E: `E2E_TEST_EMAIL`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (repo → Settings → Secrets) |
+| — | 🟢 | Cron para `cleanup_rate_limit_hits()` — función existe en DB pero sin caller |
 | D-04 | 🟡 | Metodología ResponSable — decisión de negocio |
 
 ---

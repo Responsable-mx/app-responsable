@@ -37,6 +37,26 @@ const ReportNarrativeSchema = z.object({
     action: z.string(),
     priority: z.enum(["inmediata", "corto_plazo", "mediano_plazo"]),
   })).min(1),
+  // Campos extendidos para visualizaciones en PDF
+  priority_topics: z.array(z.object({
+    tema: z.string(),
+    score_financiero: z.number().min(1).max(10),
+    score_impacto: z.number().min(1).max(10),
+    prioridad: z.enum(["alta", "media", "baja"]),
+    accion_clave: z.string(),
+  })).min(3).max(8).optional(),
+  benchmark_gaps: z.array(z.object({
+    dimension: z.string(),
+    nivel_cliente: z.enum(["Básico", "Intermedio", "Avanzado", "Líder"]),
+    nivel_sector: z.enum(["Básico", "Intermedio", "Avanzado", "Líder"]),
+    brecha: z.enum(["alta", "media", "baja", "ninguna"]),
+  })).min(3).optional(),
+  proximos_pasos: z.array(z.object({
+    servicio: z.string(),
+    descripcion: z.string(),
+    plazo: z.enum(["90 días", "6 meses", "12 meses"]),
+    tipo: z.enum(["diagnóstico", "implementación", "certificación", "reporte"]),
+  })).min(3).max(5).optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -68,7 +88,7 @@ Genera el contenido narrativo del reporte de Doble Materialidad para ${client.na
 3. Priorizar acciones por urgencia (CSRD entra en vigor progresivamente)
 4. Usar lenguaje ejecutivo, no técnico
 
-Responde ÚNICAMENTE con JSON válido:
+Responde ÚNICAMENTE con JSON válido. Incluye TODOS los campos — los últimos 3 son obligatorios para generar visualizaciones en el PDF:
 {
   "executive_summary": "Resumen ejecutivo 2-3 párrafos: situación actual, brechas principales, oportunidad estratégica",
   "client_position": "Párrafo de 150-200 palabras: cómo se posiciona ${client.name} vs el grupo de referencia, con datos concretos del benchmark",
@@ -86,8 +106,38 @@ Responde ÚNICAMENTE con JSON válido:
       "action": "Acción concreta recomendada",
       "priority": "inmediata|corto_plazo|mediano_plazo"
     }
+  ],
+  "priority_topics": [
+    {
+      "tema": "Nombre del tema material (ej: Emisiones GHG, Cadena de Suministro)",
+      "score_financiero": 7.5,
+      "score_impacto": 8.2,
+      "prioridad": "alta|media|baja",
+      "accion_clave": "Acción concreta en 8-12 palabras"
+    }
+  ],
+  "benchmark_gaps": [
+    {
+      "dimension": "Nombre de la dimensión ESG analizada",
+      "nivel_cliente": "Básico|Intermedio|Avanzado|Líder",
+      "nivel_sector": "Básico|Intermedio|Avanzado|Líder",
+      "brecha": "alta|media|baja|ninguna"
+    }
+  ],
+  "proximos_pasos": [
+    {
+      "servicio": "Nombre del servicio de consultoría (ej: Diagnóstico de Gobierno ESG)",
+      "descripcion": "Qué incluye y por qué es prioritario para ${client.name} (1-2 oraciones)",
+      "plazo": "90 días|6 meses|12 meses",
+      "tipo": "diagnóstico|implementación|certificación|reporte"
+    }
   ]
-}`;
+}
+
+INSTRUCCIONES para los campos visuales:
+- priority_topics: 4-7 temas. Scores 1-10 basados en relevancia real para el sector de ${client.name} y evidencia del benchmark. Al menos 2 con prioridad "alta".
+- benchmark_gaps: Una fila por cada campo analizado en el benchmark. Nivel honesto — no inflar al cliente.
+- proximos_pasos: 3-5 pasos ordenables en 90d/6m/12m. Deben ser servicios reales de consultoría ESG que ResponSable podría ofrecer. Tipos: diagnóstico (auditorías, gap analysis), implementación (políticas, sistemas), certificación (ESR CEMEFI, GRI, B Corp), reporte (GRI, CSRD, TCFD).`;
 }
 
 // ── GET: retorna el último reporte DM + verifica batch si pending ───────────
@@ -297,7 +347,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: docRow.id,
           params: {
             model,
-            max_tokens: 4000,
+            max_tokens: 6000,
             system: [{
               type: "text",
               text: "Eres un consultor senior de Doble Materialidad (ESRS/GRI/CSRD). Redactas reportes ejecutivos claros y accionables. Responde solo con JSON válido.",
@@ -350,7 +400,7 @@ function buildMarkdownReport(
   const areasSection = narrative.improvement_areas.map((a) => `- ${a}`).join("\n");
 
   const recoSection = narrative.recommendations
-    .map((r) => `- **[${r.priority.replace("_", " ")}]** ${r.action}`)
+    .map((r) => `- **[${r.priority.replace(/_/g, " ")}]** ${r.action}`)
     .join("\n");
 
   const comparisonTable = Object.entries(comparison)
@@ -365,6 +415,15 @@ function buildMarkdownReport(
 
   const companiesLine = companies.length ? `*Empresas analizadas: ${companies.join(", ")}*\n\n` : "";
   const fieldsLine = fields.length ? `*Campos analizados: ${fields.join(", ")}*\n\n` : "";
+
+  const proximosPasosSection = narrative.proximos_pasos?.length
+    ? `\n---\n\n## Próximos Pasos\n\n${narrative.proximos_pasos
+        .map((p) => `- **[${p.plazo}]** ${p.servicio}: ${p.descripcion}`)
+        .join("\n")}\n`
+    : "";
+
+  // Embeber JSON completo al final — recuperado por export-dm-pdf para el PDF estructurado
+  const embeddedJson = `\n---NARRATIVE_JSON_START---\n${JSON.stringify(narrative)}\n---NARRATIVE_JSON_END---\n`;
 
   return `# Reporte de Doble Materialidad — ${clientName}
 *Generado: ${new Date().toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" })}*
@@ -410,5 +469,5 @@ ${recoSection}
 ## Detalle del Benchmark
 
 ${fieldsLine}${comparisonTable}
-`;
+${proximosPasosSection}${embeddedJson}`;
 }

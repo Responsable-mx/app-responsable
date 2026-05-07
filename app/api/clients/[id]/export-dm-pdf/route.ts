@@ -4,7 +4,7 @@ import React from "react";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DmReportDocument, type DmReportData } from "@/lib/pdf/dm-report";
+import { DmReportDocument, type DmReportData, type ReportNarrative } from "@/lib/pdf/dm-report";
 import { BENCHMARK_FIELDS } from "@/lib/dm/fields";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
@@ -18,14 +18,11 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  // Rate limit: PDF generation es CPU-heavy — 5 exports/min por usuario
   const limited = await checkRateLimit(
     rateLimitKey("GET", "/api/clients/[id]/export-dm-pdf", user),
-    { max: 5, windowMs: 60_000, errorMessage: "Demasiadas exportaciones. Espera 1 minuto antes de generar otro PDF." }
+    { max: 5, windowMs: 60_000, errorMessage: "Demasiadas exportaciones. Espera 1 minuto." }
   );
-  if (limited) {
-    return NextResponse.json({ error: limited.message }, { status: 429 });
-  }
+  if (limited) return NextResponse.json({ error: limited.message }, { status: 429 });
 
   const resultId = req.nextUrl.searchParams.get("result_id");
   if (!resultId) return NextResponse.json({ error: "result_id requerido" }, { status: 400 });
@@ -46,7 +43,6 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Resultado de benchmark no encontrado" }, { status: 404 });
   }
 
-  // También buscar la narrativa del reporte (si ya fue generada)
   const { data: reportDoc } = await admin
     .from("client_documents")
     .select("markdown_content")
@@ -56,25 +52,31 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     .limit(1)
     .single();
 
-  // Construir narrativa desde el markdown guardado o usar datos del benchmark
-  // Si no hay reporte generado, el PDF solo incluirá el benchmark
   const companies = (result.companies_snapshot as Array<{ name: string; country: string | null; relation: string }>) ?? [];
 
-  // Narrativa básica si no hay reporte IA generado aún
-  const defaultNarrative: DmReportData["narrative"] = {
-    executive_summary: reportDoc?.markdown_content
-      ? extractSection(reportDoc.markdown_content, "Resumen Ejecutivo")
-      : `Este reporte presenta el análisis de Doble Materialidad para ${client.name} basado en el benchmark con ${companies.length} empresas de referencia. Genera el reporte con IA para obtener análisis narrativo completo.`,
-    client_position: result.narrative ?? "Ejecuta el análisis de reporte IA para obtener el posicionamiento detallado.",
-    risks: [],
-    strengths: ["Ver análisis detallado en el reporte IA"],
-    improvement_areas: ["Genera el reporte con IA para obtener áreas de mejora específicas"],
-    recommendations: [{ action: "Generar reporte completo con IA desde el tab de Doble Materialidad", priority: "inmediata" }],
-  };
+  // Intentar recuperar narrativa completa desde JSON embebido en el markdown
+  let narrative: ReportNarrative | null = null;
+  if (reportDoc?.markdown_content) {
+    narrative = extractEmbeddedNarrative(reportDoc.markdown_content);
+  }
+
+  // Fallback: narrativa mínima si no hay reporte IA generado
+  if (!narrative) {
+    narrative = {
+      executive_summary: reportDoc?.markdown_content
+        ? extractSection(reportDoc.markdown_content, "Resumen Ejecutivo")
+        : `Análisis de Doble Materialidad para ${client.name} vs ${companies.length} empresas de referencia. Genera el reporte con IA para análisis narrativo completo.`,
+      client_position: result.narrative ?? "Ejecuta el análisis de reporte IA para obtener el posicionamiento detallado.",
+      risks: [],
+      strengths: ["Ver análisis detallado en el reporte IA"],
+      improvement_areas: ["Genera el reporte con IA para obtener áreas de mejora específicas"],
+      recommendations: [{ action: "Generar reporte completo con IA desde el tab de Doble Materialidad", priority: "inmediata" }],
+    };
+  }
 
   const reportData: DmReportData = {
     client,
-    narrative: defaultNarrative,
+    narrative,
     companies,
     fields: BENCHMARK_FIELDS,
     comparison: (result.comparison as Record<string, Record<string, string>>) ?? {},
@@ -95,6 +97,17 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       "Cache-Control": "no-store",
     },
   });
+}
+
+// Extraer narrativa JSON embebida por buildMarkdownReport
+function extractEmbeddedNarrative(markdown: string): ReportNarrative | null {
+  const match = markdown.match(/---NARRATIVE_JSON_START---\n([\s\S]*?)\n---NARRATIVE_JSON_END---/);
+  if (!match?.[1]) return null;
+  try {
+    return JSON.parse(match[1]) as ReportNarrative;
+  } catch {
+    return null;
+  }
 }
 
 function extractSection(markdown: string, sectionTitle: string): string {

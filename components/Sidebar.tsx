@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import useSWR from "swr";
 import { HelpMenu } from "@/components/HelpMenu";
 import {
   IconChat,
@@ -12,11 +11,6 @@ import {
   IconLogout,
   IconGrid,
 } from "@/components/ui/Icons";
-import type { ConsultorProject } from "@/lib/consultors";
-
-type ProjectsResponse = { data: ConsultorProject[] };
-const projectsFetcher = (url: string) =>
-  fetch(url).then((r) => r.json() as Promise<ProjectsResponse>);
 
 type NavItem = {
   href: string;
@@ -93,15 +87,6 @@ export function Sidebar({
     ? [...baseFiltered, ...adminFiltered]
     : baseFiltered;
   const [collapsed, setCollapsed] = useState(false);
-
-  // Mis proyectos: asignaciones del consultor actual. revalidate 1h (cambia poco).
-  const { data: projectsData, error: projectsError } = useSWR<ProjectsResponse>(
-    "/api/consultors/me",
-    projectsFetcher,
-    { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
-  );
-  // D-39: error silencioso si la API falla — mantener array vacío pero no ocultar el estado
-  const projects = projectsError ? [] : (projectsData?.data ?? []);
 
   useEffect(() => {
     const v = localStorage.getItem("sidebar-collapsed");
@@ -200,69 +185,6 @@ export function Sidebar({
           );
         })}
       </nav>
-
-      {/* Mis proyectos: lista completa expandida, iconos en modo colapsado.
-          Se oculta dentro de /clientes/[id] — el nombre ya aparece en H1 + breadcrumb. */}
-      {!isClient && projects.length > 0 && !pathname.startsWith('/clientes/') && (
-        <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200`}>
-          {!collapsed && (
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1.5"
-             title="Clientes donde estás asignado — tu nivel en cada proyecto aparece junto al nombre">
-              Acceso rápido
-            </p>
-          )}
-          <div className="space-y-0.5">
-            {projects.map((p) => {
-              const isOverride = p.override_seniority !== null;
-              const seniority = p.override_seniority ?? p.global_seniority;
-              const active =
-                pathname === `/clientes/${p.client_id}` ||
-                pathname.startsWith(`/clientes/${p.client_id}/`);
-              return collapsed ? (
-                // Modo colapsado: inicial del cliente como icono con tooltip
-                <Link
-                  key={p.client_id}
-                  href={`/clientes/${p.client_id}`}
-                  title={p.client_name ?? "Cliente"}
-                  className={`flex items-center justify-center w-9 h-9 mx-auto rounded text-xs font-bold transition-colors ${
-                    active
-                      ? "bg-brand-primary-light text-brand-primary-dark"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  {(p.client_name ?? "?").charAt(0).toUpperCase()}
-                </Link>
-              ) : (
-                <Link
-                  key={p.client_id}
-                  href={`/clientes/${p.client_id}`}
-                  className={`flex items-center justify-between px-3 py-1.5 rounded text-xs transition-colors ${
-                    active
-                      ? "bg-brand-primary-light text-brand-primary-dark font-medium"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  <span className="truncate min-w-0 mr-2 leading-tight">
-                    {p.client_name}
-                  </span>
-                  {seniority && (
-                    <span
-                      title={isOverride ? "Override de seniority para este proyecto" : "Seniority global"}
-                      className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide ${
-                        isOverride
-                          ? "bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {seniority}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div className={`${collapsed ? "px-1" : "px-2"} py-2 border-t border-slate-200 space-y-0.5`}>
         <HelpMenu iconOnly={collapsed} />

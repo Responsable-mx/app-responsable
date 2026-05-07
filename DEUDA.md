@@ -81,11 +81,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
-### 🟡 D-85 — "MIS PROYECTOS" en sidebar duplica acceso ya dado por nav "Clientes"
-- **Descripción**: El sidebar muestra una sección "MIS PROYECTOS" con links a clientes específicos (ej: Distribuidora Altamira + EPH). El nav ya tiene "Clientes" que lleva a la lista completa. El nombre del cliente además aparece en breadcrumb + H1 cuando estás dentro.
-- **Impacto**: Ruido visual. 4 instancias del nombre del cliente en pantalla simultáneamente cuando estás en `/clientes/[id]`.
-- **Fix**: Si `/clientes` se vuelve home (D-80), MIS PROYECTOS puede ser un pin en la lista de clientes (star ★ que fija al top). Eliminar del sidebar.
-- **Esfuerzo**: 1h
+### ~~🟡 D-85 — "MIS PROYECTOS" en sidebar duplica acceso ya dado por nav "Clientes"~~ ✅ RESUELTO
+- Sección "Acceso rápido" eliminada de `Sidebar.tsx`. `useSWR`, `projectsFetcher`, `ProjectsResponse`, `ConsultorProject` — todo dead code removido. Sesión 18.
 
 ### ~~🟡 D-86 — Cronograma header redundante dentro del tab~~ ✅ VERIFICADO RESUELTO
 - `ClientCronogramaTab.tsx` — no hay h2 `CRONOGRAMA DEL CLIENTE`. Verificado sesión 17.
@@ -332,4 +329,4 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 ---
 
-*Última auditoría: may-2026 sesión 18 — D-121/122/123/124 todos resueltos. Items activos: D-04 (metodología — decisión de negocio), D-85 (sidebar acceso rápido — diseño). Score global 7.8/10 → sube a 8.2/10 post-limpieza. Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+*Última auditoría: may-2026 sesión 18 — D-85/D-121/D-122/D-123/D-124 todos resueltos. Ítem activo: D-04 (metodología — decisión de negocio). Score global 8.5/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*

@@ -11,6 +11,7 @@ import {
 } from "@/lib/questionnaires/types";
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
+import { extractJsonObject } from "@/lib/ai/extract-json";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -49,29 +50,7 @@ const AiResponseSchema = z.record(z.string(), AiFieldSchema);
 
 type Ctx = { params: Promise<{ id: string; stepKey: string }> };
 
-// Extrae primer objeto JSON balanceado del texto (misma lógica que ai-fill).
-function extractJsonObject(text: string): string | null {
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const searchText = codeBlockMatch ? codeBlockMatch[1] : text;
-  const start = searchText.indexOf("{");
-  if (start < 0) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < searchText.length; i++) {
-    const ch = searchText[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\" && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) return searchText.slice(start, i + 1);
-    }
-  }
-  return null;
-}
+
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const user = await requireConsultorOrAdmin();

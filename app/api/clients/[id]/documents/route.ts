@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { listDocumentsByClient, uploadAndParseDocument } from "@/lib/documents/queries";
+import { DOCUMENT_KIND_SCHEMA } from "@/lib/documents/types";
 import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
@@ -80,10 +81,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: `Tipo no soportado: ${file.type || "desconocido"}` }, { status: 415 });
   }
 
-  const kindRaw = formData.get("kind");
-  const kind = typeof kindRaw === "string" && ["general", "sustainability_report", "financial_report"].includes(kindRaw)
-    ? (kindRaw as "general" | "sustainability_report" | "financial_report")
-    : "general";
+  const kindParsed = DOCUMENT_KIND_SCHEMA.safeParse(formData.get("kind"));
+  const kind = kindParsed.success ? kindParsed.data : "general";
 
   const buffer = Buffer.from(await file.arrayBuffer());
 

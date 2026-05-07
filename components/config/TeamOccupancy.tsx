@@ -63,8 +63,14 @@ const STATUS_LABEL: Record<string, string> = {
   delayed: "Retrasada",
 };
 
-export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
-  const { data, error, isLoading } = useSWR("/api/team/occupancy", fetcher);
+export function TeamOccupancy({
+  filters,
+  occupancyUrl = "/api/team/occupancy",
+}: {
+  filters?: EquipoFilters;
+  occupancyUrl?: string;
+} = {}) {
+  const { data, error, isLoading } = useSWR(occupancyUrl, fetcher);
   const { data: seniorityItems = [] } = useSWR<{ value: string; label: string }[]>(
     "/api/catalogs?category=seniority_levels",
     seniorityFetcher,
@@ -137,7 +143,10 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
           </span>
           <span className="text-xs text-slate-500">{totalActive} actividades en curso</span>
           {totalDelayed > 0 && (
-            <span className="text-xs text-rose-700 font-semibold">
+            <span
+              className="text-xs text-rose-700 font-semibold"
+              title="Actividades retrasadas asignadas a consultores activos. Puede diferir del conteo en Por Proyecto (que incluye actividades sin asignar)."
+            >
               ⚠ {totalDelayed} retrasada{totalDelayed === 1 ? "" : "s"}
             </span>
           )}
@@ -178,7 +187,7 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
               </div>
             </div>
             <div className="bg-white border border-slate-200 rounded p-3 space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Atrasadas</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Retrasadas</p>
               <p className="text-xs text-slate-700">Actividades cuya <strong>fecha plan ya venció</strong> y aún no tienen fecha real de fin.</p>
               <p className="text-[10px] text-slate-500 pt-1">Si es &gt; 0 el consultor tiene compromisos vencidos. Requiere atención inmediata.</p>
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700">2</span>
@@ -225,7 +234,7 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
                   className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest w-20"
                   title="Actividades retrasadas (planeadas a terminar antes de hoy, sin fecha real de fin)"
                 >
-                  Atrasadas
+                  Retrasadas
                 </th>
                 <th
                   className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest w-24"
@@ -285,13 +294,27 @@ export function TeamOccupancy({ filters }: { filters?: EquipoFilters } = {}) {
                         {m.active_count === 0 && m.delayed_count === 0 ? (
                           <span className="text-[11px] text-slate-400 tabular-nums">0</span>
                         ) : (
-                          <span
-                            title={lvl.label}
-                            className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-sm text-xs font-bold tabular-nums ${lvl.css}`}
-                          >
-                            <span aria-hidden>{lvl.icon}</span>
-                            {m.active_count}
-                          </span>
+                          <div className="inline-flex flex-col items-center gap-0.5">
+                            <span
+                              title={`${lvl.label} — ${m.active_count} de 6 máximo recomendado`}
+                              className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-sm text-xs font-bold tabular-nums ${lvl.css}`}
+                            >
+                              <span aria-hidden>{lvl.icon}</span>
+                              {m.active_count}
+                            </span>
+                            <div className="w-10 h-1 bg-slate-100 rounded-full overflow-hidden" aria-hidden>
+                              <div
+                                className={`h-full rounded-full ${
+                                  m.delayed_count > 0 || m.active_count > 4
+                                    ? "bg-rose-400"
+                                    : m.active_count <= 2
+                                    ? "bg-emerald-400"
+                                    : "bg-amber-400"
+                                }`}
+                                style={{ width: `${Math.min(100, Math.round((m.active_count / 6) * 100))}%` }}
+                              />
+                            </div>
+                          </div>
                         )}
                       </td>
 

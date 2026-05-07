@@ -48,6 +48,7 @@ export const UserInputSchema = z.object({
   full_name: z.string().trim().max(120).optional().nullable(),
   active: z.boolean().optional(),
   seniority_level: z.string().trim().max(60).optional().nullable(),
+  is_test_account: z.boolean().optional(),
 });
 
 export const AssignConsultorSchema = z.object({

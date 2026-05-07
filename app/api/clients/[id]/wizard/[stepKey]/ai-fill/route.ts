@@ -13,6 +13,7 @@ import {
 } from "@/lib/questionnaires/types";
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
+import { extractJsonObject } from "@/lib/ai/extract-json";
 
 // Timeout serverless: hasta 5 min (web_search tarda ~30-90s por paso)
 export const maxDuration = 300;
@@ -385,39 +386,4 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
 }
 
 // Extrae primer objeto JSON balanceado del texto.
-// D-20: el regex original de code block usaba `*?` non-greedy que paraba en el
-// primer `}`, truncando JSON anidado. Ahora extrae el contenido del code block
-// y luego aplica el mismo balanced-brace parser para ambos casos.
-function extractJsonObject(text: string): string | null {
-  // Si hay code block, extraer solo el contenido entre ``` y ``` para parsear.
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const searchText = codeBlockMatch ? codeBlockMatch[1] : text;
 
-  const start = searchText.indexOf("{");
-  if (start < 0) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < searchText.length; i++) {
-    const ch = searchText[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (ch === "\\" && inString) {
-      escape = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) return searchText.slice(start, i + 1);
-    }
-  }
-  return null;
-}

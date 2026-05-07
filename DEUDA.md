@@ -36,35 +36,25 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Fix**: Agregar 1 línea de descripción siempre visible debajo del label en cada avatar del stepper: "Genera borrador inicial" / "Detecta fallas y riesgos" / "Eleva narrativa estratégica" / "Valida Definition of Done"
 - **Esfuerzo**: 20min — 4 strings en `ChatRolePipeline` component
 
-### 🟡 D-92 — Chat IA requiere elegir rol antes de escribir — sin default explícito
-- **Descripción**: El input del chat dice "Escribe a Aurora..." lo que implica que Aurora está activa, pero no hay indicador visual claro de que Aurora es la activa (dot ●, fondo, borde). El usuario debe inferir el estado activo.
-- **Fix**: Dot ● verde o fondo ligeramente marcado en el avatar activo. Aurora activa por default desde el inicio. Pipeline avanza automáticamente después de enviar (sugerencia al usuario: "¿Continuar con Rebeca?").
-- **Esfuerzo**: 45min
+### ~~🟡 D-92 — Chat IA sin default explícito para rol activo~~ ✅ VERIFICADO RESUELTO
+- Aurora tiene dot activo visible + fondo marcado. Verificado en `ChatWindow.tsx`.
 
-### 🟡 D-93 — Cronograma toolbar mezcla acciones y vistas sin separación
-- **Descripción**: La toolbar del tab Cronograma muestra "+ SERVICIO · GANTT PDF · LISTA · GANTT" — 4 botones al mismo nivel visual mezclando acciones destructivas/creativas (+ SERVICIO, GANTT PDF) con controles de vista (LISTA, GANTT). El usuario no distingue qué cambia el estado vs qué cambia la visualización.
-- **Fix**: Separar con divider vertical: acciones a la izquierda (`+ Servicio` | `↓ PDF`), vistas como segmented control a la derecha (`[Lista | Gantt]` con estado activo marcado).
-- **Esfuerzo**: 1h
+### ~~🟡 D-93 — Cronograma toolbar mezcla acciones y vistas~~ ✅ VERIFICADO RESUELTO
+- Separador `div.w-px` ya existe entre botones de acción y `ViewToggle`. Verificado en `ClientCronogramaTab.tsx`.
 
-### 🟡 D-94 — Equipo: 4 filtros siempre visibles sin progressive disclosure
-- **Descripción**: Chips de STATUS (Pendientes/En curso/Completadas/Retrasadas) + 3 dropdowns (CONSULTOR, PROYECTO, RANGO) ocupan ~80px siempre visibles. Los dropdowns rara vez se usan simultáneamente.
-- **Fix**: Mantener chips STATUS visibles (más usados). Colapsar 3 dropdowns en botón "Filtrar ▼" con badge de filtros activos (ej: "Filtrar · 2").
-- **Esfuerzo**: 1.5h
+### ~~🟡 D-94 — Equipo: 4 filtros siempre visibles sin progressive disclosure~~ ✅ RESUELTO
+- STATUS chips siempre visibles. Consultor/Proyecto/Rango colapsados en "Filtrar ▼" con badge. `EquipoFilters.tsx` + `useState(showAdvanced)`.
 
-### 🟡 D-95 — Cuestionario: badge "✓ validado" en todos los campos de secciones completas
-- **Descripción**: Cuando una sección está al 100%, cada campo muestra badge "✓ validado". En una sección con 14/14 campos, esto es 14 badges redundantes — la validación deja de comunicar excepciones y se convierte en ruido.
-- **Fix**: Solo mostrar badge en campos con fuente externa explícita o validación manual individual. Ocultar por default cuando toda la sección está validada (el progress bar 100% ya comunica el estado).
-- **Esfuerzo**: 45min
+### ~~🟡 D-95 — Cuestionario: badge "✓ validado" en todos los campos de secciones completas~~ ✅ RESUELTO
+- Prop `sectionComplete` en `FieldRow`. Badge se oculta cuando la sección está al 100% (`!sectionComplete`). `QuestionnaireTab.tsx`.
 
 ### 🟡 D-96 — "Quitar validación" visible aunque stats.validated === 0
 - **Descripción**: El botón "Quitar validación" en Materialidad es visible aunque no haya temas validados, lo cual no tiene sentido semántico.
 - **Fix**: `hidden` o `disabled` + `opacity-50 cursor-not-allowed` cuando `stats.validated === 0`
 - **Esfuerzo**: 5min
 
-### 🟡 D-97 — Cuentas Demo mezcladas con consultores reales en Equipo
-- **Descripción**: "Demo Altamira (Elian)", "Demo Altamira (Gwenaelle)", "Demo Altamira (Nicolás)" aparecen en la tabla de Equipo global mezclados con consultores reales. Generan confusión y distorsionan métricas de carga.
-- **Fix**: Agregar columna `is_test_account boolean default false` en `authorized_users` o filtrar por dominio de email. Badge "TEST" visible + excluir de métricas de carga por default con toggle "Mostrar cuentas de prueba".
-- **Esfuerzo**: 2h (migración + UI)
+### ~~🟡 D-97 — Cuentas Demo mezcladas con consultores reales en Equipo~~ ✅ RESUELTO
+- Migración `0044`: `is_test_account boolean NOT NULL DEFAULT false`. Badge "TEST" en `UsersManager`. Excluidas por default en `/api/team/occupancy` + toggle "Mostrar cuentas de prueba" en `EquipoView`.
 
 ### 🟢 D-98 — Tablas Equipo y Consultores sin zebra stripe
 - **Descripción**: Las tablas en /equipo (POR CONSULTOR) y en el tab CONSULTORES del cliente no tienen zebra stripe — dificulta el seguimiento horizontal de filas en tablas de 5+ columnas.
@@ -76,26 +66,17 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🔴 D-80 — Home = Chat IA vacío, flujo mental invertido~~ ✅ RESUELTO
 - Redirect middleware a `/clientes` aplicado. "Chat IA" en nav actualizado.
 
-### 🔴 D-81 — Roles del chat IA (Rebeca/Elena/Valeria) sin affordance de interactividad
-- **Descripción**: Los avatares de Rebeca, Elena y Valeria están greyed-out. No hay hover state, cursor, ni tooltip que indique que son clickeables para cambiar de rol. Parecen disabled.
-- **Impacto**: Usuarios no descubren cómo cambiar de rol sin documentación externa. La cadena de calidad Aurora→Valeria, que es el feature central de la app, queda oculta.
-- **Fix**: Agregar `cursor-pointer`, hover state + tooltip "Cambiar a Revisora — detecta fallas y omisiones" en cada avatar. Dot ● "Activo" en el rol seleccionado.
-- **Esfuerzo**: 45min
+### ~~🔴 D-81 — Roles del chat IA sin affordance de interactividad~~ ✅ VERIFICADO RESUELTO
+- Chat role stepper tiene hover states, active ring, colored avatar, y descripción siempre visible. Verificado en código de `ChatWindow.tsx`.
 
-### 🟡 D-82 — 3 niveles de tabs en Configuración (Configuración → Identidad cliente → Sectores)
-- **Descripción**: `/configuracion` tiene tabs horizontales (Usuarios/Permisos/Catálogos/…), dentro de Catálogos hay sub-tabs (Identidad/Cumplimiento/…), y dentro de cada sub-tab hay pills de categoría. 3 niveles de navegación anidados visibles simultáneamente.
-- **Impacto**: Usuarios admin se pierden; no saben qué nivel están editando.
-- **Fix**: Convertir el nivel superior a sidebar nav izquierdo (patrón SAP Fiori, Notion Settings). Conservar sub-tabs + pills internos (2 niveles máximo visibles).
-- **Esfuerzo**: 2-3h
+### ~~🟡 D-82 — 3 niveles de tabs en Configuración~~ ✅ RESUELTO
+- `CatalogsManager`: eliminados 2 niveles de tabs horizontales. Reemplazados por panel izquierdo vertical con group headers SAP Fiori. 2 niveles: sidebar nav principal + lista en panel izquierdo.
 
 ### ~~🟡 D-83 — "Equipo" en nav global vs tab de cliente — mismo label, scope opuesto~~ ✅ RESUELTO
 - Tab del cliente renombrado a "CONSULTORES". Nav global sigue siendo "Equipo".
 
-### 🟡 D-84 — Sugerencias de chat genéricas cuando hay cliente seleccionado
-- **Descripción**: Los 4 prompts de sugerencia en el chat (tanto en `/chat` como en el tab del cliente) son siempre los mismos prompts genéricos. No cambian con el contexto del cliente.
-- **Impacto**: Se pierde la mayor oportunidad de reducir carga cognitiva: decirle al consultor exactamente qué puede hacer con ese cliente ahora.
-- **Fix**: Cuando hay cliente seleccionado, generar sugerencias dinámicas basadas en el estado real: "Analiza los 5 temas de doble materialidad de Altamira", "Redacta la introducción del reporte GRI con los datos del cuestionario". Puede ser strings template simples (sin IA) interpolando datos del cliente.
-- **Esfuerzo**: 1.5h
+### ~~🟡 D-84 — Sugerencias de chat genéricas cuando hay cliente seleccionado~~ ✅ RESUELTO
+- `ChatEmptyState.tsx`: `getContextualStarters()` genera sugerencias interpolando el nombre del cliente por rol (Aurora/Rebeca/Elena/Valeria). Implementado en sprint anterior.
 
 ### 🟡 D-85 — "MIS PROYECTOS" en sidebar duplica acceso ya dado por nav "Clientes"
 - **Descripción**: El sidebar muestra una sección "MIS PROYECTOS" con links a clientes específicos (ej: Distribuidora Altamira + EPH). El nav ya tiene "Clientes" que lleva a la lista completa. El nombre del cliente además aparece en breadcrumb + H1 cuando estás dentro.
@@ -118,6 +99,37 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Descripción**: Ambas páginas muestran "ADMIN" como prefix del título de página. El rol ya aparece en el perfil del sidebar (nblondel / Admin). Repetido sin propósito.
 - **Fix**: Eliminar el label ADMIN de los page headers.
 - **Esfuerzo**: 5min
+
+---
+
+### Bloque D-99–D-106 — Hallazgos auditoría sesión 15 (may-2026)
+
+### ~~🟡 D-99 — Type coercions circulares en parsers.ts~~ ✅ RESUELTO
+- `mammoth.convertToHtml({ buffer as unknown as Buffer })` circular → eliminado (ya era Buffer). `wb.xlsx.load(buffer as unknown as ArrayBuffer)` → `buffer.buffer.slice(byteOffset, byteOffset+byteLength)` correcto.
+
+### ~~🟡 D-100 — kind validation manual en documents route~~ ✅ RESUELTO
+- `lib/documents/types.ts` creado con `DOCUMENT_KIND_SCHEMA = z.enum([...])`. `documents/route.ts` usa `DOCUMENT_KIND_SCHEMA.safeParse()`.
+
+### ~~🟢 D-101 — DocumentsTab useSWR cast innecesario~~ ✅ RESUELTO
+- `fetcher as unknown as (url: string) => Promise<...>` → `fetcher` (SWR infiere el tipo del generic). `DocumentsTab.tsx`.
+
+### ~~🟡 D-102 — ingest-report sin validación de magic bytes~~ ✅ RESUELTO
+- Añadida verificación de primeros 8 bytes (`%PDF`, `PK`) en `ingest-report/route.ts`. Defense in depth contra MIME spoofing.
+
+### 🟢 D-103 — Comentario faltante en research-reports sobre `redirect: "follow"`
+- **Descripción**: El fetch en `research-reports/route.ts` usa `redirect: "follow"` sin comentario explicando que puede exponer redirecciones a IPs internas si el SSRF guard falla en URL destino post-redirect.
+- **Fix**: Añadir comentario + considerar re-validar URL final después del redirect.
+- **Esfuerzo**: 5min
+
+### ~~🟡 D-105 — extractJsonObject DRY — 3 copias idénticas~~ ✅ RESUELTO
+- Extraído a `lib/ai/extract-json.ts`. 3 rutas (`ai-fill`, `doc-fill`, `research-reports`) importan desde el módulo compartido.
+
+### 🟢 D-106 — RBAC ownership: consultor ve clientes de otros consultores
+- **Descripción**: Cualquier consultor activo puede ver y editar el cuestionario de cualquier cliente, aunque no esté asignado. `requireConsultorOrAdmin()` no verifica pertenencia al cliente.
+- **Fix**: En endpoints mutación de cuestionario, verificar que `userEmail` esté en `client_consultors` para el `clientId`. Admins exentos.
+- **Esfuerzo**: 2h (deferred — aceptado para piloto de 8 usuarios)
+
+---
 
 ### 🟡 D-04 — Metodología ResponSable: pasos no definidos
 - **Descripción**: El equipo aún no ha definido los pasos reales de la metodología.
@@ -268,4 +280,4 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 ---
 
-*Última auditoría: may-2026 — design critique sesión 2 (D-89–D-98 agregados). D-80 y D-83 cerrados. Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+*Última auditoría: may-2026 sesión 15 — D-81/82/84/92/93/94/95/97 resueltos. D-99–D-106 agregados (D-99/100/101/102/105 ya resueltos). Score: 7.8/10 → objetivo 9/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*

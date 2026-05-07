@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeStatus, type ActivityStatus } from "@/lib/stages";
@@ -39,14 +39,15 @@ export type TeamMember = {
 
 const MS_DAY = 86_400_000;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const actor = await requireAdmin();
   if (!actor) return NextResponse.json({ error: "Requiere admin" }, { status: 403 });
 
+  const includeTest = req.nextUrl.searchParams.get("include_test") === "true";
   const admin = createAdminClient();
 
   // Query 1: usuarios + asignación a clientes (existente)
-  const { data: users, error: e1 } = await admin
+  let q = admin
     .from("authorized_users")
     .select(
       `email, full_name, seniority_level, role,
@@ -54,6 +55,8 @@ export async function GET() {
     )
     .eq("active", true)
     .order("full_name");
+  if (!includeTest) q = q.eq("is_test_account", false);
+  const { data: users, error: e1 } = await q;
 
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
 

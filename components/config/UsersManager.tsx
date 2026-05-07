@@ -18,6 +18,7 @@ type User = {
   last_login: string | null;
   seniority_level: string | null;
   client_id: string | null;
+  is_test_account: boolean;
   created_at: string;
 };
 
@@ -122,7 +123,16 @@ export function UsersManager() {
               <tbody className="divide-y divide-slate-100">
                 {users.map((u) => (
                   <tr key={u.email} className="even:bg-slate-50 hover:bg-slate-100">
-                    <td className="py-2 pr-4 font-mono text-xs">{u.email}</td>
+                    <td className="py-2 pr-4 font-mono text-xs">
+                      <span className="inline-flex items-center gap-1.5">
+                        {u.email}
+                        {u.is_test_account && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 border border-amber-200">
+                            TEST
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="py-2 pr-4 text-slate-700">{u.full_name ?? "—"}</td>
                     <td className="py-2 pr-4">
                       <span
@@ -241,6 +251,7 @@ function UserEditor({
   const [active, setActive] = useState(user?.active ?? true);
   const [seniorityLevel, setSeniorityLevel] = useState(user?.seniority_level ?? "");
   const [clientId, setClientId] = useState(user?.client_id ?? "");
+  const [isTestAccount, setIsTestAccount] = useState(user?.is_test_account ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -267,6 +278,7 @@ function UserEditor({
             full_name: fullName.trim() || null,
             seniority_level: seniorityLevel || null,
             client_id: role === "cliente" ? clientId : null,
+            is_test_account: isTestAccount,
           }
         : {
             email,
@@ -275,6 +287,7 @@ function UserEditor({
             full_name: fullName.trim() || null,
             seniority_level: seniorityLevel || null,
             client_id: role === "cliente" ? clientId : null,
+            is_test_account: isTestAccount,
           };
       const url = user
         ? `/api/users/${encodeURIComponent(user.email)}`
@@ -380,15 +393,26 @@ function UserEditor({
             Nivel global del consultor. Puede sobreescribirse por proyecto en la pestaña Equipo del cliente.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={active}
-            onChange={(e) => setActive(e.target.checked)}
-            className="accent-brand-primary"
-          />
-          Activo (puede iniciar sesión)
-        </label>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+              className="accent-brand-primary"
+            />
+            Activo (puede iniciar sesión)
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={isTestAccount}
+              onChange={(e) => setIsTestAccount(e.target.checked)}
+              className="accent-amber-500"
+            />
+            Cuenta de prueba — se excluye de métricas de equipo
+          </label>
+        </div>
 
         {error && (
           <div role="alert" className="text-sm text-brand-berry bg-red-50 border border-red-200 rounded p-2">

@@ -10,6 +10,7 @@ import type { ProjectOverview } from "@/app/api/projects/overview/route";
 import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { ServiceGantt } from "@/components/services/ServiceGantt";
 import { SkeletonTable } from "@/components/ui/Skeleton";
+import { SelectField } from "@/components/ui/SelectField";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -41,8 +42,16 @@ function fmt(d: string | null) {
   });
 }
 
-export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) {
-  const { data, error, isLoading } = useSWR("/api/projects/overview", fetcher);
+export function ProjectsOverview({
+  filters,
+  consultors = [],
+  onFiltersChange,
+}: {
+  filters?: EquipoFilters;
+  consultors?: { email: string; name: string | null }[];
+  onFiltersChange?: (next: EquipoFilters) => void;
+} = {}) {
+  const { data, error, isLoading, mutate } = useSWR("/api/projects/overview", fetcher);
   const { data: serviceCat = [] } = useSWR<{ value: string; label: string }[]>(
     "/api/catalogs?category=services",
     catalogFetcher,
@@ -56,6 +65,39 @@ export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) 
   const [viewMode, setViewMode] = useState<Record<string, "list" | "gantt">>({});
 
   const [now] = useState(() => Date.now());
+  const [reassigning, setReassigning] = useState<string | null>(null); // activityId en proceso
+  const [reassignLoading, setReassignLoading] = useState(false);
+
+  const consultorMap = new Map(
+    consultors.filter((c) => c.name).map((c) => [c.email, c.name as string])
+  );
+
+  function formatAssignee(email: string): string {
+    if (consultorMap.has(email)) return consultorMap.get(email)!;
+    return email
+      .split("@")[0]
+      .split(".")
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(" ");
+  }
+
+  async function handleReassign(activityId: string, newEmail: string) {
+    if (!newEmail) return;
+    setReassignLoading(true);
+    try {
+      const res = await fetch(`/api/activities/${activityId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignee_email: newEmail }),
+      });
+      if (res.ok) {
+        setReassigning(null);
+        mutate();
+      }
+    } finally {
+      setReassignLoading(false);
+    }
+  }
 
   if (isLoading) return <SkeletonTable rows={4} cols={4} />;
   if (error)
@@ -146,7 +188,12 @@ export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) 
         <span className="text-xs text-slate-500">{totalActivities} actividades</span>
         <span className="text-xs text-slate-500">{totalActive} en curso</span>
         {totalDelayed > 0 && (
-          <span className="text-xs text-rose-700 font-semibold">⚠ {totalDelayed} retrasada{totalDelayed === 1 ? "" : "s"}</span>
+          <span
+            className="text-xs text-rose-700 font-semibold"
+            title="Total de actividades retrasadas en todos los proyectos activos (incluye actividades sin asignar)."
+          >
+            ⚠ {totalDelayed} retrasada{totalDelayed === 1 ? "" : "s"}
+          </span>
         )}
       </div>
 
@@ -177,16 +224,24 @@ export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) 
                 </p>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                 {p.delayed_count > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-bold bg-rose-100 text-rose-700">
+                  <button
+                    onClick={() => onFiltersChange?.({ ...(filters ?? { statuses: new Set(), consultorEmail: null, clientId: null, dateRange: "all" }), statuses: new Set(["delayed"]) })}
+                    title="Filtrar por retrasadas"
+                    className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-bold bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors"
+                  >
                     ⚠ {p.delayed_count} retrasada{p.delayed_count === 1 ? "" : "s"}
-                  </span>
+                  </button>
                 )}
                 {p.active_count > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-bold bg-brand-primary-light text-brand-primary-dark">
+                  <button
+                    onClick={() => onFiltersChange?.({ ...(filters ?? { statuses: new Set(), consultorEmail: null, clientId: null, dateRange: "all" }), statuses: new Set(["in_progress"]) })}
+                    title="Filtrar por en curso"
+                    className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-bold bg-brand-primary-light text-brand-primary-dark hover:bg-brand-primary/20 transition-colors"
+                  >
                     {p.active_count} en curso
-                  </span>
+                  </button>
                 )}
                 {p.upcoming_count > 0 && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
@@ -281,16 +336,52 @@ export function ProjectsOverview({ filters }: { filters?: EquipoFilters } = {}) 
                                               <span>
                                                 Plan: {fmt(a.planned_start)} → {fmt(a.planned_end)}
                                               </span>
-                                              <span>
-                                                Real: {fmt(a.actual_start)} → {fmt(a.actual_end)}
-                                              </span>
-                                              {a.assignee_email && (
-                                                <span
-                                                  className="truncate max-w-[160px]"
-                                                  title={a.assignee_email}
-                                                >
-                                                  @ {a.assignee_email.split("@")[0]}
+                                              {(a.actual_start || a.actual_end) && (
+                                                <span>
+                                                  Real: {fmt(a.actual_start)} → {fmt(a.actual_end)}
                                                 </span>
+                                              )}
+                                              {a.assignee_email ? (
+                                                <span className="flex items-center gap-1.5">
+                                                  <span
+                                                    className="truncate max-w-[160px] text-brand-primary-dark font-medium"
+                                                    title={a.assignee_email}
+                                                  >
+                                                    @ {formatAssignee(a.assignee_email)}
+                                                  </span>
+                                                  {consultors.length > 0 && (
+                                                    reassigning === a.id ? (
+                                                      <span
+                                                        className="inline-flex items-center gap-1"
+                                                        onClick={(e) => e.preventDefault()}
+                                                      >
+                                                        <SelectField
+                                                          value=""
+                                                          onChange={(v) => handleReassign(a.id, v)}
+                                                          options={consultors.map((c) => ({ value: c.email, label: c.name ?? c.email }))}
+                                                          placeholder="— Seleccionar —"
+                                                          className="w-[160px] text-[10px]"
+                                                        />
+                                                        <button
+                                                          onClick={(e) => { e.preventDefault(); setReassigning(null); }}
+                                                          className="text-slate-400 hover:text-slate-700 text-[10px]"
+                                                          disabled={reassignLoading}
+                                                        >
+                                                          ✕
+                                                        </button>
+                                                      </span>
+                                                    ) : (
+                                                      <button
+                                                        onClick={(e) => { e.preventDefault(); setReassigning(a.id); }}
+                                                        className="text-[9px] text-slate-400 hover:text-brand-primary-dark underline transition-colors"
+                                                      >
+                                                        Reasignar
+                                                      </button>
+                                                    )
+                                                  )}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-400 italic">Sin asignar</span>
                                               )}
                                             </div>
                                           </div>
@@ -343,7 +434,7 @@ function ViewToggle({
         <button
           key={o.v}
           onClick={() => onChange(o.v)}
-          className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
+          className={`px-2.5 py-1.5 min-h-[32px] text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
             value === o.v
               ? "bg-white text-brand-primary-dark shadow-sm"
               : "text-slate-500 hover:text-slate-900"

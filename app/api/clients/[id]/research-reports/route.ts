@@ -5,6 +5,7 @@ import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
+import { extractJsonObject } from "@/lib/ai/extract-json";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -31,28 +32,7 @@ const KIND_LABEL = {
   financial_report: "Informe financiero / informe anual / annual report",
 } as const;
 
-function extractJsonObject(text: string): string | null {
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const searchText = codeBlockMatch ? codeBlockMatch[1] : text;
-  const start = searchText.indexOf("{");
-  if (start < 0) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < searchText.length; i++) {
-    const ch = searchText[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\" && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) return searchText.slice(start, i + 1);
-    }
-  }
-  return null;
-}
+
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const user = await requireConsultorOrAdmin();

@@ -91,15 +91,10 @@ export function ItemEditor({
           autoFocus
         />
         <Input
-          label={
-            item?.is_system
-              ? "Valor canónico (sistema, no editable)"
-              : "Valor canónico (auto)"
-          }
+          label="Valor canónico (auto)"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          disabled={item?.is_system === true}
-          className="font-mono text-xs disabled:bg-slate-50"
+          className="font-mono text-xs"
           placeholder="Se autogenera desde el label"
         />
         <Input

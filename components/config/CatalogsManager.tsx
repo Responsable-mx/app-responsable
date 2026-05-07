@@ -40,65 +40,48 @@ const GROUPS: Array<{
 ];
 
 export function CatalogsManager({ categories }: { categories: Category[] }) {
-  const [activeGroup, setActiveGroup] = useState<string>(GROUPS[0].key);
-  const [active, setActive] = useState<CatalogCategory>(
-    GROUPS[0].members[0]
-  );
+  const [active, setActive] = useState<CatalogCategory>(GROUPS[0].members[0]);
 
   const groupCats = (g: (typeof GROUPS)[number]) =>
     g.members
       .map((m) => categories.find((c) => c.key === m))
       .filter((c): c is Category => Boolean(c));
 
-  const currentGroup = GROUPS.find((g) => g.key === activeGroup) ?? GROUPS[0];
-  const groupCategories = groupCats(currentGroup);
-  const current =
-    groupCategories.find((c) => c.key === active) ?? groupCategories[0];
+  const current = categories.find((c) => c.key === active) ?? categories[0];
 
   return (
-    <div>
-      {/* Nivel 1: grupos principales */}
-      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg mb-3">
-        {GROUPS.map((g) => (
-          <button
-            key={g.key}
-            onClick={() => {
-              setActiveGroup(g.key);
-              const first = groupCats(g)[0];
-              if (first) setActive(first.key);
-            }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              activeGroup === g.key
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            {g.label}
-            <span className="ml-1.5 text-[10px] text-slate-400 tabular-nums">
-              ({groupCats(g).length})
-            </span>
-          </button>
-        ))}
-      </div>
+    <div className="flex gap-0">
+      {/* Panel izquierdo: grupos + catálogos en lista vertical */}
+      <aside className="w-44 shrink-0 border-r border-slate-200 bg-slate-50 py-3">
+        {GROUPS.map((g) => {
+          const cats = groupCats(g);
+          return (
+            <div key={g.key} className="mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 mb-1">
+                {g.label}
+              </p>
+              {cats.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setActive(c.key)}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                    active === c.key
+                      ? "bg-brand-primary-light text-brand-primary-dark font-medium border-r-2 border-brand-primary"
+                      : "text-slate-600 hover:bg-white hover:text-slate-900"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </aside>
 
-      {/* Nivel 2: catálogos del grupo activo */}
-      <div className="flex flex-wrap gap-2 mb-4 border-b border-slate-200 pb-3">
-        {groupCategories.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => setActive(c.key)}
-            className={`px-2.5 py-1 text-xs rounded transition-colors ${
-              active === c.key
-                ? "bg-brand-primary-light text-brand-primary-dark border border-brand-primary/30"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
+      {/* Panel derecho: catálogo activo */}
+      <div className="flex-1 px-6 py-4">
+        {current && <CatalogPanel category={current} />}
       </div>
-
-      {current && <CatalogPanel category={current} />}
     </div>
   );
 }

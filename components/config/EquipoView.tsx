@@ -38,10 +38,15 @@ const fetcher = (url: string) =>
 export function EquipoView() {
   const [view, setView] = useState<View>("consultor");
   const [filters, setFilters] = useState<EquipoFilters>(() => emptyFilters());
+  const [showTestAccounts, setShowTestAccounts] = useState(false);
+
+  const occupancyUrl = showTestAccounts
+    ? "/api/team/occupancy?include_test=true"
+    : "/api/team/occupancy";
 
   // Para popular dropdowns de filtros: lista de consultores + lista de proyectos.
   // Reutiliza los mismos endpoints que las vistas (SWR comparte cache).
-  const { data: teamData, error: teamError } = useSWR<{ data: TeamMember[] }>("/api/team/occupancy", fetcher);
+  const { data: teamData, error: teamError } = useSWR<{ data: TeamMember[] }>(occupancyUrl, fetcher);
   const { data: projData, error: projError } = useSWR<{ data: ProjectOverview[] }>(
     "/api/projects/overview",
     fetcher
@@ -81,7 +86,16 @@ export function EquipoView() {
       )}
       {/* Controles siempre acotados */}
       <div className="max-w-6xl mx-auto space-y-4 mb-4">
-      <div className="flex items-center justify-end gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showTestAccounts}
+            onChange={(e) => setShowTestAccounts(e.target.checked)}
+            className="accent-amber-500"
+          />
+          Mostrar cuentas de prueba
+        </label>
         <div className="inline-flex items-center bg-white border border-slate-200 rounded p-0.5 shadow-sm">
           <ToggleButton
             active={view === "consultor"}
@@ -113,47 +127,28 @@ export function EquipoView() {
               </svg>
             }
           />
-          <ToggleButton
-            active={view === "timeline"}
-            onClick={() => setView("timeline")}
-            label="Timeline"
-            icon={
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.75}
-                  d="M4 6h8M8 12h10M6 18h12"
-                />
-              </svg>
-            }
-          />
-          <ToggleButton
-            active={view === "gantt"}
-            onClick={() => setView("gantt")}
-            label="Gantt"
-            icon={
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <rect x="3" y="5" width="10" height="2.5" rx="1" />
-                <rect x="7" y="10" width="14" height="2.5" rx="1" />
-                <rect x="5" y="15" width="11" height="2.5" rx="1" />
-              </svg>
-            }
-          />
-          <ToggleButton
-            active={view === "swimlane"}
-            onClick={() => setView("swimlane")}
-            label="Swimlane"
-            icon={
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-            }
-          />
+          {/* Separador visual */}
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+          {/* Vistas avanzadas — icon-only con tooltip */}
+          <IconToggleButton active={view === "timeline"} onClick={() => setView("timeline")} label="Timeline">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h8M8 12h10M6 18h12" />
+            </svg>
+          </IconToggleButton>
+          <IconToggleButton active={view === "gantt"} onClick={() => setView("gantt")} label="Gantt">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <rect x="3" y="5" width="10" height="2.5" rx="1" />
+              <rect x="7" y="10" width="14" height="2.5" rx="1" />
+              <rect x="5" y="15" width="11" height="2.5" rx="1" />
+            </svg>
+          </IconToggleButton>
+          <IconToggleButton active={view === "swimlane"} onClick={() => setView("swimlane")} label="Swimlane">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          </IconToggleButton>
         </div>
       </div>
-      <p className="text-sm text-slate-600 max-w-2xl -mt-2">{INTRO[view]}</p>
-
       <FiltersBar
         value={filters}
         onChange={setFilters}
@@ -182,12 +177,16 @@ export function EquipoView() {
         <div className="max-w-6xl mx-auto">
           {view === "consultor" && (
             <TabErrorBoundary tabName="Por consultor">
-              <TeamOccupancy filters={filters} />
+              <TeamOccupancy filters={filters} occupancyUrl={occupancyUrl} />
             </TabErrorBoundary>
           )}
           {view === "proyecto" && (
             <TabErrorBoundary tabName="Por proyecto">
-              <ProjectsOverview filters={filters} />
+              <ProjectsOverview
+                filters={filters}
+                consultors={consultors}
+                onFiltersChange={setFilters}
+              />
             </TabErrorBoundary>
           )}
         </div>
@@ -219,6 +218,33 @@ function ToggleButton({
     >
       {icon}
       {label}
+    </button>
+  );
+}
+
+function IconToggleButton({
+  active,
+  onClick,
+  label,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      title={label}
+      className={`inline-flex items-center justify-center w-8 h-8 rounded transition-colors ${
+        active
+          ? "bg-brand-primary-light text-brand-primary-dark"
+          : "text-slate-400 hover:text-slate-700 hover:bg-slate-50"
+      }`}
+    >
+      {children}
     </button>
   );
 }

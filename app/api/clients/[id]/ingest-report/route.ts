@@ -109,6 +109,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Archivo excede 25MB" }, { status: 413 });
   }
 
+  // Defense in depth: verificar magic bytes reales vs Content-Type declarado del servidor.
+  // Un servidor remoto puede mentir el MIME; los parsers fallarían de todas formas, pero
+  // esta validación retorna error claro en vez de stack trace interno.
+  const magic = buffer.slice(0, 8);
+  const isPdf = magic[0] === 0x25 && magic[1] === 0x50 && magic[2] === 0x44 && magic[3] === 0x46; // %PDF
+  const isZip = magic[0] === 0x50 && magic[1] === 0x4b; // PK (DOCX/XLSX/PPTX son ZIP)
+  const isText = contentType.startsWith("text/");
+  if (!isPdf && !isZip && !isText) {
+    return NextResponse.json({ error: "El contenido descargado no coincide con un formato soportado" }, { status: 415 });
+  }
+
   // HTML → guardamos como text/plain (parsers no soporta HTML)
   let mimeType = contentType;
   let finalBuffer = buffer;

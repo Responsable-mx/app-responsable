@@ -32,6 +32,7 @@ export type AuthorizedUser = {
   // Solo para role='cliente'. NULL para admin/consultor. DB constraint
   // authorized_users_cliente_requires_client garantiza no-null cuando role='cliente'.
   client_id: string | null;
+  is_test_account: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -43,6 +44,7 @@ export type UserInput = {
   active?: boolean;
   seniority_level?: string | null;
   client_id?: string | null;
+  is_test_account?: boolean;
 };
 
 /**
@@ -68,6 +70,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     last_login: null,
     seniority_level: "director",
     client_id: null,
+    is_test_account: false,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -80,6 +83,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     last_login: null,
     seniority_level: "director",
     client_id: null,
+    is_test_account: false,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -92,6 +96,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     last_login: null,
     seniority_level: null,
     client_id: null,
+    is_test_account: false,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -232,6 +237,7 @@ export async function updateUser(
   if (patch.active !== undefined) update.active = patch.active;
   if (patch.seniority_level !== undefined) update.seniority_level = patch.seniority_level;
   if (patch.client_id !== undefined) update.client_id = patch.client_id;
+  if (patch.is_test_account !== undefined) update.is_test_account = patch.is_test_account;
 
   // Defensa en profundidad: si el patch deja al usuario como cliente sin client_id,
   // bloquear antes de tocar DB (el CHECK constraint también lo atajaría).

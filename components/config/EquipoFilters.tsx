@@ -1,10 +1,10 @@
 "use client";
 
 // Filtros compartidos entre las 3 vistas de /equipo.
-// Status como chips multi-select. Consultor + Proyecto como custom SelectField.
-// Nota: <select> nativo en Windows/Chrome usa fuente del SO cuando está abierto —
-// se reemplaza con SelectField para garantizar Inter en el dropdown.
+// Status como chips multi-select (siempre visible).
+// Consultor + Proyecto + Rango colapsados en "Filtrar ▼" con badge de activos.
 
+import { useState } from "react";
 import type { ActivityStatus } from "@/lib/stages";
 import { SelectField } from "@/components/ui/SelectField";
 
@@ -132,12 +132,19 @@ export function FiltersBar({
   consultors: { email: string; name: string | null }[];
   projects: { id: string; name: string }[];
 }) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   function toggleStatus(s: ActivityStatus) {
     const next = new Set(value.statuses);
     if (next.has(s)) next.delete(s);
     else next.add(s);
     onChange({ ...value, statuses: next });
   }
+
+  const advancedActiveCount =
+    (value.consultorEmail !== null ? 1 : 0) +
+    (value.clientId !== null ? 1 : 0) +
+    (value.dateRange !== "all" ? 1 : 0);
 
   return (
     <div className="bg-white border border-slate-200 rounded shadow-sm px-4 py-3 space-y-2.5">
@@ -173,59 +180,86 @@ export function FiltersBar({
           )}
         </div>
 
-        {hasActiveFilters(value) && (
+        <div className="flex items-center gap-2">
+          {/* Botón "Filtrar ▼" con badge de filtros avanzados activos */}
           <button
-            onClick={() => onChange(emptyFilters())}
-            className="text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-rose-700 transition-colors"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className={`inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded border transition-colors ${
+              showAdvanced || advancedActiveCount > 0
+                ? "border-brand-primary/40 bg-brand-primary-light text-brand-primary-dark"
+                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+            }`}
           >
-            Limpiar todo
+            Filtrar
+            {advancedActiveCount > 0 && (
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-brand-primary text-white text-[9px] font-bold leading-none">
+                {advancedActiveCount}
+              </span>
+            )}
+            <svg
+              className={`w-3 h-3 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
-        )}
-      </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Consultor
-          </span>
-          <SelectField
-            value={value.consultorEmail ?? ""}
-            onChange={(v) => onChange({ ...value, consultorEmail: v || null })}
-            options={consultors.map((c) => ({ value: c.email, label: c.name ?? c.email }))}
-            placeholder="Todos"
-            className="max-w-[220px] w-[220px]"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Proyecto
-          </span>
-          <SelectField
-            value={value.clientId ?? ""}
-            onChange={(v) => onChange({ ...value, clientId: v || null })}
-            options={projects.map((p) => ({ value: p.id, label: p.name }))}
-            placeholder="Todos"
-            className="max-w-[220px] w-[220px]"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Rango
-          </span>
-          <SelectField
-            value={value.dateRange === "all" ? "" : value.dateRange}
-            onChange={(v) => onChange({ ...value, dateRange: (v || "all") as DateRange })}
-            options={ALL_DATE_RANGES.filter((r) => r !== "all").map((r) => ({
-              value: r,
-              label: DATE_RANGE_LABEL[r],
-            }))}
-            placeholder="Todo"
-            className="w-[140px]"
-          />
+          {hasActiveFilters(value) && (
+            <button
+              onClick={() => { onChange(emptyFilters()); setShowAdvanced(false); }}
+              className="text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-rose-700 transition-colors"
+            >
+              Limpiar todo
+            </button>
+          )}
         </div>
       </div>
+
+      {showAdvanced && (
+        <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              Consultor
+            </span>
+            <SelectField
+              value={value.consultorEmail ?? ""}
+              onChange={(v) => onChange({ ...value, consultorEmail: v || null })}
+              options={consultors.map((c) => ({ value: c.email, label: c.name ?? c.email }))}
+              placeholder="Todos"
+              className="max-w-[220px] w-[220px]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              Proyecto
+            </span>
+            <SelectField
+              value={value.clientId ?? ""}
+              onChange={(v) => onChange({ ...value, clientId: v || null })}
+              options={projects.map((p) => ({ value: p.id, label: p.name }))}
+              placeholder="Todos"
+              className="max-w-[220px] w-[220px]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              Rango
+            </span>
+            <SelectField
+              value={value.dateRange === "all" ? "" : value.dateRange}
+              onChange={(v) => onChange({ ...value, dateRange: (v || "all") as DateRange })}
+              options={ALL_DATE_RANGES.filter((r) => r !== "all").map((r) => ({
+                value: r,
+                label: DATE_RANGE_LABEL[r],
+              }))}
+              placeholder="Todo"
+              className="w-[140px]"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

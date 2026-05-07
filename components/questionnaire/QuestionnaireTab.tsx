@@ -634,6 +634,7 @@ function WizardEditor({
                   stale={stale}
                   hint={field.hint}
                   updatedAt={resp?.updated_at}
+                  sectionComplete={isStepComplete}
                   onChange={(v) => setFieldValue(step.key, field.key, v)}
                   onToggleValidated={() => toggleValidated(step.key, field.key)}
                   onOpenDrawer={() => setDrawerField({ stepKey: step.key, fieldKey: field.key })}
@@ -757,6 +758,7 @@ function FieldRow({
   stale,
   hint,
   updatedAt,
+  sectionComplete,
   onChange,
   onToggleValidated,
   onOpenDrawer,
@@ -770,6 +772,7 @@ function FieldRow({
   stale: boolean;
   hint?: string;
   updatedAt?: string;
+  sectionComplete?: boolean;
   onChange: (v: FieldValue) => void;
   onToggleValidated: () => void;
   onOpenDrawer: () => void;
@@ -839,8 +842,8 @@ function FieldRow({
               ⚠ desactualizada
             </span>
           )}
-          {/* Badge validado: solo cuando validado o cuando está lleno y no validado */}
-          {validated && (
+          {/* Badge validado: ocultar cuando sección al 100% — el progress bar ya comunica el estado */}
+          {validated && !sectionComplete && (
             <button
               type="button"
               onClick={onToggleValidated}

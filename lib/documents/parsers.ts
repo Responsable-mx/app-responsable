@@ -57,14 +57,16 @@ async function parsePdf(buffer: Buffer): Promise<string> {
 async function parseDocx(buffer: Buffer): Promise<string> {
   const mammoth = await import("mammoth");
   // Mammoth no tiene markdown nativo — convertimos a HTML y luego strip básico
-  const result = await mammoth.convertToHtml({ buffer: buffer as unknown as Buffer });
+  const result = await mammoth.convertToHtml({ buffer });
   return cleanText(htmlToMarkdownLite(result.value));
 }
 
 async function parseXlsx(buffer: Buffer): Promise<string> {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+  // exceljs types quieren ArrayBuffer; Buffer.buffer es el ArrayBuffer subyacente del Uint8Array
+  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  await wb.xlsx.load(arrayBuffer as ArrayBuffer);
   const out: string[] = [];
   wb.eachSheet((sheet) => {
     out.push(`## Hoja: ${sheet.name}\n`);

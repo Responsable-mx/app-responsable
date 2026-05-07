@@ -19,5 +19,5 @@ SET schema = jsonb_set(
     "catalog": "services"
   }'::jsonb
 )
-WHERE slug = 'wizard-v2'
+WHERE service_key = 'doble-materialidad'
   AND (schema -> 'steps' -> 0 -> 'fields' -> 1 ->> 'key') = 'servicio_contratado';

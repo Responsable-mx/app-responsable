@@ -1,0 +1,318 @@
+import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import { requireConsultorForClient } from "@/lib/auth";
+import { getClient } from "@/lib/clients";
+import { buildClientContext } from "@/lib/ai/roles";
+import { extractJsonObject } from "@/lib/ai/extract-json";
+import { logAiCall } from "@/lib/ai/logging";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { BENCHMARK_FIELDS, RELATION_LABELS } from "@/lib/dm/fields";
+import type { Client } from "@/lib/clients";
+
+export const runtime = "nodejs";
+export const maxDuration = 180;
+export const dynamic = "force-dynamic";
+
+const GenerateBody = z.object({
+  result_id: z.string().uuid(),
+});
+
+// Estructura narrativa que la IA genera para el reporte
+const ReportNarrativeSchema = z.object({
+  executive_summary: z.string().min(1),
+  client_position: z.string().min(1),
+  risks: z.array(z.object({
+    title: z.string(),
+    description: z.string(),
+    severity: z.enum(["alta", "media", "baja"]),
+  })).min(1),
+  strengths: z.array(z.string()).min(1),
+  improvement_areas: z.array(z.string()).min(1),
+  recommendations: z.array(z.object({
+    action: z.string(),
+    priority: z.enum(["inmediata", "corto_plazo", "mediano_plazo"]),
+  })).min(1),
+});
+
+type Ctx = { params: Promise<{ id: string }> };
+
+function buildReportPrompt(
+  client: Client,
+  clientContext: string,
+  benchmarkResult: {
+    companies_snapshot: unknown;
+    fields_snapshot: unknown;
+    comparison: unknown;
+    narrative: string;
+  },
+): string {
+  return `Eres un consultor senior de Doble Materialidad (ESRS/GRI) redactando un reporte ejecutivo para una empresa.
+
+CONTEXTO DEL CLIENTE:
+${clientContext}
+
+RESULTADO DEL BENCHMARK:
+Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
+Campos analizados: ${JSON.stringify(benchmarkResult.fields_snapshot, null, 2)}
+Comparación detallada: ${JSON.stringify(benchmarkResult.comparison, null, 2)}
+Síntesis del analista: ${benchmarkResult.narrative}
+
+Genera el contenido narrativo del reporte de Doble Materialidad para ${client.name}. El reporte debe:
+1. Ser comprensible para dirección general (no solo para expertos ESG)
+2. Citar evidencia concreta del benchmark
+3. Priorizar acciones por urgencia (CSRD entra en vigor progresivamente)
+4. Usar lenguaje ejecutivo, no técnico
+
+Responde ÚNICAMENTE con JSON válido:
+{
+  "executive_summary": "Resumen ejecutivo 2-3 párrafos: situación actual, brechas principales, oportunidad estratégica",
+  "client_position": "Párrafo de 150-200 palabras: cómo se posiciona ${client.name} vs el grupo de referencia, con datos concretos del benchmark",
+  "risks": [
+    {
+      "title": "Nombre del riesgo",
+      "description": "Descripción del riesgo y su impacto potencial para ${client.name} (2-3 oraciones)",
+      "severity": "alta|media|baja"
+    }
+  ],
+  "strengths": ["Fortaleza 1 específica de ${client.name}", "Fortaleza 2"],
+  "improvement_areas": ["Área de mejora 1 con evidencia del benchmark", "Área 2"],
+  "recommendations": [
+    {
+      "action": "Acción concreta recomendada",
+      "priority": "inmediata|corto_plazo|mediano_plazo"
+    }
+  ]
+}`;
+}
+
+// ── GET: retorna el último reporte DM generado ──────────────────────────────
+
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("client_documents")
+    .select("id, file_name, created_at, markdown_content, parse_status")
+    .eq("client_id", id)
+    .eq("kind", "dm_report")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  return NextResponse.json({ data: data ?? null });
+}
+
+// ── POST: genera reporte narrativo + guarda en client_documents ─────────────
+
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 500 });
+  }
+
+  const client = await getClient(id).catch(() => null);
+  if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+  const parsed = GenerateBody.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "result_id requerido" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: benchmarkResult, error: fetchErr } = await admin
+    .from("dm_benchmark_results")
+    .select("*")
+    .eq("id", parsed.data.result_id)
+    .eq("client_id", id)
+    .eq("status", "done")
+    .single();
+
+  if (fetchErr || !benchmarkResult) {
+    return NextResponse.json({ error: "Resultado de benchmark no encontrado o aún no completado" }, { status: 404 });
+  }
+
+  const clientContext = buildClientContext(client);
+  const prompt = buildReportPrompt(client, clientContext, benchmarkResult as {
+    companies_snapshot: unknown;
+    fields_snapshot: unknown;
+    comparison: unknown;
+    narrative: string;
+  });
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const model = process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-20250514";
+
+  let textOut = "";
+  let inputTokens = 0, outputTokens = 0;
+  const startedAt = Date.now();
+
+  try {
+    const msg = await anthropic.messages.create(
+      {
+        model,
+        max_tokens: 3000,
+        system: [{
+          type: "text",
+          text: "Eres un consultor senior de Doble Materialidad (ESRS/GRI/CSRD). Redactas reportes ejecutivos claros y accionables. Responde solo con JSON válido.",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          cache_control: { type: "ephemeral" } as any,
+        }],
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: AbortSignal.timeout(150_000) }
+    );
+    inputTokens = msg.usage?.input_tokens ?? 0;
+    outputTokens = msg.usage?.output_tokens ?? 0;
+    for (const block of msg.content) {
+      if (block.type === "text") textOut += block.text;
+    }
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : "Error Anthropic";
+    void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt, error: errMsg });
+    return NextResponse.json({ error: errMsg }, { status: 500 });
+  }
+
+  void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt, error: null });
+
+  const jsonText = extractJsonObject(textOut);
+  if (!jsonText) return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });
+
+  let narrative: z.infer<typeof ReportNarrativeSchema>;
+  try {
+    const result = ReportNarrativeSchema.safeParse(JSON.parse(jsonText));
+    if (!result.success) return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
+    narrative = result.data;
+  } catch {
+    return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
+  }
+
+  // Serializar contenido narrativo como markdown para client_documents
+  const companyNames = (benchmarkResult.companies_snapshot as Array<{ name: string }> ?? []).map((c) => c.name);
+  const fieldLabels = BENCHMARK_FIELDS.map((f) => f.label);
+
+  const markdown = buildMarkdownReport(client.name, narrative, companyNames, fieldLabels, benchmarkResult.comparison as Record<string, Record<string, string>>);
+
+  // Eliminar reporte anterior y guardar nuevo
+  await admin.from("client_documents").delete().eq("client_id", id).eq("kind", "dm_report");
+
+  const { data: docRow, error: insertErr } = await admin
+    .from("client_documents")
+    .insert({
+      client_id: id,
+      uploaded_by: user,
+      kind: "dm_report",
+      file_name: `reporte-dm-${client.name.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.md`,
+      file_type: "md",
+      mime_type: "text/markdown",
+      size_bytes: Buffer.byteLength(markdown, "utf8"),
+      storage_path: `dm-reports/${id}/report-${Date.now()}.md`,
+      markdown_content: markdown,
+      parse_status: "ok",
+    })
+    .select("id, file_name, created_at")
+    .single();
+
+  if (insertErr || !docRow) {
+    return NextResponse.json({ error: "Error al guardar reporte" }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    data: {
+      doc_id: docRow.id,
+      file_name: docRow.file_name,
+      created_at: docRow.created_at,
+      narrative,
+    },
+  });
+}
+
+function buildMarkdownReport(
+  clientName: string,
+  narrative: z.infer<typeof ReportNarrativeSchema>,
+  companies: string[],
+  fields: string[],
+  comparison: Record<string, Record<string, string>>,
+): string {
+  const riskSection = narrative.risks
+    .map((r) => `### ${r.title} (Severidad: ${r.severity})\n${r.description}`)
+    .join("\n\n");
+
+  const strengthsSection = narrative.strengths.map((s) => `- ${s}`).join("\n");
+  const areasSection = narrative.improvement_areas.map((a) => `- ${a}`).join("\n");
+
+  const recoSection = narrative.recommendations
+    .map((r) => `- **[${r.priority.replace("_", " ")}]** ${r.action}`)
+    .join("\n");
+
+  const comparisonTable = Object.entries(comparison)
+    .map(([fieldKey, values]) => {
+      const fieldLabel = BENCHMARK_FIELDS.find((f) => f.key === fieldKey)?.label ?? fieldKey;
+      const rows = Object.entries(values)
+        .map(([company, value]) => `| ${company} | ${value} |`)
+        .join("\n");
+      return `#### ${fieldLabel}\n| Empresa | Situación |\n|---------|----------|\n${rows}`;
+    })
+    .join("\n\n");
+
+  return `# Reporte de Doble Materialidad — ${clientName}
+*Generado: ${new Date().toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" })}*
+
+---
+
+## Resumen Ejecutivo
+
+${narrative.executive_summary}
+
+---
+
+## Posicionamiento vs Grupo de Referencia
+
+*Empresas analizadas: ${companies.join(", ")}*
+
+${narrative.client_position}
+
+---
+
+## Riesgos Identificados
+
+${riskSection}
+
+---
+
+## Fortalezas
+
+${strengthsSection}
+
+---
+
+## Áreas de Mejora
+
+${areasSection}
+
+---
+
+## Recomendaciones
+
+${recoSection}
+
+---
+
+## Detalle del Benchmark
+
+*Campos analizados: ${fields.join(", ")}*
+
+${comparisonTable}
+`;
+}

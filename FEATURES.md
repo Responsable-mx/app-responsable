@@ -44,6 +44,10 @@
 - [B] ✅ Cron `daily-qa-responsable` (operacional, solo reporta fallos) — `app/api/cron/daily-qa/route.ts` + `vercel.json`, may-2026
 - [B] ✅ Cron `audit-health` quincenal (cobertura + deuda + costo API) — schedule en `vercel.json`, may-2026
 
+## Pendiente de arranque
+
+- [A] 🔜 Tab "Doble Materialidad IA" en ficha cliente (visible solo si `services` incluye `doble_materialidad_ia`). 3 etapas: (1) Contexto = link a cuestionario existente, (2) Benchmark = IA propone empresas competidoras/sector/cadena de valor → consultor valida terna → IA compara vs cliente en campos específicos, (3) Reporte PDF = generación con narrativa + matrices. Migración `0045`: `dm_benchmark_companies` + `dm_benchmark_results`. PDF guardado en `client_documents` kind=`dm_report`. Semáforo 🟡 (requiere definir campos de comparación benchmark).
+
 ## En desarrollo (may-2026)
 
 - [A] 🔄 Templates de servicio + visión global proyectos — `/configuracion/servicios` (CRUD plantillas etapas/actividades/duraciones), aplicar plantilla a cliente, vista global en `/equipo`. 15 archivos, migración 0033. Semáforo 🟢.

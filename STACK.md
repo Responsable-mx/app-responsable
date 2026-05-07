@@ -102,6 +102,9 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 | Estatus proyectos en vista global Equipo (real vs plan) | Todo el tiempo | sin caché — SWR sin revalidateOnFocus delay |
 | Informe sustentabilidad/financiero (URL + metadata, IA investiga) | Casi nunca — max 2×/año | `revalidate: 86400` (ISR diario, en Sprint B) |
 | Documentos cliente convertidos a Markdown (PDFs subidos) | Casi nunca — max 2×/año | `revalidate: 86400` (ISR diario, en Sprint B) |
+| `dm_benchmark_companies` (empresas propuestas por IA para DM) | Poco — días/semanas | `revalidate: 3600` (SWR) |
+| `dm_benchmark_results` (resultado comparación benchmark DM) | Poco — días/semanas | `revalidate: 3600` (SWR) |
+| Reporte PDF DM generado por IA | On-demand — solo al regenerar | sin caché — guardar en `client_documents` kind=`dm_report`, regenerar solo al click "Generar reporte" |
 
 ### Aplicar migraciones
 - Helper: `node scripts/apply-sql.mjs` (modo paranoico, 17 patrones bloqueados)

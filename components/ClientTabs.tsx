@@ -38,8 +38,12 @@ const DocumentsTab = dynamic(
   () => import("@/components/documents/DocumentsTab").then((m) => m.DocumentsTab),
   { loading: () => <SkeletonTable />, ssr: false }
 );
+const DoubleMaterialidadTab = dynamic(
+  () => import("@/components/doble-materialidad/DoubleMaterialidadTab").then((m) => m.DoubleMaterialidadTab),
+  { loading: () => <SkeletonDetail />, ssr: false }
+);
 
-type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "cronograma" | "equipo" | "documentos";
+type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "cronograma" | "equipo" | "documentos" | "doble-materialidad-ia";
 
 type Props = {
   client: Client;
@@ -72,19 +76,20 @@ export function ClientTabs({
 }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const hasDmService = client.services?.includes("doble_materialidad_ia") ?? false;
+  const VALID_TABS: Tab[] = ["resumen", "cuestionario", "chat", "materialidad", "cronograma", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(
-    initialTab === "resumen" || initialTab === "cuestionario" || initialTab === "chat" || initialTab === "materialidad" || initialTab === "cronograma" || initialTab === "equipo" || initialTab === "documentos"
-      ? initialTab
-      : "resumen"
+    VALID_TABS.includes(initialTab) ? initialTab : "resumen"
   );
 
   useEffect(() => {
-    const t = searchParams?.get("tab");
-    if (t === "resumen" || t === "cuestionario" || t === "chat" || t === "materialidad" || t === "cronograma" || t === "equipo" || t === "documentos") {
+    const t = searchParams?.get("tab") as Tab | null;
+    if (t && VALID_TABS.includes(t)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync de URL → state, no loop
       setTab(t);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // Limpia autoFill=1 de la URL tras consumirlo para evitar retrigger en F5/bookmark.
@@ -271,6 +276,20 @@ export function ClientTabs({
           label="Documentos"
           badge={null}
         />
+        {hasDmService && (
+          <TabButton
+            active={tab === "doble-materialidad-ia"}
+            tabId="doble-materialidad-ia"
+            onClick={() => goToTab("doble-materialidad-ia")}
+            icon={
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+            }
+            label="Doble Materialidad IA"
+            badge={null}
+          />
+        )}
       </div>
       {/* Fade gradient — indica scroll horizontal disponible */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent" />
@@ -363,6 +382,18 @@ export function ClientTabs({
         <div role="tabpanel" id="panel-documentos" tabIndex={0} aria-labelledby="tab-documentos">
           <TabErrorBoundary tabName="Documentos">
             <DocumentsTab clientId={client.id} isAdmin={isAdmin} />
+          </TabErrorBoundary>
+        </div>
+      )}
+      {tab === "doble-materialidad-ia" && hasDmService && (
+        <div role="tabpanel" id="panel-doble-materialidad-ia" tabIndex={0} aria-labelledby="tab-doble-materialidad-ia">
+          <TabErrorBoundary tabName="Doble Materialidad IA">
+            <DoubleMaterialidadTab
+              clientId={client.id}
+              clientName={client.name}
+              questionnaireProgress={questionnaireProgress}
+              onGoToCuestionario={() => goToTab("cuestionario")}
+            />
           </TabErrorBoundary>
         </div>
       )}

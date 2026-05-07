@@ -412,11 +412,24 @@ function BenchmarkSection({
                 {latestResult!.fields_snapshot.map((field) => (
                   <tr key={field.key} className="even:bg-slate-50/60 hover:bg-brand-primary-light/30 transition-colors">
                     <td className="py-2 pr-6 font-medium text-slate-700 whitespace-nowrap">{field.label}</td>
-                    {latestResult!.companies_snapshot.map((company) => (
-                      <td key={company.name} className="py-2 pr-6 text-slate-600 max-w-[220px]">
-                        {latestResult!.comparison[company.name]?.[field.key] ?? "—"}
-                      </td>
-                    ))}
+                    {latestResult!.companies_snapshot.map((company) => {
+                      // comparison = { fieldKey: { companyName: value } }
+                      // Intenta match exacto primero; si falla, busca la clave cuyo
+                      // inicio coincide con el nombre completo de la empresa (el AI
+                      // a veces abrevia "Pemex (Petróleos Mexicanos)" → "Pemex").
+                      const fieldMap = latestResult!.comparison[field.key] ?? {};
+                      const value =
+                        fieldMap[company.name] ??
+                        Object.entries(fieldMap).find(
+                          ([k]) => company.name.startsWith(k) || k.startsWith(company.name.split(" ")[0]!)
+                        )?.[1] ??
+                        "—";
+                      return (
+                        <td key={company.name} className="py-2 pr-6 text-slate-600 max-w-[220px]">
+                          {value}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>

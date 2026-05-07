@@ -106,13 +106,14 @@ Instrucciones:
 - Por cada campo: 2-3 oraciones por empresa (incluye a ${clientName}). Cita datos concretos cuando existan (toneladas CO₂, %, iniciativas específicas).
 - Si no hay datos públicos verificables, escribe "Sin datos públicos disponibles" y explica brevemente por qué es relevante el campo para ese actor.
 - Cierra con párrafo narrativo de 80-100 palabras: posición de ${clientName} en el benchmark, fortalezas claras, brechas materiales y recomendación de priorización.
+- CRÍTICO: usa EXACTAMENTE los nombres de empresa tal como aparecen en la lista EMPRESAS A COMPARAR como claves del JSON (no los abrevies).
 
 JSON únicamente:
 {
   "comparison": {
     "campo_key": {
       "${clientName}": "descripción detallada",
-      "Empresa A": "descripción detallada"
+      "Empresa A (nombre completo exacto)": "descripción detallada"
     }
   },
   "narrative": "síntesis ejecutiva"

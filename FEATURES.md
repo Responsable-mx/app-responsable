@@ -47,7 +47,7 @@
 
 ## Pendiente de arranque
 
-_(sin ítems activos — revisar aquí antes de cada deploy)_
+- [B] 🔜 **IROs ESRS en DM IA** — Reemplazar 5 campos estáticos de benchmark por los 10 estándares ESRS (E1–E5, S1–S4, G1) con 2 dimensiones cada uno (impacto + riesgo/oportunidad). Nueva tabla `dm_iro_config` editable desde /configuracion/iros. Vínculo activo a questionnaire_field_keys para inyectar respuestas del cliente al prompt. Benchmark y reporte usan IROs como ejes de comparación. Resetear `dm_benchmark_companies` + `dm_benchmark_results` al migrar. Semáforo 🟡 · Complejidad: Complejo · Modelo: Sonnet
 
 ## En desarrollo (may-2026)
 

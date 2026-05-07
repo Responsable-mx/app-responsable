@@ -117,7 +117,7 @@ export function UsersManager() {
                   {hasSeniority && <th className="pb-2 pr-4">Seniority</th>}
                   <th className="pb-2 pr-4">Estado</th>
                   <th className="pb-2 pr-4">Último login</th>
-                  <th className="pb-2 text-right">Acciones</th>
+                  <th className="pb-2 text-right sticky right-0 bg-white pl-4">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -176,7 +176,7 @@ export function UsersManager() {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 text-right sticky right-0 bg-white pl-4">
                       <button
                         onClick={() => setEditing(u)}
                         title="Editar usuario"

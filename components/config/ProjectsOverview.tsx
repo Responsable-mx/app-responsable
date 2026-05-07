@@ -4,13 +4,18 @@
 // con fechas plan/real, status y assignee. Toggle Lista/Gantt por proyecto.
 
 import { useState, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import useSWR from "swr";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
 import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
-import { ServiceGantt } from "@/components/services/ServiceGantt";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { SelectField } from "@/components/ui/SelectField";
+
+const ServiceGantt = dynamic(
+  () => import("@/components/services/ServiceGantt").then((m) => ({ default: m.ServiceGantt })),
+  { ssr: false, loading: () => <SkeletonTable rows={3} cols={4} /> }
+);
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {

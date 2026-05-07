@@ -317,7 +317,7 @@ export function listClientsLight(filter?: {
         .from("clients")
         .select(CATALOG_COLUMNS)
         .order("name")
-        .limit(filter?.limit ?? 500);
+        .limit(filter?.limit ?? 100);
       const term = filter?.search?.trim();
       if (term) q = q.ilike("name", `%${term}%`);
       const { data, error } = await q;

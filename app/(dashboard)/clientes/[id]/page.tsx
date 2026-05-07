@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getClient, clientContextCompleteness, listClients } from "@/lib/clients";
+import { getClient, clientContextCompleteness, listClientsLight } from "@/lib/clients";
 import { ClientTabs } from "@/components/ClientTabs";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
@@ -22,7 +22,7 @@ export default async function EditarClientePage({ params }: Props) {
   const [client, allClients, questionnaireBundle, materialityTopics, adminEmail] =
     await Promise.all([
       getClient(id).catch(() => null),
-      listClients().catch(() => []),
+      listClientsLight().catch(() => []),
       getQuestionnaireBundle(id, "doble-materialidad").catch(() => null),
       listMaterialityTopics(id).catch(() => []),
       requireAdmin(),

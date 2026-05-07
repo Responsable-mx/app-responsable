@@ -3,18 +3,18 @@ import { listClients, clientContextCompleteness } from "@/lib/clients";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { GuidedTour } from "@/components/GuidedTour";
 import { requireUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/users";
+import { getUserRoles } from "@/lib/users";
 
 export const metadata: Metadata = { title: "Chat IA · App ResponSable" };
 
 export const dynamic = "force-dynamic";
 
 export default async function ChatPage() {
-  const [email, clients] = await Promise.all([
-    requireUser(),
+  const email = await requireUser();
+  const [clients, { isAdmin: admin }] = await Promise.all([
     listClients().catch(() => []),
+    email ? getUserRoles(email) : Promise.resolve({ isAdmin: false, isClient: false, clientId: null }),
   ]);
-  const admin = email ? await isAdmin(email) : false;
   // Dropdown de cliente en chat: orden alfabético por nombre (es-MX).
   const sorted = [...clients].sort((a, b) =>
     a.name.localeCompare(b.name, "es-MX", { sensitivity: "base" })

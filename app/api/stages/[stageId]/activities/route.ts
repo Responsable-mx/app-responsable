@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { requireUser, requireAdmin } from "@/lib/auth";
+import { PROJECTS_OVERVIEW_TAG } from "@/app/api/projects/overview/route";
 import {
   ActivityInputSchema,
   createActivity,
@@ -49,6 +51,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       action: "create",
       after: { stage_id: stageId, name: activity.name },
     });
+    revalidateTag(PROJECTS_OVERVIEW_TAG);
     return NextResponse.json({ data: activity }, { status: 201 });
   } catch (e) {
     console.error("[POST /api/stages/:id/activities]", e);

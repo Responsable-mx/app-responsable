@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
+import { PROJECTS_OVERVIEW_TAG } from "@/app/api/projects/overview/route";
 import { updateStage, deleteStage, StageInputSchema } from "@/lib/stages";
 import { logChange } from "@/lib/audit-log";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -53,6 +55,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       before,
       after: parsed.data,
     });
+    revalidateTag(PROJECTS_OVERVIEW_TAG);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[PATCH /api/stages/:id]", e);
@@ -75,6 +78,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
       entityId: stageId,
       action: "delete",
     });
+    revalidateTag(PROJECTS_OVERVIEW_TAG);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[DELETE /api/stages/:id]", e);

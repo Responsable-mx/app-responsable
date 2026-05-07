@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { requireUser, requireAdmin } from "@/lib/auth";
+import { PROJECTS_OVERVIEW_TAG } from "@/app/api/projects/overview/route";
 import {
   ActivityInputSchema,
   updateActivity,
@@ -101,6 +103,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       action: "update",
       after: parsed.data,
     });
+    revalidateTag(PROJECTS_OVERVIEW_TAG);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[PATCH /api/activities/:id]", e);
@@ -126,6 +129,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
       entityId: activityId,
       action: "delete",
     });
+    revalidateTag(PROJECTS_OVERVIEW_TAG);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[DELETE /api/activities/:id]", e);

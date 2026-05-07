@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Modal } from "@/components/ui/Modal";
 
@@ -82,5 +82,65 @@ describe("Modal primitive", () => {
       </Modal>,
     );
     expect(screen.getByRole("dialog")).toHaveAttribute("tabindex", "-1");
+  });
+});
+
+describe("Modal — focus trap branches", () => {
+  afterEach(() => {
+    // Restaurar offsetParent al valor jsdom (null) entre tests
+    Object.defineProperty(HTMLElement.prototype, "offsetParent", {
+      get: () => null,
+      configurable: true,
+    });
+  });
+
+  it("Tab con 0 focusables visibles previene default (offsetParent null)", () => {
+    // En jsdom offsetParent=null → focusables filtrados → e.preventDefault()
+    render(
+      <Modal open onClose={() => {}} title="Sin interactivos extra">
+        <p>solo texto</p>
+      </Modal>,
+    );
+    const allowed = fireEvent.keyDown(document, { key: "Tab" });
+    expect(allowed).toBe(false);
+  });
+
+  it("Tab en último focusable mueve foco al primero (wrap forward)", () => {
+    Object.defineProperty(HTMLElement.prototype, "offsetParent", {
+      get: () => document.body,
+      configurable: true,
+    });
+    render(
+      <Modal open onClose={() => {}} title="X">
+        <button>A</button>
+        <button>B</button>
+      </Modal>,
+    );
+    const buttons = screen.getAllByRole("button");
+    // orden DOM: ✕ (Cerrar), A, B
+    const firstBtn = buttons[0];
+    const lastBtn = buttons[buttons.length - 1];
+    lastBtn.focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: false });
+    expect(document.activeElement).toBe(firstBtn);
+  });
+
+  it("Shift+Tab en primer focusable mueve foco al último (wrap backward)", () => {
+    Object.defineProperty(HTMLElement.prototype, "offsetParent", {
+      get: () => document.body,
+      configurable: true,
+    });
+    render(
+      <Modal open onClose={() => {}} title="X">
+        <button>A</button>
+        <button>B</button>
+      </Modal>,
+    );
+    const buttons = screen.getAllByRole("button");
+    const firstBtn = buttons[0];
+    const lastBtn = buttons[buttons.length - 1];
+    firstBtn.focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(lastBtn);
   });
 });

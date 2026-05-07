@@ -4,6 +4,9 @@ import {
   getUser,
   isAuthorized,
   isAdmin,
+  isConsultor,
+  isClient,
+  getUserClientId,
   createUser,
   updateUser,
   deleteUser,
@@ -48,6 +51,34 @@ describe("dev mode — seeds de admins iniciales", () => {
     process.env.AUTHORIZED_EMAILS = "fallback@x.com";
     expect(await isAuthorized("fallback@x.com")).toBe(true);
     expect(await isAdmin("fallback@x.com")).toBe(true);
+  });
+
+  it("isConsultor true para admin seed (admin ⊆ consultor)", async () => {
+    expect(await isConsultor("nblondel@s-peak.com")).toBe(true);
+  });
+
+  it("isConsultor false para email desconocido", async () => {
+    expect(await isConsultor("desconocido@example.com")).toBe(false);
+  });
+
+  it("isConsultor dev@localhost devuelve true (dev mode shortcut)", async () => {
+    expect(await isConsultor("dev@localhost")).toBe(true);
+  });
+
+  it("isClient false para admin seed", async () => {
+    expect(await isClient("nblondel@s-peak.com")).toBe(false);
+  });
+
+  it("isClient dev@localhost devuelve false (dev mode shortcut)", async () => {
+    expect(await isClient("dev@localhost")).toBe(false);
+  });
+
+  it("getUserClientId null para admin (no es cliente)", async () => {
+    expect(await getUserClientId("nblondel@s-peak.com")).toBeNull();
+  });
+
+  it("getUserClientId dev@localhost devuelve null (dev mode shortcut)", async () => {
+    expect(await getUserClientId("dev@localhost")).toBeNull();
   });
 });
 

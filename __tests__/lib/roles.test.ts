@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildClientContext, buildSystemBlocks } from "@/lib/ai/roles";
 import { DEFAULT_PROMPTS, PROMPT_KEYS } from "@/lib/ai/prompts";
+import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 
 const FULL_CLIENT = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -165,6 +166,144 @@ describe("buildClientContext", () => {
     const c = { ...FULL_CLIENT, has_double_materiality: null };
     const out = buildClientContext(c);
     expect(out).not.toContain("<has_double_materiality>");
+  });
+
+  it("serializeBlock — boolean top-level en JSONB → 'sí'/'no'", () => {
+    const c = {
+      ...FULL_CLIENT,
+      sustainability_strategy_json: {
+        ...FULL_CLIENT.sustainability_strategy_json,
+        tiene_validacion_externa: true,
+        requiere_auditoria: false,
+      },
+    };
+    const out = buildClientContext(c);
+    expect(out).toContain("<tiene_validacion_externa>sí</tiene_validacion_externa>");
+    expect(out).toContain("<requiere_auditoria>no</requiere_auditoria>");
+  });
+
+  it("serializeBlock — JSONB con todos valores null/vacío devuelve (pendiente)", () => {
+    const c = {
+      ...FULL_CLIENT,
+      sustainability_strategy_json: { campo: null, otro: "" },
+    };
+    const out = buildClientContext(c);
+    expect(out).toContain("<sustainability_strategy>(pendiente)</sustainability_strategy>");
+  });
+
+  it("buildQuestionnaireSection incluye campos llenados y omite nulls", () => {
+    const questionnaire: QuestionnaireBundle = {
+      template: {
+        service_key: "doble_materialidad",
+        label: "Doble Materialidad",
+        schema: {
+          version: 2,
+          type: "wizard",
+          steps: [
+            {
+              step: 1,
+              key: "general",
+              title: "General",
+              subtitle: "",
+              ai_can_fill: true,
+              only_double_materialidad: false,
+              fields: [
+                { key: "razon_social", label: "Razón social", type: "text" },
+                { key: "empleados", label: "Empleados", type: "number" },
+              ],
+            },
+          ],
+        },
+        version: 2,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      response: {
+        id: "resp-1",
+        client_id: FULL_CLIENT.id,
+        service_key: "doble_materialidad",
+        responses: {
+          general: {
+            razon_social: {
+              value: "Heineken México S.A. de C.V.",
+              source_type: "public",
+              sources: [],
+              validated: true,
+              updated_at: "2026-01-01T00:00:00Z",
+            },
+            empleados: {
+              value: null,
+              source_type: "consultor_only",
+              sources: [],
+              validated: false,
+              updated_at: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        completed_sections: [],
+        created_by: null,
+        updated_by: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      progress: { totalFields: 2, filledFields: 1, pct: 50, sectionProgress: {} },
+    };
+    const out = buildClientContext(FULL_CLIENT, questionnaire);
+    expect(out).toContain("<questionnaire_data>");
+    expect(out).toContain("[razon_social] Razón social: Heineken México S.A. de C.V.");
+    expect(out).not.toContain("[empleados]");
+    expect(out).toContain(`/clientes/${FULL_CLIENT.id}`);
+  });
+
+  it("buildQuestionnaireSection sin campos llenados no agrega bloque", () => {
+    const questionnaire: QuestionnaireBundle = {
+      template: {
+        service_key: "doble_materialidad",
+        label: "Doble Materialidad",
+        schema: {
+          version: 2,
+          type: "wizard",
+          steps: [
+            {
+              step: 1,
+              key: "general",
+              title: "General",
+              subtitle: "",
+              ai_can_fill: true,
+              only_double_materialidad: false,
+              fields: [{ key: "razon_social", label: "Razón social", type: "text" }],
+            },
+          ],
+        },
+        version: 2,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      response: {
+        id: "resp-2",
+        client_id: FULL_CLIENT.id,
+        service_key: "doble_materialidad",
+        responses: {
+          general: {
+            razon_social: {
+              value: null,
+              source_type: "consultor_only",
+              sources: [],
+              validated: false,
+              updated_at: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        completed_sections: [],
+        created_by: null,
+        updated_by: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      progress: { totalFields: 1, filledFields: 0, pct: 0, sectionProgress: {} },
+    };
+    const out = buildClientContext(FULL_CLIENT, questionnaire);
+    expect(out).not.toContain("<questionnaire_data>");
   });
 });
 

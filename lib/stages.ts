@@ -124,7 +124,7 @@ export async function listStagesByClient(clientId: string): Promise<ServiceStage
 
   const { data: stages, error: e2 } = await admin
     .from("service_stages")
-    .select("*")
+    .select("id,client_service_id,name,order_index,created_at,updated_at")
     .in("client_service_id", serviceIds)
     .order("order_index");
   if (e2) throw e2;
@@ -132,7 +132,7 @@ export async function listStagesByClient(clientId: string): Promise<ServiceStage
   const stageIds = (stages ?? []).map((s) => s.id);
   const { data: activities, error: e3 } = await admin
     .from("stage_activities")
-    .select("*")
+    .select("id,stage_id,name,description,order_index,planned_start,planned_end,actual_start,actual_end,assignee_email,depends_on_activity_id,actual_progress,baseline_start,baseline_end,is_milestone,estimated_days,blocker_note,created_at,updated_at")
     .in("stage_id", stageIds.length ? stageIds : ["00000000-0000-0000-0000-000000000000"])
     .order("order_index");
   if (e3) throw e3;
@@ -149,14 +149,14 @@ export async function listStagesByService(clientServiceId: string): Promise<Serv
   const admin = createAdminClient();
   const { data: stages, error } = await admin
     .from("service_stages")
-    .select("*")
+    .select("id,client_service_id,name,order_index,created_at,updated_at")
     .eq("client_service_id", clientServiceId)
     .order("order_index");
   if (error) throw error;
   const stageIds = (stages ?? []).map((s) => s.id);
   const { data: activities, error: e2 } = await admin
     .from("stage_activities")
-    .select("*")
+    .select("id,stage_id,name,description,order_index,planned_start,planned_end,actual_start,actual_end,assignee_email,depends_on_activity_id,actual_progress,baseline_start,baseline_end,is_milestone,estimated_days,blocker_note,created_at,updated_at")
     .in("stage_id", stageIds.length ? stageIds : ["00000000-0000-0000-0000-000000000000"])
     .order("order_index");
   if (e2) throw e2;

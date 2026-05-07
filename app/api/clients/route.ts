@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { listClients, listClientsLight, createClientRow, deleteClientRow } from "@/lib/clients";
+import { listClientsLight, listClientsForTable, createClientRow, deleteClientRow } from "@/lib/clients";
 import { ClientInputSchema } from "@/lib/validation";
 import { upsertQuestionnaireResponse } from "@/lib/questionnaires/queries";
 import type { FieldResponse, QuestionnaireResponseData, SourceItem } from "@/lib/questionnaires/types";
@@ -17,9 +17,7 @@ export async function GET(req: NextRequest) {
   const exclude = url.searchParams.get("exclude") ?? undefined;
 
   try {
-    const data = await listClients({ search, limit });
-
-    // Modo catálogo: devuelve {value: id, label: name} excluyendo el cliente actual
+    // Modo catálogo: early-return con id+name solo — evita query ALL_COLUMNS innecesaria
     if (catalog) {
       const light = await listClientsLight({ search, limit });
       const items = light
@@ -32,12 +30,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Lista para la tabla de clientes — columnas mínimas para el render (sin bloques narrativos ni JSONB)
+    const data = await listClientsForTable({ search, limit });
     return NextResponse.json(
       { data },
       {
         headers: {
-          // Búsqueda activa: no cachear para resultados frescos.
-          // Sin búsqueda: 60s con stale-while-revalidate para dropdown del chat.
           "Cache-Control": search
             ? "private, no-store"
             : "private, max-age=60, stale-while-revalidate=300",

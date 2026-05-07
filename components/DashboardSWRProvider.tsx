@@ -12,6 +12,7 @@ export function DashboardSWRProvider({ children }: { children: React.ReactNode }
       value={{
         revalidateOnFocus: false,
         keepPreviousData: true,
+        dedupingInterval: 5_000,
         errorRetryCount: 3,
         onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
           // No reintentar en 404 ni 401 — son errores definitivos, no transitorios

@@ -256,7 +256,7 @@ function UserEditor({
   const [error, setError] = useState("");
 
   const { data: clientsData } = useSWR<{ data: ClientOption[] }>(
-    role === "cliente" ? "/api/clients?limit=500" : null,
+    role === "cliente" ? "/api/clients?catalog=1&limit=200" : null,
     (url: string) => fetch(url).then((r) => r.json()),
     { revalidateOnFocus: false }
   );

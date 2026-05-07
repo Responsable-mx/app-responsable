@@ -33,6 +33,8 @@ export type AuthorizedUser = {
   // authorized_users_cliente_requires_client garantiza no-null cuando role='cliente'.
   client_id: string | null;
   is_test_account: boolean;
+  // Overrides de acceso por módulo. {} = usar defaults del rol.
+  feature_flags: Record<string, boolean>;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +73,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     seniority_level: "director",
     client_id: null,
     is_test_account: false,
+    feature_flags: {},
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -84,6 +87,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     seniority_level: "director",
     client_id: null,
     is_test_account: false,
+    feature_flags: {},
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -97,6 +101,7 @@ const SEED_DEV_USERS: AuthorizedUser[] = [
     seniority_level: null,
     client_id: null,
     is_test_account: false,
+    feature_flags: {},
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   },
@@ -135,7 +140,7 @@ export async function getUser(email: string): Promise<AuthorizedUser | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("authorized_users")
-    .select("*")
+    .select("email,active,role,client_id,seniority_level,full_name,is_test_account,feature_flags,created_at,updated_at")
     .eq("email", normalized)
     .maybeSingle();
   if (error) {
@@ -238,6 +243,9 @@ export async function updateUser(
   if (patch.seniority_level !== undefined) update.seniority_level = patch.seniority_level;
   if (patch.client_id !== undefined) update.client_id = patch.client_id;
   if (patch.is_test_account !== undefined) update.is_test_account = patch.is_test_account;
+  if ((patch as { feature_flags?: Record<string, boolean> }).feature_flags !== undefined) {
+    update.feature_flags = (patch as { feature_flags?: Record<string, boolean> }).feature_flags;
+  }
 
   // Defensa en profundidad: si el patch deja al usuario como cliente sin client_id,
   // bloquear antes de tocar DB (el CHECK constraint también lo atajaría).
@@ -271,10 +279,11 @@ export async function getUserRoles(email: string): Promise<{
   isAdmin: boolean;
   isClient: boolean;
   clientId: string | null;
+  featureFlags: Record<string, boolean>;
 }> {
   const normalized = email.trim().toLowerCase();
   if (isDevMode() && normalized === "dev@localhost") {
-    return { isAdmin: true, isClient: false, clientId: null };
+    return { isAdmin: true, isClient: false, clientId: null, featureFlags: {} };
   }
   const user = await getUser(normalized);
   if (user && user.active) {
@@ -282,9 +291,10 @@ export async function getUserRoles(email: string): Promise<{
       isAdmin: user.role === "admin",
       isClient: user.role === "cliente",
       clientId: user.role === "cliente" ? user.client_id : null,
+      featureFlags: (user.feature_flags as Record<string, boolean>) ?? {},
     };
   }
-  return { isAdmin: fallbackAdmins().includes(normalized), isClient: false, clientId: null };
+  return { isAdmin: fallbackAdmins().includes(normalized), isClient: false, clientId: null, featureFlags: {} };
 }
 
 export async function recordLogin(email: string): Promise<void> {

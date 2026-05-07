@@ -327,6 +327,39 @@ export function listClientsLight(filter?: {
   });
 }
 
+const TABLE_COLUMNS = "id,name,sector,countries,size,updated_at,frameworks,certifications,logo_url";
+
+export type ClientRow = Pick<
+  Client,
+  "id" | "name" | "sector" | "countries" | "size" | "updated_at" | "frameworks" | "certifications" | "logo_url"
+>;
+
+export function listClientsForTable(filter?: {
+  search?: string;
+  limit?: number;
+}): Promise<ClientRow[]> {
+  return withDevModeFallback<ClientRow[]>({
+    kind: "read",
+    fallback: DEV_SEED_CLIENTS.map(({ id, name, sector, countries, size, updated_at, frameworks, certifications, logo_url }) => ({
+      id, name, sector, countries, size, updated_at, frameworks, certifications, logo_url,
+    })),
+    async run() {
+      const admin = createAdminClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q: any = admin
+        .from("clients")
+        .select(TABLE_COLUMNS)
+        .order("updated_at", { ascending: false })
+        .limit(filter?.limit ?? 200);
+      const term = filter?.search?.trim();
+      if (term) q = q.ilike("name", `%${term}%`);
+      const { data, error } = await q;
+      if (error) throw new Error(`listClientsForTable: ${error.message}`);
+      return (data ?? []) as ClientRow[];
+    },
+  });
+}
+
 export function listClients(filter?: {
   search?: string;
   limit?: number;

@@ -36,7 +36,7 @@ export function CommandPalette() {
 
   // Fetch clients solo cuando se abre — evita fetch en cada page load.
   const { data } = useSWR(
-    open ? "/api/clients" : null,
+    open ? "/api/clients?catalog=1" : null,
     fetcher,
     { revalidateOnFocus: false, dedupingInterval: 30_000 }
   );

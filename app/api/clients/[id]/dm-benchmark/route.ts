@@ -149,8 +149,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
+  const t0 = Date.now();
+  console.log("[bm] POST start");
   const { id } = await params;
   const user = await requireConsultorForClient(id);
+  console.log(`[bm] auth done ${Date.now()-t0}ms user=${user ? "ok" : "null"}`);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -166,6 +169,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .select("id", { count: "exact", head: true })
       .eq("user_email", user)
       .gte("created_at", windowStart);
+    console.log(`[bm] ratelimit done ${Date.now()-t0}ms count=${count}`);
     if ((count ?? 0) >= BM_MAX_CALLS) {
       return NextResponse.json(
         { error: "Demasiadas solicitudes de benchmark. Espera 5 minutos antes de reintentar." },
@@ -296,6 +300,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const startedAt = Date.now();
 
   // Insertar resultado en estado pending
+  console.log(`[bm] inserting result row ${Date.now()-t0}ms`);
   const { data: resultRow, error: insertResultErr } = await admin
     .from("dm_benchmark_results")
     .insert({
@@ -308,11 +313,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     })
     .select()
     .single();
+  console.log(`[bm] insert done ${Date.now()-t0}ms err=${insertResultErr?.message ?? "none"}`);
 
   if (insertResultErr || !resultRow) {
     return NextResponse.json({ error: "Error al crear registro de resultado" }, { status: 500 });
   }
 
+  console.log(`[bm] calling anthropic ${Date.now()-t0}ms model=${model}`);
   try {
     const msg = await anthropic.messages.create(
       {
@@ -336,9 +343,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       if (block.type === "text") textOut += block.text;
     }
     anthropicBreaker.recordSuccess();
+    console.log(`[bm] anthropic done ${Date.now()-t0}ms tokens_in=${inputTokens}`);
   } catch (e) {
     anthropicBreaker.recordFailure();
     const msg = e instanceof Error ? e.message : "Error Anthropic";
+    console.log(`[bm] anthropic error ${Date.now()-t0}ms: ${msg}`);
     void logAiCall({ userEmail: user, role: "valeria", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
     await admin.from("dm_benchmark_results").update({ status: "failed", error_message: msg }).eq("id", resultRow.id);
     return NextResponse.json({ error: msg }, { status: 500 });

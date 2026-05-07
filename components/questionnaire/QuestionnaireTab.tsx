@@ -635,6 +635,7 @@ function WizardEditor({
                   hint={field.hint}
                   updatedAt={resp?.updated_at}
                   sectionComplete={isStepComplete}
+                  hideSource={step.key === "informacion-base"}
                   onChange={(v) => setFieldValue(step.key, field.key, v)}
                   onToggleValidated={() => toggleValidated(step.key, field.key)}
                   onOpenDrawer={() => setDrawerField({ stepKey: step.key, fieldKey: field.key })}
@@ -748,6 +749,11 @@ function SaveIndicator({ state, errorMsg }: { state: SaveState; errorMsg: string
   );
 }
 
+const catalogFetcher = (url: string) =>
+  fetch(url)
+    .then((r) => r.json())
+    .then((j) => (j.data ?? []) as { value: string; label: string }[]);
+
 function FieldRow({
   field,
   value,
@@ -762,6 +768,7 @@ function FieldRow({
   onChange,
   onToggleValidated,
   onOpenDrawer,
+  hideSource = false,
 }: {
   field: WizardField;
   value: FieldValue;
@@ -773,11 +780,25 @@ function FieldRow({
   hint?: string;
   updatedAt?: string;
   sectionComplete?: boolean;
+  hideSource?: boolean;
   onChange: (v: FieldValue) => void;
   onToggleValidated: () => void;
   onOpenDrawer: () => void;
 }) {
   const [pendingEdit, setPendingEdit] = useState<{ v: FieldValue } | null>(null);
+  // Opciones dinámicas desde catálogo (cuando field.catalog está definido)
+  const { data: catalogItems } = useSWR<{ value: string; label: string }[]>(
+    field.catalog ? `/api/catalogs?category=${field.catalog}` : null,
+    catalogFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
+  );
+  const resolvedOptions: { value: string; label: string }[] = catalogItems
+    ? catalogItems
+    : (field.options ?? []).map((opt) => {
+        const v = typeof opt === "string" ? opt : opt.value;
+        const l = typeof opt === "string" ? opt : opt.label;
+        return { value: v, label: l };
+      });
   const chip = SOURCE_CHIP[sourceType];
   const baseInput = "font-sans w-full border border-slate-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary";
 
@@ -798,7 +819,7 @@ function FieldRow({
         </label>
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Chip de origen: si hay exactamente 1 fuente → link directo; >1 → drawer */}
-          {(sourceType !== "consultor_only" || sources.length > 0) && (
+          {!hideSource && (sourceType !== "consultor_only" || sources.length > 0) && (
             sources.length === 1 ? (
               <a
                 href={sources[0].url}
@@ -827,7 +848,7 @@ function FieldRow({
             )
           )}
           {/* Fuentes vacías: botón minimal para abrir drawer */}
-          {sourceType === "consultor_only" && sources.length === 0 && (
+          {!hideSource && sourceType === "consultor_only" && sources.length === 0 && (
             <button
               type="button"
               onClick={onOpenDrawer}
@@ -901,36 +922,26 @@ function FieldRow({
         <SelectField
           value={typeof value === "string" ? value : ""}
           onChange={(v) => handleChange(v || null)}
-          options={
-            Array.isArray(field.options)
-              ? field.options.map((opt) => {
-                  const v = typeof opt === "string" ? opt : opt.value;
-                  const l = typeof opt === "string" ? opt : opt.label;
-                  return { value: v, label: l };
-                })
-              : []
-          }
+          options={resolvedOptions}
           placeholder="— Seleccionar —"
         />
       ) : field.type === "multiselect" ? (
         <div className="flex flex-wrap gap-1.5">
-          {(field.options ?? []).map((opt, i) => {
-            const v = typeof opt === "string" ? opt : opt.value;
-            const l = typeof opt === "string" ? opt : opt.label;
+          {resolvedOptions.map((opt, i) => {
             const arr = Array.isArray(value) ? value : [];
-            const active = arr.includes(v);
+            const active = arr.includes(opt.value);
             return (
               <button
-                key={`${v}-${i}`}
+                key={`${opt.value}-${i}`}
                 type="button"
-                onClick={() => handleChange(active ? arr.filter((x) => x !== v) : [...arr, v])}
+                onClick={() => handleChange(active ? arr.filter((x) => x !== opt.value) : [...arr, opt.value])}
                 className={`px-2.5 py-1 text-xs rounded-sm border transition-colors ${
                   active
                     ? "bg-brand-primary-light border-brand-primary text-brand-primary-dark"
                     : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                {l}
+                {opt.label}
               </button>
             );
           })}

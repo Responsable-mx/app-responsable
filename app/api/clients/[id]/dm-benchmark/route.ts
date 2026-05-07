@@ -282,7 +282,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Empresas no encontradas" }, { status: 404 });
   }
 
-  const model = getModelConfig("elena").model;
+  const model = getModelConfig("aurora").model; // Sonnet: más rápido que Opus, suficiente para JSON comparativo
   const clientContext = buildClientContext(client);
   const prompt = buildComparePrompt(client.name, clientContext, companies);
 
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const msg = await anthropic.messages.create(
       {
         model,
-        max_tokens: 3000,
+        max_tokens: 2000,
         system: [{
           type: "text",
           text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         }],
         messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(150_000) }
+      { signal: AbortSignal.timeout(50_000) }
     );
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
@@ -332,12 +332,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error Anthropic";
-    void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
+    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
     await admin.from("dm_benchmark_results").update({ status: "failed", error_message: msg }).eq("id", resultRow.id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  void logAiCall({ userEmail: user, role: "elena", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
+  void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
 
   const jsonText = extractJsonObject(textOut);
   if (!jsonText) {

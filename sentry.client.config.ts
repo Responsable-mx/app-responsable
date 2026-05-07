@@ -4,6 +4,9 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
   environment: process.env.NODE_ENV,
+  // Commit SHA → permite comparar tasas de error entre deploys sin source maps.
+  // NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA lo inyecta Vercel automáticamente.
+  release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
   // 10% de transacciones — suficiente para detectar tendencias sin agotar cuota
   tracesSampleRate: 0.1,
   // 401/404 son flujos normales, no errores reales

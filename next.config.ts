@@ -34,8 +34,10 @@ const nextConfig: NextConfig = {
 
 export default withSentryConfig(nextConfig, {
   silent: true,
-  // Source maps deshabilitados — activar con SENTRY_AUTH_TOKEN cuando se requiera
-  sourcemaps: { disable: true },
+  // Source maps: activos solo si SENTRY_AUTH_TOKEN está en env — sin token,
+  // el plugin falla silenciosamente. Agregar la var en Vercel activa esto solo.
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  authToken: process.env.SENTRY_AUTH_TOKEN,
   disableLogger: true,
   // No crear cron monitors automáticos en Vercel
   automaticVercelMonitors: false,

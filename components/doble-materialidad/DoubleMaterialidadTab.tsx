@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonList } from "@/components/ui/Skeleton";
-import { RELATION_LABELS, type CompanyRelation } from "@/lib/dm/fields";
+import { RELATION_LABELS, RELATION_ORDER, type CompanyRelation } from "@/lib/dm/fields";
 import { SelectField } from "@/components/ui/SelectField";
 import type { DmIroConfig } from "@/lib/dm/iros";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
@@ -770,8 +770,10 @@ function BenchmarkSection({
             </div>
           )}
 
-          {/* Lista de empresas por categoría */}
-          {Object.entries(groupedByRelation).map(([relation, group]) => (
+          {/* Lista de empresas por categoría — orden canónico fijo */}
+          {RELATION_ORDER.filter((r) => groupedByRelation[r]?.length).map((relation) => {
+            const group = groupedByRelation[relation]!;
+            return (
             <div key={relation}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                 {RELATION_LABELS[relation as CompanyRelation] ?? relation}
@@ -901,7 +903,7 @@ function BenchmarkSection({
                 ))}
               </div>
             </div>
-          ))}
+          ); })}
 
           {/* Botón ejecutar benchmark — sin paréntesis */}
           {companies.length > 0 && (

@@ -52,6 +52,14 @@ export const RELATION_LABELS: Record<CompanyRelation, string> = {
   cadena_valor:             "Cadena de valor",
 };
 
+// Orden canónico para mostrar grupos en UI (de más cercano a más lejano)
+export const RELATION_ORDER: CompanyRelation[] = [
+  "competitor_nacional",
+  "competitor_internacional",
+  "sector",
+  "cadena_valor",
+];
+
 /**
  * Convierte IROs activos a BenchmarkFields para almacenar en fields_snapshot.
  * Cada estándar ESRS genera 2 campos: impacto + riesgo/oportunidad.

@@ -19,6 +19,7 @@ export type ClientDocument = {
   source_url: string | null;
   parse_status: "pending" | "ok" | "failed";
   parse_error: string | null;
+  service_tag: string | null;
   created_at: string;
   updated_at: string;
 };

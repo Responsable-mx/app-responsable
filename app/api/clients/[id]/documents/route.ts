@@ -50,7 +50,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     parse_status: d.parse_status,
     parse_error: d.parse_error,
     has_content: !!d.markdown_content,
-    service_tag: (d as Record<string, unknown>).service_tag as string | null ?? null,
+    service_tag: d.service_tag ?? null,
     created_at: d.created_at,
     updated_at: d.updated_at,
   }));

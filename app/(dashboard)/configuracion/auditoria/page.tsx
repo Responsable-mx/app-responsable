@@ -60,10 +60,29 @@ async function getAuditLog(limit = 200): Promise<AuditRow[]> {
   return (data ?? []) as AuditRow[];
 }
 
+async function buildClientNameMap(rows: AuditRow[]): Promise<Map<string, string>> {
+  const clientIds = new Set<string>();
+  for (const row of rows) {
+    const obj = (row.after ?? row.before ?? {}) as Record<string, unknown>;
+    if (typeof obj.client_id === "string") clientIds.add(obj.client_id);
+  }
+  if (clientIds.size === 0) return new Map();
+  const sb = createAdminClient();
+  const { data } = await sb
+    .from("clients")
+    .select("id, name")
+    .in("id", [...clientIds]);
+  return new Map((data ?? []).map((c) => [c.id as string, c.name as string]));
+}
+
 /** Extrae nombre/label del after o before para mostrar en la tabla */
-function entityLabel(row: AuditRow): string {
-  const obj = row.after ?? row.before ?? {};
-  const name = (obj as Record<string, unknown>).name ?? (obj as Record<string, unknown>).key ?? null;
+function entityLabel(row: AuditRow, clientNames: Map<string, string>): string {
+  const obj = (row.after ?? row.before ?? {}) as Record<string, unknown>;
+  if (typeof obj.client_id === "string") {
+    const clientName = clientNames.get(obj.client_id);
+    if (clientName) return clientName;
+  }
+  const name = obj.name ?? obj.key ?? obj.email ?? obj.label ?? null;
   if (typeof name === "string" && name.length > 0) return name;
   return row.entity_id ? row.entity_id.slice(0, 8) + "…" : "—";
 }
@@ -80,6 +99,7 @@ function formatDate(iso: string): string {
 
 export default async function AuditoriaPage() {
   const rows = await getAuditLog(200);
+  const clientNames = await buildClientNameMap(rows);
 
   return (
     <div className="px-8 py-6 max-w-6xl mx-auto">
@@ -155,7 +175,7 @@ export default async function AuditoriaPage() {
                         {ENTITY_LABEL[row.entity_type] ?? row.entity_type}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-800 max-w-[200px] truncate">
-                        {entityLabel(row)}
+                        {entityLabel(row, clientNames)}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         {changedKeys.length > 0 ? (

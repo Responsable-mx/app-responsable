@@ -38,3 +38,24 @@ export const PROMPT_LABELS: Record<PromptKey, string> = {
   "dm.iro_generation":    "DM · IROs",
   "dm.report":            "DM · Reporte",
 };
+
+export const PROMPT_DESCRIPTIONS: Record<PromptKey, string> = {
+  "system.app_navigation":
+    "Bloque <app_navigation> que describe las vistas de la app a los 4 roles.",
+  "system.base_rules":
+    "Bloque <rules> común: idioma, marcos de referencia, tono, honestidad.",
+  "role.aurora":
+    "Instrucciones específicas de Aurora — construir borradores alineados a metodología.",
+  "role.rebeca":
+    "Instrucciones específicas de Rebeca — detectar fallas y producir checklist priorizado.",
+  "role.elena":
+    "Instrucciones específicas de Elena — insights, trade-offs y narrativa ejecutiva.",
+  "role.valeria":
+    "Instrucciones específicas de Valeria — validar DoD, consistencia y evidencia.",
+  "dm.benchmark_propose":
+    "Propone empresas para benchmark DM. Variables: {{client_name}}, {{sector}}, {{countries}}.",
+  "dm.iro_generation":
+    "Genera el inventario de IROs via Batch API (Sonnet). Variables: {{client_name}}, {{sector}}, {{country}}, {{questionnaire_context}}, {{benchmark_companies}}.",
+  "dm.report":
+    "Genera el reporte narrativo ejecutivo de DM via Batch API (Opus). Variables: {{client_name}}, {{client_context}}, {{iro_inventory}}, {{benchmark_data}}.",
+};

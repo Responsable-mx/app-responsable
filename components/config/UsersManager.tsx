@@ -118,7 +118,7 @@ export function UsersManager() {
                   {hasSeniority && <th className="pb-2 pr-4">Seniority</th>}
                   <th className="pb-2 pr-4">Estado</th>
                   <th className="pb-2 pr-4 hidden sm:table-cell">Último login</th>
-                  <th className="pb-2 text-right">Acciones</th>
+                  <th className="pb-2 text-right whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

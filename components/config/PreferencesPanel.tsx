@@ -1,38 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { useToast } from "@/components/ui/Toast";
 
 export function PreferencesPanel({
   currentTourVersion,
 }: {
   currentTourVersion: number;
 }) {
+  const { push } = useToast();
   const [tourVersion, setTourVersion] = useState(currentTourVersion);
   const [confirm, setConfirm] = useState(false);
-  const [info, setInfo] = useState("");
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function bump() {
     setBusy(true);
-    setError("");
-    setInfo("");
     try {
-      const res = await fetch("/api/settings/tour-version", {
-        method: "POST",
-      });
+      const res = await fetch("/api/settings/tour-version", { method: "POST" });
       const j = await res.json();
       if (!res.ok) {
-        setError(j.error ?? "Error");
+        push("error", j.error ?? "Error al reiniciar el tour");
       } else {
         setTourVersion(j.data.version);
-        setInfo(
-          `Nueva versión del tour: ${j.data.version}. Todos los usuarios verán el tour de nuevo en su próxima visita a /chat.`
-        );
+        push("success", `Tour reiniciado a v${j.data.version}. Todos los consultores lo verán en su próxima visita a /chat.`);
       }
     } catch {
-      setError("Error de conexión");
+      push("error", "Error de conexión");
     } finally {
       setBusy(false);
       setConfirm(false);
@@ -60,13 +55,14 @@ export function PreferencesPanel({
               próxima vez que entre al chat.
             </p>
           </div>
-          <button
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={() => setConfirm(true)}
             disabled={busy}
-            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 whitespace-nowrap"
           >
             Reiniciar tour para todo el equipo
-          </button>
+          </Button>
         </div>
 
         <div className="mt-4 text-xs text-slate-600 border-t border-slate-100 pt-3">
@@ -75,16 +71,6 @@ export function PreferencesPanel({
           en la barra lateral → &ldquo;Ver tour del chat&rdquo;.
         </div>
 
-        {info && (
-          <div className="mt-4 bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg p-3">
-            {info}
-          </div>
-        )}
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3">
-            {error}
-          </div>
-        )}
       </section>
 
       <ConfirmModal
@@ -95,6 +81,7 @@ export function PreferencesPanel({
         }). En la próxima visita a /chat, TODOS los consultores verán el tour de nuevo. No afecta datos ni configuración.`}
         confirmLabel="Reiniciar"
         cancelLabel="Cancelar"
+        tone="destructive"
         onConfirm={bump}
         onCancel={() => setConfirm(false)}
       />

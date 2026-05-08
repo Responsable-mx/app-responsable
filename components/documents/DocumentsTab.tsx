@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
+import { SelectField } from "@/components/ui/SelectField";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 
@@ -188,17 +189,13 @@ export function DocumentsTab({
         </div>
         <div className="flex items-center gap-2">
           {/* Selector de servicio (opcional) — aplica al próximo archivo subido */}
-          <select
+          <SelectField
             value={uploadServiceTag}
-            onChange={(e) => setUploadServiceTag(e.target.value)}
-            className="text-xs border border-slate-200 rounded px-2 py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-            title="Servicio al que aplica el documento (opcional)"
-          >
-            <option value="">Sin servicio</option>
-            {SERVICE_TAG_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            onChange={setUploadServiceTag}
+            options={SERVICE_TAG_OPTIONS}
+            placeholder="Sin servicio"
+            className="text-xs"
+          />
           <Button
             variant="primary"
             size="sm"
@@ -269,8 +266,8 @@ export function DocumentsTab({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((d) => (
-                <>
-                  <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
+                <Fragment key={d.id}>
+                  <tr className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-3 py-2.5">
                       <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
                         {TYPE_BADGE[d.file_type]}
@@ -373,13 +370,13 @@ export function DocumentsTab({
                   </tr>
                   {/* Error expandido inline — visible cuando parse falló */}
                   {d.parse_status === "failed" && d.parse_error && (
-                    <tr key={`${d.id}-error`} className="bg-rose-50/50">
-                      <td colSpan={7} className="px-3 py-2 text-[11px] text-rose-700">
+                    <tr className="bg-rose-50/50">
+                      <td colSpan={8} className="px-3 py-2 text-[11px] text-rose-700">
                         <span className="font-semibold">Error de conversión:</span> {d.parse_error}
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

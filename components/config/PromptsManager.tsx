@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { PROMPT_KEYS, PROMPT_LABELS } from "@/lib/ai/prompts-public";
+import { PROMPT_KEYS, PROMPT_LABELS, PROMPT_DESCRIPTIONS } from "@/lib/ai/prompts-public";
 import type { PromptKey } from "@/lib/ai/prompts-public";
 import { PromptEditor } from "./prompts/PromptEditor";
 
@@ -33,8 +33,7 @@ export function PromptsManager() {
 
   const meta = useSWR<{ data: PromptMeta[] }>("/api/prompts", fetcher);
 
-  const activeDescription =
-    meta.data?.data.find((x) => x.key === active)?.description ?? "";
+  const activeDescription = PROMPT_DESCRIPTIONS[active];
 
   return (
     <div className="flex gap-6 items-start">

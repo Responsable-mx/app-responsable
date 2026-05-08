@@ -50,8 +50,9 @@ const numFmt = new Intl.NumberFormat("es-MX");
 const usdFmt = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "USD",
-  currencyDisplay: "narrowSymbol",
-  minimumFractionDigits: 3,
+  currencyDisplay: "symbol",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 export default async function UsoIaPage() {
@@ -113,7 +114,7 @@ export default async function UsoIaPage() {
                   sparkColor="#7c3aed"
                 />
                 <Metric
-                  label="Cache hits"
+                  label="Hits de caché"
                   value={
                     s.total_input_tokens > 0
                       ? `${Math.round(
@@ -201,9 +202,9 @@ export default async function UsoIaPage() {
                       <th className="py-2 pr-3">Día</th>
                       <th className="py-2 pr-3">Rol</th>
                       <th className="py-2 pr-3 text-right">Llamadas</th>
-                      <th className="py-2 pr-3 text-right">Input</th>
-                      <th className="py-2 pr-3 text-right">Output</th>
-                      <th className="py-2 pr-3 text-right">Cache</th>
+                      <th className="py-2 pr-3 text-right">T. entrada</th>
+                      <th className="py-2 pr-3 text-right">T. salida</th>
+                      <th className="py-2 pr-3 text-right">Caché</th>
                       <th className="py-2 pr-3 text-right">Latencia (s)</th>
                       <th className="py-2 pr-3 text-right">Errores</th>
                     </tr>

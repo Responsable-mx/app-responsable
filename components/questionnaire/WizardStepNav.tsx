@@ -46,9 +46,7 @@ export function WizardStepNav({
                 className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
                   complete
                     ? "bg-emerald-500 text-white"
-                    : sp.pct > 0
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-slate-100 text-slate-500"
+                    : "bg-slate-100 text-slate-500"
                 }`}
               >
                 {complete ? "✓" : s.step}

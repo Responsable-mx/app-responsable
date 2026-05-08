@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import useSWR from "swr";
@@ -146,6 +146,27 @@ export function ClientTabs({
   // Override de step desde Resumen (click en card macro → paso específico)
   const [jumpToStep, setJumpToStep] = useState<number | null>(null);
 
+  // Tab scroll indicator — muestra flecha derecha cuando hay overflow horizontal
+  const tablistRef = useRef<HTMLDivElement>(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const checkTabScroll = useCallback(() => {
+    const el = tablistRef.current;
+    if (!el) return;
+    setCanScrollRight(el.scrollWidth > el.clientWidth + el.scrollLeft + 4);
+  }, []);
+  useEffect(() => {
+    checkTabScroll();
+    const el = tablistRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", checkTabScroll, { passive: true });
+    const ro = new ResizeObserver(checkTabScroll);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", checkTabScroll);
+      ro.disconnect();
+    };
+  }, [checkTabScroll]);
+
   const questionnaireProgress = questionnaireResp?.data.progress
     ? {
         filled: questionnaireResp.data.progress.filledFields,
@@ -191,7 +212,7 @@ export function ClientTabs({
       {/* Tabs — border-b full-width, botones alineados con max-w-6xl del header */}
       <div className="border-b border-slate-200 mb-5">
       <div className="max-w-6xl mx-auto relative">
-      <div role="tablist" aria-label="Secciones del cliente" className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div ref={tablistRef} role="tablist" aria-label="Secciones del cliente" className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <TabButton
           active={tab === "resumen"}
           tabId="resumen"
@@ -220,6 +241,20 @@ export function ClientTabs({
               ? `${completedMacro} de ${totalMacro} secciones con todas sus preguntas respondidas`
               : undefined
           }
+        />
+        <TabButton
+          active={tab === "materialidad"}
+          tabId="materialidad"
+          onClick={() => goToTab("materialidad")}
+          icon={
+            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+            </svg>
+          }
+          label="Materialidad"
+          badge={materialityCount === null ? null : `${materialityCount}`}
+          badgeTitle={materialityCount !== null ? `${materialityCount} temas de materialidad` : undefined}
         />
         {hasDmService && (
           <TabButton
@@ -268,7 +303,7 @@ export function ClientTabs({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           }
-          label="Consultores"
+          label="Equipo"
           badge={null}
         />
         <TabButton
@@ -283,23 +318,20 @@ export function ClientTabs({
           label="Documentos"
           badge={null}
         />
-        <TabButton
-          active={tab === "materialidad"}
-          tabId="materialidad"
-          onClick={() => goToTab("materialidad")}
-          icon={
-            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-            </svg>
-          }
-          label="Materialidad"
-          badge={materialityCount === null ? null : `${materialityCount}`}
-          badgeTitle={materialityCount !== null ? `${materialityCount} temas de materialidad` : undefined}
-        />
       </div>
-      {/* Fade gradient — indica scroll horizontal disponible */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white via-white/80 to-transparent z-10" />
+      {/* Scroll indicator — solo visible cuando hay overflow a la derecha */}
+      {canScrollRight && (
+        <button
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={() => tablistRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
+          className="absolute inset-y-0 right-0 z-20 w-14 bg-gradient-to-l from-white via-white/90 to-transparent flex items-center justify-end pr-2 hover:from-slate-50 transition-colors"
+        >
+          <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
       </div>{/* /relative wrapper */}
       </div>{/* /border-b wrapper */}
 

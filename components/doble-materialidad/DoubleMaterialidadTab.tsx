@@ -58,6 +58,12 @@ type NisItem = {
 
 type IroBatchStatus = "idle" | "pending" | "done" | "failed";
 
+type DmHorizons = {
+  corto_year:   number;
+  mediano_year: number;
+  largo_year:   number;
+};
+
 type LatestReport = {
   id: string;
   file_name: string;
@@ -212,6 +218,103 @@ function ContextoSection({
           {isComplete ? "Ver cuestionario" : "Completar cuestionario"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ── Horizontes temporales ────────────────────────────────────
+
+const DM_HORIZON_DEFAULTS: DmHorizons = { corto_year: 2027, mediano_year: 2030, largo_year: 2040 };
+
+function HorizontesConfig({
+  clientId,
+}: {
+  clientId: string;
+}) {
+  const { push } = useToast();
+  const { data, mutate } = useSWR<{ data: DmHorizons }>(
+    `/api/clients/${clientId}/dm-config`,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const horizons = data?.data ?? DM_HORIZON_DEFAULTS;
+  const [draft, setDraft] = useState<DmHorizons | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const current = draft ?? horizons;
+  const isDirty = draft !== null && (
+    draft.corto_year !== horizons.corto_year ||
+    draft.mediano_year !== horizons.mediano_year ||
+    draft.largo_year !== horizons.largo_year
+  );
+
+  const handleSave = async () => {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-config`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al guardar");
+      push("success", "Horizontes actualizados.");
+      setDraft(null);
+      mutate();
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al guardar horizontes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const HORIZON_LABELS = ["Corto plazo", "Mediano plazo", "Largo plazo"] as const;
+  const HORIZON_KEYS:   Array<keyof DmHorizons> = ["corto_year", "mediano_year", "largo_year"];
+
+  return (
+    <div className="border-l-4 border-l-slate-200 pl-4 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+        Horizontes temporales del estudio
+      </p>
+      <div className="flex items-end gap-3 flex-wrap">
+        {HORIZON_KEYS.map((key, i) => (
+          <div key={key} className="flex flex-col gap-0.5">
+            <label className="text-[10px] text-slate-500 uppercase tracking-wider">
+              {HORIZON_LABELS[i]}
+            </label>
+            <input
+              type="number"
+              min={2024}
+              max={2060}
+              value={current[key]}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) setDraft((d) => ({ ...(d ?? horizons), [key]: val }));
+              }}
+              className="font-sans w-20 text-sm border border-slate-200 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 tabular-nums"
+            />
+          </div>
+        ))}
+        {isDirty && (
+          <Button size="sm" variant="primary" loading={saving} onClick={() => void handleSave()}>
+            Guardar
+          </Button>
+        )}
+        {isDirty && (
+          <button
+            type="button"
+            className="text-xs text-slate-400 hover:underline self-end pb-1"
+            onClick={() => setDraft(null)}
+          >
+            Cancelar
+          </button>
+        )}
+      </div>
+      <p className="text-[10px] text-slate-400 mt-1.5">
+        Usados por la IA para clasificar horizontes de cada IRO · Defaults: ≤{DM_HORIZON_DEFAULTS.corto_year} / {DM_HORIZON_DEFAULTS.mediano_year} / {DM_HORIZON_DEFAULTS.largo_year}
+      </p>
     </div>
   );
 }
@@ -842,35 +945,72 @@ const SCORE_LABELS: Record<number, { label: string; color: string }> = {
   3: { label: "3", color: "bg-rose-100 text-rose-700 border-rose-300" },
 };
 
+// Etiquetas de criterio por tipo de IRO — siguiendo ESRS LSME / EFRAG
+const SCORE_DIM1_LABEL: Record<string, string> = {
+  impacto_negativo: "Severidad",   // Escala × Alcance × Remediabilidad
+  impacto_positivo: "Escala/Alcance",
+  riesgo:           "Prob.",
+  oportunidad:      "Prob.",
+};
+
+const SCORE_DIM2_LABEL: Record<string, string> = {
+  impacto_negativo: "Materialidad",
+  impacto_positivo: "Materialidad",
+  riesgo:           "Magnitud",
+  oportunidad:      "Potencial",
+};
+
+// Tooltip explicativo por tipo de IRO
+const SCORE_DIM1_TOOLTIP: Record<string, string> = {
+  impacto_negativo: "Severidad: Escala (extensión del daño) × Alcance (nº afectados) × Remediabilidad (dificultad de reparar). 1=bajo · 2=medio · 3=alto",
+  impacto_positivo: "Escala × Alcance (sin Remediabilidad para impactos positivos). 1=bajo · 2=medio · 3=alto",
+  riesgo:           "Probabilidad de que el riesgo se materialice. 1=baja · 2=media · 3=alta",
+  oportunidad:      "Probabilidad de capturar la oportunidad. 1=baja · 2=media · 3=alta",
+};
+
 function ScorePicker({
   value,
   onChange,
   disabled,
+  dimLabel,
+  dimTooltip,
 }: {
   value: number | null;
   onChange: (v: number) => void;
   disabled?: boolean;
+  dimLabel?: string;
+  dimTooltip?: string;
 }) {
   return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3].map((n) => {
-        const active = value === n;
-        const { label, color } = SCORE_LABELS[n]!;
-        return (
-          <button
-            key={n}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(n)}
-            className={`w-6 h-6 text-[10px] font-bold border rounded-sm flex items-center justify-center transition-colors
-              ${active ? color : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"}
-              ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-            aria-label={`Score ${n}`}
-          >
-            {label}
-          </button>
-        );
-      })}
+    <div className="flex flex-col items-center gap-0.5">
+      {dimLabel && (
+        <span
+          className="text-[9px] text-slate-400 uppercase tracking-wide whitespace-nowrap cursor-default"
+          title={dimTooltip}
+        >
+          {dimLabel}
+        </span>
+      )}
+      <div className="flex gap-0.5">
+        {[1, 2, 3].map((n) => {
+          const active = value === n;
+          const { label, color } = SCORE_LABELS[n]!;
+          return (
+            <button
+              key={n}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(n)}
+              className={`w-6 h-6 text-[10px] font-bold border rounded-sm flex items-center justify-center transition-colors
+                ${active ? color : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"}
+                ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+              aria-label={`${dimLabel ?? "Score"} ${n}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1034,8 +1174,11 @@ function IroSection({
             <span className="font-bold text-slate-700">{groups.length}</span> bloques ·{" "}
             <span className="font-bold text-slate-700">{includedCount}</span>/{iros.length} IROs incluidos
           </span>
-          <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-            Score: Impacto × Financiero (1=bajo · 2=medio · 3=alto)
+          <span
+            className="text-[10px] uppercase tracking-widest text-slate-400 font-bold cursor-default"
+            title="Dim 1: Severidad (impactos negativos) · Escala/Alcance (impactos positivos) · Probabilidad (riesgos/oportunidades) — Dim 2: Materialidad financiera para la empresa en todos los tipos"
+          >
+            Dim 1 (Severidad/Prob.) × Dim 2 (Materialidad) · 1=bajo · 2=medio · 3=alto ⓘ
           </span>
         </div>
         <Button size="sm" variant="secondary" loading={generating} onClick={handleGenerate}>
@@ -1054,8 +1197,8 @@ function IroSection({
               <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Tipo</th>
               <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-22">Cadena</th>
               <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Horizonte</th>
-              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Impacto</th>
-              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Financiero</th>
+              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20" title="Severidad (impactos) · Probabilidad (riesgos/oport.)">Dim. 1 ⓘ</th>
+              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20" title="Materialidad financiera para la empresa (todos los tipos)">Dim. 2 ⓘ</th>
               <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-16">Prioridad</th>
               <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-16">Incluir</th>
             </tr>
@@ -1107,6 +1250,8 @@ function IroSection({
                           <ScorePicker
                             value={iro.score_impacto}
                             disabled={isSaving}
+                            dimLabel={SCORE_DIM1_LABEL[iro.tipo]}
+                            dimTooltip={SCORE_DIM1_TOOLTIP[iro.tipo]}
                             onChange={(v) => void patchIro(iro.id, { score_impacto: v })}
                           />
                         </div>
@@ -1116,6 +1261,7 @@ function IroSection({
                           <ScorePicker
                             value={iro.score_financiero}
                             disabled={isSaving}
+                            dimLabel={SCORE_DIM2_LABEL[iro.tipo]}
                             onChange={(v) => void patchIro(iro.id, { score_financiero: v })}
                           />
                         </div>
@@ -1192,10 +1338,12 @@ const CATEGORIA_COLOR: Record<NisItem["categoria"], string> = {
 function NisSection({
   clientId,
   nisRows,
+  iros,
   onMutate,
 }: {
   clientId: string;
   nisRows: NisItem[];
+  iros: IroInventoryItem[];
   onMutate: () => void;
 }) {
   const { push } = useToast();
@@ -1240,8 +1388,44 @@ function NisSection({
   const disponiblesCount = nisRows.filter((r) => r.estado === "disponible").length;
   const parcialesCount   = nisRows.filter((r) => r.estado === "parcial").length;
 
+  // IROs de alta/media prioridad que requieren seguimiento de datos
+  const priorityIros = iros.filter(
+    (i) => i.incluido && ((i.score_impacto ?? 0) + (i.score_financiero ?? 0)) >= 4
+  );
+
   return (
     <div className="space-y-3">
+      {/* Banner: IROs priorizados que generan necesidad de datos ── */}
+      {priorityIros.length > 0 && (
+        <div className="border-l-4 border-l-brand-primary pl-3 py-2 bg-brand-primary-light/20 rounded-r">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary-dark mb-1.5">
+            IROs priorizados que requieren datos ({priorityIros.length})
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {priorityIros.map((iro) => {
+              const total = (iro.score_impacto ?? 0) + (iro.score_financiero ?? 0);
+              const isAlta = total >= 5;
+              return (
+                <span
+                  key={iro.id}
+                  className={`text-[10px] px-2 py-0.5 rounded-sm font-medium ${
+                    isAlta
+                      ? "bg-rose-50 text-rose-700 border border-rose-200"
+                      : "bg-amber-50 text-amber-700 border border-amber-200"
+                  }`}
+                  title={`${iro.descripcion} — Dim1: ${iro.score_impacto ?? "—"} · Dim2: ${iro.score_financiero ?? "—"}`}
+                >
+                  {isAlta ? "●" : "◆"} {iro.tema_esg}
+                </span>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-slate-500 mt-1.5">
+            ● Alta prioridad (Dim1+Dim2 ≥ 5) · ◆ Media (≥ 4) — verifica que tienes datos disponibles para estos temas
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-xs text-slate-600">
           Mapa de brechas de información para los indicadores NIS/IBSO más relevantes del sector.
@@ -1710,6 +1894,9 @@ export function DoubleMaterialidadTab({
         />
       </section>
 
+      {/* ── Horizontes temporales ── */}
+      <HorizontesConfig clientId={clientId} />
+
       {/* ── Etapa 2 ── */}
       <section aria-labelledby="stage-benchmark">
         <h2 id="stage-benchmark" className="sr-only">Benchmark competitivo</h2>
@@ -1756,6 +1943,7 @@ export function DoubleMaterialidadTab({
         <NisSection
           clientId={clientId}
           nisRows={nisRows}
+          iros={iros}
           onMutate={() => void mutateNis()}
         />
       </section>

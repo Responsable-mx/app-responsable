@@ -163,8 +163,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const admin = createAdminClient();
 
-  // Obtener contexto cuestionario + señales benchmark
-  const [questionnaireContext, benchmarkRes] = await Promise.all([
+  // Obtener contexto cuestionario + señales benchmark + horizontes configurados
+  const [questionnaireContext, benchmarkRes, horizonsRes] = await Promise.all([
     getFullQuestionnaireContext(id),
     admin
       .from("dm_benchmark_results")
@@ -173,6 +173,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .eq("status", "done")
       .order("created_at", { ascending: false })
       .limit(1),
+    admin
+      .from("clients")
+      .select("dm_horizons")
+      .eq("id", id)
+      .single(),
   ]);
 
   const latestBenchmark = benchmarkRes.data?.[0] ?? null;
@@ -182,6 +187,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         .map((c) => c.name).join(", ")
     : "";
 
+  const horizons = horizonsRes.data?.dm_horizons as { corto_year?: number; mediano_year?: number; largo_year?: number } | null ?? {};
+
   const prompt = await buildIroGenerationPrompt({
     clientName: client.name,
     sector: client.sector ?? null,
@@ -189,6 +196,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     questionnaireContext,
     benchmarkNarrative,
     benchmarkCompanies,
+    horizonCorto:   horizons.corto_year   ?? 2027,
+    horizonMediano: horizons.mediano_year ?? 2030,
+    horizonLargo:   horizons.largo_year   ?? 2040,
   });
 
   const model = getModelConfig("aurora").model;

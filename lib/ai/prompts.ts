@@ -323,12 +323,21 @@ REGLAS OBLIGATORIAS:
    ❌ Incorrecto: "Gestión de agua"
    ✅ Correcto: "Riesgo de interrupción operativa por escasez de agua en zonas donde opera la empresa"
 2. Debe identificar claramente dónde ocurre (upstream / ops_propia / downstream).
-3. Debe poder evaluarse en términos de gravedad (score_impacto) y magnitud financiera (score_financiero).
-4. Si no puede llevar a una acción concreta, está mal formulado.
-5. score_impacto: severidad del impacto sobre personas/ambiente/sociedad (1=bajo, 2=medio, 3=alto).
-6. score_financiero: magnitud financiera potencial para la empresa (1=bajo, 2=medio, 3=alto).
-7. Prioriza IROs respaldados por el cuestionario del cliente o el benchmark. Marca confianza=alto si tienes evidencia directa.
-8. Genera entre 15 y 25 IROs — suficientes para cubrir el perfil de riesgo sin inflar artificialmente.
+3. Si no puede llevar a una acción concreta, está mal formulado.
+4. SCORING DIFERENCIADO por tipo de IRO (ESRS LSME / EFRAG):
+   - impacto_negativo → score_impacto = Severidad combinada: considera Escala (alcance geográfico/sectorial del daño), Alcance (cantidad de personas/ecosistemas afectados) y Remediabilidad (dificultad de reparación). 1=bajo, 2=medio, 3=alto.
+   - impacto_positivo → score_impacto = Escala × Alcance (sin Remediabilidad). 1=bajo, 2=medio, 3=alto.
+   - riesgo          → score_impacto = Probabilidad de materialización (1=baja, 2=media, 3=alta).
+   - oportunidad     → score_impacto = Probabilidad de captura (1=baja, 2=media, 3=alta).
+5. score_financiero = Magnitud financiera potencial para la empresa en todos los tipos:
+   para riesgo/oportunidad: tamaño del impacto en ingresos/costos/capex/OPEX. 1=bajo, 2=medio, 3=alto.
+6. Prioriza IROs respaldados por el cuestionario del cliente o el benchmark. Marca confianza=alto si tienes evidencia directa.
+7. Genera entre 15 y 25 IROs — suficientes para cubrir el perfil de riesgo sin inflar artificialmente.
+
+HORIZONTES DEL CLIENTE (acordados al inicio del estudio):
+  Corto plazo  = hasta {{horizon_corto}}
+  Mediano plazo = {{horizon_mediano}}
+  Largo plazo   = {{horizon_largo}}
 
 TIPOS válidos: impacto_positivo | impacto_negativo | riesgo | oportunidad
 ESTADO válido: actual | potencial | emergente | en_observacion

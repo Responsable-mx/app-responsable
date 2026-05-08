@@ -18,6 +18,8 @@ type BenchmarkCompany = {
   name: string;
   country: string | null;
   sector: string | null;
+  website: string | null;
+  justification: string | null;
   relation: CompanyRelation;
   proposed_by: "ia" | "consultor";
   validated: boolean;
@@ -430,12 +432,34 @@ function BenchmarkSection({
                       className="mt-0.5 accent-brand-primary"
                     />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-slate-800">{company.name}</span>
-                      {company.country && (
-                        <span className="text-xs text-slate-500 ml-1.5">{company.country}</span>
-                      )}
+                      {/* Nombre + país + link web */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-medium text-slate-800">{company.name}</span>
+                        {company.country && (
+                          <span className="text-xs text-slate-400">{company.country}</span>
+                        )}
+                        {company.website && (
+                          <a
+                            href={company.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-brand-primary hover:text-brand-primary-dark shrink-0"
+                            title={company.website}
+                          >
+                            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M7 1h4v4M11 1L5.5 6.5M4 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V9" />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
+                      {/* Sector */}
                       {company.sector && (
-                        <p className="text-xs text-slate-500 truncate">{company.sector}</p>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">{company.sector}</p>
+                      )}
+                      {/* Justificación IA */}
+                      {company.justification && (
+                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">{company.justification}</p>
                       )}
                     </div>
                     {company.proposed_by === "ia" && (

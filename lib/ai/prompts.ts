@@ -271,6 +271,8 @@ const DEFAULT_DM_BENCHMARK_PROPOSE = `Eres un experto en sostenibilidad empresar
 
 El cliente es: {{client_name}} (sector: {{sector}}, país: {{countries}}).
 
+{{feedback_context}}
+
 Identifica empresas relevantes para un benchmark de Doble Materialidad aplicando estos criterios de selección:
 
 1. competitor_nacional — Competidores directos del cliente en el mismo país que cuenten con informe de sustentabilidad publicado.
@@ -281,7 +283,8 @@ Identifica empresas relevantes para un benchmark de Doble Materialidad aplicando
 Reglas:
 - Priorizar siempre empresas con informe de sustentabilidad publicado (GRI, TCFD, CSRD, SASB o equivalente).
 - Propón entre 6 y 10 empresas en total, con al menos 1 por categoría.
-- Para cada empresa indica: nombre, país, sector específico, tipo de relación y justificación breve (1-2 oraciones) de por qué es relevante.
+- Para cada empresa indica: nombre, país, sector específico, URL del sitio web corporativo, tipo de relación y justificación (2-3 oraciones: por qué es relevante para el benchmark, qué publica en sostenibilidad y por qué el consultor debería incluirla).
+- Si no tienes certeza del website exacto, omítelo (null) — nunca inventes una URL.
 
 Responde ÚNICAMENTE con JSON válido, sin texto adicional:
 {
@@ -290,8 +293,9 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional:
       "name": "Nombre de la empresa",
       "country": "México",
       "sector": "Sector específico",
+      "website": "https://www.example.com/sustentabilidad",
       "relation": "competitor_nacional",
-      "justification": "Por qué es relevante para el benchmark"
+      "justification": "Por qué es relevante: qué publica en ESG y qué aporta al benchmark"
     }
   ]
 }`;

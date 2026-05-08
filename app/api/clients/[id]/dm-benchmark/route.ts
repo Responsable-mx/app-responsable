@@ -37,8 +37,9 @@ const ProposedCompanySchema = z.object({
   name: z.string().min(1).max(200),
   country: z.string().max(100).optional(),
   sector: z.string().max(200).optional(),
+  website: z.string().url().max(300).optional().or(z.literal("")),
   relation: z.enum(["competitor_nacional", "competitor_internacional", "sector", "cadena_valor"]),
-  justification: z.string().max(400).optional(),
+  justification: z.string().max(600).optional(),
 });
 
 const ProposeResponseSchema = z.object({
@@ -55,12 +56,16 @@ type Ctx = { params: Promise<{ id: string }> };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-async function buildProposePrompt(client: Client): Promise<string> {
+async function buildProposePrompt(
+  client: Client,
+  feedbackContext: string,
+): Promise<string> {
   const template = await getPrompt("dm.benchmark_propose");
   return template
     .replace(/\{\{client_name\}\}/g, client.name)
     .replace(/\{\{sector\}\}/g, client.sector ?? "no especificado")
-    .replace(/\{\{countries\}\}/g, (client.countries as string[] | null)?.join(", ") ?? "México");
+    .replace(/\{\{countries\}\}/g, (client.countries as string[] | null)?.join(", ") ?? "México")
+    .replace(/\{\{feedback_context\}\}/g, feedbackContext);
 }
 
 async function buildComparePrompt(
@@ -303,8 +308,31 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   // ── PROPOSE: IA investiga y propone empresas (síncrono — Sonnet, 45s) ─────
   if (parsed.data.action === "propose") {
+    // ── Feedback context: leer empresas previas ANTES de borrarlas ───────────
+    const { data: prevCompanies } = await admin
+      .from("dm_benchmark_companies")
+      .select("name, relation, validated, proposed_by")
+      .eq("client_id", id)
+      .eq("proposed_by", "ia");
+
+    let feedbackContext = "";
+    if (prevCompanies && prevCompanies.length > 0) {
+      const approved  = prevCompanies.filter((c) => c.validated);
+      const rejected  = prevCompanies.filter((c) => !c.validated);
+      const lines: string[] = [];
+      if (approved.length > 0) {
+        lines.push(`El consultor ya aprobó estas empresas (no repetirlas, sino buscar alternativas complementarias):
+${approved.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
+      }
+      if (rejected.length > 0) {
+        lines.push(`El consultor rechazó o no seleccionó estas empresas (no volver a proponerlas):
+${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
+      }
+      feedbackContext = lines.join("\n\n");
+    }
+
     const model = getModelConfig("aurora").model;
-    const prompt = await buildProposePrompt(client);
+    const prompt = await buildProposePrompt(client, feedbackContext);
     let textOut = "";
     let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
     const startedAt = Date.now();
@@ -361,7 +389,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       name: c.name,
       country: c.country ?? null,
       sector: c.sector ?? null,
+      website: c.website && c.website.length > 0 ? c.website : null,
       relation: c.relation,
+      justification: c.justification ?? null,
       proposed_by: "ia",
       validated: false,
       created_by: user,
@@ -396,6 +426,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (fetchErr || !companies?.length) {
     return NextResponse.json({ error: "Empresas no encontradas" }, { status: 404 });
   }
+
+  // Marcar como validated=true las empresas que el consultor seleccionó para comparar.
+  // Esto alimenta el feedback loop cuando regenera (sepa cuáles ya aprobó).
+  await admin
+    .from("dm_benchmark_companies")
+    .update({ validated: true })
+    .eq("client_id", id)
+    .in("id", company_ids);
 
   // Usar Sonnet (aurora) en Batch API — sin restricción de 60s de Vercel Hobby.
   // 50% descuento en tokens vs llamada síncrona.

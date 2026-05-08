@@ -8,6 +8,7 @@ import {
   type WizardField,
   type WizardStep,
 } from "@/lib/questionnaires/types";
+import { SkeletonDashboard } from "@/components/ui/Skeleton";
 
 // ─────────────────────────────────────────────────────────────
 // Mapping mockup AppShell (5 cards) ↔ wizard canónico (9 pasos)
@@ -21,10 +22,9 @@ type MacroCard = {
   iconPath: string;
   iconBg: string;
   iconColor: string;
-  accentBorder: string;
-  // Subset de stepKeys del wizard que componen esta card macro
+  /** Color de borde cuando la card está en progreso (>0% pero <100%) */
+  accentBorderInProgress: string;
   stepKeys: string[];
-  // Campos clave a mostrar en preview (subset key + label override opcional)
   previewFields: { stepKey: string; fieldKey: string; labelOverride?: string }[];
 };
 
@@ -37,7 +37,7 @@ const MACRO_CARDS: MacroCard[] = [
       "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
     iconBg: "bg-emerald-50",
     iconColor: "text-emerald-700",
-    accentBorder: "border-l-emerald-500",
+    accentBorderInProgress: "border-l-emerald-400",
     stepKeys: ["informacion-base"],
     previewFields: [
       { stepKey: "informacion-base", fieldKey: "nombre_empresa", labelOverride: "Razón social" },
@@ -53,7 +53,7 @@ const MACRO_CARDS: MacroCard[] = [
       "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     iconBg: "bg-brand-primary-light",
     iconColor: "text-brand-primary-dark",
-    accentBorder: "border-l-brand-primary",
+    accentBorderInProgress: "border-l-brand-primary",
     stepKeys: ["informacion-general"],
     previewFields: [
       { stepKey: "informacion-general", fieldKey: "empleados", labelOverride: "Empleados" },
@@ -69,7 +69,7 @@ const MACRO_CARDS: MacroCard[] = [
       "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
     iconBg: "bg-amber-50",
     iconColor: "text-amber-700",
-    accentBorder: "border-l-amber-500",
+    accentBorderInProgress: "border-l-amber-400",
     stepKeys: ["estrategia-y-madurez"],
     previewFields: [
       { stepKey: "estrategia-y-madurez", fieldKey: "modelo_sostenibilidad", labelOverride: "Modelo" },
@@ -86,7 +86,7 @@ const MACRO_CARDS: MacroCard[] = [
       "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
     iconBg: "bg-rose-50",
     iconColor: "text-rose-700",
-    accentBorder: "border-l-rose-500",
+    accentBorderInProgress: "border-l-rose-400",
     stepKeys: ["regulacion-y-sector"],
     previewFields: [
       { stepKey: "regulacion-y-sector", fieldKey: "regulaciones", labelOverride: "Regulaciones" },
@@ -103,7 +103,7 @@ const MACRO_CARDS: MacroCard[] = [
       "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
     iconBg: "bg-slate-100",
     iconColor: "text-slate-700",
-    accentBorder: "border-l-slate-500",
+    accentBorderInProgress: "border-l-slate-400",
     stepKeys: [
       "modelo-de-negocio-estructura",
       "modelo-de-negocio-detalle",
@@ -128,110 +128,167 @@ export function ClientResumen({
   onJumpToCuestionario: (firstStepKey?: string) => void;
 }) {
   if (!questionnaire) {
-    return (
-      <div className="border border-slate-200 rounded p-8 text-center text-sm text-slate-500">
-        Cargando resumen…
-      </div>
-    );
+    return <SkeletonDashboard />;
   }
 
   const { template, response, progress } = questionnaire;
   const responses = response?.responses ?? {};
 
-  // Construir mapping step → fields (para legacy schemas que NO son wizard también)
   const stepsByKey = new Map<string, WizardStep>();
   if (isWizardSchema(template.schema)) {
     for (const s of template.schema.steps) stepsByKey.set(s.key, s);
   }
 
+  // KPI global — suma todos los steps de todas las macro-cards
+  let globalFilled = 0;
+  let globalTotal = 0;
+  for (const card of MACRO_CARDS) {
+    for (const sk of card.stepKeys) {
+      const sp = progress.sectionProgress[sk];
+      if (sp) { globalFilled += sp.filled; globalTotal += sp.total; }
+    }
+  }
+  const globalPct = globalTotal === 0 ? 0 : Math.round((globalFilled / globalTotal) * 100);
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-      {MACRO_CARDS.map((card, cardIdx) => {
-        // Sumar progreso de todos los steps de la card macro
-        let filled = 0;
-        let total = 0;
-        for (const sk of card.stepKeys) {
-          const sp = progress.sectionProgress[sk];
-          if (sp) {
-            filled += sp.filled;
-            total += sp.total;
+    <div className="space-y-4">
+      {/* KPI global — barra ejecutiva */}
+      <div className="flex items-center gap-3 px-1">
+        <div
+          role="progressbar"
+          aria-valuenow={globalPct}
+          aria-valuemax={100}
+          aria-label={`Avance global del cuestionario: ${globalPct}%`}
+          className="flex-1 h-1 bg-slate-100 overflow-hidden"
+        >
+          <div
+            className={`h-full transition-all ${globalPct === 100 ? "bg-emerald-500" : "bg-brand-primary"}`}
+            style={{ width: `${globalPct}%` }}
+          />
+        </div>
+        <span className="text-[11px] text-slate-600 tabular-nums shrink-0">
+          {globalFilled}/{globalTotal} campos · {globalPct}%
+        </span>
+      </div>
+
+      {/* Grid de macro-cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {MACRO_CARDS.map((card, cardIdx) => {
+          let filled = 0;
+          let total = 0;
+          for (const sk of card.stepKeys) {
+            const sp = progress.sectionProgress[sk];
+            if (sp) { filled += sp.filled; total += sp.total; }
           }
-        }
-        const pct = total === 0 ? 0 : Math.round((filled / total) * 100);
-        const isComplete = pct === 100 && total > 0;
+          const pct = total === 0 ? 0 : Math.round((filled / total) * 100);
+          const isComplete = pct === 100 && total > 0;
 
-        // Resolver labels reales desde el step si existen
-        const resolvedFields = card.previewFields.map((pf) => {
-          const step = stepsByKey.get(pf.stepKey);
-          const field: WizardField | undefined = step?.fields.find((f) => f.key === pf.fieldKey);
-          const label = pf.labelOverride ?? field?.label ?? pf.fieldKey;
-          const sectionResp = (responses[pf.stepKey] as Record<string, unknown> | undefined) ?? {};
-          const value = getFieldValue(sectionResp[pf.fieldKey]);
-          return { label, value };
-        });
+          // Border = status: completo=emerald, en progreso=color categoría, vacío=slate-200
+          const borderClass = isComplete
+            ? "border-l-emerald-500"
+            : pct > 0
+            ? card.accentBorderInProgress
+            : "border-l-slate-200";
 
-        // Última card en grid impar → ancho completo para evitar card huérfana
-        const isOrphan = cardIdx === MACRO_CARDS.length - 1 && MACRO_CARDS.length % 2 !== 0;
-        return (
-          <button
-            key={card.key}
-            type="button"
-            onClick={() => onJumpToCuestionario(card.stepKeys[0])}
-            className={`group bg-white border border-slate-200 ${card.accentBorder} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:border-brand-primary/40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/60 focus-visible:ring-offset-2${isOrphan ? " lg:col-span-2" : ""}`}
-          >
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-              <div className={`w-10 h-10 rounded ${card.iconBg} flex items-center justify-center shrink-0`}>
-                <svg className={`w-5 h-5 ${card.iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={card.iconPath} />
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                  {card.label}
-                </h3>
-                <p className="text-xs text-slate-600 truncate mt-0.5">{card.description}</p>
-              </div>
-              {isComplete && (
-                <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                  <svg className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          const resolvedFields = card.previewFields.map((pf) => {
+            const step = stepsByKey.get(pf.stepKey);
+            const field: WizardField | undefined = step?.fields.find((f) => f.key === pf.fieldKey);
+            const label = pf.labelOverride ?? field?.label ?? pf.fieldKey;
+            const sectionResp = (responses[pf.stepKey] as Record<string, unknown> | undefined) ?? {};
+            const value = getFieldValue(sectionResp[pf.fieldKey]);
+            return { label, value };
+          });
+
+          const isOrphan = cardIdx === MACRO_CARDS.length - 1 && MACRO_CARDS.length % 2 !== 0;
+
+          return (
+            <button
+              key={card.key}
+              type="button"
+              aria-label={`Ir a ${card.label} en cuestionario`}
+              onClick={() => onJumpToCuestionario(card.stepKeys[0])}
+              className={`group cursor-pointer bg-white border border-slate-200 ${borderClass} border-l-4 rounded shadow-sm overflow-hidden text-left hover:shadow-md hover:bg-slate-50/60 hover:border-slate-300 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/60 focus-visible:ring-offset-2${isOrphan ? " lg:col-span-2" : ""}`}
+            >
+              {/* Header de la card */}
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+                <div className={`w-10 h-10 rounded ${card.iconBg} flex items-center justify-center shrink-0`}>
+                  <svg className={`w-5 h-5 ${card.iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={card.iconPath} />
                   </svg>
                 </div>
-              )}
-            </div>
-
-            <div className="px-4 py-3">
-              <dl className="space-y-1.5">
-                {resolvedFields.map((f, i) => {
-                  const display = formatValue(f.value);
-                  return (
-                    <div key={i} className="flex items-start gap-3 text-xs">
-                      <dt className="text-slate-500 shrink-0 w-32 truncate">{f.label}</dt>
-                      <dd className={`flex-1 min-w-0 ${display === "—" ? "text-slate-400 italic" : "text-slate-800 font-medium"}`}>
-                        {display}
-                      </dd>
-                    </div>
-                  );
-                })}
-              </dl>
-            </div>
-
-            <div className="px-4 py-2 border-t border-slate-100 flex items-center gap-3">
-              <span className="text-[11px] text-slate-600 tabular-nums shrink-0">
-                {filled}/{total} preguntas
-              </span>
-              <div className="flex-1 h-1 bg-slate-100 rounded-sm overflow-hidden">
-                <div
-                  className={`h-full transition-all ${isComplete ? "bg-emerald-500" : pct > 0 ? "bg-brand-primary" : "bg-slate-300"}`}
-                  style={{ width: `${pct}%` }}
-                />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    {card.label}
+                  </h3>
+                  <p className="text-xs text-slate-600 truncate mt-0.5">{card.description}</p>
+                </div>
+                {isComplete && (
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
               </div>
-            </div>
-          </button>
-        );
-      })}
+
+              {/* Campos preview */}
+              <div className="px-4 py-3">
+                <dl className="space-y-1.5">
+                  {resolvedFields.map((f, i) => {
+                    const raw = rawValue(f.value);
+                    const display = formatValue(f.value);
+                    return (
+                      <div key={i} className="flex items-start gap-3 text-xs">
+                        <dt className="text-slate-600 shrink-0 w-32 truncate">{f.label}</dt>
+                        <dd
+                          className={`flex-1 min-w-0 line-clamp-2 ${display === "—" ? "text-slate-400 italic" : "text-slate-800 font-medium"}`}
+                          title={raw !== display ? raw : undefined}
+                        >
+                          {display}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </div>
+
+              {/* Footer: progreso + chip hover */}
+              <div className="px-4 py-2 border-t border-slate-100 flex items-center gap-3">
+                <span className="text-[11px] text-slate-600 tabular-nums shrink-0">
+                  {filled}/{total} preguntas
+                </span>
+                <div
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemax={100}
+                  aria-label={`${card.label}: ${pct}% completado`}
+                  className="flex-1 h-1 bg-slate-100 overflow-hidden"
+                >
+                  <div
+                    className={`h-full transition-all ${isComplete ? "bg-emerald-500" : pct > 0 ? "bg-brand-primary" : "bg-slate-200"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-brand-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  {isComplete ? "Ver →" : "Completar →"}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
+}
+
+/** Valor sin truncar para title tooltip */
+function rawValue(value: FieldValue): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value.trim() || "—";
+  if (typeof value === "number") return value.toLocaleString("es-MX");
+  if (typeof value === "boolean") return value ? "Sí" : "No";
+  if (Array.isArray(value)) return value.length === 0 ? "—" : value.join(", ");
+  return "—";
 }
 
 function formatValue(value: FieldValue): string {

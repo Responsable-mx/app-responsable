@@ -95,61 +95,72 @@ export default async function EditarClientePage({ params }: Props) {
       {/* Header con avatar monogram + nombre. White-label scaffold: cuando exista
           schema clients.logo_url, swappear por <img src={client.logo_url}/>. */}
       <div className="flex items-start justify-between gap-3 mb-5">
-      <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-        <ClientAvatar name={client.name} logoUrl={client.logo_url} />
-        <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
-        {meta && <span className="text-slate-300">·</span>}
-        {meta && <span className="text-xs text-slate-600" title={metaTooltip}>{meta}</span>}
-        {client.services && client.services.length > 0 && (
-          <>
-            <span className="text-slate-300">·</span>
-            {client.services.slice(0, 2).map((s) => {
-              const tabMap: Record<string, string> = {
-                doble_materialidad: "materialidad",
-                doble_materialidad_ia: "doble-materialidad-ia",
-              };
-              const targetTab = tabMap[s];
-              const label = serviceLabels.get(s) ?? s;
-              const cls = "inline-flex items-center text-[10px] font-medium bg-brand-primary-light text-brand-primary-dark rounded-sm px-2 py-0.5";
-              return targetTab ? (
-                <Link
-                  key={s}
-                  href={`?tab=${targetTab}`}
-                  className={`${cls} hover:bg-brand-primary/20 transition-colors`}
-                  title={`Ir a ${label}`}
-                >
-                  {label}
-                </Link>
-              ) : (
-                <span key={s} className={cls}>{label}</span>
-              );
-            })}
-            {client.services.length > 2 && (
-              <span className="text-[10px] text-slate-500">
-                +{client.services.length - 2} más
-              </span>
+        {/* Columna izquierda: identidad en 2 filas predecibles */}
+        <div className="min-w-0">
+          {/* Fila 1: avatar + nombre + sector/meta */}
+          <div className="flex items-center gap-x-3 flex-wrap gap-y-1">
+            <ClientAvatar name={client.name} logoUrl={client.logo_url} />
+            <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
+            {meta && <span className="text-slate-300" aria-hidden="true">·</span>}
+            {meta && <span className="text-xs text-slate-600" title={metaTooltip}>{meta}</span>}
+          </div>
+          {/* Fila 2: badges de servicio + fecha — siempre en su propia línea */}
+          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1.5 pl-11">
+            {client.services && client.services.length > 0 && (
+              <>
+                {client.services.slice(0, 2).map((s) => {
+                  const tabMap: Record<string, string> = {
+                    doble_materialidad: "materialidad",
+                    doble_materialidad_ia: "doble-materialidad-ia",
+                  };
+                  const targetTab = tabMap[s];
+                  const label = serviceLabels.get(s) ?? s;
+                  const cls = "inline-flex items-center text-[10px] font-medium bg-brand-primary-light text-brand-primary-dark rounded-sm px-2 py-0.5";
+                  return targetTab ? (
+                    <Link
+                      key={s}
+                      href={`?tab=${targetTab}`}
+                      className={`${cls} hover:bg-brand-primary/20 transition-colors`}
+                      title={`Ir a ${label}`}
+                    >
+                      {label}
+                    </Link>
+                  ) : (
+                    <span key={s} className={cls}>{label}</span>
+                  );
+                })}
+                {client.services.length > 2 && (
+                  <span className="text-[10px] text-slate-500">
+                    +{client.services.length - 2} más
+                  </span>
+                )}
+                <span className="text-slate-300" aria-hidden="true">·</span>
+              </>
             )}
-          </>
-        )}
-        <span className="text-slate-300">·</span>
-        <span className="text-xs text-slate-500">
-          Actualizado {new Date(client.updated_at).toLocaleDateString("es-MX")}
-        </span>
-      </div>
-      <div className="shrink-0 pt-0.5 flex items-center gap-2">
-        {isAdmin && (
-          <Link
-            href={`/clientes/${client.id}/editar`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Editar
-          </Link>
-        )}
-        <ExportPdfButton clientId={client.id} clientName={client.name} />
-      </div>
+            <span className="text-xs text-slate-500">
+              Actualizado {new Date(client.updated_at).toLocaleDateString("es-MX", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
+          </div>
+        </div>
+        {/* CTAs — siempre a la derecha, no participan en el wrap */}
+        <div className="shrink-0 pt-0.5 flex items-center gap-2">
+          {isAdmin && (
+            <Link
+              href={`/clientes/${client.id}/editar`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Editar
+            </Link>
+          )}
+          <ExportPdfButton clientId={client.id} clientName={client.name} />
+        </div>
       </div>
 
     </div>

@@ -170,11 +170,17 @@ export function ClientTabs({
       "stakeholders",
     ],
   };
+  // Usa pct === 100 (misma fuente que los checkmarks en ClientResumen) para evitar
+  // que el badge "N/5" y los ✓ en las cards muestren valores distintos.
   const completedMacro = (() => {
-    const completedSet = new Set(questionnaireResp?.data.response?.completed_sections ?? []);
+    const sectionProg = questionnaireResp?.data.progress.sectionProgress ?? {};
     let count = 0;
     for (const stepKeys of Object.values(MACRO_STEP_KEYS)) {
-      if (stepKeys.every((sk) => completedSet.has(sk))) count++;
+      const allComplete = stepKeys.every((sk) => {
+        const sp = sectionProg[sk];
+        return sp != null && sp.total > 0 && sp.pct === 100;
+      });
+      if (allComplete) count++;
     }
     return count;
   })();
@@ -293,7 +299,7 @@ export function ClientTabs({
         />
       </div>
       {/* Fade gradient — indica scroll horizontal disponible */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white via-white/80 to-transparent z-10" />
       </div>{/* /relative wrapper */}
       </div>{/* /border-b wrapper */}
 

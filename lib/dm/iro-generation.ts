@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listActiveIros } from "@/lib/dm/iros";
+import { getPrompt } from "@/lib/ai/prompts";
 import { z } from "zod";
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
@@ -90,64 +91,21 @@ export async function buildIroGenerationPrompt(params: {
 }): Promise<string> {
   const { clientName, sector, country, questionnaireContext, benchmarkNarrative, benchmarkCompanies } = params;
 
-  // Incluir nombres de estándares ESRS para referencia
+  // ESRS catalog como referencia normativa
   const iros = await listActiveIros().catch(() => []);
   const esrsRef = iros.length
     ? iros.map((iro) => `  ${iro.esrs_standard}: ${iro.label} — ${iro.impact_desc}`).join("\n")
-    : "";
+    : "  E1-E5 Ambiental · S1-S4 Social · G1 Gobernanza";
 
-  return `Eres un consultor senior de Doble Materialidad (ESRS/GRI/SASB) con experiencia en empresas mexicanas.
-Tu tarea es identificar el inventario preliminar de IROs (Impactos, Riesgos y Oportunidades) para ${clientName}.
+  // Leer template desde DB (con fallback al hardcoded en DEFAULT_PROMPTS)
+  const template = await getPrompt("dm.iro_generation");
 
-EMPRESA:
-  Nombre: ${clientName}
-  Sector: ${sector ?? "no especificado"}
-  País principal: ${country ?? "México"}
-
-CONTEXTO DEL CUESTIONARIO (datos del cliente):
-${questionnaireContext || "  (Sin datos del cuestionario disponibles)"}
-
-SEÑALES DEL BENCHMARK (sector y competidores):
-  Empresas analizadas: ${benchmarkCompanies || "No disponible"}
-  Narrativa del analista: ${benchmarkNarrative || "No disponible"}
-
-MARCOS DE REFERENCIA ESRS:
-${esrsRef || "  E1-E5 Ambiental · S1-S4 Social · G1 Gobernanza"}
-
-REGLAS OBLIGATORIAS:
-1. Cada IRO debe describir una situación concreta en formato causa → efecto, NO un tema genérico.
-   ❌ Incorrecto: "Gestión de agua"
-   ✅ Correcto: "Riesgo de interrupción operativa por escasez de agua en zonas donde opera la empresa"
-2. Debe identificar claramente dónde ocurre (upstream / ops_propia / downstream).
-3. Debe poder evaluarse en términos de gravedad (score_impacto) y magnitud financiera (score_financiero).
-4. Si no puede llevar a una acción concreta, está mal formulado.
-5. score_impacto: severidad del impacto sobre personas/ambiente/sociedad (1=bajo, 2=medio, 3=alto).
-6. score_financiero: magnitud financiera potencial para la empresa (1=bajo, 2=medio, 3=alto).
-7. Prioriza IROs respaldados por el cuestionario del cliente o el benchmark. Marca confianza=alto si tienes evidencia directa.
-8. Genera entre 15 y 25 IROs — suficientes para cubrir el perfil de riesgo sin inflar artificialmente.
-
-TIPOS válidos: impacto_positivo | impacto_negativo | riesgo | oportunidad
-ESTADO válido: actual | potencial | emergente | en_observacion
-CADENA válida: upstream | ops_propia | downstream
-HORIZONTE válido: corto | mediano | largo
-CONFIANZA válida: alto | medio | bajo
-
-Responde ÚNICAMENTE con JSON válido:
-{
-  "iros": [
-    {
-      "n_iro": 1,
-      "tema_esg": "Cambio climático y energía",
-      "descripcion": "Riesgo de aumento de costos operativos por impuestos al carbono y regulación de emisiones GEI en México.",
-      "tipo": "riesgo",
-      "estado": "emergente",
-      "cadena": "ops_propia",
-      "horizonte": "mediano",
-      "evidencia": "Benchmark sectorial + regulación NOM-SEMARNAT",
-      "confianza": "medio",
-      "score_impacto": 2,
-      "score_financiero": 3
-    }
-  ]
-}`;
+  return template
+    .replaceAll("{{client_name}}", clientName)
+    .replaceAll("{{sector}}", sector ?? "no especificado")
+    .replaceAll("{{country}}", country ?? "México")
+    .replaceAll("{{questionnaire_context}}", questionnaireContext || "  (Sin datos del cuestionario disponibles)")
+    .replaceAll("{{benchmark_companies}}", benchmarkCompanies || "No disponible")
+    .replaceAll("{{benchmark_narrative}}", benchmarkNarrative || "No disponible")
+    .replaceAll("{{esrs_reference}}", esrsRef);
 }

@@ -40,11 +40,12 @@ export function PromptsManager() {
         {PROMPT_KEYS.map((k, idx) => {
           const m = meta.data?.data.find((x) => x.key === k);
           const isActive = active === k;
-          // Separador visual entre prompts comunes (system.*) y por rol (role.*)
+          // Separadores visuales entre grupos
           const isFirstRole = k.startsWith("role.") && !PROMPT_KEYS[idx - 1]?.startsWith("role.");
+          const isFirstDm   = k.startsWith("dm.")   && !PROMPT_KEYS[idx - 1]?.startsWith("dm.");
           return (
             <div key={k} className="flex items-center gap-1">
-              {isFirstRole && (
+              {(isFirstRole || isFirstDm) && (
                 <div className="w-px h-5 bg-slate-300 mx-0.5" aria-hidden />
               )}
               <button

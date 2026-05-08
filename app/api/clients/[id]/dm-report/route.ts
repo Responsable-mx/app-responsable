@@ -10,6 +10,7 @@ import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 import { listActiveIros } from "@/lib/dm/iros";
+import { getPrompt } from "@/lib/ai/prompts";
 import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import type { Client } from "@/lib/clients";
 
@@ -101,7 +102,7 @@ async function buildReportPrompt(
 ): Promise<string> {
   // ESRS catalog como referencia normativa
   const esrsIros = await listActiveIros().catch(() => []);
-  const iroContext = esrsIros.length
+  const esrsContext = esrsIros.length
     ? `\nESTÁNDARES ESRS ANALIZADOS (referencia para el reporte):\n${esrsIros
         .map((iro) =>
           `${iro.esrs_standard} — ${iro.label}:\n  Impacto: ${iro.impact_desc}\n  Riesgo: ${iro.risk_desc}\n  Oportunidad: ${iro.opportunity_desc}`
@@ -110,7 +111,7 @@ async function buildReportPrompt(
     : "";
 
   // IROs del cliente ya validados por el consultor
-  const clientIroContext = clientIros.length
+  const iroInventory = clientIros.length
     ? `\nINVENTARIO DE IROs DEL CLIENTE (${clientIros.length} IROs revisados por el consultor):\n${clientIros
         .map((iro) =>
           `IRO-${iro.n_iro} [${iro.tipo}] ${iro.tema_esg}: ${iro.descripcion} (cadena: ${iro.cadena}, horizonte: ${iro.horizonte}, impacto: ${iro.score_impacto ?? "?"}/3, financiero: ${iro.score_financiero ?? "?"}/3, confianza: ${iro.confianza})`
@@ -119,102 +120,27 @@ async function buildReportPrompt(
     : "";
 
   // Brechas NIS/IBSO del cliente
-  const clientNisContext = clientNis.length
+  const nisBrechas = clientNis.length
     ? `\nMAPADE BRECHAS NIS/IBSO:\n${clientNis
         .map((n) => `${n.ibso_label} [${n.categoria}]: ${n.estado} (calidad: ${n.calidad_dato})${n.accion ? ` — acción: ${n.accion}` : ""}`)
         .join("\n")}`
     : "";
 
-  return `Eres un consultor senior de Doble Materialidad (ESRS/GRI) redactando un reporte ejecutivo para una empresa.
-
-CONTEXTO DEL CLIENTE:
-${clientContext}
-${iroContext}
-${clientIroContext}
-${clientNisContext}
-RESULTADO DEL BENCHMARK:
-Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
+  const benchmarkData = `Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
 Campos analizados: ${JSON.stringify(benchmarkResult.fields_snapshot, null, 2)}
 Comparación detallada: ${JSON.stringify(benchmarkResult.comparison, null, 2)}
-Síntesis del analista: ${benchmarkResult.narrative}
+Síntesis del analista: ${benchmarkResult.narrative}`;
 
-Genera el contenido narrativo del reporte de Doble Materialidad para ${client.name}. El reporte debe:
-1. Ser comprensible para dirección general (no solo para expertos ESG)
-2. Citar evidencia concreta del benchmark
-3. Priorizar acciones por urgencia (CSRD entra en vigor progresivamente)
-4. Usar lenguaje ejecutivo, no técnico
+  // Leer template desde DB (con fallback al hardcoded en DEFAULT_PROMPTS)
+  const template = await getPrompt("dm.report");
 
-Responde ÚNICAMENTE con JSON válido. Incluye TODOS los campos — los últimos 3 son obligatorios para generar visualizaciones en el PDF:
-{
-  "executive_summary": "Resumen ejecutivo 2-3 párrafos: situación actual, brechas principales, oportunidad estratégica",
-  "client_position": "Párrafo de 150-200 palabras: cómo se posiciona ${client.name} vs el grupo de referencia, con datos concretos del benchmark",
-  "risks": [
-    {
-      "title": "Nombre del riesgo",
-      "description": "Descripción del riesgo y su impacto potencial para ${client.name} (2-3 oraciones)",
-      "severity": "alta|media|baja"
-    }
-  ],
-  "strengths": ["Fortaleza 1 específica de ${client.name}", "Fortaleza 2"],
-  "improvement_areas": ["Área de mejora 1 con evidencia del benchmark", "Área 2"],
-  "recommendations": [
-    {
-      "action": "Acción concreta recomendada",
-      "priority": "inmediata|corto_plazo|mediano_plazo"
-    }
-  ],
-  "priority_topics": [
-    {
-      "tema": "Nombre del tema material (ej: Emisiones GHG, Cadena de Suministro)",
-      "score_financiero": 7.5,
-      "score_impacto": 8.2,
-      "prioridad": "alta|media|baja",
-      "accion_clave": "Acción concreta en 8-12 palabras"
-    }
-  ],
-  "benchmark_gaps": [
-    {
-      "dimension": "Nombre de la dimensión ESG analizada",
-      "nivel_cliente": "Básico|Intermedio|Avanzado|Líder",
-      "nivel_sector": "Básico|Intermedio|Avanzado|Líder",
-      "brecha": "alta|media|baja|ninguna"
-    }
-  ],
-  "proximos_pasos": [
-    {
-      "servicio": "Nombre del servicio de consultoría (ej: Diagnóstico de Gobierno ESG)",
-      "descripcion": "Qué incluye y por qué es prioritario para ${client.name} (1-2 oraciones)",
-      "plazo": "90 días|6 meses|12 meses",
-      "tipo": "diagnóstico|implementación|certificación|reporte"
-    }
-  ],
-  "roadmap_90d": [
-    {
-      "fase": "0-30d",
-      "actividad": "Designar responsable ESG interno y establecer comité de seguimiento de materialidad",
-      "iro_refs": "IRO-1, IRO-3",
-      "prioridad": "alta"
-    },
-    {
-      "fase": "30-60d",
-      "actividad": "Levantar inventario de datos GHG alcance 1 y 2 con metodología GRI 305",
-      "iro_refs": "IRO-2",
-      "prioridad": "alta"
-    },
-    {
-      "fase": "60-90d",
-      "actividad": "Consolidar primer reporte interno de indicadores clave y alinear con benchmark",
-      "iro_refs": "IRO-1, IRO-4, IRO-7",
-      "prioridad": "media"
-    }
-  ]
-}
-
-INSTRUCCIONES para los campos visuales:
-- priority_topics: 4-7 temas. Scores 1-10 basados en relevancia real para el sector de ${client.name} y evidencia del benchmark. Al menos 2 con prioridad "alta".
-- benchmark_gaps: Una fila por cada campo analizado en el benchmark. Nivel honesto — no inflar al cliente.
-- proximos_pasos: 3-5 pasos ordenables en 90d/6m/12m. Deben ser servicios reales de consultoría ESG que ResponSable podría ofrecer. Tipos: diagnóstico (auditorías, gap analysis), implementación (políticas, sistemas), certificación (ESR CEMEFI, GRI, B Corp), reporte (GRI, CSRD, TCFD).
-- roadmap_90d: 6-9 actividades concretas distribuidas en 3 fases de 30 días. Cada actividad debe: (a) referenciar IROs específicos por número (iro_refs: "IRO-2, IRO-5"), (b) ser ejecutable por el equipo de ${client.name} con acompañamiento de consultor, (c) tener prioridad asignada según urgencia. Fase 0-30d: acciones de diagnóstico y gobierno (establecer responsable ESG, mapear datos faltantes). Fase 30-60d: implementación de primeras medidas y recolección de datos. Fase 60-90d: consolidar entregables, preparar comunicación.`;
+  return template
+    .replaceAll("{{client_name}}", client.name)
+    .replaceAll("{{client_context}}", clientContext)
+    .replaceAll("{{esrs_context}}", esrsContext)
+    .replaceAll("{{iro_inventory}}", iroInventory)
+    .replaceAll("{{nis_brechas}}", nisBrechas)
+    .replaceAll("{{benchmark_data}}", benchmarkData);
 }
 
 // ── GET: retorna el último reporte DM + verifica batch si pending ───────────

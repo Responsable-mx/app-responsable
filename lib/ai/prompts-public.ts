@@ -10,7 +10,10 @@ export type PromptKey =
   | "role.aurora"
   | "role.rebeca"
   | "role.elena"
-  | "role.valeria";
+  | "role.valeria"
+  | "dm.benchmark_propose"
+  | "dm.iro_generation"
+  | "dm.report";
 
 export const PROMPT_KEYS: PromptKey[] = [
   "system.app_navigation",
@@ -19,6 +22,9 @@ export const PROMPT_KEYS: PromptKey[] = [
   "role.rebeca",
   "role.elena",
   "role.valeria",
+  "dm.benchmark_propose",
+  "dm.iro_generation",
+  "dm.report",
 ];
 
 export const PROMPT_LABELS: Record<PromptKey, string> = {
@@ -28,4 +34,7 @@ export const PROMPT_LABELS: Record<PromptKey, string> = {
   "role.rebeca": "Rebeca · Revisor",
   "role.elena": "Elena · Elevador",
   "role.valeria": "Valeria · Validador",
+  "dm.benchmark_propose": "DM · Benchmark",
+  "dm.iro_generation":    "DM · IROs",
+  "dm.report":            "DM · Reporte",
 };

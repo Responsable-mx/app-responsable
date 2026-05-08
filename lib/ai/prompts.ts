@@ -9,11 +9,15 @@ export type PromptKey =
   | "role.rebeca"
   | "role.elena"
   | "role.valeria"
-  | "dm.benchmark_propose";
+  | "dm.benchmark_propose"
+  | "dm.iro_generation"
+  | "dm.report";
 
 // Orden alfabético por label mostrado (es-MX).
 export const PROMPT_KEYS: PromptKey[] = [
   "dm.benchmark_propose",
+  "dm.iro_generation",
+  "dm.report",
   "role.aurora",
   "role.elena",
   "system.app_navigation",
@@ -23,7 +27,9 @@ export const PROMPT_KEYS: PromptKey[] = [
 ];
 
 export const PROMPT_LABELS: Record<PromptKey, string> = {
-  "dm.benchmark_propose": "DM IA · Propuesta de empresas benchmark",
+  "dm.benchmark_propose": "DM · Benchmark",
+  "dm.iro_generation":    "DM · IROs",
+  "dm.report":            "DM · Reporte",
   "role.aurora": "Aurora · Autor",
   "role.elena": "Elena · Elevador",
   "system.app_navigation": "Navegación de la app (común)",
@@ -34,7 +40,11 @@ export const PROMPT_LABELS: Record<PromptKey, string> = {
 
 export const PROMPT_DESCRIPTIONS: Record<PromptKey, string> = {
   "dm.benchmark_propose":
-    "Prompt que la IA usa para proponer empresas de benchmark en el módulo Doble Materialidad IA. Usa {{client_name}}, {{sector}}, {{countries}} como variables dinámicas.",
+    "Propone empresas para benchmark DM. Variables: {{client_name}}, {{sector}}, {{countries}}.",
+  "dm.iro_generation":
+    "Genera el inventario de IROs via Batch API (Sonnet). Variables: {{client_name}}, {{sector}}, {{country}}, {{questionnaire_context}}, {{benchmark_companies}}, {{benchmark_narrative}}, {{esrs_reference}}.",
+  "dm.report":
+    "Genera el reporte narrativo ejecutivo de DM via Batch API (Opus). Variables: {{client_name}}, {{client_context}}, {{esrs_context}}, {{iro_inventory}}, {{nis_brechas}}, {{benchmark_data}}.",
   "system.app_navigation":
     "Bloque <app_navigation> que describe las vistas de la app a los 4 roles.",
   "system.base_rules":
@@ -286,8 +296,153 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional:
   ]
 }`;
 
+const DEFAULT_DM_IRO_GENERATION = `Eres un consultor senior de Doble Materialidad (ESRS/GRI/SASB) con experiencia en empresas mexicanas.
+Tu tarea es identificar el inventario preliminar de IROs (Impactos, Riesgos y Oportunidades) para {{client_name}}.
+
+EMPRESA:
+  Nombre: {{client_name}}
+  Sector: {{sector}}
+  País principal: {{country}}
+
+CONTEXTO DEL CUESTIONARIO (datos del cliente):
+{{questionnaire_context}}
+
+SEÑALES DEL BENCHMARK (sector y competidores):
+  Empresas analizadas: {{benchmark_companies}}
+  Narrativa del analista: {{benchmark_narrative}}
+
+MARCOS DE REFERENCIA ESRS:
+{{esrs_reference}}
+
+REGLAS OBLIGATORIAS:
+1. Cada IRO debe describir una situación concreta en formato causa → efecto, NO un tema genérico.
+   ❌ Incorrecto: "Gestión de agua"
+   ✅ Correcto: "Riesgo de interrupción operativa por escasez de agua en zonas donde opera la empresa"
+2. Debe identificar claramente dónde ocurre (upstream / ops_propia / downstream).
+3. Debe poder evaluarse en términos de gravedad (score_impacto) y magnitud financiera (score_financiero).
+4. Si no puede llevar a una acción concreta, está mal formulado.
+5. score_impacto: severidad del impacto sobre personas/ambiente/sociedad (1=bajo, 2=medio, 3=alto).
+6. score_financiero: magnitud financiera potencial para la empresa (1=bajo, 2=medio, 3=alto).
+7. Prioriza IROs respaldados por el cuestionario del cliente o el benchmark. Marca confianza=alto si tienes evidencia directa.
+8. Genera entre 15 y 25 IROs — suficientes para cubrir el perfil de riesgo sin inflar artificialmente.
+
+TIPOS válidos: impacto_positivo | impacto_negativo | riesgo | oportunidad
+ESTADO válido: actual | potencial | emergente | en_observacion
+CADENA válida: upstream | ops_propia | downstream
+HORIZONTE válido: corto | mediano | largo
+CONFIANZA válida: alto | medio | bajo
+
+Responde ÚNICAMENTE con JSON válido:
+{
+  "iros": [
+    {
+      "n_iro": 1,
+      "tema_esg": "Cambio climático y energía",
+      "descripcion": "Riesgo de aumento de costos operativos por impuestos al carbono y regulación de emisiones GEI en México.",
+      "tipo": "riesgo",
+      "estado": "emergente",
+      "cadena": "ops_propia",
+      "horizonte": "mediano",
+      "evidencia": "Benchmark sectorial + regulación NOM-SEMARNAT",
+      "confianza": "medio",
+      "score_impacto": 2,
+      "score_financiero": 3
+    }
+  ]
+}`;
+
+const DEFAULT_DM_REPORT = `Eres un consultor senior de Doble Materialidad (ESRS/GRI) redactando un reporte ejecutivo para una empresa.
+
+CONTEXTO DEL CLIENTE:
+{{client_context}}
+{{esrs_context}}
+{{iro_inventory}}
+{{nis_brechas}}
+RESULTADO DEL BENCHMARK:
+{{benchmark_data}}
+
+Genera el contenido narrativo del reporte de Doble Materialidad para {{client_name}}. El reporte debe:
+1. Ser comprensible para dirección general (no solo para expertos ESG)
+2. Citar evidencia concreta del benchmark
+3. Priorizar acciones por urgencia (CSRD entra en vigor progresivamente)
+4. Usar lenguaje ejecutivo, no técnico
+
+Responde ÚNICAMENTE con JSON válido. Incluye TODOS los campos — los últimos 3 son obligatorios para generar visualizaciones en el PDF:
+{
+  "executive_summary": "Resumen ejecutivo 2-3 párrafos: situación actual, brechas principales, oportunidad estratégica",
+  "client_position": "Párrafo de 150-200 palabras: cómo se posiciona {{client_name}} vs el grupo de referencia, con datos concretos del benchmark",
+  "risks": [
+    {
+      "title": "Nombre del riesgo",
+      "description": "Descripción del riesgo y su impacto potencial para {{client_name}} (2-3 oraciones)",
+      "severity": "alta|media|baja"
+    }
+  ],
+  "strengths": ["Fortaleza 1 específica de {{client_name}}", "Fortaleza 2"],
+  "improvement_areas": ["Área de mejora 1 con evidencia del benchmark", "Área 2"],
+  "recommendations": [
+    {
+      "action": "Acción concreta recomendada",
+      "priority": "inmediata|corto_plazo|mediano_plazo"
+    }
+  ],
+  "priority_topics": [
+    {
+      "tema": "Nombre del tema material (ej: Emisiones GHG, Cadena de Suministro)",
+      "score_financiero": 7.5,
+      "score_impacto": 8.2,
+      "prioridad": "alta|media|baja",
+      "accion_clave": "Acción concreta en 8-12 palabras"
+    }
+  ],
+  "benchmark_gaps": [
+    {
+      "dimension": "Nombre de la dimensión ESG analizada",
+      "nivel_cliente": "Básico|Intermedio|Avanzado|Líder",
+      "nivel_sector": "Básico|Intermedio|Avanzado|Líder",
+      "brecha": "alta|media|baja|ninguna"
+    }
+  ],
+  "proximos_pasos": [
+    {
+      "servicio": "Nombre del servicio de consultoría (ej: Diagnóstico de Gobierno ESG)",
+      "descripcion": "Qué incluye y por qué es prioritario para {{client_name}} (1-2 oraciones)",
+      "plazo": "90 días|6 meses|12 meses",
+      "tipo": "diagnóstico|implementación|certificación|reporte"
+    }
+  ],
+  "roadmap_90d": [
+    {
+      "fase": "0-30d",
+      "actividad": "Designar responsable ESG interno y establecer comité de seguimiento de materialidad",
+      "iro_refs": "IRO-1, IRO-3",
+      "prioridad": "alta"
+    },
+    {
+      "fase": "30-60d",
+      "actividad": "Levantar inventario de datos GHG alcance 1 y 2 con metodología GRI 305",
+      "iro_refs": "IRO-2",
+      "prioridad": "alta"
+    },
+    {
+      "fase": "60-90d",
+      "actividad": "Consolidar primer reporte interno de indicadores clave y alinear con benchmark",
+      "iro_refs": "IRO-1, IRO-4, IRO-7",
+      "prioridad": "media"
+    }
+  ]
+}
+
+INSTRUCCIONES para los campos visuales:
+- priority_topics: 4-7 temas. Scores 1-10 basados en relevancia real para el sector de {{client_name}} y evidencia del benchmark. Al menos 2 con prioridad "alta".
+- benchmark_gaps: Una fila por cada campo analizado en el benchmark. Nivel honesto — no inflar al cliente.
+- proximos_pasos: 3-5 pasos ordenables en 90d/6m/12m. Deben ser servicios reales de consultoría ESG que ResponSable podría ofrecer. Tipos: diagnóstico (auditorías, gap analysis), implementación (políticas, sistemas), certificación (ESR CEMEFI, GRI, B Corp), reporte (GRI, CSRD, TCFD).
+- roadmap_90d: 6-9 actividades concretas distribuidas en 3 fases de 30 días. Cada actividad debe: (a) referenciar IROs específicos por número (iro_refs: "IRO-2, IRO-5"), (b) ser ejecutable por el equipo de {{client_name}} con acompañamiento de consultor, (c) tener prioridad asignada según urgencia. Fase 0-30d: acciones de diagnóstico y gobierno. Fase 30-60d: implementación de primeras medidas. Fase 60-90d: consolidar entregables y preparar comunicación.`;
+
 export const DEFAULT_PROMPTS: Record<PromptKey, string> = {
   "dm.benchmark_propose": DEFAULT_DM_BENCHMARK_PROPOSE,
+  "dm.iro_generation":    DEFAULT_DM_IRO_GENERATION,
+  "dm.report":            DEFAULT_DM_REPORT,
   "system.app_navigation": DEFAULT_APP_NAVIGATION,
   "system.base_rules": DEFAULT_BASE_RULES,
   "role.aurora": DEFAULT_AURORA,

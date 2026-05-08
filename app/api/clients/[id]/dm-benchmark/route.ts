@@ -31,7 +31,22 @@ const CompareBody = z.object({
   company_ids: z.array(z.string().uuid()).min(1).max(20),
 });
 
-const RequestBody = z.discriminatedUnion("action", [ProposeBody, CompareBody]);
+const AddManualBody = z.object({
+  action: z.literal("add_manual"),
+  name: z.string().min(1).max(200),
+  relation: z.enum(["competitor_nacional", "competitor_internacional", "sector", "cadena_valor"]),
+  country: z.string().max(100).optional().nullable(),
+  sector: z.string().max(200).optional().nullable(),
+  website: z.string().max(300).optional().nullable(),
+  justification: z.string().max(600).optional().nullable(),
+});
+
+const RemoveBody = z.object({
+  action: z.literal("remove"),
+  company_id: z.string().uuid(),
+});
+
+const RequestBody = z.discriminatedUnion("action", [ProposeBody, CompareBody, AddManualBody, RemoveBody]);
 
 const ProposedCompanySchema = z.object({
   name: z.string().min(1).max(200),
@@ -409,6 +424,53 @@ ${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
     return NextResponse.json({ data: { companies: inserted } });
+  }
+
+  // ── ADD MANUAL: consultor agrega una empresa directamente ──────────────
+  if (parsed.data.action === "add_manual") {
+    const { name, relation, country, sector, website, justification } = parsed.data;
+    const { data: inserted, error: insertErr } = await admin
+      .from("dm_benchmark_companies")
+      .insert({
+        client_id: id,
+        name,
+        relation,
+        country: country ?? null,
+        sector: sector ?? null,
+        website: website && website.length > 0 ? website : null,
+        justification: justification ?? null,
+        proposed_by: "consultor",
+        validated: false,
+        created_by: user,
+      })
+      .select()
+      .single();
+
+    if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    return NextResponse.json({ data: { company: inserted } });
+  }
+
+  // ── REMOVE: eliminar empresa individual ──────────────────────────────────
+  if (parsed.data.action === "remove") {
+    const { company_id } = parsed.data;
+    // Verificar que la empresa pertenece a este cliente
+    const { data: existing } = await admin
+      .from("dm_benchmark_companies")
+      .select("id")
+      .eq("id", company_id)
+      .eq("client_id", id)
+      .single();
+
+    if (!existing) return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 });
+
+    const { error: deleteErr } = await admin
+      .from("dm_benchmark_companies")
+      .delete()
+      .eq("id", company_id)
+      .eq("client_id", id);
+
+    if (deleteErr) return NextResponse.json({ error: deleteErr.message }, { status: 500 });
+    return NextResponse.json({ data: { removed: true } });
   }
 
   // ── COMPARE: Batch API asíncrono — Sonnet, sin límite de 60s ────────────

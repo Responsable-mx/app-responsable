@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { RELATION_LABELS, type CompanyRelation } from "@/lib/dm/fields";
+import { SelectField } from "@/components/ui/SelectField";
 import type { DmIroConfig } from "@/lib/dm/iros";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 
@@ -241,6 +242,16 @@ function BenchmarkSection({
   const [proposing, setProposing] = useState(false);
   const [confirmRepropose, setConfirmRepropose] = useState(false);
   const [fieldsExpanded, setFieldsExpanded] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addingManual, setAddingManual] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    name: "",
+    relation: "competitor_nacional" as CompanyRelation,
+    country: "",
+    sector: "",
+    website: "",
+    justification: "",
+  });
   const hasDone = latestResult?.status === "done";
   // Colapsar configuración por default cuando ya existe un resultado
   const [configExpanded, setConfigExpanded] = useState(() => latestResult?.status !== "done");
@@ -295,6 +306,51 @@ function BenchmarkSection({
       push("error", e instanceof Error ? e.message : "Error al ejecutar benchmark");
     }
   }, [clientId, selected, push, onStartPolling]);
+
+  const handleAddManual = useCallback(async () => {
+    if (!manualForm.name.trim()) return;
+    setAddingManual(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-benchmark`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_manual",
+          name: manualForm.name.trim(),
+          relation: manualForm.relation,
+          country: manualForm.country.trim() || null,
+          sector: manualForm.sector.trim() || null,
+          website: manualForm.website.trim() || null,
+          justification: manualForm.justification.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al agregar empresa");
+      push("success", `${manualForm.name.trim()} agregada al benchmark.`);
+      setShowAddForm(false);
+      setManualForm({ name: "", relation: "competitor_nacional", country: "", sector: "", website: "", justification: "" });
+      onDataMutate();
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al agregar empresa");
+    } finally {
+      setAddingManual(false);
+    }
+  }, [clientId, manualForm, push, onDataMutate]);
+
+  const handleRemoveCompany = useCallback(async (companyId: string) => {
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-benchmark`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove", company_id: companyId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al eliminar empresa");
+      onDataMutate();
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al eliminar empresa");
+    }
+  }, [clientId, push, onDataMutate]);
 
   const groupedByRelation = companies.reduce<Record<string, BenchmarkCompany[]>>((acc, c) => {
     if (!acc[c.relation]) acc[c.relation] = [];
@@ -376,8 +432,8 @@ function BenchmarkSection({
             )}
           </div>
 
-          {/* Botón proponer */}
-          <div className="flex items-center gap-3">
+          {/* Botón proponer + agregar manual */}
+          <div className="flex items-center gap-3 flex-wrap">
             <Button
               size="sm"
               variant={companies.length > 0 ? "secondary" : "primary"}
@@ -386,8 +442,18 @@ function BenchmarkSection({
             >
               {companies.length > 0 ? "Regenerar lista IA" : "Proponer empresas con IA"}
             </Button>
+            <button
+              type="button"
+              onClick={() => setShowAddForm((v) => !v)}
+              className="text-xs text-brand-primary hover:underline flex items-center gap-1"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M6 2v8M2 6h8" />
+              </svg>
+              Agregar manualmente
+            </button>
             {companies.length > 0 && (
-              <span className="text-xs text-slate-500">{companies.length} empresas propuestas</span>
+              <span className="text-xs text-slate-400">{companies.length} empresa{companies.length !== 1 ? "s" : ""}</span>
             )}
           </div>
 
@@ -462,16 +528,150 @@ function BenchmarkSection({
                         <p className="text-xs text-slate-400 mt-1 leading-relaxed">{company.justification}</p>
                       )}
                     </div>
-                    {company.proposed_by === "ia" && (
-                      <span className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded-sm shrink-0">
-                        IA
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {company.proposed_by === "ia" && (
+                        <span className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded-sm">
+                          IA
+                        </span>
+                      )}
+                      {company.proposed_by === "consultor" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleRemoveCompany(company.id);
+                          }}
+                          className="text-slate-300 hover:text-rose-500 transition-colors"
+                          title="Eliminar empresa"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 3.5h10M5 3.5V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4M3 3.5l.75 7a.5.5 0 00.5.5h5.5a.5.5 0 00.5-.5L11 3.5" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </label>
                 ))}
               </div>
             </div>
           ))}
+
+          {/* Formulario agregar empresa manual */}
+          {showAddForm && (
+            <div className="border border-brand-primary/30 rounded p-3 space-y-2.5 bg-slate-50/60">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                Agregar empresa manualmente
+              </p>
+              {/* Nombre + Relación */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
+                    Nombre <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={manualForm.name}
+                    onChange={(e) => setManualForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Ej: Grupo Bimbo"
+                    maxLength={200}
+                    className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  />
+                </div>
+                <div className="w-52 shrink-0">
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
+                    Tipo de relación <span className="text-rose-500">*</span>
+                  </label>
+                  <SelectField
+                    value={manualForm.relation}
+                    onChange={(v) => setManualForm((f) => ({ ...f, relation: v as CompanyRelation }))}
+                    options={[
+                      { value: "competitor_nacional",       label: RELATION_LABELS.competitor_nacional },
+                      { value: "competitor_internacional",  label: RELATION_LABELS.competitor_internacional },
+                      { value: "sector",                    label: RELATION_LABELS.sector },
+                      { value: "cadena_valor",              label: RELATION_LABELS.cadena_valor },
+                    ]}
+                  />
+                </div>
+              </div>
+              {/* País + Sector */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">País</label>
+                  <input
+                    type="text"
+                    value={manualForm.country}
+                    onChange={(e) => setManualForm((f) => ({ ...f, country: e.target.value }))}
+                    placeholder="Ej: México"
+                    maxLength={100}
+                    className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Sector</label>
+                  <input
+                    type="text"
+                    value={manualForm.sector}
+                    onChange={(e) => setManualForm((f) => ({ ...f, sector: e.target.value }))}
+                    placeholder="Ej: Alimentos y bebidas"
+                    maxLength={200}
+                    className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  />
+                </div>
+              </div>
+              {/* Website */}
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
+                  Sitio web
+                </label>
+                <input
+                  type="url"
+                  value={manualForm.website}
+                  onChange={(e) => setManualForm((f) => ({ ...f, website: e.target.value }))}
+                  placeholder="https://www.ejemplo.com"
+                  maxLength={300}
+                  className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                />
+              </div>
+              {/* Justificación */}
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
+                  Justificación
+                </label>
+                <textarea
+                  value={manualForm.justification}
+                  onChange={(e) => setManualForm((f) => ({ ...f, justification: e.target.value }))}
+                  placeholder="¿Por qué incluir esta empresa en el benchmark? ¿Qué reporta en sostenibilidad?"
+                  maxLength={600}
+                  rows={2}
+                  className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-none"
+                />
+                <p className="text-[10px] text-slate-300 text-right">{manualForm.justification.length}/600</p>
+              </div>
+              {/* Acciones */}
+              <div className="flex items-center gap-2 pt-0.5">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  loading={addingManual}
+                  disabled={!manualForm.name.trim()}
+                  onClick={() => void handleAddManual()}
+                >
+                  Agregar empresa
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setManualForm({ name: "", relation: "competitor_nacional", country: "", sector: "", website: "", justification: "" });
+                  }}
+                  className="text-xs text-slate-500 hover:underline"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Botón ejecutar benchmark — sin paréntesis */}
           {companies.length > 0 && (

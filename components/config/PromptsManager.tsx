@@ -21,65 +21,89 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
+const GROUPS: { label: string; prefix: string }[] = [
+  { label: "SISTEMA", prefix: "system." },
+  { label: "ROLES IA", prefix: "role." },
+  { label: "DIRECT MESSAGES", prefix: "dm." },
+];
+
 export function PromptsManager() {
   const [active, setActive] = useState<PromptKey>("role.aurora");
   const [showHistory, setShowHistory] = useState(false);
 
   const meta = useSWR<{ data: PromptMeta[] }>("/api/prompts", fetcher);
 
-  return (
-    <div>
-      {/* D-73: error state SWR — meta.error silenciado anteriormente */}
-      {meta.error && !meta.data && (
-        <p className="text-xs text-rose-700 mb-2">
-          Error al cargar estado de prompts. Los badges &ldquo;Custom&rdquo; no son visibles.{" "}
-          <button onClick={() => void meta.mutate()} className="underline">Reintentar</button>
-        </p>
-      )}
-      <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-lg mb-4">
-        {PROMPT_KEYS.map((k, idx) => {
-          const m = meta.data?.data.find((x) => x.key === k);
-          const isActive = active === k;
-          // Separadores visuales entre grupos
-          const isFirstRole = k.startsWith("role.") && !PROMPT_KEYS[idx - 1]?.startsWith("role.");
-          const isFirstDm   = k.startsWith("dm.")   && !PROMPT_KEYS[idx - 1]?.startsWith("dm.");
-          return (
-            <div key={k} className="flex items-center gap-1">
-              {(isFirstRole || isFirstDm) && (
-                <div className="w-px h-5 bg-slate-300 mx-0.5" aria-hidden />
-              )}
-              <button
-                onClick={() => {
-                  setActive(k);
-                  setShowHistory(false);
-                }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  isActive
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <span>{PROMPT_LABELS[k]}</span>
-                {m?.has_override && (
-                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
-                    Custom
-                  </span>
-                )}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+  const activeDescription =
+    meta.data?.data.find((x) => x.key === active)?.description ?? "";
 
-      <PromptEditor
-        key={active}
-        promptKey={active}
-        showHistory={showHistory}
-        onToggleHistory={() => setShowHistory((s) => !s)}
-        onSaved={() => {
-          meta.mutate();
-        }}
-      />
+  return (
+    <div className="flex gap-6 items-start">
+      {/* Sidebar de navegación */}
+      <nav className="w-48 flex-shrink-0 sticky top-4">
+        {meta.error && !meta.data && (
+          <p className="text-xs text-rose-700 mb-2">
+            Error al cargar.{" "}
+            <button onClick={() => void meta.mutate()} className="underline">
+              Reintentar
+            </button>
+          </p>
+        )}
+        <div className="space-y-4">
+          {GROUPS.map((group) => {
+            const groupKeys = PROMPT_KEYS.filter((k) =>
+              k.startsWith(group.prefix),
+            );
+            return (
+              <div key={group.prefix}>
+                <p className="uppercase tracking-widest text-[10px] font-bold text-slate-400 px-2 mb-1">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {groupKeys.map((k) => {
+                    const m = meta.data?.data.find((x) => x.key === k);
+                    const isActive = active === k;
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => {
+                          setActive(k);
+                          setShowHistory(false);
+                        }}
+                        className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors ${
+                          isActive
+                            ? "bg-white border border-slate-200 text-slate-900 shadow-sm font-medium"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="truncate">{PROMPT_LABELS[k]}</span>
+                        {m?.has_override && (
+                          <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm flex-shrink-0">
+                            Custom
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Editor */}
+      <div className="flex-1 min-w-0">
+        <PromptEditor
+          key={active}
+          promptKey={active}
+          description={activeDescription}
+          showHistory={showHistory}
+          onToggleHistory={() => setShowHistory((s) => !s)}
+          onSaved={() => {
+            void meta.mutate();
+          }}
+        />
+      </div>
     </div>
   );
 }

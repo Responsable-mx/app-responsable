@@ -2099,23 +2099,27 @@ export function DoubleMaterialidadTab({
     ? "active"
     : "pending";
 
-  const stage4Status: StageStatus = hasNis
-    ? "done"
-    : hasIros
-    ? "active"
-    : "pending";
-
-  const stage5Status: StageStatus = hasReport
-    ? "done"
-    : hasIros
-    ? "active"
-    : "pending";
-
-  const stage6Status: StageStatus = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length >= 3
+  // stage4 = Matriz (visualización IROs scored)
+  const stage4Status: StageStatus = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length >= 3
     ? "active"
     : hasIros ? "pending" : "pending";
 
-  const stage7Status: StageStatus = hasIros ? "active" : "pending";
+  // stage5 = NIS / IBSO
+  const stage5Status: StageStatus = hasNis
+    ? "done"
+    : hasIros
+    ? "active"
+    : "pending";
+
+  // stage6 = Resumen ejecutivo IA
+  const stage6Status: StageStatus = hasIros ? "active" : "pending";
+
+  // stage7 = Reporte (etapa final — requiere benchmark + IROs)
+  const stage7Status: StageStatus = hasReport
+    ? "done"
+    : hasBenchmark && hasIros
+    ? "active"
+    : "pending";
 
   if (loadingBenchmark) {
     return (
@@ -2135,13 +2139,13 @@ export function DoubleMaterialidadTab({
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
         <StageIndicator number={3} label="IROs"      status={stage3Status} sectionId="dm-sec-iros" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={4} label="NIS/IBSO"  status={stage4Status} sectionId="dm-sec-nis" />
+        <StageIndicator number={4} label="Matriz"    status={stage4Status} sectionId="dm-sec-matriz" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={5} label="Reporte"   status={stage5Status} sectionId="dm-sec-reporte" />
+        <StageIndicator number={5} label="NIS/IBSO"  status={stage5Status} sectionId="dm-sec-nis" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={6} label="Matriz"    status={stage6Status} sectionId="dm-sec-matriz" />
+        <StageIndicator number={6} label="Resumen"   status={stage6Status} sectionId="dm-sec-resumen" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={7} label="Resumen"   status={stage7Status} sectionId="dm-sec-resumen" />
+        <StageIndicator number={7} label="Reporte"   status={stage7Status} sectionId="dm-sec-reporte" />
       </div>
 
       {/* ── Etapa 1 ── */}
@@ -2194,7 +2198,7 @@ export function DoubleMaterialidadTab({
         />
       </section>
 
-      {/* ── Etapa 3.5 — Matriz de Doble Materialidad ── */}
+      {/* ── Etapa 4 — Matriz de Doble Materialidad ── */}
       {iros.filter((i) => i.incluido && i.score_impacto && i.score_financiero).length >= 3 && (
         <section id="dm-sec-matriz" aria-labelledby="stage-matriz">
           <h2 id="stage-matriz" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
@@ -2204,7 +2208,7 @@ export function DoubleMaterialidadTab({
         </section>
       )}
 
-      {/* ── Etapa 4 — NIS / IBSO ── */}
+      {/* ── Etapa 5 — NIS / IBSO ── */}
       <section id="dm-sec-nis" aria-labelledby="stage-nis">
         <h2 id="stage-nis" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
           NIS / IBSO — Brechas de información
@@ -2218,7 +2222,17 @@ export function DoubleMaterialidadTab({
         />
       </section>
 
-      {/* ── Etapa 5 — Reporte ── */}
+      {/* ── Etapa 6 — Resumen ejecutivo IA ── */}
+      {hasIros && (
+        <section id="dm-sec-resumen" aria-labelledby="stage-resumen">
+          <h2 id="stage-resumen" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+            Resumen Ejecutivo (IA)
+          </h2>
+          <ResumenEjecutivoSection clientId={clientId} />
+        </section>
+      )}
+
+      {/* ── Etapa 7 — Reporte (etapa final) ── */}
       <section id="dm-sec-reporte" aria-labelledby="stage-reporte">
         <h2 id="stage-reporte" className="sr-only">Reporte de Doble Materialidad</h2>
         <ReporteSection
@@ -2235,16 +2249,6 @@ export function DoubleMaterialidadTab({
           }}
         />
       </section>
-
-      {/* ── Resumen ejecutivo IA ── */}
-      {hasIros && (
-        <section id="dm-sec-resumen" aria-labelledby="stage-resumen">
-          <h2 id="stage-resumen" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-            Resumen Ejecutivo (IA)
-          </h2>
-          <ResumenEjecutivoSection clientId={clientId} />
-        </section>
-      )}
 
       {/* ── Checklist de cierre ── */}
       <section aria-labelledby="stage-checklist">

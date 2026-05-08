@@ -24,7 +24,12 @@ const BM_MAX_CALLS = 10;
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-const ProposeBody = z.object({ action: z.literal("propose") });
+const ProposeBody = z.object({
+  action: z.literal("propose"),
+  // IDs de empresas que el consultor ya tiene seleccionadas — se marcan validated=true
+  // ANTES de borrar las propuestas antiguas para que sobrevivan en el nuevo listado.
+  selected_ids: z.array(z.string().uuid()).optional(),
+});
 
 const CompareBody = z.object({
   action: z.literal("compare"),
@@ -325,25 +330,42 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   // ── PROPOSE: IA investiga y propone empresas (síncrono — Sonnet, 45s) ─────
   if (parsed.data.action === "propose") {
-    // ── Feedback context: leer empresas previas ANTES de borrarlas ───────────
+    const { selected_ids } = parsed.data;
+
+    // ── Paso 1: persistir selecciones locales como validated=true ────────────
+    // El consultor pudo haber marcado empresas sin correr el benchmark todavía.
+    // Las marcamos antes de borrar para que sobrevivan en el nuevo listado.
+    if (selected_ids && selected_ids.length > 0) {
+      await admin
+        .from("dm_benchmark_companies")
+        .update({ validated: true })
+        .eq("client_id", id)
+        .in("id", selected_ids);
+    }
+
+    // ── Paso 2: feedback context — incluir TODAS las empresas conocidas ───────
+    // proposed_by="ia" + proposed_by="consultor" — ambas cuentan como señal
     const { data: prevCompanies } = await admin
       .from("dm_benchmark_companies")
       .select("name, relation, validated, proposed_by")
-      .eq("client_id", id)
-      .eq("proposed_by", "ia");
+      .eq("client_id", id);
 
     let feedbackContext = "";
     if (prevCompanies && prevCompanies.length > 0) {
-      const approved  = prevCompanies.filter((c) => c.validated);
-      const rejected  = prevCompanies.filter((c) => !c.validated);
+      // Consultor-added + validated IA = aprobadas
+      const approved = prevCompanies.filter(
+        (c) => c.proposed_by === "consultor" || c.validated
+      );
+      // IA no validadas = rechazadas / ignoradas
+      const rejected = prevCompanies.filter(
+        (c) => c.proposed_by === "ia" && !c.validated
+      );
       const lines: string[] = [];
       if (approved.length > 0) {
-        lines.push(`El consultor ya aprobó estas empresas (no repetirlas, sino buscar alternativas complementarias):
-${approved.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
+        lines.push(`El consultor ya aprobó estas empresas (no repetirlas, sino buscar alternativas complementarias):\n${approved.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
       }
       if (rejected.length > 0) {
-        lines.push(`El consultor rechazó o no seleccionó estas empresas (no volver a proponerlas):
-${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
+        lines.push(`El consultor rechazó o no seleccionó estas empresas (no volver a proponerlas):\n${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
       }
       feedbackContext = lines.join("\n\n");
     }
@@ -400,8 +422,14 @@ ${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
       return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
     }
 
-    // Eliminar propuestas anteriores de IA (no las del consultor)
-    await admin.from("dm_benchmark_companies").delete().eq("client_id", id).eq("proposed_by", "ia");
+    // Eliminar propuestas anteriores de IA no seleccionadas.
+    // Las que tienen validated=true sobreviven — el consultor las aprobó.
+    await admin
+      .from("dm_benchmark_companies")
+      .delete()
+      .eq("client_id", id)
+      .eq("proposed_by", "ia")
+      .eq("validated", false);
 
     const rows = aiData.companies.map((c) => ({
       client_id: id,

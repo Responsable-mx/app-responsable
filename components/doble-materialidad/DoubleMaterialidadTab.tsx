@@ -364,23 +364,33 @@ function BenchmarkSection({
 
   const handlePropose = useCallback(async () => {
     setProposing(true);
+    // Capturar selecciones actuales antes de la petición
+    const currentSelected = Array.from(selected);
     try {
       const res = await fetch(`/api/clients/${clientId}/dm-benchmark`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "propose" }),
+        // Pasar IDs seleccionados para que el backend los marque validated=true
+        // y no los borre al regenerar
+        body: JSON.stringify({ action: "propose", selected_ids: currentSelected }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error al proponer empresas");
-      push("success", "Empresas propuestas. Revisa y selecciona las que incluirás en el benchmark.");
-      setSelected(new Set());
+      const conserved = currentSelected.length;
+      push(
+        "success",
+        conserved > 0
+          ? `Nuevas propuestas listas. Tus ${conserved} empresa${conserved > 1 ? "s" : ""} seleccionada${conserved > 1 ? "s" : ""} se conservaron.`
+          : "Empresas propuestas. Revisa y selecciona las que incluirás en el benchmark."
+      );
+      // No limpiar selected — las empresas conservadas siguen en la lista
       onDataMutate();
     } catch (e) {
       push("error", e instanceof Error ? e.message : "Error al proponer empresas");
     } finally {
       setProposing(false);
     }
-  }, [clientId, push, onDataMutate]);
+  }, [clientId, selected, push, onDataMutate]);
 
   const handleToggle = useCallback((id: string) => {
     setSelected((prev) => {
@@ -923,7 +933,7 @@ function BenchmarkSection({
       <ConfirmModal
         open={confirmRepropose}
         title="¿Regenerar lista de empresas?"
-        description="Se eliminarán las empresas actuales y la IA generará una nueva lista. El benchmark anterior se conserva hasta que ejecutes uno nuevo."
+        description="La IA generará nuevas propuestas. Las empresas que ya tienes seleccionadas se conservarán — solo se reemplazarán las no seleccionadas."
         confirmLabel="Regenerar lista"
         cancelLabel="Cancelar"
         tone="destructive"

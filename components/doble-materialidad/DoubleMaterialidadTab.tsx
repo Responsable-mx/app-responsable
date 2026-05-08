@@ -8,6 +8,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { RELATION_LABELS, type CompanyRelation } from "@/lib/dm/fields";
 import type { DmIroConfig } from "@/lib/dm/iros";
+import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 
 // ── Tipos ────────────────────────────────────────────────────
 
@@ -37,6 +38,22 @@ type BenchmarkData = {
   companies: BenchmarkCompany[];
   latest_result: BenchmarkResult | null;
 };
+
+type NisItem = {
+  id: string;
+  client_id: string;
+  ibso_key: string;
+  ibso_label: string;
+  categoria: "ambiental" | "social" | "gobernanza";
+  estado: "no_identificado" | "parcial" | "disponible";
+  calidad_dato: "baja" | "media" | "alta";
+  accion: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type IroBatchStatus = "idle" | "pending" | "done" | "failed";
 
 type LatestReport = {
   id: string;
@@ -593,7 +610,479 @@ function BenchmarkSection({
   );
 }
 
-// ── Etapa 3: Reporte ─────────────────────────────────────────
+// ── Score picker (1 / 2 / 3) ─────────────────────────────────
+
+const SCORE_LABELS: Record<number, { label: string; color: string }> = {
+  1: { label: "1", color: "bg-emerald-100 text-emerald-700 border-emerald-300" },
+  2: { label: "2", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  3: { label: "3", color: "bg-rose-100 text-rose-700 border-rose-300" },
+};
+
+function ScorePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number | null;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3].map((n) => {
+        const active = value === n;
+        const { label, color } = SCORE_LABELS[n]!;
+        return (
+          <button
+            key={n}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(n)}
+            className={`w-6 h-6 text-[10px] font-bold border rounded-sm flex items-center justify-center transition-colors
+              ${active ? color : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"}
+              ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+            aria-label={`Score ${n}`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function prioridad(impacto: number | null, financiero: number | null): { label: string; color: string } {
+  if (!impacto || !financiero) return { label: "—", color: "text-slate-400" };
+  const sum = impacto + financiero;
+  if (sum >= 5) return { label: "Alta",  color: "text-rose-600 font-semibold" };
+  if (sum >= 3) return { label: "Media", color: "text-amber-600 font-semibold" };
+  return { label: "Baja", color: "text-emerald-600 font-semibold" };
+}
+
+const TIPO_SHORT: Record<string, string> = {
+  impacto_positivo: "Imp+",
+  impacto_negativo: "Imp−",
+  riesgo:           "Riesgo",
+  oportunidad:      "Opor.",
+};
+
+const TIPO_BADGE: Record<string, string> = {
+  impacto_positivo: "bg-emerald-50 text-emerald-700",
+  impacto_negativo: "bg-rose-50 text-rose-700",
+  riesgo:           "bg-amber-50 text-amber-700",
+  oportunidad:      "bg-teal-50 text-teal-700",
+};
+
+const CADENA_LABEL: Record<string, string> = {
+  upstream:   "Upstream",
+  ops_propia: "Operación",
+  downstream: "Downstream",
+};
+
+// ── Etapa 3: IROs del cliente ────────────────────────────────
+
+function IroSection({
+  clientId,
+  iros,
+  status,
+  isPolling,
+  hasBenchmark,
+  onMutate,
+  onStartPolling,
+}: {
+  clientId: string;
+  iros: IroInventoryItem[];
+  status: IroBatchStatus;
+  isPolling: boolean;
+  hasBenchmark: boolean;
+  onMutate: () => void;
+  onStartPolling: () => void;
+}) {
+  const { push } = useToast();
+  const [generating, setGenerating] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const handleGenerate = useCallback(async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-iros`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al iniciar generación de IROs");
+      onStartPolling();
+      onMutate();
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al generar IROs");
+    } finally {
+      setGenerating(false);
+    }
+  }, [clientId, push, onMutate, onStartPolling]);
+
+  const patchIro = useCallback(async (id: string, patch: Partial<Pick<IroInventoryItem, "score_impacto" | "score_financiero" | "incluido">>) => {
+    setSavingId(id);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-iros`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error ?? "Error al actualizar IRO");
+      }
+      onMutate();
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSavingId(null);
+    }
+  }, [clientId, push, onMutate]);
+
+  const includedCount = iros.filter((i) => i.incluido).length;
+
+  if (!hasBenchmark && status === "idle") {
+    return (
+      <div className="border-l-4 border-l-slate-300 pl-4 py-2">
+        <p className="text-xs text-slate-500">
+          Completa el benchmark primero — los IROs se generan usando las señales del benchmark + el cuestionario del cliente.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "idle") {
+    return (
+      <div className="border-l-4 border-l-amber-400 pl-4 py-2 space-y-3">
+        <p className="text-xs text-slate-600">
+          La IA generará un inventario preliminar de 15–25 IROs usando el cuestionario del cliente y las señales del benchmark. Tarda 1-3 minutos.
+        </p>
+        <Button size="md" variant="primary" loading={generating} onClick={handleGenerate}>
+          Generar IROs con IA
+        </Button>
+      </div>
+    );
+  }
+
+  if (status === "pending" && isPolling) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-slate-500 py-2 border-l-4 border-l-amber-400 pl-4">
+        <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        Generando IROs — puede tardar 1-3 minutos. No cierres esta página.
+      </div>
+    );
+  }
+
+  if (status === "pending" && !isPolling) {
+    return (
+      <div className="border-l-4 border-l-amber-400 pl-4 py-2 space-y-2">
+        <p className="text-xs text-slate-500">Generación en proceso. Verifica el estado.</p>
+        <Button size="sm" variant="secondary" onClick={onMutate}>Verificar estado</Button>
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <div className="border-l-4 border-l-rose-500 pl-4 py-2 bg-rose-50 rounded-r space-y-2">
+        <p className="text-xs text-rose-700">La generación de IROs falló. Intenta de nuevo.</p>
+        <Button size="sm" variant="primary" loading={generating} onClick={handleGenerate}>Reintentar</Button>
+      </div>
+    );
+  }
+
+  // status === "done"
+  return (
+    <div className="space-y-3">
+      {/* Header resumen */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500">
+            <span className="font-bold text-slate-700">{includedCount}</span> de {iros.length} IROs incluidos
+          </span>
+          <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+            Score: Impacto × Financiero (1=bajo · 2=medio · 3=alto)
+          </span>
+        </div>
+        <Button size="sm" variant="secondary" loading={generating} onClick={handleGenerate}>
+          Regenerar IROs
+        </Button>
+      </div>
+
+      {/* Tabla IROs */}
+      <div className="overflow-x-auto border border-slate-200 rounded">
+        <table className="min-w-full w-max text-xs">
+          <thead>
+            <tr className="bg-slate-100 border-b border-slate-200">
+              <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-8">#</th>
+              <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-32">Tema ESG</th>
+              <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500">Descripción</th>
+              <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Tipo</th>
+              <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-22">Cadena</th>
+              <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Horizonte</th>
+              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Impacto</th>
+              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-20">Financiero</th>
+              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-16">Prioridad</th>
+              <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 w-16">Incluir</th>
+            </tr>
+          </thead>
+          <tbody>
+            {iros.map((iro, idx) => {
+              const isSaving = savingId === iro.id;
+              const pri = prioridad(iro.score_impacto, iro.score_financiero);
+              return (
+                <tr
+                  key={iro.id}
+                  className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/60"} ${!iro.incluido ? "opacity-50" : ""}`}
+                >
+                  <td className="px-2 py-2 text-slate-400 tabular-nums">{iro.n_iro}</td>
+                  <td className="px-2 py-2 text-slate-700 font-medium max-w-[128px]">
+                    <span className="line-clamp-2">{iro.tema_esg}</span>
+                  </td>
+                  <td className="px-2 py-2 text-slate-600 max-w-[320px]">
+                    <ExpandableCell text={iro.descripcion} />
+                  </td>
+                  <td className="px-2 py-2">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${TIPO_BADGE[iro.tipo] ?? "bg-slate-100 text-slate-600"}`}>
+                      {TIPO_SHORT[iro.tipo] ?? iro.tipo}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-slate-600">{CADENA_LABEL[iro.cadena] ?? iro.cadena}</td>
+                  <td className="px-2 py-2 text-slate-600 capitalize">{iro.horizonte}</td>
+                  <td className="px-2 py-2">
+                    <div className="flex justify-center">
+                      <ScorePicker
+                        value={iro.score_impacto}
+                        disabled={isSaving}
+                        onChange={(v) => void patchIro(iro.id, { score_impacto: v })}
+                      />
+                    </div>
+                  </td>
+                  <td className="px-2 py-2">
+                    <div className="flex justify-center">
+                      <ScorePicker
+                        value={iro.score_financiero}
+                        disabled={isSaving}
+                        onChange={(v) => void patchIro(iro.id, { score_financiero: v })}
+                      />
+                    </div>
+                  </td>
+                  <td className={`px-2 py-2 text-center text-[11px] tabular-nums ${pri.color}`}>
+                    {pri.label}
+                  </td>
+                  <td className="px-2 py-2 text-center">
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => void patchIro(iro.id, { incluido: !iro.incluido })}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-colors
+                        ${iro.incluido ? "bg-brand-primary border-brand-primary" : "bg-white border-slate-300 hover:border-slate-400"}
+                        ${isSaving ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                      aria-label={iro.incluido ? "Excluir IRO" : "Incluir IRO"}
+                    >
+                      {iro.incluido && (
+                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 6l3 3 5-5" />
+                        </svg>
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[10px] text-slate-400">
+        Confianza IA: {iros.filter((i) => i.confianza === "alto").length} alta · {iros.filter((i) => i.confianza === "medio").length} media · {iros.filter((i) => i.confianza === "bajo").length} baja.
+        Los scores son editables — ajusta según criterio del consultor.
+      </p>
+    </div>
+  );
+}
+
+// ── Etapa 4: NIS / IBSO ──────────────────────────────────────
+
+const ESTADO_LABEL: Record<NisItem["estado"], string> = {
+  no_identificado: "No identificado",
+  parcial:         "Parcial",
+  disponible:      "Disponible",
+};
+
+const ESTADO_COLOR: Record<NisItem["estado"], string> = {
+  no_identificado: "bg-slate-100 text-slate-500",
+  parcial:         "bg-amber-50 text-amber-700",
+  disponible:      "bg-emerald-50 text-emerald-700",
+};
+
+const CALIDAD_LABEL: Record<NisItem["calidad_dato"], string> = {
+  baja:  "Baja",
+  media: "Media",
+  alta:  "Alta",
+};
+
+const CATEGORIA_LABEL: Record<NisItem["categoria"], string> = {
+  ambiental:  "Ambiental",
+  social:     "Social",
+  gobernanza: "Gobernanza",
+};
+
+const CATEGORIA_COLOR: Record<NisItem["categoria"], string> = {
+  ambiental:  "bg-teal-50 text-teal-700",
+  social:     "bg-violet-50 text-violet-700",
+  gobernanza: "bg-slate-100 text-slate-600",
+};
+
+function NisSection({
+  clientId,
+  nisRows,
+  onMutate,
+}: {
+  clientId: string;
+  nisRows: NisItem[];
+  onMutate: () => void;
+}) {
+  const { push } = useToast();
+  const [generating, setGenerating] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const handleAutoGenerate = useCallback(async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-nis`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al generar NIS");
+      onMutate();
+      push("success", "Indicadores NIS/IBSO generados desde el cuestionario.");
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al generar NIS");
+    } finally {
+      setGenerating(false);
+    }
+  }, [clientId, push, onMutate]);
+
+  const patchNis = useCallback(async (id: string, patch: Partial<Pick<NisItem, "estado" | "calidad_dato" | "accion">>) => {
+    setSavingId(id);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-nis`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error ?? "Error al actualizar NIS");
+      }
+      onMutate();
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSavingId(null);
+    }
+  }, [clientId, push, onMutate]);
+
+  const disponiblesCount = nisRows.filter((r) => r.estado === "disponible").length;
+  const parcialesCount   = nisRows.filter((r) => r.estado === "parcial").length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs text-slate-600">
+          Mapa de brechas de información para los indicadores NIS/IBSO más relevantes del sector.
+          {nisRows.length > 0 && (
+            <span className="ml-1 text-slate-400">
+              {disponiblesCount} disponibles · {parcialesCount} parciales · {nisRows.length - disponiblesCount - parcialesCount} por identificar.
+            </span>
+          )}
+        </p>
+        <Button size="sm" variant={nisRows.length > 0 ? "secondary" : "primary"} loading={generating} onClick={handleAutoGenerate}>
+          {nisRows.length > 0 ? "Actualizar desde cuestionario" : "Auto-completar desde cuestionario"}
+        </Button>
+      </div>
+
+      {nisRows.length === 0 ? (
+        <div className="border-l-4 border-l-slate-300 pl-4 py-2">
+          <p className="text-xs text-slate-500">
+            Haz clic en "Auto-completar" para pre-llenar el mapa de brechas basado en el cuestionario del cliente.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto border border-slate-200 rounded">
+          <table className="min-w-full w-max text-xs">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-200">
+                <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500">Indicador IBSO</th>
+                <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-24">Categoría</th>
+                <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-32">Estado del dato</th>
+                <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-24">Calidad</th>
+                <th className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 w-48">Acción recomendada</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nisRows.map((row, idx) => {
+                const isSaving = savingId === row.id;
+                return (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-slate-100 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/60"}`}
+                  >
+                    <td className="px-2 py-2 text-slate-700 font-medium">{row.ibso_label}</td>
+                    <td className="px-2 py-2">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${CATEGORIA_COLOR[row.categoria]}`}>
+                        {CATEGORIA_LABEL[row.categoria]}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        disabled={isSaving}
+                        value={row.estado}
+                        onChange={(e) => void patchNis(row.id, { estado: e.target.value as NisItem["estado"] })}
+                        className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-sm border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-primary/40 ${ESTADO_COLOR[row.estado]}`}
+                      >
+                        {(["no_identificado", "parcial", "disponible"] as NisItem["estado"][]).map((v) => (
+                          <option key={v} value={v}>{ESTADO_LABEL[v]}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        disabled={isSaving}
+                        value={row.calidad_dato}
+                        onChange={(e) => void patchNis(row.id, { calidad_dato: e.target.value as NisItem["calidad_dato"] })}
+                        className="text-[11px] text-slate-600 border border-slate-200 rounded px-1 py-0.5 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-primary/40"
+                      >
+                        {(["baja", "media", "alta"] as NisItem["calidad_dato"][]).map((v) => (
+                          <option key={v} value={v}>{CALIDAD_LABEL[v]}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <input
+                        type="text"
+                        disabled={isSaving}
+                        defaultValue={row.accion ?? ""}
+                        placeholder="Ej: Solicitar datos a operaciones..."
+                        onBlur={(e) => {
+                          const val = e.target.value.trim() || null;
+                          if (val !== row.accion) void patchNis(row.id, { accion: val });
+                        }}
+                        className="w-full text-[11px] text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-primary/40 font-sans"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Etapa 5: Reporte ─────────────────────────────────────────
 
 function ReporteSection({
   clientId,
@@ -793,12 +1282,17 @@ export function DoubleMaterialidadTab({
   onGoToCuestionario,
 }: Props) {
   const benchmarkKey = `/api/clients/${clientId}/dm-benchmark`;
-  const reportKey = `/api/clients/${clientId}/dm-report`;
+  const irosKey     = `/api/clients/${clientId}/dm-iros`;
+  const nisKey      = `/api/clients/${clientId}/dm-nis`;
+  const reportKey   = `/api/clients/${clientId}/dm-report`;
 
   const [isPolling, setIsPolling] = useState(false);
   const { push } = useToast();
   const pollingNotified = useRef(false);
   const pollingStartId = useRef<string | null>(null);
+
+  const [isIroPolling, setIsIroPolling] = useState(false);
+  const pollingNotifiedIro = useRef(false);
 
   const [isReportPolling, setIsReportPolling] = useState(false);
   const pollingNotifiedReport = useRef(false);
@@ -811,6 +1305,17 @@ export function DoubleMaterialidadTab({
     refreshInterval: isPolling ? 5_000 : 0,
   });
 
+  const { data: irosResp, mutate: mutateIros } = useSWR<{
+    data: { status: IroBatchStatus; iros: IroInventoryItem[] };
+  }>(irosKey, fetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: isIroPolling ? 5_000 : 0,
+  });
+
+  const { data: nisResp, mutate: mutateNis } = useSWR<{
+    data: NisItem[];
+  }>(nisKey, fetcher, { revalidateOnFocus: false });
+
   const { data: reportResp, mutate: mutateReport } = useSWR<{
     data: LatestReport;
   }>(reportKey, fetcher, {
@@ -818,8 +1323,11 @@ export function DoubleMaterialidadTab({
     refreshInterval: isReportPolling ? 5_000 : 0,
   });
 
-  const companies = benchmarkResp?.data.companies ?? [];
+  const companies   = benchmarkResp?.data.companies ?? [];
   const latestResult = benchmarkResp?.data.latest_result ?? null;
+  const irosStatus  = irosResp?.data.status ?? "idle";
+  const iros        = irosResp?.data.iros ?? [];
+  const nisRows     = nisResp?.data ?? [];
   const latestReport = reportResp?.data ?? null;
 
   // Detectar cuando el batch del benchmark termina
@@ -841,6 +1349,24 @@ export function DoubleMaterialidadTab({
       push("error", "El benchmark falló. Intenta de nuevo.");
     }
   }, [latestResult?.id, latestResult?.status, isPolling, push]);
+
+  // Detectar cuando el batch de IROs termina
+  useEffect(() => {
+    if (!isIroPolling) {
+      pollingNotifiedIro.current = false;
+      return;
+    }
+    if (irosStatus === "done" && !pollingNotifiedIro.current) {
+      pollingNotifiedIro.current = true;
+      setIsIroPolling(false);
+      push("success", `${iros.length} IROs generados. Revisa y ajusta los scores.`);
+    }
+    if (irosStatus === "failed" && !pollingNotifiedIro.current) {
+      pollingNotifiedIro.current = true;
+      setIsIroPolling(false);
+      push("error", "La generación de IROs falló. Intenta de nuevo.");
+    }
+  }, [irosStatus, isIroPolling, iros.length, push]);
 
   // Detectar cuando el batch del reporte termina
   useEffect(() => {
@@ -870,20 +1396,31 @@ export function DoubleMaterialidadTab({
       : "active";
 
   const hasBenchmark = latestResult?.status === "done";
-  const hasReport = latestReport?.parse_status === "ok";
+  const hasIros      = irosStatus === "done" && iros.length > 0;
+  const hasNis       = nisRows.length > 0;
+  const hasReport    = latestReport?.parse_status === "ok";
 
-  // Fix: benchmark muestra "done" siempre que exista resultado,
-  // independientemente de si el contexto está completo.
   const stage2Status: StageStatus = hasBenchmark
     ? "done"
     : stage1Status === "done"
     ? "active"
     : "pending";
 
-  // Reporte muestra "done" siempre que exista reporte ok
-  const stage3Status: StageStatus = hasReport
+  const stage3Status: StageStatus = hasIros
     ? "done"
     : hasBenchmark
+    ? "active"
+    : "pending";
+
+  const stage4Status: StageStatus = hasNis
+    ? "done"
+    : hasIros
+    ? "active"
+    : "pending";
+
+  const stage5Status: StageStatus = hasReport
+    ? "done"
+    : hasIros
     ? "active"
     : "pending";
 
@@ -898,19 +1435,21 @@ export function DoubleMaterialidadTab({
   return (
     <div className="space-y-6 py-4">
       {/* ── Stepper header ── */}
-      <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-        <StageIndicator number={1} label="Contexto" status={stage1Status} />
-        <div className="w-8 h-px bg-slate-200" aria-hidden />
+      <div className="flex items-center gap-2 pb-4 border-b border-slate-100 flex-wrap">
+        <StageIndicator number={1} label="Contexto"  status={stage1Status} />
+        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
         <StageIndicator number={2} label="Benchmark" status={stage2Status} />
-        <div className="w-8 h-px bg-slate-200" aria-hidden />
-        <StageIndicator number={3} label="Reporte" status={stage3Status} />
+        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+        <StageIndicator number={3} label="IROs"      status={stage3Status} />
+        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+        <StageIndicator number={4} label="NIS/IBSO"  status={stage4Status} />
+        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+        <StageIndicator number={5} label="Reporte"   status={stage5Status} />
       </div>
 
       {/* ── Etapa 1 ── */}
       <section aria-labelledby="stage-contexto">
-        <h2 id="stage-contexto" className="sr-only">
-          Contexto del cliente
-        </h2>
+        <h2 id="stage-contexto" className="sr-only">Contexto del cliente</h2>
         <ContextoSection
           progress={questionnaireProgress}
           onGoToCuestionario={onGoToCuestionario}
@@ -919,9 +1458,7 @@ export function DoubleMaterialidadTab({
 
       {/* ── Etapa 2 ── */}
       <section aria-labelledby="stage-benchmark">
-        <h2 id="stage-benchmark" className="sr-only">
-          Benchmark competitivo
-        </h2>
+        <h2 id="stage-benchmark" className="sr-only">Benchmark competitivo</h2>
         <BenchmarkSection
           clientId={clientId}
           clientName={clientName}
@@ -937,11 +1474,41 @@ export function DoubleMaterialidadTab({
         />
       </section>
 
-      {/* ── Etapa 3 ── */}
-      <section aria-labelledby="stage-reporte">
-        <h2 id="stage-reporte" className="sr-only">
-          Reporte de Doble Materialidad
+      {/* ── Etapa 3 — IROs del cliente ── */}
+      <section aria-labelledby="stage-iros">
+        <h2 id="stage-iros" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+          Inventario de IROs
         </h2>
+        <IroSection
+          clientId={clientId}
+          iros={iros}
+          status={irosStatus}
+          isPolling={isIroPolling}
+          hasBenchmark={hasBenchmark}
+          onMutate={() => void mutateIros()}
+          onStartPolling={() => {
+            pollingNotifiedIro.current = false;
+            setIsIroPolling(true);
+            void mutateIros();
+          }}
+        />
+      </section>
+
+      {/* ── Etapa 4 — NIS / IBSO ── */}
+      <section aria-labelledby="stage-nis">
+        <h2 id="stage-nis" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+          NIS / IBSO — Brechas de información
+        </h2>
+        <NisSection
+          clientId={clientId}
+          nisRows={nisRows}
+          onMutate={() => void mutateNis()}
+        />
+      </section>
+
+      {/* ── Etapa 5 — Reporte ── */}
+      <section aria-labelledby="stage-reporte">
+        <h2 id="stage-reporte" className="sr-only">Reporte de Doble Materialidad</h2>
         <ReporteSection
           clientId={clientId}
           clientName={clientName}

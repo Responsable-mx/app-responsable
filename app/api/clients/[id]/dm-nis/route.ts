@@ -1,0 +1,151 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { requireConsultorForClient } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getIbsoForSector } from "@/lib/dm/nis-catalog";
+import { getClient } from "@/lib/clients";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const PatchBody = z.object({
+  id:           z.string().uuid(),
+  estado:       z.enum(["no_identificado", "parcial", "disponible"]).optional(),
+  calidad_dato: z.enum(["baja", "media", "alta"]).optional(),
+  accion:       z.string().max(400).nullable().optional(),
+});
+
+type Ctx = { params: Promise<{ id: string }> };
+
+// ── GET — devuelve filas NIS/IBSO del cliente ─────────────────
+
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("client_nis_assessment")
+    .select("*")
+    .eq("client_id", id)
+    .order("sort_order", { ascending: true });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data: data ?? [] });
+}
+
+// ── POST — genera NIS desde cuestionario (sin IA, instantáneo) ─
+
+// Keywords por indicador — detecta si el cuestionario menciona este tema
+const INDICATOR_KEYWORDS: Record<string, string[]> = {
+  emisiones_ghg:          ["emision", "ghg", "carbono", "co2", "gases", "huella", "alcance"],
+  consumo_energia:        ["energia", "kwh", "electricidad", "combustible", "renovable", "solar"],
+  consumo_agua:           ["agua", "water", "hidrico", "descarga", "consumo agua"],
+  residuos:               ["residuo", "desecho", "basura", "reciclaje", "disposicion", "manejo residuo"],
+  cumplimiento_ambiental: ["norma ambiental", "regulacion", "licencia ambiental", "iso 14001", "semarnat"],
+  seguridad_laboral:      ["seguridad", "accidente", "incidente", "salud laboral", "lesion", "ergonomia"],
+  capacitacion:           ["capacitacion", "formacion", "entrenamiento", "desarrollo personal", "becas"],
+  condiciones_laborales:  ["salario", "jornada", "contrato", "derechos laborales", "sindical"],
+  cadena_suministro:      ["proveedor", "cadena suministro", "compra sostenible", "supply chain"],
+  privacidad_datos:       ["datos personales", "privacidad", "ciberseguridad", "gdpr", "lfpdppp"],
+  etica_anticorrupcion:   ["etica", "anticorrupcion", "soborno", "integridad", "codigo conducta", "whistleblower"],
+  gestion_riesgos_esg:    ["riesgo", "gobierno", "esg", "comite", "politica sostenibilidad", "materialidad"],
+};
+
+export async function POST(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const client = await getClient(id).catch(() => null);
+  if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+
+  const admin = createAdminClient();
+
+  // Obtener cuestionario para pattern-matching
+  const { data: qData } = await admin
+    .from("questionnaire_responses")
+    .select("responses")
+    .eq("client_id", id)
+    .eq("service_key", "doble-materialidad")
+    .maybeSingle();
+
+  const questText = qData?.responses
+    ? JSON.stringify(qData.responses).toLowerCase()
+    : "";
+
+  // Indicadores relevantes según sector
+  const ibsos = getIbsoForSector(client.sector);
+
+  const rows = ibsos.map((ibso) => {
+    const keywords = INDICATOR_KEYWORDS[ibso.key] ?? [];
+    const hasEvidence = keywords.some((kw) => questText.includes(kw));
+    return {
+      client_id:    id,
+      ibso_key:     ibso.key,
+      ibso_label:   ibso.label,
+      categoria:    ibso.categoria,
+      estado:       hasEvidence ? "parcial" : "no_identificado",
+      calidad_dato: hasEvidence ? "media" : "baja",
+      accion:       null as string | null,
+      sort_order:   ibso.sort_order,
+    };
+  });
+
+  // Insertar solo los indicadores que no existen aún (preservar ediciones del consultor)
+  const { data: existing } = await admin
+    .from("client_nis_assessment")
+    .select("ibso_key")
+    .eq("client_id", id);
+
+  const existingKeys = new Set((existing ?? []).map((r) => r.ibso_key));
+  const toInsert = rows.filter((r) => !existingKeys.has(r.ibso_key));
+
+  if (toInsert.length > 0) {
+    await admin.from("client_nis_assessment").insert(toInsert);
+  }
+
+  const { data: final } = await admin
+    .from("client_nis_assessment")
+    .select("*")
+    .eq("client_id", id)
+    .order("sort_order", { ascending: true });
+
+  return NextResponse.json({ data: final ?? [] });
+}
+
+// ── PATCH — actualiza una fila ────────────────────────────────
+
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+  const parsed = PatchBody.safeParse(body);
+  if (!parsed.success)
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Body inválido" }, { status: 400 });
+
+  const { id: nisId, ...fields } = parsed.data;
+
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (fields.estado !== undefined)       update.estado = fields.estado;
+  if (fields.calidad_dato !== undefined) update.calidad_dato = fields.calidad_dato;
+  if (fields.accion !== undefined)       update.accion = fields.accion;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("client_nis_assessment")
+    .update(update)
+    .eq("id", nisId)
+    .eq("client_id", id)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data });
+}

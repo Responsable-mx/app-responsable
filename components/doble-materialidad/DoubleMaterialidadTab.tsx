@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +11,18 @@ import { RELATION_LABELS, RELATION_ORDER, type CompanyRelation } from "@/lib/dm/
 import { SelectField } from "@/components/ui/SelectField";
 import type { DmIroConfig } from "@/lib/dm/iros";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
+import { classifyEsg, ESG_BADGE } from "@/lib/dm/esg-classify";
+import { ResumenEjecutivoSection } from "@/components/doble-materialidad/ResumenEjecutivoSection";
+import { ChecklistCierre } from "@/components/doble-materialidad/ChecklistCierre";
+import { LogDecisionesSection } from "@/components/doble-materialidad/LogDecisionesSection";
+
+const MatrizDM = dynamic(
+  () => import("@/components/doble-materialidad/MatrizDM").then((m) => ({ default: m.MatrizDM })),
+  {
+    loading: () => <div className="h-40 bg-slate-50 animate-pulse rounded" />,
+    ssr: false,
+  }
+);
 
 // ── Tipos ────────────────────────────────────────────────────
 
@@ -1310,9 +1323,21 @@ function IroSection({
             Dim 1 (Severidad/Prob.) × Dim 2 (Materialidad) · 1=bajo · 2=medio · 3=alto ⓘ
           </span>
         </div>
-        <Button size="sm" variant="secondary" loading={generating} onClick={handleGenerate}>
-          Regenerar IROs
-        </Button>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/api/clients/${clientId}/dm-export-iros`}
+            download
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2 12h12M8 2v8m0 0-3-3m3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Exportar Excel
+          </a>
+          <Button size="sm" variant="secondary" loading={generating} onClick={handleGenerate}>
+            Regenerar IROs
+          </Button>
+        </div>
       </div>
 
       {/* Tabla IROs */}
@@ -1344,6 +1369,27 @@ function IroSection({
                     <span className="ml-2 text-[10px] text-teal-500">
                       · {group.items.filter((i) => i.incluido).length}/{group.items.length}
                     </span>
+                    {(() => {
+                      const cat = classifyEsg(group.tema);
+                      return (
+                        <span className={`ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-widest ${ESG_BADGE[cat]}`}>
+                          {cat}
+                        </span>
+                      );
+                    })()}
+                    {(() => {
+                      const consolidado = Math.max(
+                        ...group.items.filter(i => i.score_impacto || i.score_financiero)
+                          .map(i => Math.max(i.score_impacto ?? 0, i.score_financiero ?? 0))
+                      );
+                      if (!isFinite(consolidado) || consolidado === 0) return null;
+                      const color = consolidado === 3 ? "text-rose-600" : consolidado === 2 ? "text-amber-600" : "text-emerald-600";
+                      return (
+                        <span className={`ml-3 text-[9px] tabular-nums ${color}`} title="Score consolidado del tema (max de impacto y financiero)">
+                          Score max: {consolidado}
+                        </span>
+                      );
+                    })()}
                   </td>
                 </tr>
                 {/* ── IROs del bloque ── */}
@@ -1991,6 +2037,12 @@ export function DoubleMaterialidadTab({
     ? "active"
     : "pending";
 
+  const stage6Status: StageStatus = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length >= 3
+    ? "active"
+    : hasIros ? "pending" : "pending";
+
+  const stage7Status: StageStatus = hasIros ? "active" : "pending";
+
   if (loadingBenchmark) {
     return (
       <div className="py-6">
@@ -2012,6 +2064,10 @@ export function DoubleMaterialidadTab({
         <StageIndicator number={4} label="NIS/IBSO"  status={stage4Status} />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
         <StageIndicator number={5} label="Reporte"   status={stage5Status} />
+        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+        <StageIndicator number={6} label="Matriz"    status={stage6Status} />
+        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+        <StageIndicator number={7} label="Resumen"   status={stage7Status} />
       </div>
 
       {/* ── Etapa 1 ── */}
@@ -2064,6 +2120,16 @@ export function DoubleMaterialidadTab({
         />
       </section>
 
+      {/* ── Etapa 3.5 — Matriz de Doble Materialidad ── */}
+      {iros.filter((i) => i.incluido && i.score_impacto && i.score_financiero).length >= 3 && (
+        <section aria-labelledby="stage-matriz">
+          <h2 id="stage-matriz" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+            Matriz de Doble Materialidad
+          </h2>
+          <MatrizDM iros={iros.filter((i) => i.incluido)} />
+        </section>
+      )}
+
       {/* ── Etapa 4 — NIS / IBSO ── */}
       <section aria-labelledby="stage-nis">
         <h2 id="stage-nis" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
@@ -2093,6 +2159,41 @@ export function DoubleMaterialidadTab({
             void mutateReport();
           }}
         />
+      </section>
+
+      {/* ── Resumen ejecutivo IA ── */}
+      {hasIros && (
+        <section aria-labelledby="stage-resumen">
+          <h2 id="stage-resumen" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+            Resumen Ejecutivo (IA)
+          </h2>
+          <ResumenEjecutivoSection clientId={clientId} />
+        </section>
+      )}
+
+      {/* ── Checklist de cierre ── */}
+      <section aria-labelledby="stage-checklist">
+        <h2 id="stage-checklist" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+          Checklist de Cierre
+        </h2>
+        <ChecklistCierre
+          questionnaireProgress={questionnaireProgress}
+          hasCompletedBenchmark={hasBenchmark}
+          iroCount={iros.length}
+          includedIroCount={iros.filter((i) => i.incluido).length}
+          scoredIroCount={iros.filter((i) => i.score_impacto !== null && i.score_financiero !== null).length}
+          hasNisData={hasNis}
+          hasReport={hasReport}
+          hasResumen={false}
+        />
+      </section>
+
+      {/* ── Log de decisiones ── */}
+      <section aria-labelledby="stage-log">
+        <h2 id="stage-log" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+          Log de Decisiones
+        </h2>
+        <LogDecisionesSection clientId={clientId} />
       </section>
     </div>
   );

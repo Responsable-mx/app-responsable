@@ -222,6 +222,20 @@ export function ClientForm(props: Props) {
           />
         </div>
 
+        {/* Sitio web — elevado: fuente primaria para IA */}
+        <Field label="Sitio web corporativo">
+          <input
+            type="text"
+            value={form.website_url}
+            onChange={(e) => update("website_url", e.target.value)}
+            className={inputCls}
+            placeholder="responsable.net"
+          />
+          <p className="text-[10px] text-slate-400 mt-1">
+            La IA usará este sitio como fuente primaria para llenar el cuestionario automáticamente.
+          </p>
+        </Field>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div className="flex items-end justify-between gap-2 mb-1">
@@ -269,21 +283,15 @@ export function ClientForm(props: Props) {
           placeholder="México, Colombia, España…"
         />
 
-        {/* Sitio web corporativo */}
-        <Field label="Sitio web corporativo">
-          <input
-            type="text"
-            value={form.website_url}
-            onChange={(e) => update("website_url", e.target.value)}
-            className={inputCls}
-            placeholder="responsable.net"
-          />
-          <p className="text-[10px] text-slate-400 mt-1">
-            La IA usará este sitio como fuente primaria para llenar el cuestionario automáticamente.
-          </p>
-        </Field>
+        <MultiSelectCombobox
+          category="services"
+          label="Servicios contratados"
+          hint="Define qué tabs y funciones IA se habilitan para este cliente."
+          value={form.services}
+          onChange={(v) => update("services", (v as string[]) ?? [])}
+        />
 
-        {/* Logo URL */}
+        {/* Logo — al final: dato cosmético */}
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">
             URL del logo
@@ -331,17 +339,6 @@ export function ClientForm(props: Props) {
             URL pública de la imagen (PNG, SVG, JPG). Si no se carga, se muestra el monograma.
           </p>
         </div>
-      </Section>
-
-      {/* ═══ Servicios contratados ════════════════════════════ */}
-      <Section title="Servicios contratados">
-        <MultiSelectCombobox
-          category="services"
-          label="Servicios ResponSable"
-          hint="Define qué tabs y funciones IA se habilitan para este cliente."
-          value={form.services}
-          onChange={(v) => update("services", (v as string[]) ?? [])}
-        />
       </Section>
 
       {/* ═══ Atributos de sostenibilidad ═════════════════════ */}

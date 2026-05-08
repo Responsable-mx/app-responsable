@@ -128,11 +128,11 @@ ESTÁNDARES ESRS A ANALIZAR (2 dimensiones por estándar):
 ${iroSections.join("\n\n")}
 
 INSTRUCCIONES:
-- Por cada dimensión (impacto + riesgo/oportunidad): 2-3 oraciones por empresa (incluye a ${clientName}).
+- Por cada dimensión (impacto + riesgo/oportunidad): 1-2 oraciones concisas por empresa (incluye a ${clientName}).
 - Si en "Datos del cuestionario" hay información del cliente, úsala como evidencia concreta en el análisis de ${clientName}.
-- Si no hay datos públicos verificables para una empresa en una dimensión, escribe "Sin datos públicos disponibles" y explica brevemente la relevancia.
+- Si no hay datos públicos verificables para una empresa en una dimensión, escribe "Sin datos públicos disponibles."
 - CRÍTICO: usa EXACTAMENTE los nombres de empresa tal como aparecen en EMPRESAS A COMPARAR como claves del JSON.
-- Cierra con párrafo narrativo de 80-120 palabras: posición de ${clientName}, fortalezas clave, brechas por dimensión y recomendación de priorización.
+- Cierra con párrafo narrativo de 60-80 palabras: posición de ${clientName}, fortalezas clave, brechas principales y prioridad recomendada.
 
 JSON únicamente — usa estas claves exactas: ${fieldKeys}
 {
@@ -585,7 +585,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: resultRow.id,
           params: {
             model,
-            max_tokens: 6000, // 10 empresas × 5 campos × 2-3 oraciones ≈ 4500 tokens mínimo
+            max_tokens: 8000, // 10 IROs × 2 dims × N empresas × 1-2 oraciones; máximo claude-sonnet-4-6
             system: [{
               type: "text",
               text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",

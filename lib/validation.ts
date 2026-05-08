@@ -71,6 +71,9 @@ export const PromptKeySchema = z.enum([
   "role.rebeca",
   "role.elena",
   "role.valeria",
+  "dm.benchmark_propose",
+  "dm.iro_generation",
+  "dm.report",
 ]);
 
 export const PromptUpdateSchema = z.object({

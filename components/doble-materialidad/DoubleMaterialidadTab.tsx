@@ -13,6 +13,21 @@ import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 
 // ── Tipos ────────────────────────────────────────────────────
 
+type RejectionReason =
+  | "sector_diferente"
+  | "tamano_incomparable"
+  | "sin_reporte"
+  | "ya_es_cliente"
+  | "otro";
+
+const REJECTION_OPTIONS: { value: RejectionReason; label: string }[] = [
+  { value: "sector_diferente",    label: "Sector diferente" },
+  { value: "tamano_incomparable", label: "Tamaño incomparable" },
+  { value: "sin_reporte",         label: "Sin reporte público" },
+  { value: "ya_es_cliente",       label: "Ya es cliente" },
+  { value: "otro",                label: "Otro motivo" },
+];
+
 type BenchmarkCompany = {
   id: string;
   client_id: string;
@@ -24,6 +39,8 @@ type BenchmarkCompany = {
   relation: CompanyRelation;
   proposed_by: "ia" | "consultor";
   validated: boolean;
+  rejection_reason: RejectionReason | null;
+  reports_publicly: boolean | null;
   created_at: string;
 };
 
@@ -361,6 +378,8 @@ function BenchmarkSection({
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(companies.filter((c) => c.validated).map((c) => c.id))
   );
+  // ID de empresa esperando razón de rechazo (al desmarcar)
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   const handlePropose = useCallback(async () => {
     setProposing(true);
@@ -394,17 +413,60 @@ function BenchmarkSection({
 
   const handleToggle = useCallback((id: string) => {
     setSelected((prev) => {
+      if (prev.has(id)) {
+        // Deseleccionando → pedir razón de rechazo en lugar de quitar directo
+        setRejectingId(id);
+        return prev; // no quitar todavía — se quita tras elegir razón
+      }
+      // Seleccionando → limpiar rejection_reason si tenía una
+      void fetch(`/api/clients/${clientId}/dm-benchmark`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: id, rejection_reason: null }),
+      });
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.add(id);
       return next;
     });
-  }, []);
+  }, [clientId]);
+
+  const handleRejectionPick = useCallback(async (companyId: string, reason: RejectionReason | null) => {
+    // Quitar de selección
+    setSelected((prev) => { const n = new Set(prev); n.delete(companyId); return n; });
+    setRejectingId(null);
+    if (reason) {
+      await fetch(`/api/clients/${clientId}/dm-benchmark`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId, rejection_reason: reason }),
+      });
+      onDataMutate();
+    }
+  }, [clientId, onDataMutate]);
+
+  const handleToggleReportsPublicly = useCallback(async (companyId: string, current: boolean | null) => {
+    const next = current === true ? false : current === false ? null : true;
+    await fetch(`/api/clients/${clientId}/dm-benchmark`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company_id: companyId, reports_publicly: next }),
+    });
+    onDataMutate();
+  }, [clientId, onDataMutate]);
 
   const handleCompare = useCallback(async () => {
     if (selected.size < 2) {
       push("error", "Selecciona al menos 2 empresas para el benchmark");
       return;
+    }
+    // C — diversidad mínima de relaciones (best practice mundial: ≥2 tipos)
+    const selectedCompanies = companies.filter((c) => selected.has(c.id));
+    const relationTypes = new Set(selectedCompanies.map((c) => c.relation));
+    if (relationTypes.size < 2) {
+      push(
+        "warning",
+        "Todas las empresas son del mismo tipo de relación. Considera agregar al menos un tipo diferente (sector, cadena de valor, etc.) para un benchmark más robusto."
+      );
     }
     try {
       const res = await fetch(`/api/clients/${clientId}/dm-benchmark`, {
@@ -716,71 +778,126 @@ function BenchmarkSection({
               </p>
               <div className="space-y-1">
                 {group.map((company) => (
-                  <label
-                    key={company.id}
-                    className="flex items-start gap-2.5 p-2.5 border border-slate-200 rounded cursor-pointer hover:bg-slate-50 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(company.id)}
-                      onChange={() => handleToggle(company.id)}
-                      className="mt-0.5 accent-brand-primary"
-                    />
-                    <div className="flex-1 min-w-0">
-                      {/* Nombre + país + link web */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-medium text-slate-800">{company.name}</span>
-                        {company.country && (
-                          <span className="text-xs text-slate-400">{company.country}</span>
+                  <div key={company.id} className="border border-slate-200 rounded overflow-hidden">
+                    {/* Fila principal */}
+                    <div className="flex items-start gap-2.5 p-2.5 hover:bg-slate-50 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(company.id)}
+                        onChange={() => handleToggle(company.id)}
+                        className="mt-0.5 accent-brand-primary cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        {/* Nombre + país + link web */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-medium text-slate-800">{company.name}</span>
+                          {company.country && (
+                            <span className="text-xs text-slate-400">{company.country}</span>
+                          )}
+                          {company.website && (
+                            <a
+                              href={company.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-brand-primary hover:text-brand-primary-dark shrink-0"
+                              title={company.website}
+                            >
+                              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M7 1h4v4M11 1L5.5 6.5M4 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V9" />
+                              </svg>
+                            </a>
+                          )}
+                          {/* Razón de rechazo guardada */}
+                          {!selected.has(company.id) && company.rejection_reason && (
+                            <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-200 px-1.5 py-0.5 rounded-sm">
+                              {REJECTION_OPTIONS.find((r) => r.value === company.rejection_reason)?.label ?? company.rejection_reason}
+                            </span>
+                          )}
+                        </div>
+                        {/* Sector */}
+                        {company.sector && (
+                          <p className="text-xs text-slate-500 truncate mt-0.5">{company.sector}</p>
                         )}
-                        {company.website && (
-                          <a
-                            href={company.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-brand-primary hover:text-brand-primary-dark shrink-0"
-                            title={company.website}
-                          >
-                            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M7 1h4v4M11 1L5.5 6.5M4 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V9" />
-                            </svg>
-                          </a>
+                        {/* Justificación IA */}
+                        {company.justification && (
+                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">{company.justification}</p>
                         )}
                       </div>
-                      {/* Sector */}
-                      {company.sector && (
-                        <p className="text-xs text-slate-500 truncate mt-0.5">{company.sector}</p>
-                      )}
-                      {/* Justificación IA */}
-                      {company.justification && (
-                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">{company.justification}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {company.proposed_by === "ia" && (
-                        <span className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded-sm">
-                          IA
-                        </span>
-                      )}
-                      {company.proposed_by === "consultor" && (
+                      {/* Controles derecha */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* B — toggle reporte ESG público */}
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            void handleRemoveCompany(company.id);
-                          }}
-                          className="text-slate-300 hover:text-rose-500 transition-colors"
-                          title="Eliminar empresa"
+                          onClick={() => void handleToggleReportsPublicly(company.id, company.reports_publicly)}
+                          title={
+                            company.reports_publicly === true
+                              ? "Tiene reporte ESG público — clic para cambiar"
+                              : company.reports_publicly === false
+                              ? "Sin reporte ESG público — clic para cambiar"
+                              : "¿Tiene reporte ESG público? (GRI/CSRD/TCFD)"
+                          }
+                          className={`p-0.5 rounded transition-colors ${
+                            company.reports_publicly === true
+                              ? "text-teal-600"
+                              : company.reports_publicly === false
+                              ? "text-slate-300 line-through"
+                              : "text-slate-300 hover:text-slate-500"
+                          }`}
                         >
                           <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M2 3.5h10M5 3.5V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4M3 3.5l.75 7a.5.5 0 00.5.5h5.5a.5.5 0 00.5-.5L11 3.5" />
+                            <path d="M3 1h6l3 3v9H3V1z" />
+                            <path d="M9 1v3h3" />
+                            <path d="M5 7h4M5 9.5h3" />
                           </svg>
                         </button>
-                      )}
+                        {company.proposed_by === "ia" && (
+                          <span className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded-sm">
+                            IA
+                          </span>
+                        )}
+                        {company.proposed_by === "consultor" && (
+                          <button
+                            type="button"
+                            onClick={() => void handleRemoveCompany(company.id)}
+                            className="text-slate-300 hover:text-rose-500 transition-colors"
+                            title="Eliminar empresa"
+                          >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 3.5h10M5 3.5V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4M3 3.5l.75 7a.5.5 0 00.5.5h5.5a.5.5 0 00.5-.5L11 3.5" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </label>
+
+                    {/* A — picker razón de rechazo (aparece al desmarcar) */}
+                    {rejectingId === company.id && (
+                      <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+                          ¿Por qué no incluyes esta empresa?
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {REJECTION_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => void handleRejectionPick(company.id, opt.value)}
+                              className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm hover:border-brand-primary hover:text-brand-primary transition-colors"
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => void handleRejectionPick(company.id, null)}
+                            className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1"
+                          >
+                            Omitir
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

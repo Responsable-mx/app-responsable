@@ -347,7 +347,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     // proposed_by="ia" + proposed_by="consultor" — ambas cuentan como señal
     const { data: prevCompanies } = await admin
       .from("dm_benchmark_companies")
-      .select("name, relation, validated, proposed_by")
+      .select("name, relation, validated, proposed_by, rejection_reason, reports_publicly")
       .eq("client_id", id);
 
     let feedbackContext = "";
@@ -362,10 +362,24 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       );
       const lines: string[] = [];
       if (approved.length > 0) {
-        lines.push(`El consultor ya aprobó estas empresas (no repetirlas, sino buscar alternativas complementarias):\n${approved.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
+        lines.push(
+          `El consultor ya aprobó estas empresas (no repetirlas, sino buscar alternativas complementarias):\n` +
+          approved.map((c) => {
+            const pub = c.reports_publicly === true ? " [con reporte ESG público verificado]" : "";
+            return `  - ${c.name} [${c.relation}]${pub}`;
+          }).join("\n")
+        );
       }
       if (rejected.length > 0) {
-        lines.push(`El consultor rechazó o no seleccionó estas empresas (no volver a proponerlas):\n${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
+        lines.push(
+          `El consultor rechazó o no seleccionó estas empresas (no volver a proponerlas):\n` +
+          rejected.map((c) => {
+            const reason = c.rejection_reason
+              ? ` — motivo: ${c.rejection_reason.replace(/_/g, " ")}`
+              : "";
+            return `  - ${c.name} [${c.relation}]${reason}`;
+          }).join("\n")
+        );
       }
       feedbackContext = lines.join("\n\n");
     }
@@ -610,4 +624,64 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       status: "pending",
     },
   });
+}
+
+// ── PATCH — actualiza rejection_reason o reports_publicly de una empresa ─────
+
+const CompanyPatchBody = z.object({
+  company_id: z.string().uuid(),
+  rejection_reason: z.enum([
+    "sector_diferente",
+    "tamano_incomparable",
+    "sin_reporte",
+    "ya_es_cliente",
+    "otro",
+  ]).nullable().optional(),
+  reports_publicly: z.boolean().nullable().optional(),
+});
+
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const parsed = CompanyPatchBody.safeParse(body);
+  if (!parsed.success)
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Body inválido" }, { status: 400 });
+
+  const { company_id, rejection_reason, reports_publicly } = parsed.data;
+
+  // Verificar pertenencia al cliente
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("dm_benchmark_companies")
+    .select("id")
+    .eq("id", company_id)
+    .eq("client_id", id)
+    .maybeSingle();
+
+  if (!existing) return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 });
+
+  const updatePayload: Record<string, unknown> = {};
+  if (rejection_reason !== undefined) updatePayload.rejection_reason = rejection_reason;
+  if (reports_publicly !== undefined) updatePayload.reports_publicly = reports_publicly;
+
+  if (Object.keys(updatePayload).length === 0)
+    return NextResponse.json({ error: "Sin campos a actualizar" }, { status: 400 });
+
+  const { data, error } = await admin
+    .from("dm_benchmark_companies")
+    .update(updatePayload)
+    .eq("id", company_id)
+    .eq("client_id", id)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data });
 }

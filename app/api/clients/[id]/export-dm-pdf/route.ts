@@ -4,7 +4,7 @@ import React from "react";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DmReportDocument, type DmReportData, type ReportNarrative, type IroInventoryPdfItem, type NisBrechasPdfItem } from "@/lib/pdf/dm-report";
+import { DmReportDocument, type DmReportData, type ReportNarrative, type IroInventoryPdfItem, type NisBrechasPdfItem, type PriorityTopic } from "@/lib/pdf/dm-report";
 import { BENCHMARK_FIELDS } from "@/lib/dm/fields";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
@@ -90,6 +90,27 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       improvement_areas: ["Genera el reporte con IA para obtener áreas de mejora específicas"],
       recommendations: [{ action: "Generar reporte completo con IA desde el tab de Doble Materialidad", priority: "inmediata" }],
     };
+  }
+
+  // Reemplazar priority_topics AI-generados por los scores reales del consultor cuando estén disponibles.
+  // Mapeo 1-3 → 1-10: 1→3, 2→6, 3→9 (separación clara entre niveles)
+  const SCORE_MAP: Record<number, number> = { 1: 3, 2: 6, 3: 9 };
+  const irosConScores = iros.filter((i) => i.score_impacto != null && i.score_financiero != null);
+  if (irosConScores.length >= 3) {
+    const derivedTopics: PriorityTopic[] = irosConScores.map((iro) => {
+      const imp = iro.score_impacto ?? 1;
+      const fin = iro.score_financiero ?? 1;
+      const sum = imp + fin;
+      const prioridad: "alta" | "media" | "baja" = sum >= 5 ? "alta" : sum >= 3 ? "media" : "baja";
+      return {
+        tema: iro.tema_esg,
+        score_financiero: SCORE_MAP[fin] ?? 3,
+        score_impacto:    SCORE_MAP[imp] ?? 3,
+        prioridad,
+        accion_clave: iro.descripcion.slice(0, 65) + (iro.descripcion.length > 65 ? "…" : ""),
+      };
+    });
+    narrative = { ...narrative, priority_topics: derivedTopics };
   }
 
   const reportData: DmReportData = {

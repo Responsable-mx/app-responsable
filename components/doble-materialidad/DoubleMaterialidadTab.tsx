@@ -739,6 +739,14 @@ function IroSection({
 
   const includedCount = iros.filter((i) => i.incluido).length;
 
+  // Agrupar por tema_esg preservando orden de aparición
+  const groups: Array<{ tema: string; items: IroInventoryItem[] }> = [];
+  for (const iro of iros) {
+    const existing = groups.find((g) => g.tema === iro.tema_esg);
+    if (existing) existing.items.push(iro);
+    else groups.push({ tema: iro.tema_esg, items: [iro] });
+  }
+
   if (!hasBenchmark && status === "idle") {
     return (
       <div className="border-l-4 border-l-slate-300 pl-4 py-2">
@@ -799,7 +807,8 @@ function IroSection({
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">
-            <span className="font-bold text-slate-700">{includedCount}</span> de {iros.length} IROs incluidos
+            <span className="font-bold text-slate-700">{groups.length}</span> bloques ·{" "}
+            <span className="font-bold text-slate-700">{includedCount}</span>/{iros.length} IROs incluidos
           </span>
           <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
             Score: Impacto × Financiero (1=bajo · 2=medio · 3=alto)
@@ -828,69 +837,90 @@ function IroSection({
             </tr>
           </thead>
           <tbody>
-            {iros.map((iro, idx) => {
-              const isSaving = savingId === iro.id;
-              const pri = prioridad(iro.score_impacto, iro.score_financiero);
-              return (
-                <tr
-                  key={iro.id}
-                  className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/60"} ${!iro.incluido ? "opacity-50" : ""}`}
-                >
-                  <td className="px-2 py-2 text-slate-400 tabular-nums">{iro.n_iro}</td>
-                  <td className="px-2 py-2 text-slate-700 font-medium max-w-[128px]">
-                    <span className="line-clamp-2">{iro.tema_esg}</span>
-                  </td>
-                  <td className="px-2 py-2 text-slate-600 max-w-[320px]">
-                    <ExpandableCell text={iro.descripcion} />
-                  </td>
-                  <td className="px-2 py-2">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${TIPO_BADGE[iro.tipo] ?? "bg-slate-100 text-slate-600"}`}>
-                      {TIPO_SHORT[iro.tipo] ?? iro.tipo}
+            {groups.map((group) => (
+              <>
+                {/* ── Cabecera de bloque temático ── */}
+                <tr key={`group-${group.tema}`} className="bg-teal-50 border-b border-teal-200">
+                  <td colSpan={10} className="px-2 py-1.5 border-l-2 border-l-brand-primary">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-teal-700">
+                      {group.tema}
+                    </span>
+                    <span className="ml-2 text-[10px] text-teal-500">
+                      · {group.items.filter((i) => i.incluido).length}/{group.items.length}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-slate-600">{CADENA_LABEL[iro.cadena] ?? iro.cadena}</td>
-                  <td className="px-2 py-2 text-slate-600 capitalize">{iro.horizonte}</td>
-                  <td className="px-2 py-2">
-                    <div className="flex justify-center">
-                      <ScorePicker
-                        value={iro.score_impacto}
-                        disabled={isSaving}
-                        onChange={(v) => void patchIro(iro.id, { score_impacto: v })}
-                      />
-                    </div>
-                  </td>
-                  <td className="px-2 py-2">
-                    <div className="flex justify-center">
-                      <ScorePicker
-                        value={iro.score_financiero}
-                        disabled={isSaving}
-                        onChange={(v) => void patchIro(iro.id, { score_financiero: v })}
-                      />
-                    </div>
-                  </td>
-                  <td className={`px-2 py-2 text-center text-[11px] tabular-nums ${pri.color}`}>
-                    {pri.label}
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => void patchIro(iro.id, { incluido: !iro.incluido })}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-colors
-                        ${iro.incluido ? "bg-brand-primary border-brand-primary" : "bg-white border-slate-300 hover:border-slate-400"}
-                        ${isSaving ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                      aria-label={iro.incluido ? "Excluir IRO" : "Incluir IRO"}
-                    >
-                      {iro.incluido && (
-                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 6l3 3 5-5" />
-                        </svg>
-                      )}
-                    </button>
-                  </td>
                 </tr>
-              );
-            })}
+                {/* ── IROs del bloque ── */}
+                {group.items.map((iro, idx) => {
+                  const isSaving = savingId === iro.id;
+                  const pri = prioridad(iro.score_impacto, iro.score_financiero);
+                  return (
+                    <tr
+                      key={iro.id}
+                      className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/60"} ${!iro.incluido ? "opacity-50" : ""}`}
+                    >
+                      <td className="px-2 py-2 text-slate-400 tabular-nums">{iro.n_iro}</td>
+                      <td className="px-2 py-2 text-slate-700 font-medium max-w-[128px]">
+                        <span className="line-clamp-2 text-xs">{iro.tema_esg}</span>
+                      </td>
+                      <td className="px-2 py-2 text-slate-600 max-w-[300px]">
+                        <ExpandableCell text={iro.descripcion} />
+                        {iro.evidencia && (
+                          <p className="text-[10px] text-slate-400 mt-0.5 italic line-clamp-1">
+                            Fuente: {iro.evidencia}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${TIPO_BADGE[iro.tipo] ?? "bg-slate-100 text-slate-600"}`}>
+                          {TIPO_SHORT[iro.tipo] ?? iro.tipo}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-xs text-slate-600">{CADENA_LABEL[iro.cadena] ?? iro.cadena}</td>
+                      <td className="px-2 py-2 text-xs text-slate-600 capitalize">{iro.horizonte}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex justify-center">
+                          <ScorePicker
+                            value={iro.score_impacto}
+                            disabled={isSaving}
+                            onChange={(v) => void patchIro(iro.id, { score_impacto: v })}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex justify-center">
+                          <ScorePicker
+                            value={iro.score_financiero}
+                            disabled={isSaving}
+                            onChange={(v) => void patchIro(iro.id, { score_financiero: v })}
+                          />
+                        </div>
+                      </td>
+                      <td className={`px-2 py-2 text-center text-[11px] tabular-nums ${pri.color}`}>
+                        {pri.label}
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => void patchIro(iro.id, { incluido: !iro.incluido })}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-colors
+                            ${iro.incluido ? "bg-brand-primary border-brand-primary" : "bg-white border-slate-300 hover:border-slate-400"}
+                            ${isSaving ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                          aria-label={iro.incluido ? "Excluir IRO" : "Incluir IRO"}
+                        >
+                          {iro.incluido && (
+                            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 6l3 3 5-5" />
+                            </svg>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </>
+            ))}
           </tbody>
         </table>
       </div>

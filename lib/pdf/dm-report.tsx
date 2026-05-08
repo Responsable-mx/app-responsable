@@ -31,6 +31,13 @@ export type ProximoPaso = {
   tipo: "diagnóstico" | "implementación" | "certificación" | "reporte";
 };
 
+export type RoadmapItem = {
+  fase: "0-30d" | "30-60d" | "60-90d";
+  actividad: string;
+  iro_refs: string;
+  prioridad: "alta" | "media" | "baja";
+};
+
 export type ReportNarrative = {
   executive_summary: string;
   client_position: string;
@@ -42,6 +49,7 @@ export type ReportNarrative = {
   priority_topics?: PriorityTopic[];
   benchmark_gaps?: BenchmarkGap[];
   proximos_pasos?: ProximoPaso[];
+  roadmap_90d?: RoadmapItem[];
 };
 
 export type IroInventoryPdfItem = {
@@ -51,6 +59,7 @@ export type IroInventoryPdfItem = {
   tipo: "impacto_positivo" | "impacto_negativo" | "riesgo" | "oportunidad";
   cadena: "upstream" | "ops_propia" | "downstream";
   horizonte: "corto" | "mediano" | "largo";
+  evidencia?: string | null;
   score_impacto: number | null;
   score_financiero: number | null;
   confianza: "alto" | "medio" | "bajo";
@@ -529,53 +538,78 @@ function scoreColor(v: number | null): string {
 // ── Inventario IROs ──────────────────────────────────────────
 
 function IroInventorySection({ iros }: { iros: IroInventoryPdfItem[] }) {
+  // Agrupar por tema_esg preservando orden de aparición
+  const groups: Array<{ tema: string; items: IroInventoryPdfItem[] }> = [];
+  for (const iro of iros) {
+    const existing = groups.find((g) => g.tema === iro.tema_esg);
+    if (existing) existing.items.push(iro);
+    else groups.push({ tema: iro.tema_esg, items: [iro] });
+  }
+
+  let rowIdx = 0;
   return (
     <View style={s.tableWrapper}>
       {/* Header */}
-      <View style={[s.tableHeader]}>
+      <View style={s.tableHeader}>
         <Text style={[s.iroTh, { width: "4%" }]}>#</Text>
-        <Text style={[s.iroTh, { width: "18%" }]}>Tema ESG</Text>
-        <Text style={[s.iroTh, { flex: 1 }]}>Descripción</Text>
+        <Text style={[s.iroTh, { flex: 1 }]}>Descripción / Evidencia</Text>
         <Text style={[s.iroTh, { width: "11%", textAlign: "center" }]}>Tipo</Text>
         <Text style={[s.iroTh, { width: "11%", textAlign: "center" }]}>Cadena</Text>
-        <Text style={[s.iroTh, { width: "8%", textAlign: "center" }]}>Horiz.</Text>
-        <Text style={[s.iroTh, { width: "6%", textAlign: "center" }]}>Imp.</Text>
-        <Text style={[s.iroTh, { width: "6%", textAlign: "center" }]}>Fin.</Text>
+        <Text style={[s.iroTh, { width: "8%",  textAlign: "center" }]}>Horiz.</Text>
+        <Text style={[s.iroTh, { width: "6%",  textAlign: "center" }]}>Imp.</Text>
+        <Text style={[s.iroTh, { width: "6%",  textAlign: "center" }]}>Fin.</Text>
       </View>
-      {iros.map((iro, i) => {
-        const tipo = TIPO_PDF[iro.tipo];
-        const descTrunc = iro.descripcion.length > 120
-          ? iro.descripcion.slice(0, 118) + "…"
-          : iro.descripcion;
-        return (
-          <View key={i} style={i % 2 === 1 ? [s.tableRow, s.tableRowAlt] : s.tableRow}>
-            <Text style={[s.iroTd, { width: "4%", color: C.slate400 }]}>{iro.n_iro}</Text>
-            <Text style={[s.iroTd, { width: "18%", fontFamily: "Helvetica-Bold" }]}>
-              {iro.tema_esg.length > 28 ? iro.tema_esg.slice(0, 26) + "…" : iro.tema_esg}
-            </Text>
-            <Text style={[s.iroTd, { flex: 1 }]}>{descTrunc}</Text>
-            <View style={[{ width: "11%", paddingHorizontal: 4, paddingVertical: 3, justifyContent: "flex-start" }]}>
-              {tipo && (
-                <View style={[s.tipoBadgePdf, { backgroundColor: tipo.bg }]}>
-                  <Text style={{ color: tipo.text }}>{tipo.label}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[s.iroTd, { width: "11%", textAlign: "center" }]}>
-              {CADENA_PDF[iro.cadena] ?? iro.cadena}
-            </Text>
-            <Text style={[s.iroTd, { width: "8%", textAlign: "center", textTransform: "capitalize" }]}>
-              {iro.horizonte}
-            </Text>
-            <Text style={[s.iroTd, { width: "6%", textAlign: "center", color: scoreColor(iro.score_impacto), fontFamily: "Helvetica-Bold" }]}>
-              {iro.score_impacto ?? "—"}
-            </Text>
-            <Text style={[s.iroTd, { width: "6%", textAlign: "center", color: scoreColor(iro.score_financiero), fontFamily: "Helvetica-Bold" }]}>
-              {iro.score_financiero ?? "—"}
+
+      {groups.map((group) => (
+        <View key={group.tema}>
+          {/* Cabecera de bloque temático */}
+          <View style={{ backgroundColor: C.tealLight, paddingHorizontal: 5, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: C.teal }}>
+            <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", color: C.tealDark, textTransform: "uppercase", letterSpacing: 0.8 }}>
+              {group.tema}
             </Text>
           </View>
-        );
-      })}
+
+          {group.items.map((iro) => {
+            const i = rowIdx++;
+            const tipo = TIPO_PDF[iro.tipo];
+            const descTrunc = iro.descripcion.length > 130
+              ? iro.descripcion.slice(0, 128) + "…"
+              : iro.descripcion;
+            return (
+              <View key={iro.n_iro} style={i % 2 === 1 ? [s.tableRow, s.tableRowAlt] : s.tableRow}>
+                <Text style={[s.iroTd, { width: "4%", color: C.slate400 }]}>{iro.n_iro}</Text>
+                <View style={[{ flex: 1, paddingHorizontal: 4, paddingVertical: 3 }]}>
+                  <Text style={{ fontSize: 7, color: C.slate700, lineHeight: 1.35 }}>{descTrunc}</Text>
+                  {iro.evidencia ? (
+                    <Text style={{ fontSize: 5.5, color: C.slate400, marginTop: 1 }}>
+                      Fuente: {iro.evidencia.length > 70 ? iro.evidencia.slice(0, 68) + "…" : iro.evidencia}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={{ width: "11%", paddingHorizontal: 4, paddingVertical: 3, justifyContent: "flex-start" }}>
+                  {tipo ? (
+                    <View style={[s.tipoBadgePdf, { backgroundColor: tipo.bg }]}>
+                      <Text style={{ color: tipo.text }}>{tipo.label}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={[s.iroTd, { width: "11%", textAlign: "center" }]}>
+                  {CADENA_PDF[iro.cadena] ?? iro.cadena}
+                </Text>
+                <Text style={[s.iroTd, { width: "8%", textAlign: "center", textTransform: "capitalize" }]}>
+                  {iro.horizonte}
+                </Text>
+                <Text style={[s.iroTd, { width: "6%", textAlign: "center", color: scoreColor(iro.score_impacto), fontFamily: "Helvetica-Bold" }]}>
+                  {iro.score_impacto ?? "—"}
+                </Text>
+                <Text style={[s.iroTd, { width: "6%", textAlign: "center", color: scoreColor(iro.score_financiero), fontFamily: "Helvetica-Bold" }]}>
+                  {iro.score_financiero ?? "—"}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -627,6 +661,59 @@ function NisBrechasSection({ items }: { items: NisBrechasPdfItem[] }) {
   );
 }
 
+// ── Roadmap 90 días ──────────────────────────────────────────
+
+const FASE_COLORS: Record<RoadmapItem["fase"], { bg: string; text: string }> = {
+  "0-30d":  { bg: C.roseLight,    text: C.rose },
+  "30-60d": { bg: C.amberLight,   text: C.amberDark },
+  "60-90d": { bg: C.tealLight,    text: C.tealDark },
+};
+
+function Roadmap90DSection({ items }: { items: RoadmapItem[] }) {
+  // Agrupar por fase preservando orden
+  const phases: Array<RoadmapItem["fase"]> = ["0-30d", "30-60d", "60-90d"];
+  const byFase = phases.reduce<Record<string, RoadmapItem[]>>((acc, f) => {
+    acc[f] = items.filter((i) => i.fase === f);
+    return acc;
+  }, {});
+
+  return (
+    <View>
+      {phases.map((fase) => {
+        const faseItems = byFase[fase] ?? [];
+        if (faseItems.length === 0) return null;
+        const colors = FASE_COLORS[fase];
+        return (
+          <View key={fase} style={{ marginBottom: 10 }}>
+            {/* Fase header */}
+            <View style={{ backgroundColor: colors.bg, paddingHorizontal: 8, paddingVertical: 4, borderLeftWidth: 3, borderLeftColor: colors.text, marginBottom: 4 }}>
+              <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", color: colors.text, textTransform: "uppercase", letterSpacing: 1 }}>
+                {fase} — {fase === "0-30d" ? "Acciones inmediatas" : fase === "30-60d" ? "Consolidación" : "Cierre y entregables"}
+              </Text>
+            </View>
+            {faseItems.map((item, i) => (
+              <View key={i} style={{ flexDirection: "row", gap: 8, paddingVertical: 4, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.slate100, alignItems: "flex-start" }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.text, marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 8, color: C.slate700, lineHeight: 1.4 }}>{item.actividad}</Text>
+                  {item.iro_refs ? (
+                    <Text style={{ fontSize: 6, color: C.slate400, marginTop: 1 }}>IROs: {item.iro_refs}</Text>
+                  ) : null}
+                </View>
+                <View style={[s.tipoBadgePdf, { backgroundColor: SEVERITY_COLORS[item.prioridad]?.bg ?? C.slate100, marginTop: 1 }]}>
+                  <Text style={{ color: SEVERITY_COLORS[item.prioridad]?.text ?? C.slate600, fontFamily: "Helvetica-Bold" }}>
+                    {item.prioridad.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ── Documento principal ──────────────────────────────────────
 
 export function DmReportDocument({ data }: { data: DmReportData }) {
@@ -637,6 +724,7 @@ export function DmReportDocument({ data }: { data: DmReportData }) {
   const hasProximosPasos  = narrative.proximos_pasos && narrative.proximos_pasos.length > 0;
   const hasIros           = iros && iros.length > 0;
   const hasNis            = nisBrechas && nisBrechas.length > 0;
+  const hasRoadmap        = narrative.roadmap_90d && narrative.roadmap_90d.length > 0;
 
   return (
     <Document>
@@ -749,6 +837,21 @@ export function DmReportDocument({ data }: { data: DmReportData }) {
         </View>
         <Footer clientName={client.name} />
       </Page>
+
+      {/* ── Roadmap 90 días ──────────────────────────────────── */}
+      {hasRoadmap && (
+        <Page size="A4" style={s.page}>
+          <View style={s.section}>
+            <SectionTitle>Roadmap 90 Días</SectionTitle>
+            <Text style={[s.body, { marginBottom: 10, fontSize: 8, color: C.slate500 }]}>
+              Acciones concretas priorizadas para los primeros 90 días, organizadas en tres fases de 30 días.
+              Basadas en los IROs de mayor prioridad identificados para {client.name}.
+            </Text>
+            <Roadmap90DSection items={narrative.roadmap_90d!} />
+          </View>
+          <Footer clientName={client.name} />
+        </Page>
+      )}
 
       {/* ── Inventario IROs ──────────────────────────────────── */}
       {hasIros && (

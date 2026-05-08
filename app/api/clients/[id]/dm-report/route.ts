@@ -57,6 +57,12 @@ const ReportNarrativeSchema = z.object({
     plazo: z.enum(["90 días", "6 meses", "12 meses"]),
     tipo: z.enum(["diagnóstico", "implementación", "certificación", "reporte"]),
   })).min(3).max(5).optional(),
+  roadmap_90d: z.array(z.object({
+    fase:      z.enum(["0-30d", "30-60d", "60-90d"]),
+    actividad: z.string().min(10).max(200),
+    iro_refs:  z.string().max(60),
+    prioridad: z.enum(["alta", "media", "baja"]),
+  })).min(3).max(9).optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -181,13 +187,34 @@ Responde ÚNICAMENTE con JSON válido. Incluye TODOS los campos — los últimos
       "plazo": "90 días|6 meses|12 meses",
       "tipo": "diagnóstico|implementación|certificación|reporte"
     }
+  ],
+  "roadmap_90d": [
+    {
+      "fase": "0-30d",
+      "actividad": "Designar responsable ESG interno y establecer comité de seguimiento de materialidad",
+      "iro_refs": "IRO-1, IRO-3",
+      "prioridad": "alta"
+    },
+    {
+      "fase": "30-60d",
+      "actividad": "Levantar inventario de datos GHG alcance 1 y 2 con metodología GRI 305",
+      "iro_refs": "IRO-2",
+      "prioridad": "alta"
+    },
+    {
+      "fase": "60-90d",
+      "actividad": "Consolidar primer reporte interno de indicadores clave y alinear con benchmark",
+      "iro_refs": "IRO-1, IRO-4, IRO-7",
+      "prioridad": "media"
+    }
   ]
 }
 
 INSTRUCCIONES para los campos visuales:
 - priority_topics: 4-7 temas. Scores 1-10 basados en relevancia real para el sector de ${client.name} y evidencia del benchmark. Al menos 2 con prioridad "alta".
 - benchmark_gaps: Una fila por cada campo analizado en el benchmark. Nivel honesto — no inflar al cliente.
-- proximos_pasos: 3-5 pasos ordenables en 90d/6m/12m. Deben ser servicios reales de consultoría ESG que ResponSable podría ofrecer. Tipos: diagnóstico (auditorías, gap analysis), implementación (políticas, sistemas), certificación (ESR CEMEFI, GRI, B Corp), reporte (GRI, CSRD, TCFD).`;
+- proximos_pasos: 3-5 pasos ordenables en 90d/6m/12m. Deben ser servicios reales de consultoría ESG que ResponSable podría ofrecer. Tipos: diagnóstico (auditorías, gap analysis), implementación (políticas, sistemas), certificación (ESR CEMEFI, GRI, B Corp), reporte (GRI, CSRD, TCFD).
+- roadmap_90d: 6-9 actividades concretas distribuidas en 3 fases de 30 días. Cada actividad debe: (a) referenciar IROs específicos por número (iro_refs: "IRO-2, IRO-5"), (b) ser ejecutable por el equipo de ${client.name} con acompañamiento de consultor, (c) tener prioridad asignada según urgencia. Fase 0-30d: acciones de diagnóstico y gobierno (establecer responsable ESG, mapear datos faltantes). Fase 30-60d: implementación de primeras medidas y recolección de datos. Fase 60-90d: consolidar entregables, preparar comunicación.`;
 }
 
 // ── GET: retorna el último reporte DM + verifica batch si pending ───────────

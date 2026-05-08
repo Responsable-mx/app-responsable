@@ -35,11 +35,13 @@ const RequestBody = z.discriminatedUnion("action", [ProposeBody, CompareBody]);
 
 const ProposedCompanySchema = z.object({
   name: z.string().min(1).max(200),
-  country: z.string().max(100).optional(),
-  sector: z.string().max(200).optional(),
-  website: z.string().url().max(300).optional().or(z.literal("")),
+  country: z.string().max(100).optional().nullable(),
+  sector: z.string().max(200).optional().nullable(),
+  // Acepta URL completa, URL sin protocolo, null (cuando IA no tiene certeza), o ausente.
+  // No aplicamos .url() estricto — la IA puede omitir "https://" o el campo completo.
+  website: z.string().max(300).optional().nullable(),
   relation: z.enum(["competitor_nacional", "competitor_internacional", "sector", "cadena_valor"]),
-  justification: z.string().max(600).optional(),
+  justification: z.string().max(600).optional().nullable(),
 });
 
 const ProposeResponseSchema = z.object({
@@ -341,7 +343,7 @@ ${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
       const msg = await anthropic.messages.create(
         {
           model,
-          max_tokens: 1500,
+          max_tokens: 2200, // 10 empresas × ~150 tok (nombre+país+sector+website+relación+justificación 2-3 oraciones)
           system: [{
             type: "text",
             text: "Eres un experto en análisis de sostenibilidad empresarial. Responde solo con JSON válido.",
@@ -359,6 +361,8 @@ ${rejected.map((c) => `  - ${c.name} [${c.relation}]`).join("\n")}`);
       for (const block of msg.content) {
         if (block.type === "text") textOut += block.text;
       }
+      // DEBUG: loguear respuesta cruda para verificar que IA devuelve website/justification
+      console.log("[dm-benchmark propose] raw AI response (first 800 chars):", textOut.slice(0, 800));
       anthropicBreaker.recordSuccess();
     } catch (e) {
       anthropicBreaker.recordFailure();

@@ -125,10 +125,12 @@ function StageIndicator({
   number,
   label,
   status,
+  sectionId,
 }: {
   number: number;
   label: string;
   status: StageStatus;
+  sectionId?: string;
 }) {
   const ringColor =
     status === "done"
@@ -137,8 +139,11 @@ function StageIndicator({
       ? "bg-white text-brand-primary border-brand-primary"
       : "bg-white text-slate-400 border-slate-300";
 
-  return (
-    <div className="flex items-center gap-2">
+  const labelColor =
+    status === "active" ? "text-brand-primary" : status === "done" ? "text-slate-500" : "text-slate-400";
+
+  const inner = (
+    <>
       <div
         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] font-bold shrink-0 ${ringColor}`}
       >
@@ -150,15 +155,36 @@ function StageIndicator({
           number
         )}
       </div>
-      <span
-        className={`text-xs font-bold uppercase tracking-widest ${
-          status === "active" ? "text-brand-primary" : status === "done" ? "text-slate-500" : "text-slate-400"
-        }`}
-      >
+      <span className={`text-xs font-bold uppercase tracking-widest ${labelColor}`}>
         {label}
       </span>
-    </div>
+    </>
   );
+
+  if (sectionId) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          const el = document.getElementById(sectionId);
+          if (!el) return;
+          const main = document.querySelector("main");
+          if (main) {
+            const top = el.getBoundingClientRect().top + main.scrollTop - 8;
+            main.scrollTo({ top, behavior: "smooth" });
+          } else {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }}
+        aria-label={`Ir a ${label}`}
+        className="flex items-center gap-2 hover:opacity-75 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded"
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return <div className="flex items-center gap-2">{inner}</div>;
 }
 
 // ── Celda expandible ─────────────────────────────────────────
@@ -281,6 +307,15 @@ function HorizontesConfig({
 
   const handleSave = async () => {
     if (!draft) return;
+    // Validar orden y rango
+    if (draft.corto_year >= draft.mediano_year || draft.mediano_year >= draft.largo_year) {
+      push("error", "Corto plazo < Mediano plazo < Largo plazo — verifica los años");
+      return;
+    }
+    if (draft.corto_year < 2025 || draft.largo_year > 2100) {
+      push("error", "Los años deben estar entre 2025 y 2100");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/clients/${clientId}/dm-config`, {
@@ -592,6 +627,8 @@ function BenchmarkSection({
             <button
               type="button"
               onClick={() => setFieldsExpanded((v) => !v)}
+              aria-expanded={fieldsExpanded}
+              aria-controls="esrs-fields-panel"
               className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 w-full text-left"
             >
               Estándares ESRS ({iros.length > 0 ? iros.length : 10} · 2 dimensiones c/u)
@@ -606,7 +643,7 @@ function BenchmarkSection({
               </svg>
             </button>
             {fieldsExpanded && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              <div id="esrs-fields-panel" className="flex flex-wrap gap-1.5 mt-2">
                 {(iros.length > 0 ? iros : []).map((iro) => (
                   <span
                     key={iro.id}
@@ -794,8 +831,15 @@ function BenchmarkSection({
               <div className="space-y-1">
                 {group.map((company) => (
                   <div key={company.id} className="border border-slate-200 rounded overflow-hidden">
-                    {/* Fila principal */}
-                    <div className="flex items-start gap-2.5 p-2.5 hover:bg-slate-50 transition-colors">
+                    {/* Fila principal — clic en cualquier parte del row (excepto controles) activa el checkbox */}
+                    <div
+                      className="flex items-start gap-2.5 p-2.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        const t = e.target as HTMLElement;
+                        if (t.closest("a, button, input")) return;
+                        handleToggle(company.id);
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={selected.has(company.id)}
@@ -833,9 +877,11 @@ function BenchmarkSection({
                         {company.sector && (
                           <p className="text-xs text-slate-500 truncate mt-0.5">{company.sector}</p>
                         )}
-                        {/* Justificación IA */}
+                        {/* Justificación IA — line-clamp-3, expandible */}
                         {company.justification && (
-                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">{company.justification}</p>
+                          <div className="mt-1">
+                            <ExpandableCell text={company.justification} />
+                          </div>
                         )}
                       </div>
                       {/* Controles derecha */}
@@ -1058,7 +1104,26 @@ function BenchmarkSection({
 
       {latestResult?.status === "failed" && (
         <div className="border-l-4 border-l-rose-500 pl-4 py-2 bg-rose-50 rounded-r">
-          <p className="text-xs text-rose-700">El benchmark anterior falló. Intenta de nuevo.</p>
+          <p className="text-xs text-rose-700">
+            El benchmark anterior falló.{" "}
+            <button
+              type="button"
+              onClick={() => void handleCompare()}
+              className="underline font-medium"
+            >
+              Intenta de nuevo
+            </button>
+            .
+          </p>
+          <p className="text-[10px] text-rose-400 mt-0.5">
+            {new Date(latestResult.created_at).toLocaleString("es-MX", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
         </div>
       )}
 
@@ -1514,11 +1579,13 @@ function NisSection({
   clientId,
   nisRows,
   iros,
+  hasBenchmark,
   onMutate,
 }: {
   clientId: string;
   nisRows: NisItem[];
   iros: IroInventoryItem[];
+  hasBenchmark: boolean;
   onMutate: () => void;
 }) {
   const { push } = useToast();
@@ -1610,7 +1677,14 @@ function NisSection({
             </span>
           )}
         </p>
-        <Button size="sm" variant={nisRows.length > 0 ? "secondary" : "primary"} loading={generating} onClick={handleAutoGenerate}>
+        <Button
+          size="sm"
+          variant={nisRows.length > 0 ? "secondary" : "primary"}
+          loading={generating}
+          onClick={handleAutoGenerate}
+          disabled={!hasBenchmark}
+          title={!hasBenchmark ? "Completa el benchmark primero para generar el mapa NIS/IBSO" : undefined}
+        >
           {nisRows.length > 0 ? "Actualizar desde cuestionario" : "Auto-completar desde cuestionario"}
         </Button>
       </div>
@@ -2053,25 +2127,25 @@ export function DoubleMaterialidadTab({
 
   return (
     <div className="space-y-6 py-4">
-      {/* ── Stepper header ── */}
+      {/* ── Stepper header — cada paso navega a su sección ── */}
       <div className="flex items-center gap-2 pb-4 border-b border-slate-100 flex-wrap">
-        <StageIndicator number={1} label="Contexto"  status={stage1Status} />
+        <StageIndicator number={1} label="Contexto"  status={stage1Status} sectionId="dm-sec-contexto" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={2} label="Benchmark" status={stage2Status} />
+        <StageIndicator number={2} label="Benchmark" status={stage2Status} sectionId="dm-sec-benchmark" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={3} label="IROs"      status={stage3Status} />
+        <StageIndicator number={3} label="IROs"      status={stage3Status} sectionId="dm-sec-iros" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={4} label="NIS/IBSO"  status={stage4Status} />
+        <StageIndicator number={4} label="NIS/IBSO"  status={stage4Status} sectionId="dm-sec-nis" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={5} label="Reporte"   status={stage5Status} />
+        <StageIndicator number={5} label="Reporte"   status={stage5Status} sectionId="dm-sec-reporte" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={6} label="Matriz"    status={stage6Status} />
+        <StageIndicator number={6} label="Matriz"    status={stage6Status} sectionId="dm-sec-matriz" />
         <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={7} label="Resumen"   status={stage7Status} />
+        <StageIndicator number={7} label="Resumen"   status={stage7Status} sectionId="dm-sec-resumen" />
       </div>
 
       {/* ── Etapa 1 ── */}
-      <section aria-labelledby="stage-contexto">
+      <section id="dm-sec-contexto" aria-labelledby="stage-contexto">
         <h2 id="stage-contexto" className="sr-only">Contexto del cliente</h2>
         <ContextoSection
           progress={questionnaireProgress}
@@ -2083,7 +2157,7 @@ export function DoubleMaterialidadTab({
       <HorizontesConfig clientId={clientId} />
 
       {/* ── Etapa 2 ── */}
-      <section aria-labelledby="stage-benchmark">
+      <section id="dm-sec-benchmark" aria-labelledby="stage-benchmark">
         <h2 id="stage-benchmark" className="sr-only">Benchmark competitivo</h2>
         <BenchmarkSection
           clientId={clientId}
@@ -2101,7 +2175,7 @@ export function DoubleMaterialidadTab({
       </section>
 
       {/* ── Etapa 3 — IROs del cliente ── */}
-      <section aria-labelledby="stage-iros">
+      <section id="dm-sec-iros" aria-labelledby="stage-iros">
         <h2 id="stage-iros" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
           Inventario de IROs
         </h2>
@@ -2122,7 +2196,7 @@ export function DoubleMaterialidadTab({
 
       {/* ── Etapa 3.5 — Matriz de Doble Materialidad ── */}
       {iros.filter((i) => i.incluido && i.score_impacto && i.score_financiero).length >= 3 && (
-        <section aria-labelledby="stage-matriz">
+        <section id="dm-sec-matriz" aria-labelledby="stage-matriz">
           <h2 id="stage-matriz" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
             Matriz de Doble Materialidad
           </h2>
@@ -2131,7 +2205,7 @@ export function DoubleMaterialidadTab({
       )}
 
       {/* ── Etapa 4 — NIS / IBSO ── */}
-      <section aria-labelledby="stage-nis">
+      <section id="dm-sec-nis" aria-labelledby="stage-nis">
         <h2 id="stage-nis" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
           NIS / IBSO — Brechas de información
         </h2>
@@ -2139,12 +2213,13 @@ export function DoubleMaterialidadTab({
           clientId={clientId}
           nisRows={nisRows}
           iros={iros}
+          hasBenchmark={hasBenchmark}
           onMutate={() => void mutateNis()}
         />
       </section>
 
       {/* ── Etapa 5 — Reporte ── */}
-      <section aria-labelledby="stage-reporte">
+      <section id="dm-sec-reporte" aria-labelledby="stage-reporte">
         <h2 id="stage-reporte" className="sr-only">Reporte de Doble Materialidad</h2>
         <ReporteSection
           clientId={clientId}
@@ -2163,7 +2238,7 @@ export function DoubleMaterialidadTab({
 
       {/* ── Resumen ejecutivo IA ── */}
       {hasIros && (
-        <section aria-labelledby="stage-resumen">
+        <section id="dm-sec-resumen" aria-labelledby="stage-resumen">
           <h2 id="stage-resumen" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
             Resumen Ejecutivo (IA)
           </h2>

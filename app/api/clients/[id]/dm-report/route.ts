@@ -61,6 +61,26 @@ const ReportNarrativeSchema = z.object({
 
 type Ctx = { params: Promise<{ id: string }> };
 
+type ClientIroRow = {
+  n_iro: number;
+  tema_esg: string;
+  descripcion: string;
+  tipo: string;
+  cadena: string;
+  horizonte: string;
+  score_impacto: number | null;
+  score_financiero: number | null;
+  confianza: string;
+};
+
+type ClientNisRow = {
+  ibso_label: string;
+  categoria: string;
+  estado: string;
+  calidad_dato: string;
+  accion: string | null;
+};
+
 async function buildReportPrompt(
   client: Client,
   clientContext: string,
@@ -70,15 +90,33 @@ async function buildReportPrompt(
     comparison: unknown;
     narrative: string;
   },
+  clientIros: ClientIroRow[],
+  clientNis: ClientNisRow[],
 ): Promise<string> {
-  // Incluir descripciones IRO en el prompt para que el reporte referencie ambas dimensiones
-  const iros = await listActiveIros().catch(() => []);
-  const iroContext = iros.length
-    ? `\nESTÁNDARES ESRS ANALIZADOS (referencia para el reporte):\n${iros
+  // ESRS catalog como referencia normativa
+  const esrsIros = await listActiveIros().catch(() => []);
+  const iroContext = esrsIros.length
+    ? `\nESTÁNDARES ESRS ANALIZADOS (referencia para el reporte):\n${esrsIros
         .map((iro) =>
           `${iro.esrs_standard} — ${iro.label}:\n  Impacto: ${iro.impact_desc}\n  Riesgo: ${iro.risk_desc}\n  Oportunidad: ${iro.opportunity_desc}`
         )
         .join("\n\n")}`
+    : "";
+
+  // IROs del cliente ya validados por el consultor
+  const clientIroContext = clientIros.length
+    ? `\nINVENTARIO DE IROs DEL CLIENTE (${clientIros.length} IROs revisados por el consultor):\n${clientIros
+        .map((iro) =>
+          `IRO-${iro.n_iro} [${iro.tipo}] ${iro.tema_esg}: ${iro.descripcion} (cadena: ${iro.cadena}, horizonte: ${iro.horizonte}, impacto: ${iro.score_impacto ?? "?"}/3, financiero: ${iro.score_financiero ?? "?"}/3, confianza: ${iro.confianza})`
+        )
+        .join("\n")}`
+    : "";
+
+  // Brechas NIS/IBSO del cliente
+  const clientNisContext = clientNis.length
+    ? `\nMAPADE BRECHAS NIS/IBSO:\n${clientNis
+        .map((n) => `${n.ibso_label} [${n.categoria}]: ${n.estado} (calidad: ${n.calidad_dato})${n.accion ? ` — acción: ${n.accion}` : ""}`)
+        .join("\n")}`
     : "";
 
   return `Eres un consultor senior de Doble Materialidad (ESRS/GRI) redactando un reporte ejecutivo para una empresa.
@@ -86,6 +124,8 @@ async function buildReportPrompt(
 CONTEXTO DEL CLIENTE:
 ${clientContext}
 ${iroContext}
+${clientIroContext}
+${clientNisContext}
 RESULTADO DEL BENCHMARK:
 Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
 Campos analizados: ${JSON.stringify(benchmarkResult.fields_snapshot, null, 2)}
@@ -313,13 +353,37 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
   }
 
+  // Contexto IA: IROs validados + brechas NIS del cliente
+  const [irosRes, nisRes] = await Promise.all([
+    admin
+      .from("client_iro_inventory")
+      .select("n_iro, tema_esg, descripcion, tipo, cadena, horizonte, score_impacto, score_financiero, confianza")
+      .eq("client_id", id)
+      .eq("incluido", true)
+      .order("n_iro", { ascending: true }),
+    admin
+      .from("client_nis_assessment")
+      .select("ibso_label, categoria, estado, calidad_dato, accion")
+      .eq("client_id", id)
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  const clientIros = (irosRes.data ?? []) as ClientIroRow[];
+  const clientNis  = (nisRes.data ?? []) as ClientNisRow[];
+
   const clientContext = buildClientContext(client);
-  const prompt = await buildReportPrompt(client, clientContext, benchmarkResult as {
-    companies_snapshot: unknown;
-    fields_snapshot: unknown;
-    comparison: unknown;
-    narrative: string;
-  });
+  const prompt = await buildReportPrompt(
+    client,
+    clientContext,
+    benchmarkResult as {
+      companies_snapshot: unknown;
+      fields_snapshot: unknown;
+      comparison: unknown;
+      narrative: string;
+    },
+    clientIros,
+    clientNis,
+  );
 
   const anthropic = createAnthropicClient();
   const model = getModelConfig("elena").model;

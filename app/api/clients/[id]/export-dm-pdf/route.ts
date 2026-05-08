@@ -4,7 +4,7 @@ import React from "react";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DmReportDocument, type DmReportData, type ReportNarrative } from "@/lib/pdf/dm-report";
+import { DmReportDocument, type DmReportData, type ReportNarrative, type IroInventoryPdfItem, type NisBrechasPdfItem } from "@/lib/pdf/dm-report";
 import { BENCHMARK_FIELDS } from "@/lib/dm/fields";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
@@ -54,6 +54,24 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 
   const companies = (result.companies_snapshot as Array<{ name: string; country: string | null; relation: string }>) ?? [];
 
+  // Fetchar IROs + NIS frescos desde DB (más actualizado que el JSON embebido)
+  const [irosRes, nisRes] = await Promise.all([
+    admin
+      .from("client_iro_inventory")
+      .select("n_iro, tema_esg, descripcion, tipo, cadena, horizonte, score_impacto, score_financiero, confianza")
+      .eq("client_id", id)
+      .eq("incluido", true)
+      .order("n_iro", { ascending: true }),
+    admin
+      .from("client_nis_assessment")
+      .select("ibso_label, categoria, estado, calidad_dato, accion")
+      .eq("client_id", id)
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  const iros = (irosRes.data ?? []) as IroInventoryPdfItem[];
+  const nisBrechas = (nisRes.data ?? []) as NisBrechasPdfItem[];
+
   // Intentar recuperar narrativa completa desde JSON embebido en el markdown
   let narrative: ReportNarrative | null = null;
   if (reportDoc?.markdown_content) {
@@ -83,6 +101,8 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     generatedAt: new Date().toLocaleDateString("es-MX", {
       year: "numeric", month: "long", day: "numeric",
     }),
+    iros:       iros.length > 0 ? iros : undefined,
+    nisBrechas: nisBrechas.length > 0 ? nisBrechas : undefined,
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -44,6 +44,26 @@ export type ReportNarrative = {
   proximos_pasos?: ProximoPaso[];
 };
 
+export type IroInventoryPdfItem = {
+  n_iro: number;
+  tema_esg: string;
+  descripcion: string;
+  tipo: "impacto_positivo" | "impacto_negativo" | "riesgo" | "oportunidad";
+  cadena: "upstream" | "ops_propia" | "downstream";
+  horizonte: "corto" | "mediano" | "largo";
+  score_impacto: number | null;
+  score_financiero: number | null;
+  confianza: "alto" | "medio" | "bajo";
+};
+
+export type NisBrechasPdfItem = {
+  ibso_label: string;
+  categoria: "ambiental" | "social" | "gobernanza";
+  estado: "no_identificado" | "parcial" | "disponible";
+  calidad_dato: "baja" | "media" | "alta";
+  accion: string | null;
+};
+
 export type DmReportData = {
   client: Client;
   narrative: ReportNarrative;
@@ -51,6 +71,8 @@ export type DmReportData = {
   fields: BenchmarkField[];
   comparison: Record<string, Record<string, string>>;
   generatedAt: string;
+  iros?: IroInventoryPdfItem[];
+  nisBrechas?: NisBrechasPdfItem[];
 };
 
 // ── Colores brand (hex — no Tailwind) ───────────────────────
@@ -173,6 +195,11 @@ const s = StyleSheet.create({
   pasoDesc:     { fontSize: 8, color: C.slate700, lineHeight: 1.4 },
   plazoBadge: { fontSize: 7, fontFamily: "Helvetica-Bold", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2, textTransform: "uppercase", letterSpacing: 0.5 },
   tipoBadge:  { fontSize: 6, color: C.slate500, textTransform: "uppercase", letterSpacing: 1, marginTop: 3 },
+  // IRO / NIS tables
+  iroTh:    { fontSize: 6, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.8, color: C.slate500, paddingHorizontal: 4, paddingVertical: 3 },
+  iroTd:    { fontSize: 7, color: C.slate700, paddingHorizontal: 4, paddingVertical: 3, lineHeight: 1.35 },
+  tipoBadgePdf: { fontSize: 6, fontFamily: "Helvetica-Bold", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, alignSelf: "flex-start" },
+  scoreDot: { width: 14, height: 14, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   // CTA box
   ctaBox: { marginTop: 16, padding: 14, backgroundColor: C.tealLight, borderRadius: 4, borderLeftWidth: 4, borderLeftColor: C.teal },
   ctaTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.tealDark, marginBottom: 6 },
@@ -466,14 +493,150 @@ function ResponsableCta({ clientName }: { clientName: string }) {
   );
 }
 
+// ── Helpers IRO / NIS ────────────────────────────────────────
+
+const TIPO_PDF: Record<string, { label: string; bg: string; text: string }> = {
+  impacto_positivo: { label: "Imp+",   bg: "#d1fae5", text: "#065f46" },
+  impacto_negativo: { label: "Imp−",   bg: "#fee2e2", text: "#991b1b" },
+  riesgo:           { label: "Riesgo", bg: "#fef3c7", text: "#92400e" },
+  oportunidad:      { label: "Opor.",  bg: "#ccfbf1", text: "#115e59" },
+};
+
+const CADENA_PDF: Record<string, string> = {
+  upstream:   "Upstream",
+  ops_propia: "Operación",
+  downstream: "Downstream",
+};
+
+const ESTADO_PDF: Record<string, { label: string; bg: string; text: string }> = {
+  no_identificado: { label: "No identificado", bg: C.slate100,    text: C.slate500 },
+  parcial:         { label: "Parcial",          bg: "#fef3c7",     text: "#92400e" },
+  disponible:      { label: "Disponible",       bg: "#d1fae5",     text: "#065f46" },
+};
+
+const CAT_PDF: Record<string, { label: string; bg: string; text: string }> = {
+  ambiental:  { label: "Ambiental",  bg: "#ccfbf1", text: "#0f766e" },
+  social:     { label: "Social",     bg: "#ede9fe", text: "#5b21b6" },
+  gobernanza: { label: "Gobernanza", bg: C.slate100, text: C.slate600 },
+};
+
+function scoreColor(v: number | null): string {
+  if (v === 3) return C.rose;
+  if (v === 2) return C.amber;
+  return C.emerald;
+}
+
+// ── Inventario IROs ──────────────────────────────────────────
+
+function IroInventorySection({ iros }: { iros: IroInventoryPdfItem[] }) {
+  return (
+    <View style={s.tableWrapper}>
+      {/* Header */}
+      <View style={[s.tableHeader]}>
+        <Text style={[s.iroTh, { width: "4%" }]}>#</Text>
+        <Text style={[s.iroTh, { width: "18%" }]}>Tema ESG</Text>
+        <Text style={[s.iroTh, { flex: 1 }]}>Descripción</Text>
+        <Text style={[s.iroTh, { width: "11%", textAlign: "center" }]}>Tipo</Text>
+        <Text style={[s.iroTh, { width: "11%", textAlign: "center" }]}>Cadena</Text>
+        <Text style={[s.iroTh, { width: "8%", textAlign: "center" }]}>Horiz.</Text>
+        <Text style={[s.iroTh, { width: "6%", textAlign: "center" }]}>Imp.</Text>
+        <Text style={[s.iroTh, { width: "6%", textAlign: "center" }]}>Fin.</Text>
+      </View>
+      {iros.map((iro, i) => {
+        const tipo = TIPO_PDF[iro.tipo];
+        const descTrunc = iro.descripcion.length > 120
+          ? iro.descripcion.slice(0, 118) + "…"
+          : iro.descripcion;
+        return (
+          <View key={i} style={i % 2 === 1 ? [s.tableRow, s.tableRowAlt] : s.tableRow}>
+            <Text style={[s.iroTd, { width: "4%", color: C.slate400 }]}>{iro.n_iro}</Text>
+            <Text style={[s.iroTd, { width: "18%", fontFamily: "Helvetica-Bold" }]}>
+              {iro.tema_esg.length > 28 ? iro.tema_esg.slice(0, 26) + "…" : iro.tema_esg}
+            </Text>
+            <Text style={[s.iroTd, { flex: 1 }]}>{descTrunc}</Text>
+            <View style={[{ width: "11%", paddingHorizontal: 4, paddingVertical: 3, justifyContent: "flex-start" }]}>
+              {tipo && (
+                <View style={[s.tipoBadgePdf, { backgroundColor: tipo.bg }]}>
+                  <Text style={{ color: tipo.text }}>{tipo.label}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[s.iroTd, { width: "11%", textAlign: "center" }]}>
+              {CADENA_PDF[iro.cadena] ?? iro.cadena}
+            </Text>
+            <Text style={[s.iroTd, { width: "8%", textAlign: "center", textTransform: "capitalize" }]}>
+              {iro.horizonte}
+            </Text>
+            <Text style={[s.iroTd, { width: "6%", textAlign: "center", color: scoreColor(iro.score_impacto), fontFamily: "Helvetica-Bold" }]}>
+              {iro.score_impacto ?? "—"}
+            </Text>
+            <Text style={[s.iroTd, { width: "6%", textAlign: "center", color: scoreColor(iro.score_financiero), fontFamily: "Helvetica-Bold" }]}>
+              {iro.score_financiero ?? "—"}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ── NIS / IBSO Brechas ───────────────────────────────────────
+
+function NisBrechasSection({ items }: { items: NisBrechasPdfItem[] }) {
+  return (
+    <View style={s.tableWrapper}>
+      <View style={s.tableHeader}>
+        <Text style={[s.iroTh, { flex: 1 }]}>Indicador IBSO</Text>
+        <Text style={[s.iroTh, { width: "14%", textAlign: "center" }]}>Categoría</Text>
+        <Text style={[s.iroTh, { width: "18%", textAlign: "center" }]}>Estado</Text>
+        <Text style={[s.iroTh, { width: "12%", textAlign: "center" }]}>Calidad</Text>
+        <Text style={[s.iroTh, { width: "28%" }]}>Acción</Text>
+      </View>
+      {items.map((item, i) => {
+        const estado = ESTADO_PDF[item.estado];
+        const cat    = CAT_PDF[item.categoria];
+        return (
+          <View key={i} style={i % 2 === 1 ? [s.tableRow, s.tableRowAlt] : s.tableRow}>
+            <Text style={[s.iroTd, { flex: 1, fontFamily: "Helvetica-Bold" }]}>{item.ibso_label}</Text>
+            <View style={[{ width: "14%", paddingHorizontal: 4, paddingVertical: 3, justifyContent: "center", alignItems: "center" }]}>
+              {cat && (
+                <View style={[s.tipoBadgePdf, { backgroundColor: cat.bg }]}>
+                  <Text style={{ color: cat.text }}>{cat.label}</Text>
+                </View>
+              )}
+            </View>
+            <View style={[{ width: "18%", paddingHorizontal: 4, paddingVertical: 3, justifyContent: "center", alignItems: "center" }]}>
+              {estado && (
+                <View style={[s.tipoBadgePdf, { backgroundColor: estado.bg }]}>
+                  <Text style={{ color: estado.text }}>{estado.label}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[s.iroTd, { width: "12%", textAlign: "center", textTransform: "capitalize" }]}>
+              {item.calidad_dato}
+            </Text>
+            <Text style={[s.iroTd, { width: "28%", color: C.slate500 }]}>
+              {item.accion
+                ? (item.accion.length > 60 ? item.accion.slice(0, 58) + "…" : item.accion)
+                : "—"}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ── Documento principal ──────────────────────────────────────
 
 export function DmReportDocument({ data }: { data: DmReportData }) {
-  const { client, narrative, companies, fields, comparison, generatedAt } = data;
+  const { client, narrative, companies, fields, comparison, generatedAt, iros, nisBrechas } = data;
   const companyList = companies.map((c) => c.name).join(", ");
   const hasPriorityTopics = narrative.priority_topics && narrative.priority_topics.length > 0;
   const hasBenchmarkGaps  = narrative.benchmark_gaps && narrative.benchmark_gaps.length > 0;
   const hasProximosPasos  = narrative.proximos_pasos && narrative.proximos_pasos.length > 0;
+  const hasIros           = iros && iros.length > 0;
+  const hasNis            = nisBrechas && nisBrechas.length > 0;
 
   return (
     <Document>
@@ -586,6 +749,36 @@ export function DmReportDocument({ data }: { data: DmReportData }) {
         </View>
         <Footer clientName={client.name} />
       </Page>
+
+      {/* ── Inventario IROs ──────────────────────────────────── */}
+      {hasIros && (
+        <Page size="A4" style={s.page}>
+          <View style={s.section}>
+            <SectionTitle>Inventario Preliminar de IROs</SectionTitle>
+            <Text style={[s.body, { marginBottom: 8, fontSize: 8, color: C.slate500 }]}>
+              {iros!.length} IROs identificados y revisados por el consultor.
+              Imp. = Score impacto sobre sociedad/ambiente (1–3). Fin. = Magnitud financiera potencial (1–3).
+            </Text>
+            <IroInventorySection iros={iros!} />
+          </View>
+          <Footer clientName={client.name} />
+        </Page>
+      )}
+
+      {/* ── NIS / IBSO Brechas ──────────────────────────────── */}
+      {hasNis && (
+        <Page size="A4" style={s.page}>
+          <View style={s.section}>
+            <SectionTitle>NIS / IBSO — Mapa de Brechas de Información</SectionTitle>
+            <Text style={[s.body, { marginBottom: 8, fontSize: 8, color: C.slate500 }]}>
+              Indicadores de alto valor (IBSO) identificados para el sector.
+              Estado: Disponible = dato existe · Parcial = incompleto · No identificado = por recopilar.
+            </Text>
+            <NisBrechasSection items={nisBrechas!} />
+          </View>
+          <Footer clientName={client.name} />
+        </Page>
+      )}
 
       {/* ── Próximos Pasos + CTA ─────────────────────────────── */}
       {hasProximosPasos && (

@@ -1,11 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import type { DmIroConfig } from "@/lib/dm/iros";
+
+// ── AutoTextarea — se ajusta al contenido ────────────────────────────────────
+function AutoTextarea({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      className={className}
+      style={{ overflow: "hidden", resize: "none" }}
+    />
+  );
+}
 
 // ── Fetcher ──────────────────────────────────────────────────────────────────
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -204,9 +232,8 @@ export function IrosManager() {
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
                 Impacto (Empresa → Sociedad)
               </label>
-              <textarea
-                rows={3}
-                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-y"
+              <AutoTextarea
+                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 min-h-[60px]"
                 value={form.impact_desc}
                 onChange={(e) => setForm({ ...form, impact_desc: e.target.value })}
               />
@@ -217,9 +244,8 @@ export function IrosManager() {
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
                 Riesgo (Entorno → Empresa)
               </label>
-              <textarea
-                rows={2}
-                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-y"
+              <AutoTextarea
+                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 min-h-[44px]"
                 value={form.risk_desc}
                 onChange={(e) => setForm({ ...form, risk_desc: e.target.value })}
               />
@@ -230,9 +256,8 @@ export function IrosManager() {
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
                 Oportunidad (Entorno → Empresa)
               </label>
-              <textarea
-                rows={2}
-                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-y"
+              <AutoTextarea
+                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 min-h-[44px]"
                 value={form.opportunity_desc}
                 onChange={(e) => setForm({ ...form, opportunity_desc: e.target.value })}
               />

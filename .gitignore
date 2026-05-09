@@ -42,6 +42,9 @@ yarn-error.log*
 .claude/
 next-env.d.ts
 
+# Supabase CLI temp
+supabase/.temp/
+
 # Playwright E2E — sesiones de auth (contienen tokens, no commitear)
 e2e/.auth/
 playwright-report/

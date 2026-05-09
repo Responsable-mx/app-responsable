@@ -53,6 +53,8 @@
   .scatter-wrap { position: relative; border-left: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1; }
   .dot { position: absolute; transform: translate(-50%, 50%); cursor: pointer; transition: transform .15s, filter .15s; }
   .dot:hover { transform: translate(-50%, 50%) scale(1.4); filter: brightness(0.88); z-index: 10; }
+  .dot-diamond { transform: translate(-50%, 50%) rotate(45deg); }
+  .dot-diamond:hover { transform: translate(-50%, 50%) rotate(45deg) scale(1.4); filter: brightness(0.88); z-index: 10; }
 
   /* Custom tooltip on dots */
   .dot-tip {
@@ -567,10 +569,6 @@
               <h2 class="text-lg font-semibold text-slate-900">Impactos, Riesgos y Oportunidades</h2>
               <p class="text-xs text-slate-500 mt-0.5">Estándares ESRS identificados y calificados para inclusión en el estudio</p>
             </div>
-            <div class="flex gap-2 flex-shrink-0 ml-3">
-              <span class="text-[10px] bg-brand-primary-light text-brand-primary-dark px-2 py-1 rounded-sm font-bold whitespace-nowrap">9 incluidos</span>
-              <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-sm font-bold">8 calificados</span>
-            </div>
           </div>
           <div class="px-6 py-5">
             <div class="overflow-x-auto thin-scroll">
@@ -697,10 +695,10 @@
                     <div class="dot-tip">E2 · Contaminación</div>
                   </div>
                   <!-- ◆ diamonds = mat. impacto (amber) -->
-                  <div class="dot" style="left:30%;bottom:75%;width:14px;height:14px;background:#f59e0b;transform:translate(-50%,50%) rotate(45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
+                  <div class="dot dot-diamond" style="left:30%;bottom:75%;width:14px;height:14px;background:#f59e0b;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
                     <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S1 · Fuerza laboral</div>
                   </div>
-                  <div class="dot" style="left:22%;bottom:62%;width:13px;height:13px;background:#f59e0b;transform:translate(-50%,50%) rotate(45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
+                  <div class="dot dot-diamond" style="left:22%;bottom:62%;width:13px;height:13px;background:#f59e0b;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
                     <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S2 · Cadena de valor</div>
                   </div>
                   <!-- ■ squares = mat. financiero (teal) -->
@@ -791,7 +789,7 @@
                   <span class="text-[10px] text-slate-500 truncate">Biodiversidad</span>
                 </div>
                 <div class="mt-3 pt-2 border-t border-slate-100">
-                  <p class="text-[9px] text-slate-400 italic">Haz clic para ver scores y clasificación ESRS</p>
+                  <p class="text-[9px] text-slate-500 italic">Haz clic para ver scores y clasificación ESRS</p>
                 </div>
               </div>
 
@@ -912,7 +910,7 @@
             <div>
               <div class="flex items-center gap-2">
                 <h2 class="text-lg font-semibold text-slate-900">Resumen ejecutivo del estudio</h2>
-                <span class="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm uppercase tracking-wide">Borrador</span>
+                <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm uppercase tracking-wide">Vista previa</span>
               </div>
               <p class="text-xs text-slate-500 mt-0.5">Síntesis generada por Elena — integra benchmark + IROs + brechas · pendiente de validación con cliente</p>
             </div>
@@ -969,7 +967,10 @@
             <button onclick="goStage(5)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors whitespace-nowrap">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> NIS/IBSO
             </button>
-            <div></div>
+            <button id="btn-mark-reviewed" onclick="markExecReviewed()" class="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-emerald-700 font-medium border border-slate-200 px-3 py-1.5 rounded-sm hover:border-emerald-200 hover:bg-emerald-50 transition-colors whitespace-nowrap">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Marcar resumen como revisado
+            </button>
             <button onclick="goStage(7)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
               Validar con cliente <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -1014,7 +1015,7 @@
               </div>
               <!-- Asistentes -->
               <div class="mt-3">
-                <p class="th mb-2">Asistentes del cliente <span class="text-slate-400 font-normal normal-case tracking-normal">(opcional · recomendado por GRI)</span></p>
+                <p class="th mb-2">Asistentes del cliente <span class="text-slate-400 font-normal normal-case tracking-normal">(opcional · GRI 3 §4.28)</span></p>
                 <div id="asistentes-list" class="space-y-1 mb-2">
                   <div class="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-100 px-2.5 py-1.5 rounded-sm">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1027,18 +1028,25 @@
                     <button onclick="removeAsistente(this)" class="text-slate-300 hover:text-rose-500 transition-colors">✕</button>
                   </div>
                 </div>
-                <button onclick="addAsistente()" class="flex items-center gap-1.5 text-[11px] text-brand-primary font-semibold hover:underline">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Agregar asistente
-                </button>
+                <div>
+                  <div id="asistente-form" class="hidden flex gap-2 mt-1 items-center">
+                    <input id="asistente-input" type="text" placeholder="Nombre · Cargo"
+                      class="flex-1 border border-slate-200 rounded-sm px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-primary/30 focus:border-brand-primary" />
+                    <button onclick="confirmAddAsistente()" class="text-[11px] text-white bg-brand-primary font-semibold px-2.5 py-1.5 rounded-sm hover:bg-brand-primary-dark transition-colors whitespace-nowrap">Agregar</button>
+                    <button onclick="cancelAddAsistente()" class="text-[11px] text-slate-400 hover:text-slate-600 px-1.5 py-1.5 transition-colors">✕</button>
+                  </div>
+                  <button id="btn-add-asistente" onclick="showAsistenteForm()" class="flex items-center gap-1.5 text-[11px] text-brand-primary font-semibold hover:underline">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Agregar asistente
+                  </button>
+                </div>
               </div>
             </div>
 
             <!-- ── Sección 2: Tabla de ajustes IRO ── -->
             <div>
-              <div class="flex items-center justify-between mb-3">
+              <div class="mb-3">
                 <p class="th">Revisión de hallazgos</p>
-                <span id="iro-status-summary" class="text-[10px] text-slate-500">8 IROs · <span id="iro-pending-count" class="font-bold text-amber-600">3 pendientes</span></span>
               </div>
               <div class="overflow-x-auto thin-scroll">
                 <table class="min-w-full text-xs">
@@ -1072,15 +1080,21 @@
 
           </div>
 
-          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-            <button onclick="goStage(6)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors whitespace-nowrap">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Resumen IA
-            </button>
-            <button id="val-proceed-btn" onclick="proceedToReport()" disabled
-              class="flex items-center gap-1.5 bg-slate-300 text-slate-400 text-xs font-semibold px-4 py-2 rounded cursor-not-allowed whitespace-nowrap transition-colors">
-              Proceder a reporte
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50">
+            <div class="flex justify-between items-center">
+              <button onclick="goStage(6)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors whitespace-nowrap">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Resumen IA
+              </button>
+              <div class="text-right">
+                <button id="val-proceed-btn" onclick="proceedToReport()" disabled
+                  aria-disabled="true" aria-describedby="val-hint"
+                  class="flex items-center gap-1.5 bg-slate-300 text-slate-400 text-xs font-semibold px-4 py-2 rounded cursor-not-allowed whitespace-nowrap transition-colors">
+                  Proceder a reporte
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+                <p id="val-hint" class="text-[10px] text-amber-600 mt-0.5 h-3">3 IROs sin decisión</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1096,7 +1110,7 @@
           <div id="s8-generating" class="hidden px-6 py-10 text-center">
             <div class="flex items-center justify-center gap-3 text-sm text-slate-600 mb-2">
               <div class="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-              Elena está generando el reporte · ~90 segundos
+              Elena está generando el reporte · 1–2 min
             </div>
             <p class="text-[10px] text-slate-400">Puedes navegar otras etapas mientras esperas</p>
           </div>
@@ -1129,34 +1143,24 @@
               <div>
                 <p class="th mb-3">El reporte incluirá</p>
                 <div class="space-y-2">
-                  <div class="flex items-start gap-2">
-                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
+                  <div class="flex items-start gap-2.5">
+                    <span class="text-slate-400 flex-shrink-0 font-bold leading-5 select-none">–</span>
                     <span class="text-xs text-slate-700">Contexto del negocio y metodología aplicada</span>
                   </div>
-                  <div class="flex items-start gap-2">
-                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
+                  <div class="flex items-start gap-2.5">
+                    <span class="text-slate-400 flex-shrink-0 font-bold leading-5 select-none">–</span>
                     <span class="text-xs text-slate-700">Benchmark vs 5 empresas del sector (Pemex, Repsol, Shell Méx., Valero)</span>
                   </div>
-                  <div class="flex items-start gap-2">
-                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
+                  <div class="flex items-start gap-2.5">
+                    <span class="text-slate-400 flex-shrink-0 font-bold leading-5 select-none">–</span>
                     <span class="text-xs text-slate-700">Matriz de doble materialidad con 8 IROs graficados (E1–G1)</span>
                   </div>
-                  <div class="flex items-start gap-2">
-                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
+                  <div class="flex items-start gap-2.5">
+                    <span class="text-slate-400 flex-shrink-0 font-bold leading-5 select-none">–</span>
                     <span class="text-xs text-slate-700">Análisis de brechas NIS/IBSO con plan de acción priorizado</span>
                   </div>
-                  <div class="flex items-start gap-2">
-                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
+                  <div class="flex items-start gap-2.5">
+                    <span class="text-slate-400 flex-shrink-0 font-bold leading-5 select-none">–</span>
                     <span class="text-xs text-slate-700">Resumen ejecutivo y recomendaciones estratégicas (GRI-aligned)</span>
                   </div>
                 </div>
@@ -1187,7 +1191,7 @@
                 </div>
                 <div class="pt-2 border-t border-slate-200">
                   <p class="text-[10px] text-slate-400">Tiempo estimado de generación</p>
-                  <p class="text-sm font-bold text-slate-700 tabular-nums">~90 segundos</p>
+                  <p class="text-sm font-bold text-slate-700 tabular-nums">1–2 min</p>
                 </div>
               </div>
             </div>
@@ -1196,7 +1200,7 @@
             <div class="p-4 bg-slate-50 border border-slate-100 rounded">
               <div class="flex items-center justify-between mb-3">
                 <p class="th">Checklist de cierre</p>
-                <span class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm">5 / 7 criterios</span>
+                <span id="checklist-criteria-count" class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm">5 / 7 criterios</span>
               </div>
               <div class="space-y-1.5 text-xs">
                 <div class="flex items-center gap-2 text-slate-700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Cuestionario ≥80% completado <span class="text-slate-400 ml-auto">18/20 · 90%</span></div>
@@ -1204,7 +1208,7 @@
                 <div class="flex items-center gap-2 text-slate-700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> IROs calificados (≥5 con score) <span class="text-slate-400 ml-auto">8 calificados</span></div>
                 <div class="flex items-center gap-2 text-slate-700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Matriz de materialidad generada <span class="text-slate-400 ml-auto">8 IROs</span></div>
                 <div class="flex items-center gap-2 text-slate-700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Brechas NIS/IBSO documentadas <span class="text-slate-400 ml-auto">4 brechas</span></div>
-                <div class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Resumen ejecutivo revisado</div>
+                <div id="checklist-reviewed-row" class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Resumen ejecutivo revisado</div>
                 <div id="checklist-validated" class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Hallazgos validados con cliente <span id="checklist-val-date" class="text-[9px] text-slate-300 ml-0.5">· pendiente junta</span></div>
                 <div class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reporte generado y descargado <span class="text-[9px] text-slate-300 ml-0.5">· automático al generar</span></div>
               </div>
@@ -1238,7 +1242,7 @@
   <div class="bg-white rounded-md shadow-xl w-full max-w-sm mx-4 overflow-hidden">
     <div class="px-6 pt-5 pb-4">
       <h3 id="modal-title" class="text-sm font-semibold text-slate-900 mb-1">Generar reporte para Nuvoil S.A. de C.V.</h3>
-      <p class="text-xs text-slate-500 mb-3">Elena analizará toda la información y generará el PDF en ~90 segundos. La descarga iniciará automáticamente.</p>
+      <p class="text-xs text-slate-500 mb-3">Elena analizará toda la información y generará el PDF en 1–2 min. La descarga iniciará automáticamente.</p>
       <div class="bg-slate-50 border border-slate-200 rounded p-3 space-y-1 text-xs text-slate-600 mb-1">
         <div class="flex items-center gap-2"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Cuestionario 18/20 campos (90%)</div>
         <div class="flex items-center gap-2"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Benchmark sectorial generado (5 empresas)</div>
@@ -1624,14 +1628,14 @@ const IRO_DATA = [
   { id: 'G1', label: 'Ética empresarial',  aia: 'Mat. financiero', aiaClass: 'bg-emerald-100 text-emerald-800' },
   { id: 'E4', label: 'Biodiversidad',      aia: 'Seguimiento',     aiaClass: 'bg-slate-100 text-slate-500'  },
 ];
-const IRO_OPTIONS = ['Sin cambio','Doble material','Mat. impacto','Mat. financiero','Seguimiento','Excluir del estudio'];
+const IRO_OPTIONS = ['Confirmar propuesta IA','Doble material','Mat. impacto','Mat. financiero','Seguimiento','Excluir del estudio'];
 
 // decision per IRO: null=pendiente, string=decisión
 const iroDecisions = {};
 IRO_DATA.forEach(d => { iroDecisions[d.id] = null; });
 
-// Pre-fill 5 as "Sin cambio" so only 3 remain pending on load
-['E1','E3','S2','G1','E4'].forEach(id => { iroDecisions[id] = 'Sin cambio'; });
+// Pre-fill 5 as "Confirmar propuesta IA" so only 3 remain pending on load
+['E1','E3','S2','G1','E4'].forEach(id => { iroDecisions[id] = 'Confirmar propuesta IA'; });
 
 let valDate = '8 may 2026';
 
@@ -1641,12 +1645,12 @@ function renderIroTable() {
   tbody.innerHTML = IRO_DATA.map(iro => {
     const dec = iroDecisions[iro.id];
     const isPending = dec === null;
-    const isAdjusted = dec && dec !== 'Sin cambio' && dec !== null;
+    const isAdjusted = dec && dec !== 'Confirmar propuesta IA' && dec !== null;
     const statusHtml = isPending
       ? '<span class="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-sm">● Pendiente</span>'
       : isAdjusted
         ? '<span class="text-[9px] bg-orange-100 text-orange-700 font-bold px-1.5 py-0.5 rounded-sm">⚠ Ajustado</span>'
-        : '<span class="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm">✓ Validado</span>';
+        : '<span class="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm">✓ Confirmado</span>';
     const selectVal = dec || '';
     return `<tr class="row">
       <td class="py-2 pr-3 font-mono text-[10px] font-bold text-slate-500">${iro.id}</td>
@@ -1683,12 +1687,12 @@ function setIroDecision(id, value) {
 
 function updateValidationCta() {
   const pending = IRO_DATA.filter(d => iroDecisions[d.id] === null).length;
-  const adjusted = IRO_DATA.filter(d => iroDecisions[d.id] && iroDecisions[d.id] !== 'Sin cambio').length;
+  const adjusted = IRO_DATA.filter(d => iroDecisions[d.id] && iroDecisions[d.id] !== 'Confirmar propuesta IA').length;
 
   // Check all motivos filled
   let motivosMissing = 0;
   IRO_DATA.forEach(d => {
-    if (iroDecisions[d.id] && iroDecisions[d.id] !== 'Sin cambio') {
+    if (iroDecisions[d.id] && iroDecisions[d.id] !== 'Confirmar propuesta IA') {
       const el = document.getElementById('motivo-' + d.id);
       if (!el || !el.value.trim()) motivosMissing++;
     }
@@ -1696,8 +1700,8 @@ function updateValidationCta() {
 
   const total = pending + motivosMissing;
   const badge = document.getElementById('val-progress-badge');
-  const pendCount = document.getElementById('iro-pending-count');
   const btn = document.getElementById('val-proceed-btn');
+  const hint = document.getElementById('val-hint');
 
   if (badge) {
     if (total === 0) {
@@ -1708,18 +1712,25 @@ function updateValidationCta() {
       badge.className = 'text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-sm font-bold whitespace-nowrap ml-3 flex-shrink-0';
     }
   }
-  if (pendCount) {
-    pendCount.textContent = pending + ' pendiente' + (pending !== 1 ? 's' : '');
-    pendCount.className = pending > 0 ? 'font-bold text-amber-600' : 'font-bold text-emerald-600';
-  }
   if (btn) {
     if (total === 0) {
       btn.disabled = false;
+      btn.removeAttribute('aria-disabled');
       btn.className = 'flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap';
     } else {
       btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
       btn.className = 'flex items-center gap-1.5 bg-slate-300 text-slate-400 text-xs font-semibold px-4 py-2 rounded cursor-not-allowed whitespace-nowrap';
-      btn.title = 'Valida los ' + total + ' ítem' + (total !== 1 ? 's' : '') + ' pendiente' + (total !== 1 ? 's' : '') + ' para continuar';
+    }
+  }
+  if (hint) {
+    if (total > 0) {
+      const parts = [];
+      if (pending > 0) parts.push(pending + ' IRO' + (pending > 1 ? 's' : '') + ' sin decisión');
+      if (motivosMissing > 0) parts.push(motivosMissing + ' motivo' + (motivosMissing > 1 ? 's' : '') + ' faltante' + (motivosMissing > 1 ? 's' : ''));
+      hint.textContent = parts.join(' · ');
+    } else {
+      hint.textContent = '';
     }
   }
 }
@@ -1744,14 +1755,49 @@ function proceedToReport() {
   goStage(8);
 }
 
-function addAsistente() {
-  const name = prompt('Nombre y cargo del asistente:');
-  if (!name || !name.trim()) return;
+function showAsistenteForm() {
+  document.getElementById('asistente-form').classList.remove('hidden');
+  document.getElementById('btn-add-asistente').classList.add('hidden');
+  document.getElementById('asistente-input').focus();
+}
+function cancelAddAsistente() {
+  document.getElementById('asistente-form').classList.add('hidden');
+  document.getElementById('btn-add-asistente').classList.remove('hidden');
+  document.getElementById('asistente-input').value = '';
+}
+function confirmAddAsistente() {
+  const input = document.getElementById('asistente-input');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
   const list = document.getElementById('asistentes-list');
   const div = document.createElement('div');
   div.className = 'flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-100 px-2.5 py-1.5 rounded-sm';
-  div.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="flex-1">${name.trim()}</span><button onclick="removeAsistente(this)" class="text-slate-300 hover:text-rose-500 transition-colors">✕</button>`;
+  div.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="flex-1">${name}</span><button onclick="removeAsistente(this)" class="text-slate-300 hover:text-rose-500 transition-colors">✕</button>`;
   list.appendChild(div);
+  cancelAddAsistente();
+}
+
+function markExecReviewed() {
+  const btn = document.getElementById('btn-mark-reviewed');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Resumen marcado como revisado';
+    btn.className = 'flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium px-3 py-1.5 rounded-sm pointer-events-none';
+  }
+  const row = document.getElementById('checklist-reviewed-row');
+  if (row) {
+    row.className = 'flex items-center gap-2 text-slate-700';
+    row.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Resumen ejecutivo revisado';
+  }
+  const cc = document.getElementById('checklist-criteria-count');
+  if (cc) {
+    const cur = parseInt(cc.textContent.split('/')[0].trim()) || 5;
+    const next = cur + 1;
+    cc.textContent = next + ' / 7 criterios';
+    if (next >= 7) {
+      cc.className = 'text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-sm';
+    }
+  }
 }
 
 function removeAsistente(btn) {
@@ -1763,6 +1809,17 @@ renderCompanyList();
 setBenchState('c'); // Iniciar en estado C (resultados ya generados, como en V4)
 renderIroTable();
 updateStepper(4);
+
+// Asistente input — keyboard shortcuts
+document.addEventListener('DOMContentLoaded', () => {
+  const ai = document.getElementById('asistente-input');
+  if (ai) {
+    ai.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); confirmAddAsistente(); }
+      if (e.key === 'Escape') { e.preventDefault(); cancelAddAsistente(); }
+    });
+  }
+});
 </script>
 </body>
 </html>

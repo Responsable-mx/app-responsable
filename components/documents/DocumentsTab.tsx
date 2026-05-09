@@ -22,21 +22,12 @@ type DocMeta = {
   parse_status: "pending" | "ok" | "failed";
   parse_error: string | null;
   has_content: boolean;
-  service_tag: string | null;
+  service_ids: string[];
   created_at: string;
   updated_at: string;
 };
 
-// Etiquetas de servicio — se muestran como badge secundario cuando está asignado
-const SERVICE_TAG_OPTIONS: { value: string; label: string }[] = [
-  { value: "doble_materialidad_ia", label: "Doble Materialidad IA" },
-  { value: "reporte_gri",           label: "Reporte GRI" },
-  { value: "diagnostico_rse",       label: "Diagnóstico RSE" },
-  { value: "estrategia_rse",        label: "Estrategia RSE" },
-];
-const SERVICE_TAG_LABEL: Record<string, string> = Object.fromEntries(
-  SERVICE_TAG_OPTIONS.map((o) => [o.value, o.label])
-);
+type ServiceOption = { id: string; label: string };
 
 const KIND_LABEL: Record<DocMeta["kind"], string> = {
   general: "General",
@@ -62,7 +53,7 @@ const TYPE_BADGE: Record<DocMeta["file_type"], string> = {
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<{ data: DocMeta[] }>;
+    return r.json();
   });
 
 export function DocumentsTab({
@@ -76,11 +67,23 @@ export function DocumentsTab({
     `/api/clients/${clientId}/documents`,
     fetcher
   );
+  // Catálogo de servicios cargado dinámicamente — nunca hardcodeado
+  const { data: catalogData } = useSWR<{ data: { id: string; value: string; label: string }[] }>(
+    `/api/catalogs?category=services`,
+    fetcher
+  );
+  const serviceOptions: ServiceOption[] = (catalogData?.data ?? []).map((c) => ({
+    id: c.id,
+    label: c.label,
+  }));
+  const serviceLabelById = Object.fromEntries(serviceOptions.map((s) => [s.id, s.label]));
+
   const [filter, setFilter] = useState<"all" | DocMeta["kind"]>("all");
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<DocMeta | null>(null);
   const [previewing, setPreviewing] = useState<DocMeta | null>(null);
-  const [uploadServiceTag, setUploadServiceTag] = useState<string>("");
+  // Multi-select: IDs de servicios seleccionados para el próximo upload
+  const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -102,7 +105,7 @@ export function DocumentsTab({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("kind", "general");
-      if (uploadServiceTag) fd.append("service_tag", uploadServiceTag);
+      if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
       try {
         const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
         if (!res.ok) {
@@ -188,14 +191,14 @@ export function DocumentsTab({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Selector de servicio (opcional) — aplica al próximo archivo subido */}
-          <SelectField
-            value={uploadServiceTag}
-            onChange={setUploadServiceTag}
-            options={SERVICE_TAG_OPTIONS}
-            placeholder="Sin servicio"
-            className="text-xs"
-          />
+          {/* Multi-select de servicios — aplica al próximo archivo subido */}
+          {serviceOptions.length > 0 && (
+            <ServiceMultiSelect
+              options={serviceOptions}
+              selected={uploadServiceIds}
+              onChange={setUploadServiceIds}
+            />
+          )}
           <Button
             variant="primary"
             size="sm"
@@ -292,10 +295,17 @@ export function DocumentsTab({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      {d.service_tag ? (
-                        <span className="text-[10px] font-semibold rounded-sm px-1.5 py-0.5 bg-brand-primary-light/40 text-brand-primary-dark whitespace-nowrap">
-                          {SERVICE_TAG_LABEL[d.service_tag] ?? d.service_tag}
-                        </span>
+                      {d.service_ids.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {d.service_ids.map((sid) => (
+                            <span
+                              key={sid}
+                              className="text-[10px] font-semibold rounded-sm px-1.5 py-0.5 bg-brand-primary-light/40 text-brand-primary-dark whitespace-nowrap"
+                            >
+                              {serviceLabelById[sid] ?? sid}
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-[10px] text-slate-300">—</span>
                       )}
@@ -395,6 +405,72 @@ export function DocumentsTab({
           onConfirm={async () => handleDelete(deleting)}
           onCancel={() => setDeleting(null)}
         />
+      )}
+    </div>
+  );
+}
+
+// Multi-select compacto para servicios (sin <select> nativo — CLAUDE.md §SelectField)
+function ServiceMultiSelect({
+  options,
+  selected,
+  onChange,
+}: {
+  options: ServiceOption[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
+  }
+
+  const label =
+    selected.length === 0
+      ? "Sin servicio"
+      : selected.length === 1
+      ? (options.find((o) => o.id === selected[0])?.label ?? "1 servicio")
+      : `${selected.length} servicios`;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 min-w-[120px] justify-between"
+      >
+        <span className="truncate max-w-[140px]">{label}</span>
+        <svg className="w-3 h-3 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded shadow-sm min-w-[200px] py-1">
+          {options.map((o) => (
+            <label
+              key={o.id}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(o.id)}
+                onChange={() => toggle(o.id)}
+                className="rounded border-slate-300 text-brand-primary"
+              />
+              {o.label}
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="w-full text-left px-3 py-1.5 text-[11px] text-slate-400 hover:text-slate-600 border-t border-slate-100 mt-1"
+            >
+              Limpiar selección
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

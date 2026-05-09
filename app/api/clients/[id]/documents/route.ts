@@ -4,7 +4,6 @@ import { getClient } from "@/lib/clients";
 import { listDocumentsByClient, uploadAndParseDocument } from "@/lib/documents/queries";
 import { DOCUMENT_KIND_SCHEMA } from "@/lib/documents/types";
 import { logChange } from "@/lib/audit-log";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -50,7 +49,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     parse_status: d.parse_status,
     parse_error: d.parse_error,
     has_content: !!d.markdown_content,
-    service_tag: d.service_tag ?? null,
+    service_ids: d.service_ids ?? [],
     created_at: d.created_at,
     updated_at: d.updated_at,
   }));
@@ -88,8 +87,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const kindParsed = DOCUMENT_KIND_SCHEMA.safeParse(formData.get("kind"));
   const kind = kindParsed.success ? kindParsed.data : "general";
 
-  const rawServiceTag = formData.get("service_tag");
-  const serviceTag = typeof rawServiceTag === "string" && rawServiceTag.trim() ? rawServiceTag.trim() : null;
+  // service_ids: array de UUIDs separados por coma (FormData no soporta arrays nativos)
+  const rawServiceIds = formData.get("service_ids");
+  const serviceIds = typeof rawServiceIds === "string" && rawServiceIds.trim()
+    ? rawServiceIds.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -102,16 +104,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       mimeType: file.type,
       buffer,
       kind,
+      serviceIds,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error subiendo documento";
     return NextResponse.json({ error: msg }, { status: 500 });
-  }
-
-  // Actualiza service_tag si se envió (columna opcional, additive migration 0059)
-  if (serviceTag) {
-    const admin = createAdminClient();
-    await admin.from("client_documents").update({ service_tag: serviceTag }).eq("id", doc.id);
   }
 
   void logChange({
@@ -120,7 +117,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     entityId: doc.id,
     action: "create",
     before: null,
-    after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_tag: serviceTag },
+    after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_ids: serviceIds },
   });
 
   return NextResponse.json({
@@ -133,7 +130,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       parse_status: doc.parse_status,
       parse_error: doc.parse_error,
       has_content: !!doc.markdown_content,
-      service_tag: serviceTag,
+      service_ids: doc.service_ids ?? [],
       created_at: doc.created_at,
     },
   });

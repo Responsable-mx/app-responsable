@@ -19,7 +19,7 @@ export type ClientDocument = {
   source_url: string | null;
   parse_status: "pending" | "ok" | "failed";
   parse_error: string | null;
-  service_tag: string | null;
+  service_ids: string[];
   created_at: string;
   updated_at: string;
 };
@@ -32,6 +32,7 @@ export type UploadDocOpts = {
   buffer: Buffer;
   kind?: "general" | "sustainability_report" | "financial_report";
   sourceUrl?: string;
+  serviceIds?: string[];
 };
 
 export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<ClientDocument> {
@@ -86,6 +87,7 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
       source_url: opts.sourceUrl ?? null,
       parse_status: parseStatus,
       parse_error: parseError,
+      service_ids: opts.serviceIds ?? [],
     })
     .select("*")
     .single();

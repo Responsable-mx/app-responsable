@@ -70,4 +70,33 @@ describe("isPublicHttpUrl - bloquea", () => {
   it("IPv6 ::1", () => {
     expect(isPublicHttpUrl("http://[::1]/x").ok).toBe(false);
   });
+
+  it("IPv6 ULA fc::/7 (privada)", () => {
+    expect(isPublicHttpUrl("http://[fc00::1]/x").ok).toBe(false);
+    expect(isPublicHttpUrl("http://[fd12:3456::1]/x").ok).toBe(false);
+  });
+
+  it("IPv4-mapped IPv6 ::ffff:192.168.x.x (bypass RFC1918)", () => {
+    expect(isPublicHttpUrl("http://[::ffff:192.168.1.1]/x").ok).toBe(false);
+  });
+
+  it("IPv4-mapped IPv6 ::ffff:10.x.x.x", () => {
+    expect(isPublicHttpUrl("http://[::ffff:10.0.0.1]/x").ok).toBe(false);
+  });
+
+  it("IPv4-mapped IPv6 ::ffff:172.16.x.x", () => {
+    expect(isPublicHttpUrl("http://[::ffff:172.16.0.1]/x").ok).toBe(false);
+  });
+
+  it("IPv4-mapped IPv6 ::ffff:127.x.x.x (loopback)", () => {
+    expect(isPublicHttpUrl("http://[::ffff:127.0.0.1]/x").ok).toBe(false);
+  });
+
+  it("IPv4-mapped IPv6 ::ffff:169.254.x.x (link-local)", () => {
+    expect(isPublicHttpUrl("http://[::ffff:169.254.169.254]/x").ok).toBe(false);
+  });
+
+  it("IPv4-mapped IPv6 ::ffff:8.8.8.8 (pública — NO bloquear)", () => {
+    expect(isPublicHttpUrl("http://[::ffff:8.8.8.8]/x").ok).toBe(true);
+  });
 });

@@ -37,6 +37,7 @@ export default defineConfig({
         "lib/audit-log.ts",
         "lib/catalogs/index.ts",
         "lib/clients.ts",
+        "lib/documents/ssrf.ts",
         "lib/env.ts",
         "lib/users.ts",
         "lib/validation.ts",

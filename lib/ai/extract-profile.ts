@@ -212,7 +212,10 @@ export async function extractProfileFromUrl(rawUrl: string): Promise<ProfileExtr
   if (text.length < 50) throw new Error("La página contiene muy poco texto para analizar");
 
   const fields = await extractFromText(text);
-  const result: ProfileExtractResult = { ...fields, logo_url: ogImage, cached: false };
+  // Preferimos Google favicon service (logo nítido, siempre cuadrado) sobre og:image
+  // que suele ser una foto hero o banner, no el logotipo de la empresa.
+  const logoUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`;
+  const result: ProfileExtractResult = { ...fields, logo_url: logoUrl, cached: false };
   setCached(key, result);
   return result;
 }

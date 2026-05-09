@@ -1,10 +1,7 @@
-/**
- * Avatar circular del cliente. White-label ready: cuando exista clients.logo_url
- * en el schema, agregar prop `logoUrl` y renderizar <img/> en su lugar.
- *
- * Genera un monogram tipográfico con paleta determinística por hash del nombre,
- * evitando colores aleatorios entre renders y manteniendo identidad visual estable.
- */
+"use client";
+
+import { useState } from "react";
+
 type Props = {
   name: string;
   size?: "sm" | "md" | "lg";
@@ -47,13 +44,11 @@ function getInitials(name: string): string {
 }
 
 export function ClientAvatar({ name, size = "md", logoUrl = null }: Props) {
+  const [imgError, setImgError] = useState(false);
   const sizeClass = SIZE_MAP[size];
 
-  // D-24: validar que logoUrl sea https:// antes de renderizar. Sin esta validación,
-  // valores como "javascript:..." serían inyectables como src. onError hace fallback
-  // al monogram si la URL 404s en lugar de mostrar broken image.
   const safeLogoUrl =
-    logoUrl && (logoUrl.startsWith("https://") || logoUrl.startsWith("http://"))
+    !imgError && logoUrl && (logoUrl.startsWith("https://") || logoUrl.startsWith("http://"))
       ? logoUrl
       : null;
 
@@ -66,10 +61,7 @@ export function ClientAvatar({ name, size = "md", logoUrl = null }: Props) {
         width={size === "sm" ? 28 : size === "lg" ? 48 : 36}
         height={size === "sm" ? 28 : size === "lg" ? 48 : 36}
         className={`${sizeClass} rounded shrink-0 object-cover bg-white border border-slate-200`}
-        onError={(e) => {
-          // Fallback al monogram si la URL rompe — evita broken image icon.
-          (e.currentTarget as HTMLImageElement).style.display = "none";
-        }}
+        onError={() => setImgError(true)}
       />
     );
   }

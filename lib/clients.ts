@@ -427,6 +427,7 @@ function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
     "has_sustainability_report",
     "has_sustainability_strategy",
     "website_url",
+    "logo_url",
     "sustainability_strategy_url",
     "sustainability_report_url",
     "financial_report_url",

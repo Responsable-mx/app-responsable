@@ -422,6 +422,7 @@ function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
     "countries",
     "size",
     ...STRUCTURED_ARRAYS,
+    "services",
     "maturity_level",
     "has_double_materiality",
     "has_sustainability_report",

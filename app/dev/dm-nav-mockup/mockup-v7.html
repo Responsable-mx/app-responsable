@@ -156,7 +156,7 @@
   #pill-bar::-webkit-scrollbar { display: none; }
 
   /* Stepper overflow */
-  #stepper-wrap { overflow: hidden; }
+  #stepper-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
   .stepper-pills { overflow-x: auto; scrollbar-width: none; }
   .stepper-pills::-webkit-scrollbar { display: none; }
 </style>
@@ -653,32 +653,32 @@
                   <span class="absolute text-[9px] text-slate-500" style="bottom:6px;left:5px">Baja prioridad</span>
 
                   <!-- Dots — ● circles = doble material (rose) -->
-                  <div class="dot" style="left:72%;bottom:85%;width:20px;height:20px;background:#f43f5e;border-radius:50%;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E1','Cambio climático','Doble material','8.5 / 7.2')">
+                  <div id="dot-E1" class="dot" style="left:72%;bottom:85%;width:20px;height:20px;background:#f43f5e;border-radius:50%;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E1','Cambio climático','Doble material','8.5 / 7.2')">
                     <div class="dot-tip">E1 · Cambio climático</div>
                   </div>
-                  <div class="dot" style="left:61%;bottom:70%;width:20px;height:20px;background:#f43f5e;border-radius:50%;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E2','Contaminación','Doble material','7.0 / 6.1')">
+                  <div id="dot-E2" class="dot" style="left:61%;bottom:70%;width:20px;height:20px;background:#f43f5e;border-radius:50%;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E2','Contaminación','Doble material','7.0 / 6.1')">
                     <div class="dot-tip">E2 · Contaminación</div>
                   </div>
                   <!-- ◆ diamonds = mat. impacto (amber) -->
-                  <div class="dot dot-diamond" style="left:30%;bottom:75%;width:20px;height:20px;background:#f59e0b;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
+                  <div id="dot-S1" class="dot dot-diamond" style="left:30%;bottom:75%;width:20px;height:20px;background:#f59e0b;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
                     <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S1 · Fuerza laboral</div>
                   </div>
-                  <div class="dot dot-diamond" style="left:22%;bottom:62%;width:18px;height:18px;background:#f59e0b;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
+                  <div id="dot-S2" class="dot dot-diamond" style="left:22%;bottom:62%;width:18px;height:18px;background:#f59e0b;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
                     <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S2 · Cadena de valor</div>
                   </div>
                   <!-- ■ squares = mat. financiero (teal) -->
-                  <div class="dot" style="left:65%;bottom:35%;width:18px;height:18px;background:#0f766e;border-radius:2px;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E3','Recursos hídricos','Mat. financiero','3.5 / 6.5')">
+                  <div id="dot-E3" class="dot" style="left:65%;bottom:35%;width:18px;height:18px;background:#0f766e;border-radius:2px;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E3','Recursos hídricos','Mat. financiero','3.5 / 6.5')">
                     <div class="dot-tip">E3 · Recursos hídricos</div>
                   </div>
-                  <div class="dot" style="left:78%;bottom:28%;width:18px;height:18px;background:#0f766e;border-radius:2px;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'G1','Ética empresarial','Mat. financiero','2.8 / 7.8')">
+                  <div id="dot-G1" class="dot" style="left:78%;bottom:28%;width:18px;height:18px;background:#0f766e;border-radius:2px;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'G1','Ética empresarial','Mat. financiero','2.8 / 7.8')">
                     <div class="dot-tip">G1 · Ética empresarial</div>
                   </div>
                   <!-- ▲ triangles = seguimiento (slate) -->
-                  <div class="dot" style="left:18%;bottom:22%;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:15px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'S4','Comunidades locales','Seguimiento','2.2 / 2.2')">
-                    <div class="dot-tip">S4 · Comunidades</div>
+                  <div class="dot" id="dot-S3" style="left:18%;bottom:22%;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:15px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'S3','Comunidades locales','Seguimiento','2.2 / 2.2')">
+                    <div class="dot-tip">S3 · Comunidades</div>
                   </div>
-                  <div class="dot" style="left:35%;bottom:18%;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:15px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'E5','Biodiversidad','Seguimiento','1.8 / 3.5')">
-                    <div class="dot-tip">E5 · Biodiversidad</div>
+                  <div class="dot" id="dot-E4" style="left:35%;bottom:18%;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:15px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'E4','Biodiversidad','Seguimiento','1.8 / 3.5')">
+                    <div class="dot-tip">E4 · Biodiversidad</div>
                   </div>
 
                   <!-- Dot popover (shared, positioned by JS) -->
@@ -758,14 +758,14 @@
                   <span class="font-mono text-[10px] text-slate-400 font-bold w-5">G1</span>
                   <span class="text-[10px] text-slate-600 truncate">Ética empresarial</span>
                 </div>
-                <div class="iro-index-item">
+                <div class="iro-index-item" onclick="openPopover(event,'S3','Comunidades locales','Seguimiento','2.2 / 2.2')">
                   <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:7px solid #94a3b8;flex-shrink:0;margin-top:1px"></div>
-                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">S4</span>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">S3</span>
                   <span class="text-[10px] text-slate-500 truncate">Comunidades</span>
                 </div>
-                <div class="iro-index-item">
+                <div class="iro-index-item" onclick="openPopover(event,'E4','Biodiversidad','Seguimiento','1.8 / 3.5')">
                   <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:7px solid #94a3b8;flex-shrink:0;margin-top:1px"></div>
-                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">E5</span>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">E4</span>
                   <span class="text-[10px] text-slate-500 truncate">Biodiversidad</span>
                 </div>
                 <div class="mt-3 pt-2 border-t border-slate-100">
@@ -792,7 +792,7 @@
               </div>
               <div class="flex items-center gap-1.5">
                 <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #94a3b8"></div>
-                <span class="text-[10px] text-slate-600 font-medium">▲ Seguimiento <span class="text-slate-400">(S4, E5)</span></span>
+                <span class="text-[10px] text-slate-600 font-medium">▲ Seguimiento <span class="text-slate-400">(S3, E4)</span></span>
               </div>
             </div>
           </div>
@@ -890,7 +890,7 @@
             <div>
               <div class="flex items-center gap-2">
                 <h2 class="text-lg font-semibold text-slate-900">Resumen ejecutivo del estudio</h2>
-                <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm uppercase tracking-wide">Vista previa</span>
+                <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm uppercase tracking-wide">Borrador IA · pendiente revisión</span>
               </div>
               <p class="text-xs text-slate-500 mt-0.5">Síntesis generada por Elena — integra benchmark + IROs + brechas · pendiente de validación con cliente</p>
             </div>
@@ -901,7 +901,7 @@
                 Editar
               </button>
               <button onclick="confirmRegenerate()" class="flex items-center gap-1.5 border border-slate-200 text-slate-500 text-xs font-semibold px-3 py-1.5 rounded hover:bg-slate-50 hover:text-slate-700 transition-colors whitespace-nowrap">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 Regenerar síntesis
               </button>
             </div>
@@ -923,15 +923,17 @@
                   <strong>Recomendación prioritaria:</strong> Establecer meta net-zero con horizonte 2050 y plan de descarbonización por segmento, contratar auditoría ESG externa para el próximo ciclo de reporte, e implementar sistema de monitoreo de vertimientos de agua (brecha crítica sin paralelo en peers). Estas tres acciones mejorarían el perfil de materialidad de Nuvoil de "en desarrollo" a "alineado con sector" en un ciclo de 12–18 meses.
                 </p>
               </div>
-              <div class="flex items-center gap-3 mt-2 flex-wrap">
-                <button onclick="toggleSynth()" id="synth-toggle" class="text-[10px] text-brand-primary font-semibold hover:underline">
+              <div class="mt-2">
+                <button onclick="toggleSynth()" id="synth-toggle" class="text-[10px] text-brand-primary font-semibold underline hover:no-underline">
                   Leer síntesis completa ↓
                 </button>
-                <button id="btn-mark-reviewed" onclick="markExecReviewed()" class="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-emerald-700 font-medium border border-slate-200 px-3 py-1.5 rounded-sm hover:border-emerald-200 hover:bg-emerald-50 transition-colors">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
-                  Marcar resumen como revisado
-                </button>
               </div>
+            </div>
+            <div class="pt-3 mt-1 border-t border-slate-100 flex justify-end">
+              <button id="btn-mark-reviewed" onclick="markExecReviewed()" class="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-emerald-700 font-medium border border-slate-200 px-3 py-1.5 rounded-sm hover:border-emerald-200 hover:bg-emerald-50 transition-colors">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
+                Marcar resumen como revisado
+              </button>
             </div>
             <!-- ── Synthesis edit (write) ── -->
             <div id="synth-edit-area" class="hidden border border-slate-200 rounded">
@@ -956,22 +958,22 @@ Recomendación prioritaria: Establecer meta net-zero con horizonte 2050 y plan d
               </div>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-rose-500 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded" style="border-left:4px solid #e11d48;">
                 <p class="th text-rose-600 mb-1">Doble material</p>
                 <p class="text-xl font-bold text-rose-800 tabular-nums">2</p>
                 <p class="text-[10px] text-rose-600 mt-0.5">E1 · E2</p>
               </div>
-              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-amber-500 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded" style="border-left:4px solid #d97706;">
                 <p class="th text-amber-600 mb-1">Mat. impacto</p>
                 <p class="text-xl font-bold text-amber-800 tabular-nums">2</p>
                 <p class="text-[10px] text-amber-600 mt-0.5">S1 · S2</p>
               </div>
-              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-teal-600 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded" style="border-left:4px solid #0f766e;">
                 <p class="th text-brand-primary mb-1">Mat. financiero</p>
                 <p class="text-xl font-bold text-brand-primary tabular-nums">2</p>
                 <p class="text-[10px] text-brand-primary mt-0.5">E3 · G1</p>
               </div>
-              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-rose-600 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded" style="border-left:4px solid #dc2626;">
                 <p class="th text-red-600 mb-1">Brechas críticas</p>
                 <p class="text-xl font-bold text-red-700 tabular-nums">3</p>
                 <!-- line-clamp-2 + title tooltip: maneja N brechas sin romper la card -->
@@ -1105,7 +1107,7 @@ Recomendación prioritaria: Establecer meta net-zero con horizonte 2050 y plan d
                   Proceder a reporte
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
-                <p id="val-hint" class="text-[10px] text-amber-600 mt-0.5 h-3">3 IROs sin decisión</p>
+                <p id="val-hint" class="text-[10px] text-amber-600 mt-1" style="min-height:1rem;">3 IROs sin decisión</p>
               </div>
             </div>
           </div>
@@ -1221,8 +1223,8 @@ Recomendación prioritaria: Establecer meta net-zero con horizonte 2050 y plan d
                 <div class="flex items-center gap-2 text-slate-700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> IROs calificados (≥5 con score) <span class="text-slate-400 ml-auto">8 calificados</span></div>
                 <div class="flex items-center gap-2 text-slate-700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Matriz de materialidad generada <span class="text-slate-400 ml-auto">8 IROs</span></div>
                 <div class="flex items-center gap-2 text-slate-700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Brechas NIS/IBSO documentadas <span class="text-slate-400 ml-auto">4 brechas</span></div>
-                <div id="checklist-reviewed-row" class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Resumen ejecutivo revisado</div>
-                <div id="checklist-validated" class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Hallazgos validados con cliente <span id="checklist-val-date" class="text-[9px] text-slate-300 ml-0.5">· pendiente junta</span></div>
+                <div id="checklist-reviewed-row" class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Resumen ejecutivo revisado <span onclick="goStage(6)" style="font-size:10px;color:#0f766e;text-decoration:underline;cursor:pointer;margin-left:8px;">→ Resumen IA</span></div>
+                <div id="checklist-validated" class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Hallazgos validados con cliente <span id="checklist-val-date" class="text-[9px] text-slate-300 ml-0.5">· pendiente junta</span><span onclick="goStage(7)" style="font-size:10px;color:#0f766e;text-decoration:underline;cursor:pointer;margin-left:8px;">→ Validación</span></div>
                 <div class="flex items-center gap-2 text-slate-400"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reporte generado y descargado <span class="text-[9px] text-slate-300 ml-0.5">· automático al generar</span></div>
               </div>
             </div>
@@ -1232,7 +1234,7 @@ Recomendación prioritaria: Establecer meta net-zero con horizonte 2050 y plan d
               <p class="text-[11px] text-amber-700"><strong>2 criterios sin completar</strong> — el reporte se puede generar, pero la calidad será menor. Revisa: Resumen ejecutivo revisado · Hallazgos validados con cliente.</p>
             </div>
             <button onclick="showConfirmModal()" class="w-full flex items-center justify-center gap-2 bg-brand-primary text-white text-sm font-semibold py-3 rounded hover:bg-brand-primary-dark transition-colors shadow-sm">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               Generar reporte PDF — Elena
             </button>
             <p class="text-[10px] text-slate-400 text-center">Generado por Elena · descarga automática al completar</p>
@@ -1310,6 +1312,8 @@ function goStage(n, fromKeyboard) {
   cur = n;
   updateStepper(n);
 
+  // Auto-position scatter dots from calculated scores when Stage 4 becomes visible
+  if (n === 4) { requestAnimationFrame(renderScatterDots); }
 
   // Scroll to top — instant for keyboard nav, smooth for clicks
   document.getElementById('main').scrollTo({ top: 0, behavior: fromKeyboard ? 'instant' : 'smooth' });
@@ -1435,8 +1439,9 @@ function openPopover(event, code, name, quad, scores) {
   const py = document.getElementById('pop-y');
   const pflag = document.getElementById('pop-pos-flag');
   if (px && py && s) {
-    px.value = s.x !== undefined ? s.x : parseFloat(scores.split('/')[1]) || 0;
-    py.value = s.y !== undefined ? s.y : parseFloat(scores.split('/')[0]) || 0;
+    // Dots CSS usa porcentaje (0-100); inputs muestran escala del eje (0-10)
+    px.value = s.x !== undefined ? +(s.x / 10).toFixed(1) : 0;
+    py.value = s.y !== undefined ? +(s.y / 10).toFixed(1) : 0;
     if (pflag) { s.pos_override ? pflag.classList.remove('hidden') : pflag.classList.add('hidden'); }
   }
 
@@ -1986,12 +1991,12 @@ let materialityThreshold = 5.0;
 const expandedIros3 = new Set();
 
 function calcImpScore(id) {
-  const s = IRO_SCORES[id]; if (!s || !s.imp) return 0;
-  return +(s.imp.reduce((acc, v, i) => acc + v * IRO_DIM_W_IMP[i], 0) * 2).toFixed(1);
+  const s = IRO_SCORES[id]; if (!s || !s.imp) return '0.0';
+  return (s.imp.reduce((acc, v, i) => acc + v * IRO_DIM_W_IMP[i], 0) * 2).toFixed(1);
 }
 function calcFinScore(id) {
   const s = IRO_SCORES[id]; if (!s || !s.fin) return null;
-  return +(s.fin.reduce((acc, v, i) => acc + v * IRO_DIM_W_FIN[i], 0) * 2).toFixed(1);
+  return (s.fin.reduce((acc, v, i) => acc + v * IRO_DIM_W_FIN[i], 0) * 2).toFixed(1);
 }
 function getQuadranteCalc(imp, fin) {
   const i = parseFloat(imp) >= materialityThreshold;
@@ -2021,8 +2026,10 @@ function updateDimScore(id, type, idx, val) {
   if (type === 'imp') s.imp[idx] = val;
   else if (type === 'fin' && s.fin) s.fin[idx] = val;
   s.score_override = true;
+  s.pos_override = false; // reset manual override so auto-calc takes over
   expandedIros3.add(id);
   renderStage3Table();
+  renderScatterDots(); // update scatter if stage 4 dots exist in DOM
 }
 
 function saveIroDesc(id) {
@@ -2058,8 +2065,8 @@ function renderIro3Row(iro) {
   const esgCls = cat==='E' ? 'bg-emerald-100 text-emerald-800' : cat==='S' ? 'bg-blue-100 text-blue-800' : 'bg-violet-100 text-violet-800';
   const overrideBadge = s.score_override ? ' <span style="font-size:8px;background:#fed7aa;color:#9a3412;font-weight:700;padding:1px 5px;border-radius:2px;margin-left:3px;">Ajustado</span>' : '';
   const descBadge = s.desc_edited ? ' <span style="font-size:8px;color:#0f766e;font-weight:600;">✎</span>' : '';
-  const impColor = imp >= materialityThreshold ? '#be123c' : '#475569';
-  const finColor = fin !== null && fin >= materialityThreshold ? '#0f766e' : '#475569';
+  const impColor = parseFloat(imp) >= materialityThreshold ? '#be123c' : '#475569';
+  const finColor = fin !== null && parseFloat(fin) >= materialityThreshold ? '#0f766e' : '#475569';
   const checkSvg = included
     ? '<svg style="display:inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
     : '<svg style="display:inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
@@ -2115,7 +2122,10 @@ function renderIro3Row(iro) {
           <textarea id="desc-ta-${iro.id}" rows="2"
             style="width:100%;border:1px solid #e2e8f0;border-radius:3px;padding:6px 8px;font-size:11px;color:#334155;resize:none;background:white;font-family:inherit;line-height:1.5;"
           >${s.desc || ''}</textarea>
-          <button onclick="saveIroDesc('${iro.id}')" style="margin-top:4px;font-size:10px;color:#0f766e;font-weight:600;cursor:pointer;background:none;border:none;padding:0;">Guardar descripción</button>
+          <button onclick="saveIroDesc('${iro.id}')" style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:#0f766e;border:1px solid #0f766e;border-radius:3px;padding:2px 8px;background:white;cursor:pointer;" onmouseover="this.style.background='#f0fdfa'" onmouseout="this.style.background='white'">
+            <svg style="width:10px;height:10px" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            Guardar descripción
+          </button>
         </div>
 
         <!-- Classification -->
@@ -2180,14 +2190,14 @@ function renderIro3Row(iro) {
   return `
   <tr class="row" style="border-bottom:1px solid #f1f5f9;cursor:pointer;${isExpanded ? 'background:#f8fafc;' : ''}"
     onclick="toggleIroRow3('${iro.id}')">
-    <td style="padding:8px 4px 8px 8px;font-size:11px;color:#94a3b8;user-select:none;">${isExpanded ? '▾' : '▸'}</td>
+    <td style="padding:4px 4px 4px 4px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;cursor:pointer;font-size:11px;color:#94a3b8;user-select:none;">${isExpanded ? '▾' : '▸'}</span></td>
     <td style="padding:8px 4px;font-family:monospace;font-size:10px;font-weight:700;color:#64748b;white-space:nowrap;">
       ${iro.id}${overrideBadge}
     </td>
     <td style="padding:8px 8px 8px 4px;color:#334155;font-weight:500;">${iro.label}${descBadge}</td>
     <td style="padding:8px;text-align:center;"><span class="${esgCls} text-[9px] font-bold px-1.5 py-0.5 rounded-sm">${cat}</span></td>
     <td style="padding:8px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:${impColor};">${imp}</td>
-    <td style="padding:8px;text-align:center;font-variant-numeric:tabular-nums;color:${finColor};${fin !== null && fin >= materialityThreshold ? 'font-weight:700;' : ''}">${fin !== null ? fin : '<span style="color:#cbd5e1;" title="Sin dimensiones financieras definidas">—</span>'}</td>
+    <td style="padding:8px;text-align:center;font-variant-numeric:tabular-nums;color:${finColor};${fin !== null && parseFloat(fin) >= materialityThreshold ? 'font-weight:700;' : ''}">${fin !== null ? fin : '<span style="color:#cbd5e1;" title="Sin dimensiones financieras definidas">—</span>'}</td>
     <td style="padding:8px;text-align:center;"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded-sm ${quad.cls} whitespace-nowrap">${quad.label}</span></td>
     <td style="padding:8px;text-align:center;">${checkSvg}</td>
   </tr>
@@ -2214,6 +2224,32 @@ function renderStage3Table() {
   </table>`;
 }
 
+// ── Scatter dots auto-position from calculated scores (F13) ──────────────────
+function renderScatterDots() {
+  Object.keys(IRO_SCORES).forEach(id => {
+    const dot = document.getElementById('dot-' + id);
+    if (!dot) return;
+    const s = IRO_SCORES[id];
+    if (s.pos_override) {
+      dot.style.left = s.x + '%';
+      dot.style.bottom = s.y + '%';
+      return;
+    }
+    const impS = calcImpScore(id);
+    const finS = calcFinScore(id);
+    // impS/finS are strings from toFixed(1); parseFloat for arithmetic
+    const impNum = parseFloat(impS);
+    const finNum = finS !== null ? parseFloat(finS) : null;
+    dot.style.bottom = (impNum * 10) + '%';
+    if (finNum !== null) {
+      dot.style.left = (finNum * 10) + '%';
+    }
+    // Update stored position
+    s.x = finNum !== null ? finNum * 10 : s.x;
+    s.y = impNum * 10;
+  });
+}
+
 // ── Matrix position adjustment ───────────────────────────────────────────────
 function updateDotPosition() {
   if (!currentDotEl || !currentPopCode) return;
@@ -2222,8 +2258,8 @@ function updateDotPosition() {
   currentDotEl.style.left = (x * 10) + '%';
   currentDotEl.style.bottom = (y * 10) + '%';
   if (IRO_SCORES[currentPopCode]) {
-    IRO_SCORES[currentPopCode].x = x;
-    IRO_SCORES[currentPopCode].y = y;
+    IRO_SCORES[currentPopCode].x = x * 10; // guardar como % para coincidir con CSS left/bottom
+    IRO_SCORES[currentPopCode].y = y * 10;
     IRO_SCORES[currentPopCode].pos_override = true;
   }
   const flag = document.getElementById('pop-pos-flag');
@@ -2236,6 +2272,7 @@ setBenchState('c'); // Iniciar en estado C (resultados ya generados, como en V4)
 renderIroTable();
 renderStage3Table();
 updateStepper(4);
+renderScatterDots(); // position dots from calculated scores on load
 
 // Asistente input — keyboard shortcuts
 document.addEventListener('DOMContentLoaded', () => {

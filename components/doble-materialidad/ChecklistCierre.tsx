@@ -3,6 +3,20 @@
 // Checklist de cierre del Estudio de Doble Materialidad.
 // Derivado de props calculadas en el componente padre — sin fetch propio.
 
+// ── Helper: scroll a sección de la pestaña DM ─────────────────────────────────
+
+function scrollToDmSection(sectionId: string) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  const main = document.querySelector("main");
+  if (main) {
+    const top = el.getBoundingClientRect().top + main.scrollTop - 8;
+    main.scrollTo({ top, behavior: "smooth" });
+  } else {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 type Props = {
@@ -58,10 +72,13 @@ function CriterioItem({
   label,
   cumple,
   hint,
+  sectionId,
 }: {
   label: string;
   cumple: boolean;
   hint?: string;
+  /** ID de sección dentro del tab DM — muestra botón "→ Ir" cuando no cumple */
+  sectionId?: string;
 }) {
   return (
     <li className="flex items-start gap-2.5 py-1.5">
@@ -75,7 +92,19 @@ function CriterioItem({
           {label}
         </span>
         {hint && !cumple && (
-          <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            {hint}
+            {sectionId && (
+              <button
+                type="button"
+                onClick={() => scrollToDmSection(sectionId)}
+                className="ml-1.5 text-brand-primary hover:underline focus:outline-none"
+                aria-label={`Ir a la sección: ${label}`}
+              >
+                → Ir
+              </button>
+            )}
+          </p>
         )}
       </div>
     </li>
@@ -95,7 +124,12 @@ export function ChecklistCierre({
   hasResumen,
 }: Props) {
   // Evaluar cada criterio
-  const criterios = [
+  const criterios: Array<{
+    label: string;
+    cumple: boolean;
+    hint?: string;
+    sectionId?: string;
+  }> = [
     {
       label: "Cuestionario de contexto completo",
       cumple:
@@ -105,39 +139,46 @@ export function ChecklistCierre({
       hint: questionnaireProgress
         ? `${questionnaireProgress.filled} / ${questionnaireProgress.total} respuestas completadas`
         : "Sin datos de cuestionario",
+      // Cuestionario vive en otro tab — no hay sectionId de DM
     },
     {
       label: "Benchmark competitivo completado",
       cumple: hasCompletedBenchmark,
       hint: "Ejecuta el benchmark desde la sección correspondiente",
+      sectionId: "dm-sec-benchmark",
     },
     {
       label: "IROs generados (mínimo 10)",
       cumple: iroCount >= 10,
       hint: `${iroCount} IRO${iroCount !== 1 ? "s" : ""} registrados — se requieren al menos 10`,
+      sectionId: "dm-sec-iros",
     },
     {
       label: "IROs priorizados (70 % con scores asignados)",
       cumple:
         includedIroCount > 0 && scoredIroCount >= includedIroCount * 0.7,
       hint: `${scoredIroCount} de ${includedIroCount} IROs incluidos tienen score de impacto y financiero`,
+      sectionId: "dm-sec-iros",
     },
     {
       label: "Mapa NIS/IBSO capturado",
       cumple: hasNisData,
       hint: "Registra al menos una brecha en la sección NIS/IBSO",
+      sectionId: "dm-sec-nis",
     },
     {
       label: "Reporte DM generado",
       cumple: hasReport,
       hint: "Genera el reporte desde la sección Reporte DM",
+      sectionId: "dm-sec-reporte",
     },
     {
       label: "Resumen ejecutivo generado",
       cumple: hasResumen,
       hint: "Genera el resumen ejecutivo desde la sección correspondiente",
+      sectionId: "dm-sec-resumen",
     },
-  ] as const;
+  ];
 
   const cumplidos = criterios.filter((c) => c.cumple).length;
   const total = criterios.length;
@@ -179,7 +220,8 @@ export function ChecklistCierre({
               key={i}
               label={c.label}
               cumple={c.cumple}
-              hint={"hint" in c ? c.hint : undefined}
+              hint={c.hint}
+              sectionId={c.sectionId}
             />
           ))}
         </ul>

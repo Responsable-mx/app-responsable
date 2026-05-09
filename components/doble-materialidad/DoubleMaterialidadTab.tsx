@@ -202,7 +202,7 @@ function ExpandableCell({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="text-[10px] text-brand-primary hover:underline mt-0.5 focus:outline-none"
+          className="min-h-[24px] inline-flex items-center text-[10px] text-brand-primary hover:underline mt-0.5 focus:outline-none"
         >
           {expanded ? "Ver menos" : "Ver más"}
         </button>
@@ -665,7 +665,23 @@ function BenchmarkSection({
               loading={proposing}
               onClick={companies.length > 0 ? () => setConfirmRepropose(true) : handlePropose}
             >
-              {companies.length > 0 ? "Regenerar lista IA" : "Proponer empresas con IA"}
+              {companies.length > 0 ? (
+                <>
+                  <svg className="w-3 h-3 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 4a4 4 0 11-7.9 1" />
+                    <path d="M2 2v3h3" />
+                  </svg>
+                  Regenerar lista IA
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 1v7M6 8l-2.5-2.5M6 8l2.5-2.5" />
+                    <path d="M1 11h10" />
+                  </svg>
+                  Proponer empresas con IA
+                </>
+              )}
             </Button>
             <button
               type="button"
@@ -1335,6 +1351,10 @@ function IroSection({
           La IA generará un inventario preliminar de 15–25 IROs usando el cuestionario del cliente y las señales del benchmark. Tarda 1-3 minutos.
         </p>
         <Button size="md" variant="primary" loading={generating} onClick={handleGenerate}>
+          <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 1v7M6 8l-2.5-2.5M6 8l2.5-2.5" />
+            <path d="M1 11h10" />
+          </svg>
           Generar IROs con IA
         </Button>
       </div>
@@ -1400,6 +1420,10 @@ function IroSection({
             Exportar Excel
           </a>
           <Button size="sm" variant="secondary" loading={generating} onClick={handleGenerate}>
+            <svg className="w-3 h-3 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 4a4 4 0 11-7.9 1" />
+              <path d="M2 2v3h3" />
+            </svg>
             Regenerar IROs
           </Button>
         </div>
@@ -1917,28 +1941,36 @@ function ReporteSection({
               minute: "2-digit",
             })}
           </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" variant="primary" loading={downloading} onClick={handleDownloadPdf}>
-              <svg
-                className="w-3.5 h-3.5 mr-1.5"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
+          <div className="flex flex-col gap-3">
+            <div>
+              <Button size="sm" variant="primary" loading={downloading} onClick={handleDownloadPdf}>
+                <svg
+                  className="w-3.5 h-3.5 mr-1.5"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" />
+                </svg>
+                Descargar PDF
+              </Button>
+            </div>
+            {/* Regenerar — destructivo, separado visualmente */}
+            <div className="pt-2 border-t border-slate-100">
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={generating}
+                onClick={() => setConfirmRegenerate(true)}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" />
-              </svg>
-              Descargar PDF
-            </Button>
-            {/* Regenerar — destructivo, requiere confirmación */}
-            <Button
-              size="sm"
-              variant="secondary"
-              loading={generating}
-              onClick={() => setConfirmRegenerate(true)}
-            >
-              Regenerar reporte
-            </Button>
+                <svg className="w-3 h-3 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 4a4 4 0 11-7.9 1" />
+                  <path d="M2 2v3h3" />
+                </svg>
+                Regenerar reporte
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -2131,21 +2163,23 @@ export function DoubleMaterialidadTab({
 
   return (
     <div className="space-y-6 py-4">
-      {/* ── Stepper header — cada paso navega a su sección ── */}
-      <div className="flex items-center gap-2 pb-4 border-b border-slate-100 flex-wrap">
-        <StageIndicator number={1} label="Contexto"  status={stage1Status} sectionId="dm-sec-contexto" />
-        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={2} label="Benchmark" status={stage2Status} sectionId="dm-sec-benchmark" />
-        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={3} label="IROs"      status={stage3Status} sectionId="dm-sec-iros" />
-        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={4} label="Matriz"    status={stage4Status} sectionId="dm-sec-matriz" />
-        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={5} label="NIS/IBSO"  status={stage5Status} sectionId="dm-sec-nis" />
-        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={6} label="Resumen"   status={stage6Status} sectionId="dm-sec-resumen" />
-        <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-        <StageIndicator number={7} label="Reporte"   status={stage7Status} sectionId="dm-sec-reporte" />
+      {/* ── Stepper header — scroll-x en tablet, no flex-wrap ── */}
+      <div className="overflow-x-auto pb-4 border-b border-slate-100 -mx-1 px-1">
+        <div className="flex items-center gap-2 min-w-max">
+          <StageIndicator number={1} label="Contexto"  status={stage1Status} sectionId="dm-sec-contexto" />
+          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+          <StageIndicator number={2} label="Benchmark" status={stage2Status} sectionId="dm-sec-benchmark" />
+          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+          <StageIndicator number={3} label="IROs"      status={stage3Status} sectionId="dm-sec-iros" />
+          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+          <StageIndicator number={4} label="Matriz"    status={stage4Status} sectionId="dm-sec-matriz" />
+          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+          <StageIndicator number={5} label="NIS/IBSO"  status={stage5Status} sectionId="dm-sec-nis" />
+          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+          <StageIndicator number={6} label="Resumen"   status={stage6Status} sectionId="dm-sec-resumen" />
+          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
+          <StageIndicator number={7} label="Reporte"   status={stage7Status} sectionId="dm-sec-reporte" />
+        </div>
       </div>
 
       {/* ── Etapa 1 ── */}

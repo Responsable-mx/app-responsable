@@ -16,6 +16,25 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-144–D-147 — Hallazgos auditoría sesión 22 (may-2026)
+
+### ~~🔴 D-144 — SSRF guard duplicado, sin cobertura IPv4-mapped IPv6~~ ✅ RESUELTO
+- `extract-profile.ts` usaba guard custom más débil que `isPublicHttpUrl`. `::ffff:192.168.x.x` bypasaba `isPrivateIPv4()`. Fix: ssrf.ts + extract-profile.ts unificados. Sesión 22.
+
+### 🟡 D-145 — chat_requests sin índice compuesto para rate limit extract-profile
+- **Descripción**: `POST /api/clients/extract-profile` hace `COUNT(*) WHERE user_email=X AND role='extract-profile' AND created_at>=Y` sin índice en `(user_email, role, created_at)`. Para 8 usuarios es inobservable; a 50+ usuarios el COUNT full-scan empieza a notarse.
+- **Fix**: `CREATE INDEX idx_chat_requests_ratelimit ON chat_requests (user_email, role, created_at DESC);`
+- **Esfuerzo**: 5 min (migración SQL aditiva)
+
+### ~~🟢 D-146 — extract-profile no registraba en logAiCall~~ ✅ RESUELTO
+- Tokens propagados desde `resp.usage` → `ProfileExtractResult` → route → `logAiCall`. Sesión 22.
+
+### 🟢 D-147 — Cache in-memory de extract-profile se pierde en cada deploy
+- **Descripción**: `const cache = new Map()` en `lib/ai/extract-profile.ts`. Aceptable para MVP (8 usuarios, TTL 30min). A escala: migrar a Redis o tabla Supabase con columna `expires_at`.
+- **Esfuerzo**: Sprint post-piloto
+
+---
+
 ### Bloque D-89–D-98 — Hallazgos design critique may-2026 (sesión 2)
 
 ### ~~🔴 D-89 — Configuración abre en blanco sin contenido default~~ ✅ VERIFICADO RESUELTO

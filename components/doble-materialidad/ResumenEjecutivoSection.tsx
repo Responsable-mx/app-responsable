@@ -18,8 +18,16 @@ type ResumenData = {
   error_msg: string | null;
 } | null;
 
+type QuadrantCounts = {
+  doble_material: number;
+  solo_impacto: number;
+  solo_financiero: number;
+  brechas_criticas: number;
+};
+
 type Props = {
   clientId: string;
+  quadrantCounts: QuadrantCounts;
 };
 
 // ── Fetcher ───────────────────────────────────────────────────────────────────
@@ -42,11 +50,57 @@ function formatDate(iso: string): string {
   });
 }
 
+// ── KPI cards config ──────────────────────────────────────────────────────────
+
+const KPI_CARDS: Array<{
+  key: keyof QuadrantCounts;
+  label: string;
+  sublabel: string;
+  borderClass: string;
+  textClass: string;
+  countClass: string;
+}> = [
+  {
+    key: "doble_material",
+    label: "Doble material",
+    sublabel: "impacto + financiero",
+    borderClass: "border-l-rose-600",
+    textClass: "text-rose-600",
+    countClass: "text-rose-700",
+  },
+  {
+    key: "solo_impacto",
+    label: "Mat. impacto",
+    sublabel: "solo impacto",
+    borderClass: "border-l-amber-600",
+    textClass: "text-amber-600",
+    countClass: "text-amber-700",
+  },
+  {
+    key: "solo_financiero",
+    label: "Mat. financiero",
+    sublabel: "solo financiero",
+    borderClass: "border-l-brand-primary",
+    textClass: "text-brand-primary",
+    countClass: "text-teal-700",
+  },
+  {
+    key: "brechas_criticas",
+    label: "Brechas NIS",
+    sublabel: "sin información",
+    borderClass: "border-l-red-600",
+    textClass: "text-red-600",
+    countClass: "text-red-700",
+  },
+];
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function ResumenEjecutivoSection({ clientId }: Props) {
+export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
   const { push: pushToast } = useToast();
   const [generating, setGenerating] = useState(false);
+  // Estado local de revisión — deriva a DB en sprint posterior (ver DEUDA.md)
+  const [isReviewed, setIsReviewed] = useState(false);
 
   const { data, isLoading, mutate } = useSWR<{ data: ResumenData }>(
     `/api/clients/${clientId}/dm-resumen`,
@@ -59,6 +113,7 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
 
   const handleGenerar = useCallback(async () => {
     setGenerating(true);
+    setIsReviewed(false); // nuevo borrador al regenerar
     try {
       const res = await fetch(`/api/clients/${clientId}/dm-resumen`, {
         method: "POST",
@@ -93,7 +148,7 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
 
   return (
     <section className="border border-slate-200 rounded bg-white shadow-sm">
-      {/* Encabezado de sección */}
+      {/* ── Encabezado ── */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
           {/* Ícono documento */}
@@ -119,8 +174,41 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
               Resumen ejecutivo
             </h3>
           </div>
+
+          {/* Badge de estado de revisión */}
+          {hasContent && !isReviewed && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-amber-50 border border-amber-200 text-[10px] font-medium text-amber-700 ml-1">
+              <svg
+                className="w-3 h-3 shrink-0"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 3.75a.75.75 0 00-1.5 0v3.5c0 .414.336.75.75.75h2.5a.75.75 0 000-1.5H8.75V4.75z" />
+              </svg>
+              Borrador IA · pendiente revisión
+            </span>
+          )}
+          {hasContent && isReviewed && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-emerald-50 border border-emerald-200 text-[10px] font-medium text-emerald-700 ml-1">
+              <svg
+                className="w-3 h-3 text-emerald-600 shrink-0"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Revisado por consultor
+            </span>
+          )}
         </div>
 
+        {/* Acciones */}
         <div className="flex items-center gap-2">
           {hasContent && (
             <Button
@@ -129,7 +217,6 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
               onClick={handleCopiar}
               aria-label="Copiar resumen al portapapeles"
             >
-              {/* Ícono copiar */}
               <svg
                 className="w-4 h-4 mr-1.5"
                 viewBox="0 0 20 20"
@@ -154,18 +241,36 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
         </div>
       </div>
 
-      {/* Cuerpo */}
+      {/* ── KPI cards — solo cuando hay contenido ── */}
+      {hasContent && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 pt-4 pb-2">
+          {KPI_CARDS.map((card) => (
+            <div
+              key={card.key}
+              className={`p-3 bg-slate-50 border border-slate-200 rounded border-l-4 ${card.borderClass}`}
+            >
+              <p className={`text-[10px] font-bold uppercase tracking-widest ${card.textClass} mb-1.5`}>
+                {card.label}
+              </p>
+              <p className={`text-2xl font-bold tabular-nums ${card.countClass} leading-none`}>
+                {quadrantCounts[card.key]}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">{card.sublabel}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Cuerpo: contenido generado / estados ── */}
       <div className="px-5 py-4">
         {isLoading ? (
           <SkeletonList items={4} />
         ) : generating ? (
-          // Estado generando
           <div
             className="flex flex-col items-center justify-center py-10 gap-3"
             role="status"
             aria-live="polite"
           >
-            {/* Spinner */}
             <svg
               className="w-6 h-6 text-brand-primary animate-spin"
               viewBox="0 0 24 24"
@@ -191,7 +296,6 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
             </p>
           </div>
         ) : hasContent ? (
-          // Contenido generado
           <div>
             {resumen?.created_at && (
               <p className="text-[11px] text-slate-400 mb-4">
@@ -212,7 +316,6 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
             </div>
           </div>
         ) : resumen?.status === "failed" ? (
-          // Estado de error
           <div className="rounded border-l-4 border-l-brand-berry bg-red-50 px-4 py-3">
             <p className="text-sm font-medium text-red-700">
               No se pudo generar el resumen
@@ -225,7 +328,6 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
             </p>
           </div>
         ) : (
-          // Estado vacío / inicial
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
             <svg
               className="w-8 h-8 text-slate-300"
@@ -251,6 +353,36 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── CTA: marcar como revisado ── */}
+      {hasContent && !isReviewed && (
+        <div className="border-t border-slate-100 px-5 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-slate-500">
+              Revisa el borrador y márcalo como revisado para avanzar al reporte.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsReviewed(true)}
+            >
+              <svg
+                className="w-3.5 h-3.5 mr-1.5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Marcar como revisado
+            </Button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

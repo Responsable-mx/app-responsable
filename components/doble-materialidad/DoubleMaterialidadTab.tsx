@@ -13,6 +13,7 @@ import type { DmIroConfig } from "@/lib/dm/iros";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 import { classifyEsg, ESG_BADGE } from "@/lib/dm/esg-classify";
 import { ResumenEjecutivoSection } from "@/components/doble-materialidad/ResumenEjecutivoSection";
+import { ValidacionSection } from "@/components/doble-materialidad/ValidacionSection";
 import { ChecklistCierre } from "@/components/doble-materialidad/ChecklistCierre";
 import { LogDecisionesSection } from "@/components/doble-materialidad/LogDecisionesSection";
 
@@ -117,46 +118,86 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
-// ── Stage indicator ──────────────────────────────────────────
+// ── Scroll helper ────────────────────────────────────────────
+
+function scrollToDmSection(sectionId: string) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  const main = document.querySelector("main");
+  if (main) {
+    const top = el.getBoundingClientRect().top + main.scrollTop - 8;
+    main.scrollTo({ top, behavior: "smooth" });
+  } else {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+// ── Tipo de estado de etapa ──────────────────────────────────
 
 type StageStatus = "done" | "active" | "pending";
 
-function StageIndicator({
-  number,
+// ── Pill del stepper ─────────────────────────────────────────
+// Reemplaza StageIndicator (círculo + número) con pill compacto
+
+function StagePill({
   label,
   status,
+  subtitle,
   sectionId,
 }: {
-  number: number;
   label: string;
   status: StageStatus;
+  /** Texto bajo el label: fecha de completado / "En curso" / "Pendiente" */
+  subtitle: string;
   sectionId?: string;
 }) {
-  const ringColor =
-    status === "done"
-      ? "bg-brand-primary text-white border-brand-primary"
-      : status === "active"
-      ? "bg-white text-brand-primary border-brand-primary"
-      : "bg-white text-slate-400 border-slate-300";
+  const pillBase =
+    "flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm border transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40";
 
-  const labelColor =
-    status === "active" ? "text-brand-primary" : status === "done" ? "text-slate-500" : "text-slate-400";
+  const pillStyle =
+    status === "done"
+      ? `${pillBase} bg-slate-50 border-slate-200 hover:bg-slate-100`
+      : status === "active"
+      ? `${pillBase} bg-brand-primary border-brand-primary`
+      : `${pillBase} border-slate-200 hover:border-slate-300`;
 
   const inner = (
     <>
-      <div
-        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] font-bold shrink-0 ${ringColor}`}
-      >
-        {status === "done" ? (
-          <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
-            <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <div className="flex items-center gap-1.5">
+        {status === "done" && (
+          <svg
+            className="w-2.5 h-2.5 text-brand-primary shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
           </svg>
-        ) : (
-          number
         )}
+        <span
+          className={`text-[11px] whitespace-nowrap ${
+            status === "done"
+              ? "font-semibold text-brand-primary"
+              : status === "active"
+              ? "font-bold text-white"
+              : "font-medium text-slate-500"
+          }`}
+        >
+          {label}
+        </span>
       </div>
-      <span className={`text-xs font-bold uppercase tracking-widest ${labelColor}`}>
-        {label}
+      <span
+        className={`text-[9px] whitespace-nowrap ${
+          status === "done"
+            ? "text-slate-500"
+            : status === "active"
+            ? "text-white/80"
+            : "text-slate-400"
+        }`}
+      >
+        {subtitle}
       </span>
     </>
   );
@@ -165,26 +206,26 @@ function StageIndicator({
     return (
       <button
         type="button"
-        onClick={() => {
-          const el = document.getElementById(sectionId);
-          if (!el) return;
-          const main = document.querySelector("main");
-          if (main) {
-            const top = el.getBoundingClientRect().top + main.scrollTop - 8;
-            main.scrollTo({ top, behavior: "smooth" });
-          } else {
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        }}
+        onClick={() => scrollToDmSection(sectionId)}
         aria-label={`Ir a ${label}`}
-        className="flex items-center gap-2 hover:opacity-75 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded"
+        className={pillStyle}
       >
         {inner}
       </button>
     );
   }
 
-  return <div className="flex items-center gap-2">{inner}</div>;
+  return <div className={pillStyle}>{inner}</div>;
+}
+
+// ── Formato fecha de etapa ────────────────────────────────────
+
+function formatStageDate(iso: string | null | undefined): string {
+  if (!iso) return "Completado";
+  return new Date(iso).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 // ── Celda expandible ─────────────────────────────────────────
@@ -2000,10 +2041,12 @@ export function DoubleMaterialidadTab({
   questionnaireProgress,
   onGoToCuestionario,
 }: Props) {
-  const benchmarkKey = `/api/clients/${clientId}/dm-benchmark`;
-  const irosKey     = `/api/clients/${clientId}/dm-iros`;
-  const nisKey      = `/api/clients/${clientId}/dm-nis`;
-  const reportKey   = `/api/clients/${clientId}/dm-report`;
+  const benchmarkKey   = `/api/clients/${clientId}/dm-benchmark`;
+  const irosKey        = `/api/clients/${clientId}/dm-iros`;
+  const nisKey         = `/api/clients/${clientId}/dm-nis`;
+  const reportKey      = `/api/clients/${clientId}/dm-report`;
+  const resumenKey     = `/api/clients/${clientId}/dm-resumen`;
+  const validacionKey  = `/api/clients/${clientId}/dm-validacion`;
 
   const [isPolling, setIsPolling] = useState(false);
   const { push } = useToast();
@@ -2042,7 +2085,15 @@ export function DoubleMaterialidadTab({
     refreshInterval: isReportPolling ? 5_000 : 0,
   });
 
-  const companies   = benchmarkResp?.data.companies ?? [];
+  // SWR para resumen y validación — deduplicado con los SWR de los hijos
+  const { data: resumenResp } = useSWR<{ data: { status: string } | null }>(
+    resumenKey, fetcher, { revalidateOnFocus: false }
+  );
+  const { data: validacionResp } = useSWR<{ data: {
+    iro_decisions: Record<string, { decision: string | null }>;
+  } | null }>(validacionKey, fetcher, { revalidateOnFocus: false });
+
+  const companies    = benchmarkResp?.data.companies ?? [];
   const latestResult = benchmarkResp?.data.latest_result ?? null;
   const irosStatus  = irosResp?.data.status ?? "idle";
   const iros        = irosResp?.data.iros ?? [];
@@ -2144,14 +2195,48 @@ export function DoubleMaterialidadTab({
     : "pending";
 
   // stage6 = Resumen ejecutivo IA
-  const stage6Status: StageStatus = hasIros ? "active" : "pending";
+  const hasResumen = resumenResp?.data?.status === "done";
+  const stage6Status: StageStatus = hasResumen
+    ? "done"
+    : hasIros
+    ? "active"
+    : "pending";
 
-  // stage7 = Reporte (etapa final — requiere benchmark + IROs)
-  const stage7Status: StageStatus = hasReport
+  // stage7 = Validación con el cliente
+  const validacionRec = validacionResp?.data ?? null;
+  const includedIros  = iros.filter((i) => i.incluido);
+  const allIrosDecided =
+    includedIros.length > 0 &&
+    includedIros.every((i) => validacionRec?.iro_decisions[i.id]?.decision);
+  const stage7Status: StageStatus = allIrosDecided
+    ? "done"
+    : hasResumen
+    ? "active"
+    : "pending";
+
+  // stage8 = Reporte (etapa final — requiere benchmark + IROs)
+  const stage8Status: StageStatus = hasReport
     ? "done"
     : hasBenchmark && hasIros
     ? "active"
     : "pending";
+
+  // Conteos por cuadrante — pasados a ResumenEjecutivoSection para KPI cards
+  const scoredIncluded = iros.filter(
+    (i) => i.incluido && i.score_impacto != null && i.score_financiero != null
+  );
+  const quadrantCounts = {
+    doble_material: scoredIncluded.filter(
+      (i) => (i.score_impacto ?? 0) >= 2 && (i.score_financiero ?? 0) >= 2
+    ).length,
+    solo_impacto: scoredIncluded.filter(
+      (i) => (i.score_impacto ?? 0) >= 2 && (i.score_financiero ?? 0) < 2
+    ).length,
+    solo_financiero: scoredIncluded.filter(
+      (i) => (i.score_impacto ?? 0) < 2 && (i.score_financiero ?? 0) >= 2
+    ).length,
+    brechas_criticas: nisRows.filter((i) => i.estado === "no_identificado").length,
+  };
 
   if (loadingBenchmark) {
     return (
@@ -2163,24 +2248,108 @@ export function DoubleMaterialidadTab({
 
   return (
     <div className="space-y-6 py-4">
-      {/* ── Stepper header — scroll-x en tablet, no flex-wrap ── */}
-      <div className="overflow-x-auto pb-4 border-b border-slate-100 -mx-1 px-1">
-        <div className="flex items-center gap-2 min-w-max">
-          <StageIndicator number={1} label="Contexto"  status={stage1Status} sectionId="dm-sec-contexto" />
-          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-          <StageIndicator number={2} label="Benchmark" status={stage2Status} sectionId="dm-sec-benchmark" />
-          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-          <StageIndicator number={3} label="IROs"      status={stage3Status} sectionId="dm-sec-iros" />
-          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-          <StageIndicator number={4} label="Matriz"    status={stage4Status} sectionId="dm-sec-matriz" />
-          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-          <StageIndicator number={5} label="NIS/IBSO"  status={stage5Status} sectionId="dm-sec-nis" />
-          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-          <StageIndicator number={6} label="Resumen"   status={stage6Status} sectionId="dm-sec-resumen" />
-          <div className="w-6 h-px bg-slate-200 shrink-0" aria-hidden />
-          <StageIndicator number={7} label="Reporte"   status={stage7Status} sectionId="dm-sec-reporte" />
-        </div>
-      </div>
+      {/* ── Stepper V3 — card con pill bar + progress + chips ── */}
+      {(() => {
+        const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null }> = [
+          { label: "Contexto",    status: stage1Status, sectionId: "dm-sec-contexto" },
+          { label: "Benchmark",   status: stage2Status, sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at },
+          { label: "IROs",        status: stage3Status, sectionId: "dm-sec-iros" },
+          { label: "Matriz",      status: stage4Status, sectionId: "dm-sec-matriz" },
+          { label: "NIS/IBSO",    status: stage5Status, sectionId: "dm-sec-nis" },
+          { label: "Resumen IA",  status: stage6Status, sectionId: "dm-sec-resumen" },
+          { label: "Validación",  status: stage7Status, sectionId: "dm-sec-validacion" },
+          { label: "Reporte",     status: stage8Status, sectionId: "dm-sec-reporte", doneDate: latestReport?.created_at },
+        ];
+        const doneCount = stagesData.filter((s) => s.status === "done").length;
+        const pct = Math.round((doneCount / stagesData.length) * 100);
+        const validatedCompanies = companies.filter((c) => c.validated).length;
+        const hasChips = validatedCompanies > 0 || iros.length > 0 || quadrantCounts.doble_material > 0 || quadrantCounts.solo_impacto > 0;
+
+        return (
+          <div className="bg-white border border-slate-200 rounded shadow-sm">
+            {/* Cabecera progreso */}
+            <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                  Estado del estudio
+                </span>
+                <div className="h-[3px] w-28 bg-slate-200 flex-shrink-0 overflow-hidden">
+                  <div
+                    className="h-full bg-brand-primary transition-all duration-300"
+                    style={{ width: `${pct}%` }}
+                    role="progressbar"
+                    aria-valuenow={pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${doneCount} de ${stagesData.length} etapas completadas`}
+                  />
+                </div>
+                <span className="text-[10px] text-slate-500 font-semibold tabular-nums whitespace-nowrap">
+                  {doneCount}/{stagesData.length} completadas
+                </span>
+              </div>
+            </div>
+
+            {/* Pill bar */}
+            <div className="flex items-center gap-1 px-4 py-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {stagesData.map((s, idx) => (
+                <span key={s.sectionId} className="contents">
+                  <StagePill
+                    label={s.label}
+                    status={s.status}
+                    subtitle={
+                      s.status === "done"
+                        ? formatStageDate(s.doneDate)
+                        : s.status === "active"
+                        ? "En curso"
+                        : "Pendiente"
+                    }
+                    sectionId={s.sectionId}
+                  />
+                  {idx < stagesData.length - 1 && (
+                    <div
+                      className={`flex-1 h-0.5 min-w-1 max-w-9 rounded-sm shrink-0 ${
+                        s.status === "done" ? "bg-brand-primary" : "bg-slate-200"
+                      }`}
+                      aria-hidden
+                    />
+                  )}
+                </span>
+              ))}
+            </div>
+
+            {/* Context chips — solo si hay datos relevantes */}
+            {hasChips && (
+              <div className="border-t border-slate-100 px-5 py-2">
+                <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {validatedCompanies > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                      <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                      {validatedCompanies} empresa{validatedCompanies !== 1 ? "s" : ""} benchmark
+                    </span>
+                  )}
+                  {iros.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                      <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                      {iros.length} IROs · {scoredIncluded.length} calificados
+                    </span>
+                  )}
+                  {quadrantCounts.doble_material > 0 && (
+                    <span className="inline-flex text-[10px] font-semibold bg-rose-50 border border-rose-200 text-rose-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                      {quadrantCounts.doble_material} doble material
+                    </span>
+                  )}
+                  {quadrantCounts.solo_impacto > 0 && (
+                    <span className="inline-flex text-[10px] font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                      {quadrantCounts.solo_impacto} mat. por impacto
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Etapa 1 ── */}
       <section id="dm-sec-contexto" aria-labelledby="stage-contexto">
@@ -2195,7 +2364,7 @@ export function DoubleMaterialidadTab({
       <HorizontesConfig clientId={clientId} />
 
       {/* ── Etapa 2 ── */}
-      <section id="dm-sec-benchmark" aria-labelledby="stage-benchmark">
+      <section id="dm-sec-benchmark" className="border-l-4 border-l-blue-600 pl-3" aria-labelledby="stage-benchmark">
         <h2 id="stage-benchmark" className="sr-only">Benchmark competitivo</h2>
         <BenchmarkSection
           clientId={clientId}
@@ -2213,7 +2382,7 @@ export function DoubleMaterialidadTab({
       </section>
 
       {/* ── Etapa 3 — IROs del cliente ── */}
-      <section id="dm-sec-iros" aria-labelledby="stage-iros">
+      <section id="dm-sec-iros" className="border-l-4 border-l-violet-600 pl-3" aria-labelledby="stage-iros">
         <h2 id="stage-iros" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
           Inventario de IROs
         </h2>
@@ -2234,7 +2403,7 @@ export function DoubleMaterialidadTab({
 
       {/* ── Etapa 4 — Matriz de Doble Materialidad ── */}
       {iros.filter((i) => i.incluido && i.score_impacto && i.score_financiero).length >= 3 && (
-        <section id="dm-sec-matriz" aria-labelledby="stage-matriz">
+        <section id="dm-sec-matriz" className="border-l-4 border-l-brand-primary pl-3" aria-labelledby="stage-matriz">
           <h2 id="stage-matriz" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
             Matriz de Doble Materialidad
           </h2>
@@ -2243,7 +2412,7 @@ export function DoubleMaterialidadTab({
       )}
 
       {/* ── Etapa 5 — NIS / IBSO ── */}
-      <section id="dm-sec-nis" aria-labelledby="stage-nis">
+      <section id="dm-sec-nis" className="border-l-4 border-l-amber-600 pl-3" aria-labelledby="stage-nis">
         <h2 id="stage-nis" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
           NIS / IBSO — Brechas de información
         </h2>
@@ -2258,16 +2427,26 @@ export function DoubleMaterialidadTab({
 
       {/* ── Etapa 6 — Resumen ejecutivo IA ── */}
       {hasIros && (
-        <section id="dm-sec-resumen" aria-labelledby="stage-resumen">
+        <section id="dm-sec-resumen" className="border-l-4 border-l-cyan-600 pl-3" aria-labelledby="stage-resumen">
           <h2 id="stage-resumen" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
             Resumen Ejecutivo (IA)
           </h2>
-          <ResumenEjecutivoSection clientId={clientId} />
+          <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
         </section>
       )}
 
-      {/* ── Etapa 7 — Reporte (etapa final) ── */}
-      <section id="dm-sec-reporte" aria-labelledby="stage-reporte">
+      {/* ── Etapa 7 — Validación con el cliente ── */}
+      {hasResumen && (
+        <section id="dm-sec-validacion" className="border-l-4 border-l-amber-600 pl-3" aria-labelledby="stage-validacion">
+          <h2 id="stage-validacion" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+            Validación con el cliente
+          </h2>
+          <ValidacionSection clientId={clientId} iros={iros} />
+        </section>
+      )}
+
+      {/* ── Etapa 8 — Reporte (etapa final) ── */}
+      <section id="dm-sec-reporte" className="border-l-4 border-l-emerald-600 pl-3" aria-labelledby="stage-reporte">
         <h2 id="stage-reporte" className="sr-only">Reporte de Doble Materialidad</h2>
         <ReporteSection
           clientId={clientId}
@@ -2293,11 +2472,11 @@ export function DoubleMaterialidadTab({
           questionnaireProgress={questionnaireProgress}
           hasCompletedBenchmark={hasBenchmark}
           iroCount={iros.length}
-          includedIroCount={iros.filter((i) => i.incluido).length}
+          includedIroCount={includedIros.length}
           scoredIroCount={iros.filter((i) => i.score_impacto !== null && i.score_financiero !== null).length}
           hasNisData={hasNis}
           hasReport={hasReport}
-          hasResumen={false}
+          hasResumen={hasResumen}
         />
       </section>
 

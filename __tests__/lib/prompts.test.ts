@@ -30,9 +30,9 @@ describe("dev mode — fallback a DEFAULT_PROMPTS", () => {
     expect(d.content).toBe(DEFAULT_PROMPTS["role.elena"]);
   });
 
-  it("listPromptsMeta devuelve las 6 keys sin override", async () => {
+  it("listPromptsMeta devuelve todas las keys sin override", async () => {
     const metas = await listPromptsMeta();
-    expect(metas).toHaveLength(6);
+    expect(metas).toHaveLength(PROMPT_KEYS.length);
     expect(metas.every((m) => !m.has_override)).toBe(true);
   });
 
@@ -87,8 +87,12 @@ describe("buildRoleSystemText compone 3 piezas", () => {
 });
 
 describe("PROMPT_KEYS y PROMPT_LABELS", () => {
-  it("hay 6 keys canónicas", () => {
-    expect(PROMPT_KEYS).toHaveLength(6);
+  it("hay keys canónicas (roles + sistema + DM)", () => {
+    expect(PROMPT_KEYS.length).toBeGreaterThanOrEqual(9);
+    expect(PROMPT_KEYS).toContain("role.aurora");
+    expect(PROMPT_KEYS).toContain("dm.benchmark_propose");
+    expect(PROMPT_KEYS).toContain("dm.iro_generation");
+    expect(PROMPT_KEYS).toContain("dm.report");
   });
 
   it("cada key tiene label", () => {

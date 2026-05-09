@@ -10,7 +10,6 @@ import { ClientAvatar } from "@/components/ClientAvatar";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 import { StructuredBlockEditor } from "@/components/StructuredBlockEditor";
 import { BoolTriField } from "@/components/fields/BoolTriField";
-import { ExtractSectorModal } from "@/components/extract/ExtractSectorModal";
 import { ReportIaButton } from "@/components/clients/ReportIaButton";
 import {
   NARRATIVE_SCHEMAS,
@@ -82,7 +81,7 @@ export function ClientForm(props: Props) {
   const { push } = useToast();
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [sectorAiOpen, setSectorAiOpen] = useState(false);
+  const [fillingProfile, setFillingProfile] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     name: props.initial?.name ?? "",
@@ -119,6 +118,44 @@ export function ClientForm(props: Props) {
       ...prev,
       blocks: { ...prev.blocks, [block]: next },
     }));
+  }
+
+  async function handleFillProfile() {
+    if (!form.website_url.trim()) {
+      push("error", "Escribe el sitio web del cliente primero");
+      return;
+    }
+    setFillingProfile(true);
+    try {
+      const url = form.website_url.trim().startsWith("http")
+        ? form.website_url.trim()
+        : `https://${form.website_url.trim()}`;
+      const res = await fetch("/api/clients/extract-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const json = await res.json();
+      if (!res.ok) { push("error", json.error ?? "Error al analizar el sitio"); return; }
+      const d = json.data;
+      const filled: string[] = [];
+      setForm((prev) => {
+        const next = { ...prev };
+        if (d.sector)    { next.sector = d.sector;       filled.push("Sector"); }
+        if (d.subsector) { next.subsector = d.subsector; filled.push("Subsector"); }
+        if (d.size)      { next.size = d.size;           filled.push("Tamaño"); }
+        if (d.countries?.length) { next.countries = d.countries; filled.push("Países"); }
+        if (d.logo_url)  { next.logo_url = d.logo_url;  filled.push("Logo"); }
+        return next;
+      });
+      push("success", filled.length
+        ? `Completados con IA: ${filled.join(", ")}`
+        : "El sitio no aportó datos suficientes para completar campos");
+    } catch {
+      push("error", "Error de conexión");
+    } finally {
+      setFillingProfile(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -201,7 +238,35 @@ export function ClientForm(props: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pb-24">
       {/* ═══ Identificación ══════════════════════════════════ */}
-      <Section title="Identificación">
+      <Section
+        title="Identificación"
+        action={
+          <button
+            type="button"
+            onClick={handleFillProfile}
+            disabled={fillingProfile || !form.website_url.trim()}
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20 hover:bg-brand-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title={form.website_url.trim() ? "Completa los campos desde el sitio web" : "Escribe el sitio web primero"}
+          >
+            {fillingProfile ? (
+              <>
+                <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                Analizando…
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                </svg>
+                Completar con IA
+              </>
+            )}
+          </button>
+        }
+      >
         <div className="grid grid-cols-2 gap-4">
           <Field label="Nombre *">
             <input
@@ -238,25 +303,9 @@ export function ClientForm(props: Props) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <div className="flex items-end justify-between gap-2 mb-1">
-              <label className="block text-xs font-medium text-slate-700">
-                Sector
-              </label>
-              <button
-                type="button"
-                onClick={() => setSectorAiOpen(true)}
-                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20 hover:bg-brand-primary/20 transition-colors"
-                title="Rellenar con IA desde URL o transcripción"
-              >
-                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-                Rellenar con IA
-              </button>
-            </div>
             <MultiSelectCombobox
               category="sectors"
-              label=""
+              label="Sector"
               mode="single"
               value={form.sector}
               onChange={(v) => update("sector", (v as string) ?? "")}
@@ -544,12 +593,6 @@ export function ClientForm(props: Props) {
         </div>
       </div>
 
-      <ExtractSectorModal
-        open={sectorAiOpen}
-        onClose={() => setSectorAiOpen(false)}
-        onApply={(v) => update("sector", v)}
-      />
-
       {props.mode === "edit" && (
         <ConfirmModal
           open={confirmDelete}
@@ -580,16 +623,21 @@ const urlInputCls =
 
 function Section({
   title,
+  action,
   children,
 }: {
   title: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="bg-white border border-slate-200 rounded p-6 space-y-4">
-      <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
-        {title}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
+          {title}
+        </h2>
+        {action}
+      </div>
       {children}
     </div>
   );

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { listCatalog } from "@/lib/catalogs";
+import { isPublicHttpUrl } from "@/lib/documents/ssrf";
 
 const MODEL = process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6";
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -19,6 +20,10 @@ export type ProfileExtractResult = {
   countries: string[];
   logo_url: string | null;
   cached: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
 };
 
 // ── Cache 30 min ─────────────────────────────────────────────
@@ -42,21 +47,12 @@ function setCached(key: string, result: ProfileExtractResult): void {
   }
 }
 
-// ── Anti-SSRF ────────────────────────────────────────────────
-const BLOCKED = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "169.254.169.254", "metadata.google.internal"]);
-
-function isPrivateIPv4(h: string): boolean {
-  const [a = 0, b = 0] = h.split(".").map(Number);
-  return a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-}
-
+// ── Anti-SSRF — reutiliza isPublicHttpUrl de lib/documents/ssrf.ts ──────────
+// Cubre: RFC1918, loopback, link-local, IPv6 ULA, IPv4-mapped IPv6 (::ffff:*)
 function validateUrl(raw: string): URL {
-  let url: URL;
-  try { url = new URL(raw); } catch { throw new Error("URL inválida"); }
-  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Solo http/https");
-  const host = url.hostname.toLowerCase();
-  if (BLOCKED.has(host) || isPrivateIPv4(host)) throw new Error("Hostname bloqueado por seguridad");
-  return url;
+  const check = isPublicHttpUrl(raw);
+  if (!check.ok) throw new Error(check.reason ?? "URL bloqueada por seguridad");
+  return new URL(raw);
 }
 
 // ── Fetch + parse HTML ───────────────────────────────────────
@@ -125,7 +121,9 @@ const ExtractSchema = z.object({
   countries: z.array(z.string()).default([]),
 });
 
-async function extractFromText(text: string): Promise<Omit<ProfileExtractResult, "logo_url" | "cached">> {
+type ExtractTextResult = Omit<ProfileExtractResult, "logo_url" | "cached">;
+
+async function extractFromText(text: string): Promise<ExtractTextResult> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY no configurada");
 
   const [sectors, sizes, countries] = await Promise.all([
@@ -191,6 +189,7 @@ Reglas:
   const validSize = sizes.find(s => s.value === d.size);
   const validCountries = (d.countries ?? []).filter(c => countries.some(cat => cat.value === c));
 
+  const u = resp.usage as { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
   return {
     sector: validSector?.value ?? null,
     sector_label: validSector?.label ?? null,
@@ -198,6 +197,10 @@ Reglas:
     size: validSize?.value ?? null,
     size_label: validSize?.label ?? null,
     countries: validCountries,
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens,
+    cacheCreationTokens: u.cache_creation_input_tokens ?? 0,
+    cacheReadTokens: u.cache_read_input_tokens ?? 0,
   };
 }
 

@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 import { extractProfileFromUrl } from "@/lib/ai/extract-profile";
+import { logAiCall } from "@/lib/ai/logging";
 
 export const maxDuration = 60;
 
@@ -44,11 +45,17 @@ export async function POST(req: NextRequest) {
   if (!body.url || typeof body.url !== "string")
     return NextResponse.json({ error: "url requerida" }, { status: 400 });
 
+  const startedAt = Date.now();
   try {
     const result = await extractProfileFromUrl(body.url);
+    if (!result.cached) {
+      const model = process.env.ANTHROPIC_MODEL_SONNET ?? "claude-sonnet-4-6";
+      void logAiCall({ userEmail: user, role: "aurora", clientId: null, model, inputTokens: result.inputTokens ?? 0, outputTokens: result.outputTokens ?? 0, cacheCreationTokens: result.cacheCreationTokens ?? 0, cacheReadTokens: result.cacheReadTokens ?? 0, latencyMs: Date.now() - startedAt, error: null });
+    }
     return NextResponse.json({ data: result });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error desconocido";
+    void logAiCall({ userEmail: user, role: "aurora", clientId: null, model: process.env.ANTHROPIC_MODEL_SONNET ?? "claude-sonnet-4-6", inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, latencyMs: Date.now() - startedAt, error: msg });
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

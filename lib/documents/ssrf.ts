@@ -22,5 +22,13 @@ export function isPublicHttpUrl(u: string): { ok: boolean; reason?: string } {
   if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return { ok: false, reason: "IP privada (RFC1918 172.16.0.0/12)" };
   if (/^169\.254\./.test(host)) return { ok: false, reason: "Link-local (169.254.0.0/16)" };
   if (host === "::1" || host.startsWith("fc") || host.startsWith("fd")) return { ok: false, reason: "IP privada IPv6" };
+  // IPv4-mapped IPv6 (::ffff:192.168.x.x) — bypasaría checks IPv4 anteriores
+  if (host.startsWith("::ffff:")) {
+    const ipv4 = host.slice(7);
+    if (/^127\./.test(ipv4) || /^10\./.test(ipv4) || /^192\.168\./.test(ipv4) ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ipv4) || /^169\.254\./.test(ipv4)) {
+      return { ok: false, reason: "IP privada (IPv4-mapped IPv6)" };
+    }
+  }
   return { ok: true };
 }

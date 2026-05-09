@@ -26,9 +26,11 @@
 - No cubría IPv6 ULA (`fc`/`fd` prefixes)
 - Duplicaba lógica ya existente en `lib/documents/ssrf.ts`
 
-**Fix**:
+**Fix sesión 22**:
 1. `lib/documents/ssrf.ts`: agregado check `::ffff:*` IPv4-mapped IPv6 para todos los rangos RFC1918
 2. `lib/ai/extract-profile.ts`: `validateUrl()` reemplazada → usa `isPublicHttpUrl` de ssrf.ts
+
+**Fix adicional sesión 22 (post-tests)**: El check `::ffff:*` inicial era incorrecto — Node.js WHATWG URL parser normaliza `[::ffff:192.168.1.1]` a hostname `::ffff:c0a8:101` (grupos hex). El regex dotted-decimal nunca matcheaba. Bug descubierto al escribir tests de regresión. Fix: conversión hex→decimal antes del regex (`hi/lo = parseInt(parts, 16)` → `octet = (hi >> 8) & 0xff` etc.).
 
 ### D-146 — logAiCall en extract-profile (🟢 → ✅)
 

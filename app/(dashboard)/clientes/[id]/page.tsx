@@ -15,10 +15,8 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function EditarClientePage({ params }: Props) {
   const { id } = await params;
-  // Prefetch paralelo: cliente + clients list (nav) + questionnaire + materiality.
-  // Antes ClientTabs hacía 2 fetches client-side en cascada al montar tabs (cuestionario,
-  // materialidad), causando spinners visibles. Ahora SWR arranca con datos en memoria
-  // y solo revalida en background.
+  // Prefetch paralelo: cliente + clients list (nav) + questionnaire + catálogos.
+  // SWR arranca con datos en memoria y solo revalida en background.
   const [client, allClients, questionnaireBundle, adminEmail, serviceCatalog] =
     await Promise.all([
       getClient(id).catch(() => null),

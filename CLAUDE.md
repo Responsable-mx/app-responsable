@@ -288,9 +288,10 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 
 ### ClientTabs — lazy loading (may-2026)
 
-6 tabs pesados usan `next/dynamic` con fallback `<Skeleton>`:
-- `QuestionnaireTab`, `MaterialityTab`, `ChatWindow`, `ClientCronogramaTab`, `TeamTab`, `DocumentsTab`
-- Solo `ClientResumen` es eager (tab por defecto).
+3 tabs usan `next/dynamic` con fallback `<Skeleton>`:
+- `QuestionnaireTab`, `TeamTab`, `DocumentsTab`
+- `ClientResumen` eager (tab por defecto). `DoubleMaterialidadTab` lazy condicional (solo si hasDmService).
+- Tabs eliminadas (may-2026): `ChatWindow`, `ClientCronogramaTab`, `MaterialityTab` (removidas de ClientTabs; Chat accesible desde nav lateral).
 - Patrón canónico: `components/ClientTabs.tsx`.
 
 ## Deploy — app-responsable (may-2026)

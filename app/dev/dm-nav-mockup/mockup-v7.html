@@ -154,6 +154,11 @@
   #pill-bar { overflow-x: auto; }
   #pill-bar { scrollbar-width: none; }
   #pill-bar::-webkit-scrollbar { display: none; }
+
+  /* Stepper overflow */
+  #stepper-wrap { overflow: hidden; }
+  .stepper-pills { overflow-x: auto; scrollbar-width: none; }
+  .stepper-pills::-webkit-scrollbar { display: none; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -227,7 +232,7 @@
         </div>
 
         <!-- Pill bar — overflow-x-auto for narrow viewports -->
-        <div class="flex items-center gap-1 px-4 py-3 thin-scroll" id="pill-bar">
+        <div class="flex items-center gap-1 px-4 py-3 thin-scroll stepper-pills" id="pill-bar">
 
           <!-- Pills are data-stage buttons; JS updates their look -->
           <button data-stage="1" data-label="Contexto" onclick="goStage(1)"
@@ -489,7 +494,7 @@
           <div id="bench-c" class="hidden px-6 py-5 space-y-4">
             <div class="flex items-center justify-between">
               <p class="text-[10px] text-slate-500">Empresas comparables validadas · 12 campos ESG · 4 mostrados</p>
-              <button onclick="setBenchState('a')" class="flex items-center gap-1.5 text-xs text-slate-600 font-semibold px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 transition-colors whitespace-nowrap">
+              <button onclick="confirmEditList()" class="flex items-center gap-1.5 text-xs text-slate-600 font-semibold px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 transition-colors whitespace-nowrap">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 Editar lista
               </button>
@@ -544,7 +549,7 @@
             </div>
             <p class="text-[10px] text-slate-500">Columna <strong class="text-brand-primary-dark">Nuvoil</strong> resaltada. 3 de 4 peers tiene auditoría ESG externa — brecha a documentar en el reporte.</p>
             <button class="w-full mt-3 flex items-center justify-center gap-1.5 text-xs text-brand-primary font-semibold py-2 border border-dashed border-brand-primary/40 rounded hover:bg-brand-primary/5 transition-colors">
-              Ver los 12 campos ESG →
+              Ver los 8 campos ESG adicionales ▾
             </button>
           </div>
 
@@ -626,7 +631,7 @@
               </table>
             </div>
             <button class="w-full mt-3 flex items-center justify-center gap-1.5 text-xs text-brand-primary font-semibold py-2 border border-dashed border-brand-primary/40 rounded hover:bg-brand-primary/5 transition-colors">
-              Ver los 9 IROs completos →
+              Ver los 5 IROs adicionales ▾
             </button>
           </div>
           <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
@@ -678,9 +683,11 @@
                   <!-- Midlines -->
                   <div class="absolute border-l border-dashed border-slate-300 opacity-50" style="left:50%;top:0;bottom:0"></div>
                   <div class="absolute border-t border-dashed border-slate-300 opacity-50" style="top:50%;left:0;right:0"></div>
-                  <!-- Quadrant fills — very subtle -->
-                  <div class="absolute bg-rose-400" style="top:0;left:50%;right:0;bottom:50%;opacity:.04"></div>
-                  <div class="absolute bg-amber-400" style="top:0;left:0;right:50%;bottom:50%;opacity:.03"></div>
+                  <!-- Cuadrant tints -->
+                  <div class="absolute" style="left:0;bottom:50%;right:50%;top:0;background:rgba(245,158,11,0.04);"></div>  <!-- Mat. impacto - top-left amber -->
+                  <div class="absolute" style="left:50%;bottom:50%;right:0;top:0;background:rgba(244,63,94,0.05);"></div>   <!-- Doble material - top-right rose -->
+                  <div class="absolute" style="left:50%;bottom:0;right:0;top:50%;background:rgba(15,118,110,0.04);"></div>   <!-- Mat. financiero - bottom-right teal -->
+                  <div class="absolute" style="left:0;bottom:0;right:50%;top:50%;background:rgba(100,116,139,0.03);"></div>  <!-- Baja prioridad - bottom-left slate -->
                   <!-- Quadrant labels -->
                   <span class="absolute text-[9px] text-rose-400 font-bold" style="top:5px;right:6px">Doble material</span>
                   <span class="absolute text-[9px] text-amber-500 font-semibold" style="top:5px;left:5px">Mat. impacto</span>
@@ -688,31 +695,31 @@
                   <span class="absolute text-[9px] text-slate-500" style="bottom:6px;left:5px">Baja prioridad</span>
 
                   <!-- Dots — ● circles = doble material (rose) -->
-                  <div class="dot" style="left:72%;bottom:85%;width:16px;height:16px;background:#f43f5e;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2)" onclick="openPopover(event,'E1','Cambio climático','Doble material','8.5 / 7.2')">
+                  <div class="dot" style="left:72%;bottom:85%;width:20px;height:20px;background:#f43f5e;border-radius:50%;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E1','Cambio climático','Doble material','8.5 / 7.2')">
                     <div class="dot-tip">E1 · Cambio climático</div>
                   </div>
-                  <div class="dot" style="left:61%;bottom:70%;width:16px;height:16px;background:#f43f5e;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2)" onclick="openPopover(event,'E2','Contaminación','Doble material','7.0 / 6.1')">
+                  <div class="dot" style="left:61%;bottom:70%;width:20px;height:20px;background:#f43f5e;border-radius:50%;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E2','Contaminación','Doble material','7.0 / 6.1')">
                     <div class="dot-tip">E2 · Contaminación</div>
                   </div>
                   <!-- ◆ diamonds = mat. impacto (amber) -->
-                  <div class="dot dot-diamond" style="left:30%;bottom:75%;width:14px;height:14px;background:#f59e0b;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
+                  <div class="dot dot-diamond" style="left:30%;bottom:75%;width:20px;height:20px;background:#f59e0b;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
                     <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S1 · Fuerza laboral</div>
                   </div>
-                  <div class="dot dot-diamond" style="left:22%;bottom:62%;width:13px;height:13px;background:#f59e0b;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
+                  <div class="dot dot-diamond" style="left:22%;bottom:62%;width:18px;height:18px;background:#f59e0b;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
                     <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S2 · Cadena de valor</div>
                   </div>
                   <!-- ■ squares = mat. financiero (teal) -->
-                  <div class="dot" style="left:65%;bottom:35%;width:13px;height:13px;background:#0f766e;border-radius:2px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'E3','Recursos hídricos','Mat. financiero','3.5 / 6.5')">
+                  <div class="dot" style="left:65%;bottom:35%;width:18px;height:18px;background:#0f766e;border-radius:2px;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'E3','Recursos hídricos','Mat. financiero','3.5 / 6.5')">
                     <div class="dot-tip">E3 · Recursos hídricos</div>
                   </div>
-                  <div class="dot" style="left:78%;bottom:28%;width:13px;height:13px;background:#0f766e;border-radius:2px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'G1','Ética empresarial','Mat. financiero','2.8 / 7.8')">
+                  <div class="dot" style="left:78%;bottom:28%;width:18px;height:18px;background:#0f766e;border-radius:2px;outline:2px solid white;outline-offset:-2px" onclick="openPopover(event,'G1','Ética empresarial','Mat. financiero','2.8 / 7.8')">
                     <div class="dot-tip">G1 · Ética empresarial</div>
                   </div>
                   <!-- ▲ triangles = seguimiento (slate) -->
-                  <div class="dot" style="left:18%;bottom:22%;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'S4','Comunidades locales','Seguimiento','2.2 / 2.2')">
+                  <div class="dot" style="left:18%;bottom:22%;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:15px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'S4','Comunidades locales','Seguimiento','2.2 / 2.2')">
                     <div class="dot-tip">S4 · Comunidades</div>
                   </div>
-                  <div class="dot" style="left:35%;bottom:18%;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'E5','Biodiversidad','Seguimiento','1.8 / 3.5')">
+                  <div class="dot" style="left:35%;bottom:18%;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:15px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'E5','Biodiversidad','Seguimiento','1.8 / 3.5')">
                     <div class="dot-tip">E5 · Biodiversidad</div>
                   </div>
 
@@ -849,7 +856,7 @@
                     <th class="th text-left py-2 pr-3 w-44">Área IBSO</th>
                     <th class="th text-center py-2 px-2 w-24">Categoría</th>
                     <th class="th text-center py-2 px-2 w-28">Estado</th>
-                    <th class="th text-center py-2 px-2 w-20">Calidad</th>
+                    <th class="th text-center py-2 px-2 w-20">Cobertura</th>
                     <th class="th text-left py-2 pl-3">Acción requerida</th>
                     <th class="th text-center py-2 px-2 w-20">Plazo</th>
                   </tr>
@@ -939,24 +946,28 @@
               <button onclick="toggleSynth()" id="synth-toggle" class="mt-2 text-[10px] text-brand-primary font-semibold hover:underline">
                 Leer síntesis completa ↓
               </button>
+              <button id="btn-mark-reviewed" onclick="markExecReviewed()" class="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-emerald-700 font-medium border border-slate-200 px-3 py-1.5 rounded-sm hover:border-emerald-200 hover:bg-emerald-50 transition-colors">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
+                Marcar resumen como revisado
+              </button>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div class="p-3 bg-rose-50 border border-rose-100 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-rose-500 rounded">
                 <p class="th text-rose-600 mb-1">Doble material</p>
                 <p class="text-xl font-bold text-rose-800 tabular-nums">2</p>
                 <p class="text-[10px] text-rose-600 mt-0.5">E1 · E2</p>
               </div>
-              <div class="p-3 bg-amber-50 border border-amber-100 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-amber-500 rounded">
                 <p class="th text-amber-600 mb-1">Mat. impacto</p>
                 <p class="text-xl font-bold text-amber-800 tabular-nums">2</p>
                 <p class="text-[10px] text-amber-600 mt-0.5">S1 · S2</p>
               </div>
-              <div class="p-3 bg-brand-primary-light border border-emerald-100 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-teal-600 rounded">
                 <p class="th text-brand-primary mb-1">Mat. financiero</p>
                 <p class="text-xl font-bold text-brand-primary tabular-nums">2</p>
                 <p class="text-[10px] text-brand-primary mt-0.5">E3 · G1</p>
               </div>
-              <div class="p-3 bg-red-50 border border-red-100 rounded">
+              <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-rose-600 rounded">
                 <p class="th text-red-600 mb-1">Brechas críticas</p>
                 <p class="text-xl font-bold text-red-700 tabular-nums">1</p>
                 <p class="text-[10px] text-red-600 mt-0.5">Vertimientos de agua</p>
@@ -967,10 +978,7 @@
             <button onclick="goStage(5)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors whitespace-nowrap">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> NIS/IBSO
             </button>
-            <button id="btn-mark-reviewed" onclick="markExecReviewed()" class="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-emerald-700 font-medium border border-slate-200 px-3 py-1.5 rounded-sm hover:border-emerald-200 hover:bg-emerald-50 transition-colors whitespace-nowrap">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              Marcar resumen como revisado
-            </button>
+            <div></div>
             <button onclick="goStage(7)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
               Validar con cliente <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -1072,7 +1080,7 @@
             <div>
               <label class="th mb-2 block">Acuerdos y compromisos <span class="text-slate-400 font-normal normal-case tracking-normal">(opcional · incluido en el reporte)</span></label>
               <textarea id="val-notes" rows="3" maxlength="500"
-                oninput="document.getElementById('val-notes-count').textContent = this.value.length + ' / 500'"
+                oninput="updateNotesCount()"
                 placeholder="Ej: El cliente solicitó incluir cadena de suministro en S1 para el siguiente ciclo. Pendiente revisión en estudio 2027."
                 class="w-full border border-slate-200 rounded-sm px-3 py-2 text-xs text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary leading-relaxed"></textarea>
               <p class="text-[10px] text-slate-400 text-right mt-0.5" id="val-notes-count">0 / 500</p>
@@ -1133,7 +1141,7 @@
                 ↺ Nueva versión
               </button>
             </div>
-            <p class="text-[10px] text-slate-400">PDF descargado automáticamente · ~8 páginas · incluido en tu plan</p>
+            <p class="text-[10px] text-slate-400">PDF descargado automáticamente · ~8 páginas</p>
           </div>
 
           <!-- Estado: principal -->
@@ -1214,11 +1222,15 @@
               </div>
             </div>
 
+            <div id="s8-incomplete-banner" class="mb-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-sm px-3 py-2.5">
+              <svg width="14" height="14" class="text-amber-600 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+              <p class="text-[11px] text-amber-700"><strong>2 criterios sin completar</strong> — el reporte se puede generar, pero la calidad será menor. Revisa: Resumen ejecutivo revisado · Hallazgos validados con cliente.</p>
+            </div>
             <button onclick="showConfirmModal()" class="w-full flex items-center justify-center gap-2 bg-brand-primary text-white text-sm font-semibold py-3 rounded hover:bg-brand-primary-dark transition-colors shadow-sm">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               Generar reporte PDF — Elena
             </button>
-            <p class="text-[10px] text-slate-400 text-center">Generado por Elena · incluido en tu plan · descarga automática al completar</p>
+            <p class="text-[10px] text-slate-400 text-center">Generado por Elena · descarga automática al completar</p>
           </div>
           </div><!-- /s7-main -->
           <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
@@ -1503,6 +1515,12 @@ function toggleCardDetail(id) {
 function selectAll()  { COMPANIES.forEach(c => c.selected = true);  renderCompanyList(); updateExecBtn(); }
 function clearAll()   { COMPANIES.forEach(c => c.selected = false); renderCompanyList(); updateExecBtn(); }
 function regenerarIA(){ if(confirm('¿Regenerar lista? Elena buscará nuevas empresas comparables. Las selecciones actuales se reiniciarán.')) alert('En producción: llama a Elena para proponer nuevas empresas.'); }
+function confirmEditList() {
+  if (confirm('Cambiar las empresas recalcula las comparativas. Los ajustes manuales se perderán. ¿Continuar?')) {
+    setBenchState('a');
+    document.getElementById('bench-c')?.scrollIntoView({behavior:'smooth'});
+  }
+}
 
 function renderCompanyCard(c) {
   const chk = c.selected
@@ -1652,7 +1670,7 @@ function renderIroTable() {
         ? '<span class="text-[9px] bg-orange-100 text-orange-700 font-bold px-1.5 py-0.5 rounded-sm">⚠ Ajustado</span>'
         : '<span class="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm">✓ Confirmado</span>';
     const selectVal = dec || '';
-    return `<tr class="row">
+    return `<tr class="row border-b border-slate-100" style="${isPending ? 'background:#fffbeb;' : ''}">
       <td class="py-2 pr-3 font-mono text-[10px] font-bold text-slate-500">${iro.id}</td>
       <td class="py-2 pr-3 text-slate-700 font-medium">${iro.label}</td>
       <td class="py-2 pr-3"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded-sm ${iro.aiaClass}">${iro.aia}</span></td>
@@ -1735,6 +1753,15 @@ function updateValidationCta() {
   }
 }
 
+function updateNotesCount() {
+  const ta = document.getElementById('val-notes');
+  const ct = document.getElementById('val-notes-count');
+  if (!ta || !ct) return;
+  const len = ta.value.length;
+  ct.textContent = len + ' / 500';
+  ct.className = len >= 500 ? 'text-[10px] text-red-600' : len >= 450 ? 'text-[10px] text-amber-600' : 'text-[10px] text-slate-400';
+}
+
 function onValDateChange(val) {
   if (!val) return;
   const d = new Date(val + 'T12:00:00');
@@ -1753,6 +1780,7 @@ function proceedToReport() {
     rowEl.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Hallazgos validados con cliente <span class="text-[9px] text-slate-400 ml-0.5">· ' + valDate + '</span>';
   }
   goStage(8);
+  updateS8Banner();
 }
 
 function showAsistenteForm() {
@@ -1777,6 +1805,23 @@ function confirmAddAsistente() {
   cancelAddAsistente();
 }
 
+function updateS8Banner() {
+  const banner = document.getElementById('s8-incomplete-banner');
+  if (!banner) return;
+  const reviewedRow = document.getElementById('checklist-reviewed-row');
+  const validatedRow = document.getElementById('checklist-validated');
+  let missing = [];
+  if (reviewedRow && reviewedRow.className.includes('text-slate-400')) missing.push('Resumen ejecutivo revisado');
+  if (validatedRow && validatedRow.className.includes('text-slate-400')) missing.push('Hallazgos validados con cliente');
+  if (missing.length === 0) {
+    banner.style.display = 'none';
+  } else {
+    banner.style.display = 'flex';
+    const p = banner.querySelector('p');
+    if (p) p.innerHTML = '<strong>' + missing.length + ' criterio' + (missing.length > 1 ? 's' : '') + ' sin completar</strong> — el reporte se puede generar, pero la calidad será menor. Revisa: ' + missing.join(' · ') + '.';
+  }
+}
+
 function markExecReviewed() {
   const btn = document.getElementById('btn-mark-reviewed');
   if (btn) {
@@ -1798,6 +1843,7 @@ function markExecReviewed() {
       cc.className = 'text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-sm';
     }
   }
+  updateS8Banner();
 }
 
 function removeAsistente(btn) {

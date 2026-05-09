@@ -921,15 +921,22 @@
               </div>
               <p class="text-xs text-slate-500 mt-0.5">Síntesis generada por Elena — integra benchmark + IROs + brechas · pendiente de validación con cliente</p>
             </div>
-            <!-- Ghost button — lower visual weight than forward CTA -->
-            <button onclick="confirmRegenerate()" class="flex items-center gap-1.5 border border-slate-200 text-slate-500 text-xs font-semibold px-3 py-1.5 rounded hover:bg-slate-50 hover:text-slate-700 transition-colors flex-shrink-0 ml-3 whitespace-nowrap">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Regenerar síntesis
-            </button>
+            <!-- Header CTAs -->
+            <div class="flex items-center gap-2 flex-shrink-0 ml-3">
+              <button onclick="editSynthesis()" id="btn-edit-synth" class="flex items-center gap-1.5 border border-slate-200 text-slate-500 text-xs font-medium px-3 py-1.5 rounded hover:bg-slate-50 hover:text-slate-700 transition-colors whitespace-nowrap">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Editar
+              </button>
+              <button onclick="confirmRegenerate()" class="flex items-center gap-1.5 border border-slate-200 text-slate-500 text-xs font-semibold px-3 py-1.5 rounded hover:bg-slate-50 hover:text-slate-700 transition-colors whitespace-nowrap">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Regenerar síntesis
+              </button>
+            </div>
           </div>
           <div class="px-6 py-5 space-y-4">
-            <div class="border-l-4 border-brand-primary pl-4 py-3 bg-brand-primary/5 rounded-r">
-              <p class="text-xs text-slate-800 leading-relaxed font-medium">
+            <!-- ── Synthesis display (read) ── -->
+            <div id="synth-display" class="border-l-4 border-brand-primary pl-4 py-3 bg-brand-primary/5 rounded-r">
+              <p id="synth-p1" class="text-xs text-slate-800 leading-relaxed font-medium">
                 <strong>Nuvoil S.A. de C.V.</strong> enfrenta una exposición significativa a riesgos de transición climática en el sector petróleo y gas. El análisis identificó <strong>8 IROs prioritarios</strong>: 2 temas doble material (E1 Cambio climático · E2 Contaminación), 2 materiales por impacto (S1, S2), 2 materiales financieros (E3, G1) y 2 en seguimiento. La brecha más crítica es la ausencia de monitoreo de vertimientos de agua — ninguno de los 4 peers comparables presenta este faltante.
               </p>
               <div id="synth-full" class="hidden">
@@ -943,13 +950,37 @@
                   <strong>Recomendación prioritaria:</strong> Establecer meta net-zero con horizonte 2050 y plan de descarbonización por segmento, contratar auditoría ESG externa para el próximo ciclo de reporte, e implementar sistema de monitoreo de vertimientos de agua (brecha crítica sin paralelo en peers). Estas tres acciones mejorarían el perfil de materialidad de Nuvoil de "en desarrollo" a "alineado con sector" en un ciclo de 12–18 meses.
                 </p>
               </div>
-              <button onclick="toggleSynth()" id="synth-toggle" class="mt-2 text-[10px] text-brand-primary font-semibold hover:underline">
-                Leer síntesis completa ↓
-              </button>
-              <button id="btn-mark-reviewed" onclick="markExecReviewed()" class="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-emerald-700 font-medium border border-slate-200 px-3 py-1.5 rounded-sm hover:border-emerald-200 hover:bg-emerald-50 transition-colors">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
-                Marcar resumen como revisado
-              </button>
+              <div class="flex items-center gap-3 mt-2 flex-wrap">
+                <button onclick="toggleSynth()" id="synth-toggle" class="text-[10px] text-brand-primary font-semibold hover:underline">
+                  Leer síntesis completa ↓
+                </button>
+                <button id="btn-mark-reviewed" onclick="markExecReviewed()" class="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-emerald-700 font-medium border border-slate-200 px-3 py-1.5 rounded-sm hover:border-emerald-200 hover:bg-emerald-50 transition-colors">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
+                  Marcar resumen como revisado
+                </button>
+              </div>
+            </div>
+            <!-- ── Synthesis edit (write) ── -->
+            <div id="synth-edit-area" class="hidden border border-slate-200 rounded">
+              <div class="px-3 pt-2 pb-1 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Editar síntesis</span>
+                <span class="text-[10px] text-slate-400">Texto plano · separar párrafos con línea en blanco</span>
+              </div>
+              <textarea id="synth-textarea" rows="10" class="w-full text-xs text-slate-800 leading-relaxed px-4 py-3 resize-none focus:outline-none focus:ring-1 focus:ring-brand-primary/40 font-sans"
+>Nuvoil S.A. de C.V. enfrenta una exposición significativa a riesgos de transición climática en el sector petróleo y gas. El análisis identificó 8 IROs prioritarios: 2 temas doble material (E1 Cambio climático · E2 Contaminación), 2 materiales por impacto (S1, S2), 2 materiales financieros (E3, G1) y 2 en seguimiento. La brecha más crítica es la ausencia de monitoreo de vertimientos de agua — ninguno de los 4 peers comparables presenta este faltante.
+
+En términos de materialidad financiera, los riesgos físicos de E1 representan el principal vector de impacto en activos de producción offshore, con exposición estimada en el rango de 15–25% del valor de los activos de largo plazo en un escenario de calentamiento de 2.5 °C. Los riesgos de transición (regulación de carbono, cambios en demanda) se materializan principalmente en el corto plazo (2027) para el segmento de refinación.
+
+En el benchmark sectorial, Nuvoil muestra brechas relevantes en 3 de 4 métricas clave: (1) Sin meta net-zero definida vs. peers con compromisos 2045–2060; (2) Reporte de sostenibilidad parcial vs. GRI completo de Pemex y Repsol; (3) Sin auditoría ESG externa vs. práctica estándar en los 4 comparables. La única fortaleza relativa es estar "en medición" de Scope 1–2, lo que sugiere capacidad instalada para mejorar.
+
+Recomendación prioritaria: Establecer meta net-zero con horizonte 2050 y plan de descarbonización por segmento, contratar auditoría ESG externa para el próximo ciclo de reporte, e implementar sistema de monitoreo de vertimientos de agua (brecha crítica sin paralelo en peers). Estas tres acciones mejorarían el perfil de materialidad de Nuvoil de "en desarrollo" a "alineado con sector" en un ciclo de 12–18 meses.</textarea>
+              <div class="px-3 py-2 bg-slate-50 border-t border-slate-200 flex items-center gap-2 justify-end">
+                <button onclick="cancelSynthesisEdit()" class="text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 transition-colors">Cancelar</button>
+                <button onclick="saveSynthesis()" class="flex items-center gap-1.5 text-xs text-white bg-brand-primary font-semibold px-4 py-1.5 rounded hover:bg-brand-primary-dark transition-colors">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  Guardar cambios
+                </button>
+              </div>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-rose-500 rounded">
@@ -969,8 +1000,9 @@
               </div>
               <div class="p-3 bg-slate-50 border border-slate-200 border-l-4 border-l-rose-600 rounded">
                 <p class="th text-red-600 mb-1">Brechas críticas</p>
-                <p class="text-xl font-bold text-red-700 tabular-nums">1</p>
-                <p class="text-[10px] text-red-600 mt-0.5">Vertimientos de agua</p>
+                <p class="text-xl font-bold text-red-700 tabular-nums">3</p>
+                <!-- line-clamp-2 + title tooltip: maneja N brechas sin romper la card -->
+                <p class="text-[10px] text-red-600 mt-0.5 line-clamp-2 leading-tight" title="Vertimientos de agua · Monitoreo carbono Scope 3 · Gestión de residuos peligrosos">Vertimientos de agua · Monitoreo carbono · Gestión residuos</p>
               </div>
             </div>
           </div>
@@ -1603,6 +1635,59 @@ function setBenchState(s) {
 function executeBenchmark() {
   if (selectedCount() === 0) { alert('Selecciona al menos una empresa para ejecutar el benchmark.'); return; }
   setBenchState('b');
+}
+
+// ── editSynthesis / saveSynthesis / cancelSynthesisEdit ────────────────────
+function editSynthesis() {
+  const display  = document.getElementById('synth-display');
+  const editArea = document.getElementById('synth-edit-area');
+  if (!display || !editArea) return;
+  // Populate textarea with current plain-text content
+  const ta = document.getElementById('synth-textarea');
+  if (ta) {
+    const p1 = document.getElementById('synth-p1');
+    const full = document.getElementById('synth-full');
+    let text = p1 ? p1.textContent.trim() : '';
+    if (full) {
+      full.querySelectorAll('p').forEach(p => {
+        text += '\n\n' + p.textContent.trim();
+      });
+    }
+    ta.value = text;
+  }
+  display.classList.add('hidden');
+  editArea.classList.remove('hidden');
+  if (ta) { ta.focus(); ta.setSelectionRange(0, 0); }
+}
+
+function saveSynthesis() {
+  const ta       = document.getElementById('synth-textarea');
+  const display  = document.getElementById('synth-display');
+  const editArea = document.getElementById('synth-edit-area');
+  if (!ta || !display || !editArea) return;
+  const paragraphs = ta.value.trim().split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+  const p1 = document.getElementById('synth-p1');
+  const synthFull = document.getElementById('synth-full');
+  if (p1) p1.textContent = paragraphs[0] || '';
+  if (synthFull) {
+    synthFull.innerHTML = paragraphs.slice(1)
+      .map(p => `<p class="text-xs text-slate-700 leading-relaxed mt-2">${p}</p>`)
+      .join('');
+    if (paragraphs.length > 1) {
+      synthFull.classList.remove('hidden');
+      const btn = document.getElementById('synth-toggle');
+      if (btn) btn.textContent = 'Colapsar síntesis ↑';
+    }
+  }
+  editArea.classList.add('hidden');
+  display.classList.remove('hidden');
+}
+
+function cancelSynthesisEdit() {
+  const display  = document.getElementById('synth-display');
+  const editArea = document.getElementById('synth-edit-area');
+  if (display)  display.classList.remove('hidden');
+  if (editArea) editArea.classList.add('hidden');
 }
 
 // ── toggleSynth ────────────────────────────────────────────────────────────

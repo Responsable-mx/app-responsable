@@ -7,7 +7,6 @@
 // Constantes, tipos y helpers puros → lib/timeline/utils.ts
 
 import { useMemo, useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import useSWR from "swr";
 import { TimelineChartRow } from "./TimelineChartRow";
 import type { ProjectOverview } from "@/app/api/projects/overview/route";
@@ -15,10 +14,10 @@ import { activityInDateRange, type EquipoFilters } from "./EquipoFilters";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import {
   MS_DAY, LABEL_W, CHART_BASE, ZOOM_STEPS, ZOOM_DEFAULT, PROJECT_PALETTE,
-  STATUS_INLINE, hexAlpha, estimateProgress,
-  parseDate, startOfMonth, addMonths, fmtMonth, fmt,
+  STATUS_INLINE,
+  parseDate, startOfMonth, addMonths, fmtMonth,
   assignLanes, computeOverlapBands, computeMilestones,
-  type ColorMode, type FlatActivity, type Milestone, type OverlapBand,
+  type ColorMode, type FlatActivity,
 } from "@/lib/timeline/utils";
 
 const fetcher = (url: string) =>
@@ -278,18 +277,6 @@ export function GlobalTimeline({
     }
     return out;
   })();
-
-  function pxOf(s: string | null): number | null {
-    const d = parseDate(s);
-    if (!d) return null;
-    return ((d.getTime() - range!.min) / totalMs) * chartW;
-  }
-  function barPx(s: string | null, e: string | null): { left: number; width: number } | null {
-    const a = pxOf(s);
-    const b = pxOf(e);
-    if (a === null || b === null) return null;
-    return { left: a, width: Math.max(b - a, 2) };
-  }
 
   function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
     if (!e.ctrlKey && !e.metaKey) return;

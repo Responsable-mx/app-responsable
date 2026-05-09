@@ -8,7 +8,6 @@ import type { Client } from "@/lib/clients";
 // ClientResumen es el tab default → eager (no lazy) para evitar skeleton en primera carga.
 import { ClientResumen } from "@/components/ClientResumen";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
-import type { MaterialityTopic } from "@/lib/materiality/types";
 
 
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
@@ -19,18 +18,6 @@ import { SkeletonDetail, SkeletonTable } from "@/components/ui/Skeleton";
 const QuestionnaireTab = dynamic(
   () => import("@/components/questionnaire/QuestionnaireTab").then((m) => m.QuestionnaireTab),
   { loading: () => <SkeletonDetail />, ssr: false }
-);
-const MaterialityTab = dynamic(
-  () => import("@/components/materiality/MaterialityTab").then((m) => m.MaterialityTab),
-  { loading: () => <SkeletonDetail />, ssr: false }
-);
-const ChatWindow = dynamic(
-  () => import("@/components/chat/ChatWindow").then((m) => m.ChatWindow),
-  { loading: () => <SkeletonDetail />, ssr: false }
-);
-const ClientCronogramaTab = dynamic(
-  () => import("@/components/services/ClientCronogramaTab").then((m) => m.ClientCronogramaTab),
-  { loading: () => <SkeletonTable />, ssr: false }
 );
 const TeamTab = dynamic(
   () => import("@/components/equipo/TeamTab").then((m) => m.TeamTab),
@@ -45,7 +32,7 @@ const DoubleMaterialidadTab = dynamic(
   { loading: () => <SkeletonDetail />, ssr: false }
 );
 
-type Tab = "resumen" | "cuestionario" | "chat" | "materialidad" | "cronograma" | "equipo" | "documentos" | "doble-materialidad-ia";
+type Tab = "resumen" | "cuestionario" | "equipo" | "documentos" | "doble-materialidad-ia";
 
 type Props = {
   client: Client;
@@ -54,7 +41,6 @@ type Props = {
   // Datos prefetched server-side. SWR los usa como fallback inicial y revalida
   // en background. Evita waterfall de 2 fetches al montar tabs.
   initialQuestionnaire?: QuestionnaireBundle | null;
-  initialMateriality?: MaterialityTopic[];
 };
 
 const questionnaireFetcher = (url: string) =>
@@ -63,18 +49,12 @@ const questionnaireFetcher = (url: string) =>
     return r.json() as Promise<{ data: QuestionnaireBundle }>;
   });
 
-const materialityFetcher = (url: string) =>
-  fetch(url).then((r) => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<{ data: MaterialityTopic[] }>;
-  });
 
 export function ClientTabs({
   client,
   completeness,
   isAdmin = false,
   initialQuestionnaire,
-  initialMateriality,
 }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -93,25 +73,12 @@ export function ClientTabs({
       onError: (e: unknown) => console.warn("[ClientTabs] questionnaire revalidation failed:", e),
     }
   );
-  const { data: materialityResp, error: materialityError } = useSWR(
-    `/api/clients/${client.id}/materiality`,
-    materialityFetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnMount: !initialMateriality,
-      fallbackData: initialMateriality ? { data: initialMateriality } : undefined,
-      onError: (e: unknown) => console.warn("[ClientTabs] materiality revalidation failed:", e),
-    }
-  );
-  // D-74: fallbackData garantiza la carga inicial. Si revalidación falla, los badges
-  // quedan con datos del servidor (aceptable). El console.warn permite detectar en logs.
   void questionnaireError;
-  void materialityError;
 
   // Tab DM-IA visible cuando client.services incluye "doble_materialidad_ia".
   // Fuente de verdad única: perfil del cliente (editable desde /editar).
   const hasDmService = client.services?.includes("doble_materialidad_ia") ?? false;
-  const VALID_TABS: Tab[] = ["resumen", "cuestionario", "materialidad", "chat", "cronograma", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
+  const VALID_TABS: Tab[] = ["resumen", "cuestionario", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
   const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
   const [tab, setTab] = useState<Tab>(
     VALID_TABS.includes(initialTab) ? initialTab : "resumen"
@@ -174,7 +141,6 @@ export function ClientTabs({
       }
     : null;
   const schema = questionnaireResp?.data.template.schema;
-  const materialityCount = materialityResp?.data?.length ?? null;
 
   // Resumen tab: 5 cards macro. Una card está completa si TODOS sus stepKeys están en completed_sections.
   // Mapping idéntico al de ClientResumen.tsx
@@ -257,30 +223,6 @@ export function ClientTabs({
           />
         )}
         <TabButton
-          active={tab === "chat"}
-          tabId="chat"
-          onClick={() => goToTab("chat")}
-          icon={
-            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-          }
-          label="Chat con IA"
-          badge={null}
-        />
-        <TabButton
-          active={tab === "cronograma"}
-          tabId="cronograma"
-          onClick={() => goToTab("cronograma")}
-          icon={
-            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          }
-          label="Cronograma"
-          badge={null}
-        />
-        <TabButton
           active={tab === "equipo"}
           tabId="equipo"
           onClick={() => goToTab("equipo")}
@@ -304,20 +246,6 @@ export function ClientTabs({
           label="Documentos"
           badge={null}
         />
-        <TabButton
-          active={tab === "materialidad"}
-          tabId="materialidad"
-          onClick={() => goToTab("materialidad")}
-          icon={
-            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-            </svg>
-          }
-          label="Materialidad"
-          badge={materialityCount === null ? null : `${materialityCount}`}
-          badgeTitle={materialityCount !== null ? `${materialityCount} temas de materialidad` : undefined}
-        />
       </div>
       {/* Scroll indicator — solo visible cuando hay overflow a la derecha */}
       {canScrollRight && (
@@ -335,8 +263,7 @@ export function ClientTabs({
       </div>{/* /relative wrapper */}
       </div>{/* /border-b wrapper */}
 
-      {/* Panels: cronograma sin max-w (gantt full-width), resto con max-w-6xl */}
-      <div className={tab === "cronograma" ? "" : "max-w-6xl mx-auto"}>
+      <div className="max-w-6xl mx-auto">
       {tab === "resumen" && (
         <div role="tabpanel" id="panel-resumen" tabIndex={0} aria-labelledby="tab-resumen">
           <TabErrorBoundary tabName="Resumen">
@@ -371,45 +298,6 @@ export function ClientTabs({
                 sustainability: client.sustainability_report_url ?? null,
                 financial: client.financial_report_url ?? null,
               }}
-            />
-          </TabErrorBoundary>
-        </div>
-      )}
-      {tab === "materialidad" && (
-        <div role="tabpanel" id="panel-materialidad" tabIndex={0} aria-labelledby="tab-materialidad">
-          <TabErrorBoundary tabName="Materialidad">
-            <MaterialityTab clientId={client.id} />
-          </TabErrorBoundary>
-        </div>
-      )}
-      {tab === "chat" && (
-        <div role="tabpanel" id="panel-chat" tabIndex={0} aria-labelledby="tab-chat">
-          <TabErrorBoundary tabName="Chat IA">
-            <div className="border border-slate-200 rounded shadow-sm overflow-hidden bg-white h-[min(75vh,720px)]">
-              <ChatWindow
-                key={client.id}
-                clients={[
-                  {
-                    id: client.id,
-                    name: client.name,
-                    sector: client.sector,
-                    completeness,
-                  },
-                ]}
-                initialClientId={client.id}
-                clientLocked
-              />
-            </div>
-          </TabErrorBoundary>
-        </div>
-      )}
-      {tab === "cronograma" && (
-        <div role="tabpanel" id="panel-cronograma" tabIndex={0} aria-labelledby="tab-cronograma">
-          <TabErrorBoundary tabName="Cronograma">
-            <ClientCronogramaTab
-              clientId={client.id}
-              isAdmin={isAdmin}
-              initialView={searchParams?.get("view") === "gantt" ? "gantt" : "list"}
             />
           </TabErrorBoundary>
         </div>

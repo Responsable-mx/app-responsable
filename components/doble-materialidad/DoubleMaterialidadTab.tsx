@@ -528,7 +528,7 @@ function BenchmarkSection({
     } catch (e) {
       push("error", e instanceof Error ? e.message : "Error al ejecutar benchmark");
     }
-  }, [clientId, selected, push, onStartPolling]);
+  }, [clientId, selected, companies, push, onStartPolling]);
 
   const handleAddManual = useCallback(async () => {
     if (!manualForm.name.trim()) return;

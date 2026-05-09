@@ -41,7 +41,6 @@ export async function checkRateLimit(
   opts: RateLimitOptions
 ): Promise<RateLimitResult | null> {
   const { max, windowMs, errorMessage } = opts;
-  const windowSec = Math.round(windowMs / 1_000);
   const windowMinutes = Math.ceil(windowMs / 60_000);
 
   try {

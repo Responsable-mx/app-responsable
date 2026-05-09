@@ -208,7 +208,7 @@ export async function extractProfileFromUrl(rawUrl: string): Promise<ProfileExtr
   if (cached) return cached;
 
   const url = validateUrl(rawUrl);
-  const { text, ogImage } = await fetchPageData(url);
+  const { text } = await fetchPageData(url);
   if (text.length < 50) throw new Error("La página contiene muy poco texto para analizar");
 
   const fields = await extractFromText(text);

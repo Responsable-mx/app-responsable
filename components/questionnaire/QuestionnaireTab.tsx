@@ -71,7 +71,7 @@ export function QuestionnaireTab({
 
 function WizardEditor({
   clientId,
-  clientServices = [],
+  clientServices: _clientServices = [],
   initial,
   mutate,
   initialStepIndex = 0,
@@ -89,7 +89,7 @@ function WizardEditor({
   const { template } = initial;
   const schema = template.schema;
   const isWizard = isWizardSchema(schema);
-  const steps: WizardStep[] = isWizard ? schema.steps : [];
+  const steps = useMemo<WizardStep[]>(() => isWizardSchema(schema) ? schema.steps : [], [schema]);
 
   const [responses, setResponses] = useState<QuestionnaireResponseData>(
     initial.response?.responses ?? {}

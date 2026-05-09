@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "app/dev/**",       // preview mockups — estándares de producción no aplican
   ]),
+  {
+    rules: {
+      // Variables prefijadas con _ son intencionalmente no usadas (destructuring omit)
+      "@typescript-eslint/no-unused-vars": ["warn", { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }],
+    },
+  },
 ]);
 
 export default eslintConfig;

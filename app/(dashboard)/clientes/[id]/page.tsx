@@ -7,7 +7,6 @@ import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { requireAdmin } from "@/lib/auth";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
-import { listMaterialityTopics } from "@/lib/materiality/queries";
 import { listCatalog } from "@/lib/catalogs";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +19,11 @@ export default async function EditarClientePage({ params }: Props) {
   // Antes ClientTabs hacía 2 fetches client-side en cascada al montar tabs (cuestionario,
   // materialidad), causando spinners visibles. Ahora SWR arranca con datos en memoria
   // y solo revalida en background.
-  const [client, allClients, questionnaireBundle, materialityTopics, adminEmail, serviceCatalog] =
+  const [client, allClients, questionnaireBundle, adminEmail, serviceCatalog] =
     await Promise.all([
       getClient(id).catch(() => null),
       listClientsLight().catch(() => []),
       getQuestionnaireBundle(id, "doble-materialidad").catch(() => null),
-      listMaterialityTopics(id).catch(() => []),
       requireAdmin(),
       listCatalog("services").catch(() => []),
     ]);
@@ -170,7 +168,6 @@ export default async function EditarClientePage({ params }: Props) {
         completeness={completeness}
         isAdmin={isAdmin}
         initialQuestionnaire={questionnaireBundle}
-        initialMateriality={materialityTopics}
       />
     </div>
     </>

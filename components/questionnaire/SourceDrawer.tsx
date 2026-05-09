@@ -27,7 +27,7 @@ function SourceBody({
   date, setDate,
   isValidUrl,
   onUpdateSourceType,
-  onAddSource,
+  onAddSource: _onAddSource,
   onRemoveSource,
   handleAdd,
 }: {

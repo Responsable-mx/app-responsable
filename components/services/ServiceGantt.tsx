@@ -10,7 +10,7 @@ import type { ActivityStatus, ServiceStage, StageActivity } from "@/lib/stages";
 import { QuickActionPopover, type QuickPatch } from "./QuickActionPopover";
 import { GanttToolbar } from "./GanttToolbar";
 import { GanttHeader } from "./GanttHeader";
-import { GanttEvm, type EvmMetrics } from "./GanttEvm";
+import { GanttEvm } from "./GanttEvm";
 import { GanttLegend } from "./GanttLegend";
 import { RichTooltip } from "./GanttTooltip";
 

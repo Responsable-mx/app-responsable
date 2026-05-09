@@ -22,10 +22,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - `extract-profile.ts` usaba guard custom más débil que `isPublicHttpUrl`. `::ffff:192.168.x.x` bypasaba `isPrivateIPv4()`. Fix sesión 22: ssrf.ts + extract-profile.ts unificados.
 - Fix adicional sesión 23: check `::ffff:*` en ssrf.ts era incorrecto — Node.js WHATWG normaliza `[::ffff:192.168.1.1]` → `::ffff:c0a8:101` (hex), regex dotted-decimal nunca matcheaba. Fix: conversión hex→decimal. Descubierto por tests de regresión.
 
-### 🟡 D-145 — chat_requests sin índice compuesto para rate limit extract-profile
-- **Descripción**: `POST /api/clients/extract-profile` hace `COUNT(*) WHERE user_email=X AND role='extract-profile' AND created_at>=Y` sin índice en `(user_email, role, created_at)`. Para 8 usuarios es inobservable; a 50+ usuarios el COUNT full-scan empieza a notarse.
-- **Fix**: `CREATE INDEX idx_chat_requests_ratelimit ON chat_requests (user_email, role, created_at DESC);`
-- **Esfuerzo**: 5 min (migración SQL aditiva)
+### ~~🟡 D-145 — chat_requests sin índice compuesto para rate limit extract-profile~~ ✅ RESUELTO (sesión 24)
+- Migración `0070_chat_requests_ratelimit_index.sql` aplicada. `idx_chat_requests_ratelimit ON chat_requests (user_email, role, created_at DESC)`.
 
 ### ~~🟢 D-146 — extract-profile no registraba en logAiCall~~ ✅ RESUELTO
 - Tokens propagados desde `resp.usage` → `ProfileExtractResult` → route → `logAiCall`. Sesión 22.

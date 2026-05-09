@@ -125,7 +125,8 @@ function scrollToDmSection(sectionId: string) {
   if (!el) return;
   const main = document.querySelector("main");
   if (main) {
-    const top = el.getBoundingClientRect().top + main.scrollTop - 8;
+    // 120px offset: compensa el stepper sticky + header de la app
+    const top = el.getBoundingClientRect().top + main.scrollTop - 120;
     main.scrollTo({ top, behavior: "smooth" });
   } else {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -228,6 +229,100 @@ function formatStageDate(iso: string | null | undefined): string {
   });
 }
 
+// ── Sección colapsable de etapa ───────────────────────────────
+
+function CollapsibleStageSection({
+  id,
+  stageNum,
+  label,
+  status,
+  accent,
+  open,
+  onToggle,
+  nextSection,
+  children,
+}: {
+  id: string;
+  stageNum: number;
+  label: string;
+  status: StageStatus;
+  accent: string;
+  open: boolean;
+  onToggle: () => void;
+  nextSection?: { id: string; label: string };
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} aria-labelledby={`stage-lbl-${id}`} className={`border-l-4 ${accent}`}>
+      {/* Header clickable */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={`${id}-body`}
+        className="w-full flex items-center justify-between pl-3 pr-2 py-2 hover:bg-slate-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-r-sm"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            id={`stage-lbl-${id}`}
+            className="text-xs font-bold uppercase tracking-widest text-slate-600 truncate"
+          >
+            {stageNum}. {label}
+          </span>
+          {status === "done" && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 shrink-0">
+              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Completado
+            </span>
+          )}
+          {status === "active" && (
+            <span className="px-1.5 py-0.5 rounded-sm bg-brand-primary border border-brand-primary text-[10px] font-semibold text-white shrink-0">
+              En curso
+            </span>
+          )}
+          {status === "pending" && (
+            <span className="px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
+              Pendiente
+            </span>
+          )}
+        </div>
+        {/* Chevron toggle */}
+        <svg
+          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      {/* Body expandible */}
+      {open && (
+        <div id={`${id}-body`} className="pl-3 pt-1 pb-4">
+          {children}
+          {nextSection && (
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => scrollToDmSection(nextSection.id)}
+                className="inline-flex items-center gap-1 text-xs text-brand-primary hover:underline font-medium focus:outline-none"
+              >
+                {nextSection.label}
+                <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ── Celda expandible ─────────────────────────────────────────
 
 function ExpandableCell({ text }: { text: string }) {
@@ -279,14 +374,9 @@ function ContextoSection({
   onGoToCuestionario: () => void;
 }) {
   const isComplete = progress && progress.filled >= progress.total && progress.total > 0;
-  const borderColor = isComplete
-    ? "border-l-emerald-600"
-    : progress && progress.filled > 0
-    ? "border-l-amber-500"
-    : "border-l-slate-300";
 
   return (
-    <div className={`border-l-4 ${borderColor} pl-4 py-2`}>
+    <div className="py-2">
       <p className="text-xs text-slate-600 mb-3">
         El cuestionario de contexto es la base para que la IA entienda a tu cliente antes de ejecutar el benchmark.
       </p>
@@ -2053,6 +2143,20 @@ export function DoubleMaterialidadTab({
   const pollingNotified = useRef(false);
   const pollingStartId = useRef<string | null>(null);
 
+  // Estado de colapso por sección — key=sectionId, value=abierto
+  // Por defecto: solo la etapa "active" está abierta; done y pending colapsadas
+  const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({});
+  const isSectionOpen = useCallback(
+    (sectionId: string, status: StageStatus) =>
+      sectionId in sectionOpen ? sectionOpen[sectionId]! : status === "active",
+    [sectionOpen]
+  );
+  const toggleSection = useCallback(
+    (sectionId: string, status: StageStatus) =>
+      setSectionOpen((prev) => ({ ...prev, [sectionId]: !isSectionOpen(sectionId, status) })),
+    [isSectionOpen]
+  );
+
   const [isIroPolling, setIsIroPolling] = useState(false);
   const pollingNotifiedIro = useRef(false);
 
@@ -2266,7 +2370,7 @@ export function DoubleMaterialidadTab({
         const hasChips = validatedCompanies > 0 || iros.length > 0 || quadrantCounts.doble_material > 0 || quadrantCounts.solo_impacto > 0;
 
         return (
-          <div className="bg-white border border-slate-200 rounded shadow-sm">
+          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-0 z-10">
             {/* Cabecera progreso */}
             <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-3 min-w-0">
@@ -2352,20 +2456,36 @@ export function DoubleMaterialidadTab({
       })()}
 
       {/* ── Etapa 1 ── */}
-      <section id="dm-sec-contexto" aria-labelledby="stage-contexto">
-        <h2 id="stage-contexto" className="sr-only">Contexto del cliente</h2>
+      <CollapsibleStageSection
+        id="dm-sec-contexto"
+        stageNum={1}
+        label="Contexto del cliente"
+        status={stage1Status}
+        accent="border-l-teal-500"
+        open={isSectionOpen("dm-sec-contexto", stage1Status)}
+        onToggle={() => toggleSection("dm-sec-contexto", stage1Status)}
+        nextSection={{ id: "dm-sec-benchmark", label: "Siguiente: Benchmark" }}
+      >
         <ContextoSection
           progress={questionnaireProgress}
           onGoToCuestionario={onGoToCuestionario}
         />
-      </section>
+      </CollapsibleStageSection>
 
       {/* ── Horizontes temporales ── */}
       <HorizontesConfig clientId={clientId} />
 
       {/* ── Etapa 2 ── */}
-      <section id="dm-sec-benchmark" className="border-l-4 border-l-blue-600 pl-3" aria-labelledby="stage-benchmark">
-        <h2 id="stage-benchmark" className="sr-only">Benchmark competitivo</h2>
+      <CollapsibleStageSection
+        id="dm-sec-benchmark"
+        stageNum={2}
+        label="Benchmark competitivo"
+        status={stage2Status}
+        accent="border-l-blue-600"
+        open={isSectionOpen("dm-sec-benchmark", stage2Status)}
+        onToggle={() => toggleSection("dm-sec-benchmark", stage2Status)}
+        nextSection={{ id: "dm-sec-iros", label: "Siguiente: IROs" }}
+      >
         <BenchmarkSection
           clientId={clientId}
           clientName={clientName}
@@ -2379,13 +2499,19 @@ export function DoubleMaterialidadTab({
             void mutateBenchmark();
           }}
         />
-      </section>
+      </CollapsibleStageSection>
 
       {/* ── Etapa 3 — IROs del cliente ── */}
-      <section id="dm-sec-iros" className="border-l-4 border-l-violet-600 pl-3" aria-labelledby="stage-iros">
-        <h2 id="stage-iros" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-          Inventario de IROs
-        </h2>
+      <CollapsibleStageSection
+        id="dm-sec-iros"
+        stageNum={3}
+        label="Inventario de IROs"
+        status={stage3Status}
+        accent="border-l-violet-600"
+        open={isSectionOpen("dm-sec-iros", stage3Status)}
+        onToggle={() => toggleSection("dm-sec-iros", stage3Status)}
+        nextSection={{ id: "dm-sec-matriz", label: "Siguiente: Matriz" }}
+      >
         <IroSection
           clientId={clientId}
           iros={iros}
@@ -2399,23 +2525,35 @@ export function DoubleMaterialidadTab({
             void mutateIros();
           }}
         />
-      </section>
+      </CollapsibleStageSection>
 
       {/* ── Etapa 4 — Matriz de Doble Materialidad ── */}
       {iros.filter((i) => i.incluido && i.score_impacto && i.score_financiero).length >= 3 && (
-        <section id="dm-sec-matriz" className="border-l-4 border-l-brand-primary pl-3" aria-labelledby="stage-matriz">
-          <h2 id="stage-matriz" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-            Matriz de Doble Materialidad
-          </h2>
+        <CollapsibleStageSection
+          id="dm-sec-matriz"
+          stageNum={4}
+          label="Matriz de Doble Materialidad"
+          status={stage4Status}
+          accent="border-l-brand-primary"
+          open={isSectionOpen("dm-sec-matriz", stage4Status)}
+          onToggle={() => toggleSection("dm-sec-matriz", stage4Status)}
+          nextSection={{ id: "dm-sec-nis", label: "Siguiente: NIS/IBSO" }}
+        >
           <MatrizDM iros={iros.filter((i) => i.incluido)} />
-        </section>
+        </CollapsibleStageSection>
       )}
 
       {/* ── Etapa 5 — NIS / IBSO ── */}
-      <section id="dm-sec-nis" className="border-l-4 border-l-amber-600 pl-3" aria-labelledby="stage-nis">
-        <h2 id="stage-nis" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-          NIS / IBSO — Brechas de información
-        </h2>
+      <CollapsibleStageSection
+        id="dm-sec-nis"
+        stageNum={5}
+        label="NIS / IBSO — Brechas de información"
+        status={stage5Status}
+        accent="border-l-amber-600"
+        open={isSectionOpen("dm-sec-nis", stage5Status)}
+        onToggle={() => toggleSection("dm-sec-nis", stage5Status)}
+        nextSection={{ id: "dm-sec-resumen", label: "Siguiente: Resumen ejecutivo" }}
+      >
         <NisSection
           clientId={clientId}
           nisRows={nisRows}
@@ -2423,31 +2561,50 @@ export function DoubleMaterialidadTab({
           hasBenchmark={hasBenchmark}
           onMutate={() => void mutateNis()}
         />
-      </section>
+      </CollapsibleStageSection>
 
       {/* ── Etapa 6 — Resumen ejecutivo IA ── */}
       {hasIros && (
-        <section id="dm-sec-resumen" className="border-l-4 border-l-cyan-600 pl-3" aria-labelledby="stage-resumen">
-          <h2 id="stage-resumen" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-            Resumen Ejecutivo (IA)
-          </h2>
+        <CollapsibleStageSection
+          id="dm-sec-resumen"
+          stageNum={6}
+          label="Resumen Ejecutivo (IA)"
+          status={stage6Status}
+          accent="border-l-cyan-600"
+          open={isSectionOpen("dm-sec-resumen", stage6Status)}
+          onToggle={() => toggleSection("dm-sec-resumen", stage6Status)}
+          nextSection={{ id: "dm-sec-validacion", label: "Siguiente: Validación" }}
+        >
           <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
-        </section>
+        </CollapsibleStageSection>
       )}
 
       {/* ── Etapa 7 — Validación con el cliente ── */}
       {hasResumen && (
-        <section id="dm-sec-validacion" className="border-l-4 border-l-amber-600 pl-3" aria-labelledby="stage-validacion">
-          <h2 id="stage-validacion" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-            Validación con el cliente
-          </h2>
+        <CollapsibleStageSection
+          id="dm-sec-validacion"
+          stageNum={7}
+          label="Validación con el cliente"
+          status={stage7Status}
+          accent="border-l-rose-600"
+          open={isSectionOpen("dm-sec-validacion", stage7Status)}
+          onToggle={() => toggleSection("dm-sec-validacion", stage7Status)}
+          nextSection={{ id: "dm-sec-reporte", label: "Siguiente: Reporte final" }}
+        >
           <ValidacionSection clientId={clientId} iros={iros} />
-        </section>
+        </CollapsibleStageSection>
       )}
 
       {/* ── Etapa 8 — Reporte (etapa final) ── */}
-      <section id="dm-sec-reporte" className="border-l-4 border-l-emerald-600 pl-3" aria-labelledby="stage-reporte">
-        <h2 id="stage-reporte" className="sr-only">Reporte de Doble Materialidad</h2>
+      <CollapsibleStageSection
+        id="dm-sec-reporte"
+        stageNum={8}
+        label="Reporte de Doble Materialidad"
+        status={stage8Status}
+        accent="border-l-emerald-600"
+        open={isSectionOpen("dm-sec-reporte", stage8Status)}
+        onToggle={() => toggleSection("dm-sec-reporte", stage8Status)}
+      >
         <ReporteSection
           clientId={clientId}
           clientName={clientName}
@@ -2461,7 +2618,7 @@ export function DoubleMaterialidadTab({
             void mutateReport();
           }}
         />
-      </section>
+      </CollapsibleStageSection>
 
       {/* ── Checklist de cierre ── */}
       <section aria-labelledby="stage-checklist">

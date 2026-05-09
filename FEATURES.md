@@ -49,6 +49,10 @@
 
 - [B] ✅ **IROs ESRS en DM IA** — 10 estándares ESRS (E1–E5, S1–S4, G1) × 2 dimensiones (impacto + riesgo/oportunidad) reemplazan los 5 campos estáticos. `dm_iro_config` + RLS + seed completo (mig 0060). `lib/dm/iros.ts` cache 7200s + `getIroQuestionnaireContext`. Benchmark y reporte inyectan IROs como ejes; contexto del cuestionario por campo vinculado. `/configuracion/iros` editable por admin. `DoubleMaterialidadTab` usa `/api/iros` SWR. may-2026
 
+- [B] **DM-IA navegación mejorada — Ruta A (quick win)** — Stepper sticky top-0 en scroll container. Secciones colapsables: activa = auto-expandida, completadas = colapsadas por default. CTA "→ Siguiente etapa" al pie de cada sección. Toggle ▶/▼ en header de cada etapa. Solo `DoubleMaterialidadTab.tsx` (~60 líneas). Semáforo 🟢. Pendiente confirmación.
+
+- [B] **DM-IA navegación mejorada — Ruta B (arquitectura target)** — Sub-tabs por etapa (activeStage state + URL param `?stage=N`). Solo 1 etapa renderizada → DOM 7× más liviano. Extracción de `BenchmarkSection`, `IrosSection`, `ContextoSection`, `ReporteSection` a archivos separados. Stepper = tab bar con aria-selected. 5–6 archivos. Sprint siguiente.
+
 ## En desarrollo (may-2026)
 
 - [A] 🔄 Templates de servicio + visión global proyectos — `/configuracion/servicios` (CRUD plantillas etapas/actividades/duraciones), aplicar plantilla a cliente, vista global en `/equipo`. 15 archivos, migración 0033. Semáforo 🟢.

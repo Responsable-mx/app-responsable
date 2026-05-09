@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DM-IA · Ruta B V4</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            primary: '#0f766e',
+            'primary-dark': '#134e4a',
+            'primary-light': '#ccfbf1',
+            accent: '#d97706',
+          }
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { font-family: 'Inter', system-ui, sans-serif; box-sizing: border-box; }
+  body { background: #f8fafc; }
+
+  /* Pill stepper */
+  .pill { transition: all 0.15s ease; user-select: none; cursor: pointer; }
+  .pill:hover:not(.active):not(.locked) { filter: brightness(0.96); }
+  .pill.active { box-shadow: 0 0 0 2px #0f766e, 0 1px 4px rgba(15,118,110,0.18); }
+  .pill.locked { cursor: not-allowed; pointer-events: none; }
+
+  /* Connectors */
+  .conn { flex: 1; height: 2px; min-width: 4px; max-width: 36px; background: #e2e8f0; border-radius: 1px; transition: background 0.3s; }
+  .conn.done { background: #0f766e; }
+
+  /* Fade transition */
+  .fade-in { animation: fi 0.14s ease-out; }
+  @keyframes fi { from { opacity:0; transform: translateY(2px); } to { opacity:1; transform: none; } }
+
+  /* Tables */
+  .th { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #64748b; }
+  tr.row:hover td { background: #f8fafc; }
+
+  /* Progress bar */
+  .pbar { height: 3px; background: #e2e8f0; border-radius: 0; }
+  .pfill { height: 100%; background: #0f766e; border-radius: 0; transition: width .4s; }
+
+  /* Scatter */
+  .scatter-wrap { position: relative; border-left: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1; }
+  .dot { position: absolute; transform: translate(-50%, 50%); cursor: pointer; transition: transform .15s, filter .15s; }
+  .dot:hover { transform: translate(-50%, 50%) scale(1.4); filter: brightness(0.88); z-index: 10; }
+
+  /* Custom tooltip on dots */
+  .dot-tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: white;
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 30;
+    pointer-events: none;
+    line-height: 1.4;
+  }
+  .dot-tip::after {
+    content: '';
+    position: absolute;
+    top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #1e293b;
+  }
+  .dot:hover .dot-tip { display: block; }
+
+  /* Dot popover (on click) */
+  .dot-popover {
+    display: none;
+    position: absolute;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    width: 180px;
+    z-index: 40;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .dot-popover.open { display: block; }
+
+  /* Kbd hint — always visible, small */
+  .kbd-hint { opacity: 1; }
+  kbd {
+    display: inline-block; padding: 1px 5px;
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    border-radius: 3px; font-size: 10px; color: #94a3b8;
+    font-family: monospace;
+  }
+
+  /* Dot nav bar */
+  .dot-nav { width: 8px; height: 8px; border-radius: 50%; cursor: pointer; padding: 4px; background-clip: content-box; transition: all .15s; }
+  .dot-nav.done { background-color: #0f766e; }
+  .dot-nav.active { width: 12px; height: 12px; background-color: #134e4a; box-shadow: 0 0 0 2px rgba(15,118,110,.25); }
+  .dot-nav.pending { background-color: #cbd5e1; }
+  .dot-nav.locked-dot { background-color: #e2e8f0; cursor: not-allowed; pointer-events: none; }
+
+  /* Accent per stage */
+  .accent-ctx  { border-left-color: #0f766e !important; }   /* teal — contexto */
+  .accent-bch  { border-left-color: #2563eb !important; }   /* blue — benchmark */
+  .accent-iro  { border-left-color: #7c3aed !important; }   /* purple — IROs ESRS */
+  .accent-viz  { border-left-color: #0f766e !important; }   /* teal — visualización */
+  .accent-data { border-left-color: #d97706 !important; }   /* amber — brechas */
+  .accent-ai   { border-left-color: #0891b2 !important; }   /* cyan — IA summary */
+  .accent-rep  { border-left-color: #dc2626 !important; }   /* red — reporte final */
+
+  /* Confirm modal */
+  #confirm-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(15,23,42,.45);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  #confirm-overlay.open { display: flex; }
+
+  /* Scrollbar thin */
+  .thin-scroll { scrollbar-width: thin; scrollbar-color: #e2e8f0 transparent; }
+  .thin-scroll::-webkit-scrollbar { height: 4px; width: 4px; }
+  .thin-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
+
+  /* IRO index */
+  .iro-index-item { display: flex; align-items: center; gap: 5px; padding: 2px 0; cursor: pointer; }
+  .iro-index-item:hover { opacity: .7; }
+
+  /* Chips strip overflow */
+  .chip-strip { display: flex; align-items: center; gap: 6px; overflow-x: auto; }
+  .chip-strip { scrollbar-width: none; }
+  .chip-strip::-webkit-scrollbar { display: none; }
+
+  /* Pill bar overflow */
+  #pill-bar { overflow-x: auto; }
+  #pill-bar { scrollbar-width: none; }
+  #pill-bar::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body class="min-h-screen">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="w-56 bg-white border-r border-slate-200 flex-shrink-0 flex flex-col py-5 px-3 gap-1">
+    <div class="px-3 mb-4 flex items-center gap-2">
+      <div class="w-6 h-6 bg-brand-primary rounded-sm flex items-center justify-center">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      </div>
+      <span class="text-xs font-bold tracking-widest uppercase text-slate-700">ResponSable</span>
+    </div>
+    <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Clientes
+    </a>
+    <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chat IA
+    </a>
+    <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Equipo
+    </a>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 overflow-y-auto" id="main">
+
+    <!-- Header: breadcrumb + tabs — sticky -->
+    <div class="bg-white border-b border-slate-200 px-8 pt-4 pb-0 sticky top-0 z-20" id="app-header">
+      <nav class="text-xs text-slate-400 mb-2 flex items-center gap-1.5">
+        <a href="#" class="hover:text-brand-primary transition-colors">Clientes</a>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="text-slate-700 font-medium">Nuvoil S.A. de C.V.</span>
+        <span class="ml-2 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wide">Petróleo y gas · Grande</span>
+      </nav>
+      <div class="flex items-end gap-0 -mb-px overflow-x-auto thin-scroll">
+        <button class="px-4 py-2.5 text-[11px] font-semibold tracking-widest uppercase text-slate-400 hover:text-slate-600 border-b-2 border-transparent hover:border-slate-300 transition-colors whitespace-nowrap">Contexto</button>
+        <button class="px-4 py-2.5 text-[11px] font-semibold tracking-widest uppercase text-slate-400 hover:text-slate-600 border-b-2 border-transparent hover:border-slate-300 transition-colors whitespace-nowrap">
+          Cuestionario
+          <span class="ml-1.5 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-bold">18/20</span>
+        </button>
+        <button class="px-4 py-2.5 text-[11px] font-semibold tracking-widest uppercase text-brand-primary-dark border-b-2 border-brand-primary transition-colors whitespace-nowrap">
+          DM IA
+          <span class="ml-1.5 text-[9px] bg-brand-primary text-white px-1.5 py-0.5 rounded-sm font-bold" id="dm-badge">4/7</span>
+        </button>
+        <button class="px-4 py-2.5 text-[11px] font-semibold tracking-widest uppercase text-slate-400 hover:text-slate-600 border-b-2 border-transparent hover:border-slate-300 transition-colors whitespace-nowrap">Documentos</button>
+        <button class="px-4 py-2.5 text-[11px] font-semibold tracking-widest uppercase text-slate-400 hover:text-slate-600 border-b-2 border-transparent hover:border-slate-300 transition-colors whitespace-nowrap">Consultores</button>
+      </div>
+    </div>
+
+    <div class="px-8 py-5 max-w-5xl">
+
+      <!-- ══ STEPPER V3 — sticky ══ -->
+      <div class="stepper-card bg-white border border-slate-200 rounded shadow-sm mb-4 sticky z-10" id="stepper-wrap" style="top: 65px;">
+
+        <!-- Progress header -->
+        <div class="flex items-center justify-between px-5 pt-3 pb-2 border-b border-slate-100">
+          <!-- LEFT: completion progress -->
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">Estado del estudio</span>
+            <div class="pbar w-28 flex-shrink-0"><div class="pfill" id="pfill" style="width:43%"></div></div>
+            <span id="pct" class="text-[10px] text-slate-500 font-semibold tabular-nums whitespace-nowrap">3/7 completadas</span>
+          </div>
+          <!-- RIGHT: kbd navigation hint — persistent -->
+          <div class="kbd-hint flex items-center gap-1 flex-shrink-0">
+            <kbd>←</kbd><span class="text-[10px] text-slate-400 mx-0.5">navegar con</span><kbd>→</kbd>
+          </div>
+        </div>
+
+        <!-- Pill bar — overflow-x-auto for narrow viewports -->
+        <div class="flex items-center gap-1 px-4 py-3 thin-scroll" id="pill-bar">
+
+          <!-- Pills are data-stage buttons; JS updates their look -->
+          <button data-stage="1" data-label="Contexto" onclick="goStage(1)"
+            class="pill done flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm min-w-0 bg-slate-50 border border-slate-200">
+            <div class="pill-inner flex items-center gap-1.5">
+              <svg class="pill-check" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="text-[11px] font-semibold text-brand-primary whitespace-nowrap">Contexto</span>
+            </div>
+            <span class="pill-sub text-[9px] text-slate-500">8 may</span>
+          </button>
+          <div class="conn done" id="c1"></div>
+
+          <button data-stage="2" data-label="Benchmark" onclick="goStage(2)"
+            class="pill done flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm min-w-0 bg-slate-50 border border-slate-200">
+            <div class="pill-inner flex items-center gap-1.5">
+              <svg class="pill-check" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="text-[11px] font-semibold text-brand-primary whitespace-nowrap">Benchmark</span>
+            </div>
+            <span class="pill-sub text-[9px] text-slate-500">8 may</span>
+          </button>
+          <div class="conn done" id="c2"></div>
+
+          <button data-stage="3" data-label="IROs" onclick="goStage(3)"
+            class="pill done flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm min-w-0 bg-slate-50 border border-slate-200">
+            <div class="pill-inner flex items-center gap-1.5">
+              <svg class="pill-check" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="text-[11px] font-semibold text-brand-primary whitespace-nowrap">IROs</span>
+            </div>
+            <span class="pill-sub text-[9px] text-slate-500">8 may</span>
+          </button>
+          <div class="conn" id="c3"></div>
+
+          <button data-stage="4" data-label="Matriz" onclick="goStage(4)"
+            class="pill active flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm min-w-0 bg-brand-primary border border-brand-primary">
+            <div class="pill-inner flex items-center gap-1.5">
+              <span class="text-[11px] font-bold text-white whitespace-nowrap">Matriz</span>
+            </div>
+            <span class="pill-sub text-[9px] text-brand-primary-light">En curso</span>
+          </button>
+          <div class="conn" id="c4"></div>
+
+          <button data-stage="5" data-label="NIS/IBSO" onclick="goStage(5)"
+            class="pill flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm min-w-0 border border-slate-200">
+            <span class="text-[11px] font-medium text-slate-500 whitespace-nowrap">NIS/IBSO</span>
+            <span class="pill-sub text-[9px] text-slate-400">Pendiente</span>
+          </button>
+          <div class="conn" id="c5"></div>
+
+          <button data-stage="6" data-label="Resumen IA" onclick="goStage(6)"
+            class="pill flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm min-w-0 border border-slate-200">
+            <span class="text-[11px] font-medium text-slate-500 whitespace-nowrap">Resumen IA</span>
+            <span class="pill-sub text-[9px] text-slate-400">Pendiente</span>
+          </button>
+          <div class="conn" id="c6"></div>
+
+          <button data-stage="7" data-label="Reporte" onclick="goStage(7)"
+            class="pill flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm min-w-0 border border-slate-200">
+            <div class="pill-inner flex items-center gap-1.5">
+              <span class="text-[11px] font-medium text-slate-500 whitespace-nowrap">Reporte</span>
+            </div>
+            <span class="pill-sub text-[9px] text-brand-primary font-semibold">Listo para generar</span>
+          </button>
+
+        </div>
+
+        <!-- Context summary strip — fused into stepper footer -->
+        <div class="border-t border-slate-100 px-5 py-2">
+          <div class="chip-strip thin-scroll">
+            <span class="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap flex-shrink-0">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              5 empresas benchmark
+            </span>
+            <span class="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap flex-shrink-0">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              9 IROs · 8 calificados
+            </span>
+            <span class="inline-flex text-[10px] font-semibold bg-rose-50 border border-rose-200 text-rose-700 px-2 py-1 rounded-sm whitespace-nowrap flex-shrink-0">2 doble material</span>
+            <span class="inline-flex text-[10px] font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-sm whitespace-nowrap flex-shrink-0">2 mat. por impacto</span>
+          </div>
+        </div>
+
+      </div>
+      <!-- /stepper V3 -->
+
+      <!-- ══ STAGE PANELS ══ -->
+
+      <!-- STAGE 1: Contexto -->
+      <div id="panel-1" class="stage-panel hidden fade-in" tabindex="-1">
+        <div class="bg-white border border-slate-200 rounded shadow-sm border-l-4 accent-ctx">
+          <div class="px-6 py-4 border-b border-slate-100">
+            <h2 class="text-lg font-semibold text-slate-900">Cuestionario de Doble Materialidad</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Estado del llenado — base para el benchmark y los IROs</p>
+          </div>
+          <div class="px-6 py-5 space-y-4">
+            <div class="flex items-center gap-4">
+              <div class="flex-1">
+                <div class="flex justify-between text-xs text-slate-600 mb-1.5">
+                  <span class="font-medium">Campos completados</span>
+                  <span class="font-bold text-brand-primary tabular-nums">18 / 20</span>
+                </div>
+                <div class="pbar"><div class="pfill" style="width:90%"></div></div>
+              </div>
+              <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-sm font-semibold whitespace-nowrap">2 pendientes</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                <p class="th mb-1">Sector</p>
+                <p class="text-sm font-semibold text-slate-800">Petróleo y gas</p>
+              </div>
+              <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                <p class="th mb-1">Tamaño</p>
+                <p class="text-sm font-semibold text-slate-800">Grande (&gt;250 emp.)</p>
+              </div>
+              <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                <p class="th mb-1">Marcos</p>
+                <p class="text-sm font-semibold text-slate-800">GRI 2021 · TCFD</p>
+              </div>
+            </div>
+            <div class="p-3 bg-amber-50 border border-amber-100 rounded text-xs text-amber-800">
+              <strong>2 campos pendientes:</strong> Estrategia de descarbonización · Mapa de stakeholders clave.
+              Completarlos mejora la calidad del reporte final.
+              <a href="#" onclick="confirmLeaveStudy(event)" class="underline ml-1 font-semibold">Ir al cuestionario →</a>
+            </div>
+          </div>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div class="invisible">
+              <button class="flex items-center gap-1.5 text-xs px-3 py-2">placeholder</button>
+            </div>
+            <div id="dots-1" class="dot-bar-container"></div>
+            <button onclick="goStage(2)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
+              Benchmark sectorial <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 2: Benchmark -->
+      <div id="panel-2" class="stage-panel hidden fade-in" tabindex="-1">
+        <div class="bg-white border border-slate-200 rounded shadow-sm border-l-4 accent-bch">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Benchmark sectorial</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Empresas comparables validadas · 12 campos ESG · 4 mostrados</p>
+            </div>
+            <div class="flex gap-2 flex-shrink-0 ml-3">
+              <span class="text-[10px] bg-brand-primary-light text-brand-primary-dark px-2 py-1 rounded-sm font-bold whitespace-nowrap">5 validadas</span>
+              <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold">12 campos</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-4">
+            <div class="overflow-x-auto thin-scroll">
+              <table class="min-w-full text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200">
+                    <th class="th text-left py-2 pr-4 w-44">Campo ESG</th>
+                    <th class="th text-left py-2 px-3 bg-emerald-100 rounded-t w-28">Nuvoil</th>
+                    <th class="th text-left py-2 px-3 w-24">Pemex</th>
+                    <th class="th text-left py-2 px-3 w-24">Repsol</th>
+                    <th class="th text-left py-2 px-3 w-28">Shell Méx.</th>
+                    <th class="th text-left py-2 px-3 w-28">Valero</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr class="row">
+                    <td class="py-2 pr-4 text-slate-700 font-medium">Emisiones Scope 1–2</td>
+                    <td class="py-2 px-3 bg-emerald-50"><span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm whitespace-nowrap">En medición</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Reportado</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Reportado</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Reportado</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Reportado</span></td>
+                  </tr>
+                  <tr class="row even:bg-slate-50/50">
+                    <td class="py-2 pr-4 text-slate-700 font-medium">Meta net-zero</td>
+                    <td class="py-2 px-3 bg-emerald-50"><span class="text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-sm whitespace-nowrap">Sin definir</span></td>
+                    <td class="py-2 px-3 text-slate-600 tabular-nums">2060</td>
+                    <td class="py-2 px-3 text-slate-600 tabular-nums">2050</td>
+                    <td class="py-2 px-3 text-slate-600 tabular-nums">2050</td>
+                    <td class="py-2 px-3 text-slate-600 tabular-nums">2040</td>
+                  </tr>
+                  <tr class="row">
+                    <td class="py-2 pr-4 text-slate-700 font-medium">Reporte de sostenibilidad</td>
+                    <td class="py-2 px-3 bg-emerald-50"><span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm">Parcial</span></td>
+                    <td class="py-2 px-3 text-slate-600">GRI Standards</td>
+                    <td class="py-2 px-3 text-slate-600">GRI + TCFD</td>
+                    <td class="py-2 px-3 text-slate-600">GRI + SASB</td>
+                    <td class="py-2 px-3 text-slate-600">SASB + TCFD</td>
+                  </tr>
+                  <tr class="row even:bg-slate-50/50">
+                    <td class="py-2 pr-4 text-slate-700 font-medium">Auditoría externa ESG</td>
+                    <td class="py-2 px-3 bg-emerald-50"><span class="text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-sm">No</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Sí</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Sí</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Sí</span></td>
+                    <td class="py-2 px-3 text-slate-600"><span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm">Sí</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-[10px] text-slate-500">Columna <strong class="text-brand-primary-dark">Nuvoil</strong> resaltada. 3 de 4 peers tiene auditoría ESG externa — brecha a documentar en el reporte.</p>
+            <div class="flex justify-end mt-2">
+              <button class="text-[11px] text-brand-primary font-semibold hover:underline">Ver los 12 campos →</button>
+            </div>
+          </div>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <button onclick="goStage(1)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors whitespace-nowrap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Contexto
+            </button>
+            <div id="dots-2" class="dot-bar-container"></div>
+            <button onclick="goStage(3)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
+              IROs ESRS <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 3: IROs -->
+      <div id="panel-3" class="stage-panel hidden fade-in" tabindex="-1">
+        <div class="bg-white border border-slate-200 rounded shadow-sm border-l-4 accent-iro">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Impactos, Riesgos y Oportunidades</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Estándares ESRS identificados y calificados para inclusión en el estudio</p>
+            </div>
+            <div class="flex gap-2 flex-shrink-0 ml-3">
+              <span class="text-[10px] bg-brand-primary-light text-brand-primary-dark px-2 py-1 rounded-sm font-bold whitespace-nowrap">9 incluidos</span>
+              <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-sm font-bold">8 calificados</span>
+            </div>
+          </div>
+          <div class="px-6 py-5">
+            <div class="overflow-x-auto thin-scroll">
+              <table class="min-w-full text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200">
+                    <th class="th text-left py-2 pr-2 w-16">ESRS</th>
+
+                    <th class="th text-left py-2 pr-3">Descripción</th>
+                    <th class="th text-center py-2 px-2 w-12">ESG</th>
+                    <th class="th text-center py-2 px-2 w-16">Impacto</th>
+                    <th class="th text-center py-2 px-2 w-20">Financiero</th>
+                    <th class="th text-center py-2 px-2 w-28">Cuadrante</th>
+                    <th class="th text-center py-2 w-16">Incluido</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr class="row">
+                    <td class="py-2 pr-2 font-mono text-slate-500 text-[10px] font-bold">E1</td>
+                    <td class="py-2 pr-3 text-slate-700 font-medium">Cambio climático</td>
+                    <td class="py-2 px-2 text-center"><span class="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">E</span></td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-800 tabular-nums">8.5</td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-800 tabular-nums">7.2</td>
+                    <td class="py-2 px-2 text-center"><span class="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">Doble material</span></td>
+                    <td class="py-2 text-center"><svg class="inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></td>
+                  </tr>
+                  <tr class="row even:bg-slate-50/40">
+                    <td class="py-2 pr-2 font-mono text-slate-500 text-[10px] font-bold">E2</td>
+                    <td class="py-2 pr-3 text-slate-700 font-medium">Contaminación</td>
+                    <td class="py-2 px-2 text-center"><span class="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">E</span></td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-800 tabular-nums">7.0</td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-800 tabular-nums">6.1</td>
+                    <td class="py-2 px-2 text-center"><span class="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">Doble material</span></td>
+                    <td class="py-2 text-center"><svg class="inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></td>
+                  </tr>
+                  <tr class="row">
+                    <td class="py-2 pr-2 font-mono text-slate-500 text-[10px] font-bold">S1</td>
+                    <td class="py-2 pr-3 text-slate-700 font-medium">Fuerza laboral</td>
+                    <td class="py-2 px-2 text-center"><span class="bg-blue-100 text-blue-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">S</span></td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-800 tabular-nums">6.5</td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-800 tabular-nums">4.8</td>
+                    <td class="py-2 px-2 text-center"><span class="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">Mat. impacto</span></td>
+                    <td class="py-2 text-center"><svg class="inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></td>
+                  </tr>
+                  <tr class="row even:bg-slate-50/40">
+                    <td class="py-2 pr-2 font-mono text-slate-500 text-[10px] font-bold">G1</td>
+                    <td class="py-2 pr-3 text-slate-700 font-medium">Ética empresarial</td>
+                    <td class="py-2 px-2 text-center"><span class="bg-violet-100 text-violet-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">G</span></td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-800 tabular-nums">5.0</td>
+                    <td class="py-2 px-2 text-center text-slate-300 tabular-nums">—</td>
+                    <td class="py-2 px-2 text-center"><span class="text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded-sm">Seguimiento</span></td>
+                    <td class="py-2 text-center"><svg class="inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex justify-end mt-3">
+              <button class="text-[11px] text-brand-primary font-semibold hover:underline">Ver los 9 IROs →</button>
+            </div>
+          </div>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <button onclick="goStage(2)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Benchmark
+            </button>
+            <div id="dots-3" class="dot-bar-container"></div>
+            <button onclick="goStage(4)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
+              Ver en matriz <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 4: Matriz — DEFAULT ACTIVE -->
+      <div id="panel-4" class="stage-panel fade-in" tabindex="-1">
+        <div class="bg-white border border-slate-200 rounded shadow-sm border-l-4 accent-viz">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">E1 y E2 requieren acción inmediata — doble exposición material</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Matriz de Doble Materialidad · 8 IROs graficados · Ejes 0–10</p>
+            </div>
+            <span class="text-[10px] bg-rose-100 text-rose-800 px-2 py-1 rounded-sm font-bold mt-0.5 whitespace-nowrap ml-3">2 doble material</span>
+          </div>
+          <div class="px-6 py-5">
+
+            <!-- Scatter + Index panel layout -->
+            <div class="flex gap-4">
+
+              <!-- Scatter chart -->
+              <div class="flex-1 relative" style="height:340px; padding-left:40px; padding-bottom:28px; min-width:0;">
+                <!-- Y axis label -->
+                <div class="absolute left-0 top-0 bottom-7 flex items-center justify-center w-8">
+                  <span class="th" style="writing-mode:vertical-rl;transform:rotate(180deg)">IMPACTO →</span>
+                </div>
+                <!-- Y axis ticks -->
+                <div class="absolute left-8 top-0 bottom-7 flex flex-col justify-between pr-1.5">
+                  <span class="text-[9px] text-slate-400 tabular-nums text-right leading-none">10</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums text-right leading-none">8</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums text-right leading-none">6</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums text-right leading-none">4</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums text-right leading-none">2</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums text-right leading-none">0</span>
+                </div>
+                <!-- Chart area -->
+                <div class="absolute left-14 right-0 top-0 bottom-7 scatter-wrap" id="scatter">
+                  <!-- Grid -->
+                  <div class="absolute inset-0" style="background-image:repeating-linear-gradient(to right,#e2e8f0 0,#e2e8f0 1px,transparent 1px,transparent 20%),repeating-linear-gradient(to bottom,#e2e8f0 0,#e2e8f0 1px,transparent 1px,transparent 20%);opacity:.2;"></div>
+                  <!-- Midlines -->
+                  <div class="absolute border-l border-dashed border-slate-300 opacity-50" style="left:50%;top:0;bottom:0"></div>
+                  <div class="absolute border-t border-dashed border-slate-300 opacity-50" style="top:50%;left:0;right:0"></div>
+                  <!-- Quadrant fills — very subtle -->
+                  <div class="absolute bg-rose-400" style="top:0;left:50%;right:0;bottom:50%;opacity:.04"></div>
+                  <div class="absolute bg-amber-400" style="top:0;left:0;right:50%;bottom:50%;opacity:.03"></div>
+                  <!-- Quadrant labels -->
+                  <span class="absolute text-[9px] text-rose-400 font-bold" style="top:5px;right:6px">Doble material</span>
+                  <span class="absolute text-[9px] text-amber-500 font-semibold" style="top:5px;left:5px">Mat. impacto</span>
+                  <span class="absolute text-[9px] text-brand-primary font-semibold" style="bottom:52%;right:6px">Mat. financiero</span>
+                  <span class="absolute text-[9px] text-slate-500" style="bottom:6px;left:5px">Baja prioridad</span>
+
+                  <!-- Dots — ● circles = doble material (rose) -->
+                  <div class="dot" style="left:72%;bottom:85%;width:16px;height:16px;background:#f43f5e;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2)" onclick="openPopover(event,'E1','Cambio climático','Doble material','8.5 / 7.2')">
+                    <div class="dot-tip">E1 · Cambio climático</div>
+                  </div>
+                  <div class="dot" style="left:61%;bottom:70%;width:16px;height:16px;background:#f43f5e;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2)" onclick="openPopover(event,'E2','Contaminación','Doble material','7.0 / 6.1')">
+                    <div class="dot-tip">E2 · Contaminación</div>
+                  </div>
+                  <!-- ◆ diamonds = mat. impacto (amber) -->
+                  <div class="dot" style="left:30%;bottom:75%;width:14px;height:14px;background:#f59e0b;transform:translate(-50%,50%) rotate(45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
+                    <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S1 · Fuerza laboral</div>
+                  </div>
+                  <div class="dot" style="left:22%;bottom:62%;width:13px;height:13px;background:#f59e0b;transform:translate(-50%,50%) rotate(45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
+                    <div class="dot-tip" style="transform:translateX(-50%) rotate(-45deg)">S2 · Cadena de valor</div>
+                  </div>
+                  <!-- ■ squares = mat. financiero (teal) -->
+                  <div class="dot" style="left:65%;bottom:35%;width:13px;height:13px;background:#0f766e;border-radius:2px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'E3','Recursos hídricos','Mat. financiero','3.5 / 6.5')">
+                    <div class="dot-tip">E3 · Recursos hídricos</div>
+                  </div>
+                  <div class="dot" style="left:78%;bottom:28%;width:13px;height:13px;background:#0f766e;border-radius:2px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.15)" onclick="openPopover(event,'G1','Ética empresarial','Mat. financiero','2.8 / 7.8')">
+                    <div class="dot-tip">G1 · Ética empresarial</div>
+                  </div>
+                  <!-- ▲ triangles = seguimiento (slate) -->
+                  <div class="dot" style="left:18%;bottom:22%;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'S4','Comunidades locales','Seguimiento','2.2 / 2.2')">
+                    <div class="dot-tip">S4 · Comunidades</div>
+                  </div>
+                  <div class="dot" style="left:35%;bottom:18%;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #94a3b8;background:transparent;border-radius:0" onclick="openPopover(event,'E5','Biodiversidad','Seguimiento','1.8 / 3.5')">
+                    <div class="dot-tip">E5 · Biodiversidad</div>
+                  </div>
+
+                  <!-- Dot popover (shared, positioned by JS) -->
+                  <div id="dot-popover" class="dot-popover">
+                    <div class="flex items-center justify-between mb-1.5">
+                      <span id="pop-code" class="font-mono text-[10px] font-bold text-slate-500"></span>
+                      <button onclick="closePopover()" class="text-slate-300 hover:text-slate-500 text-xs leading-none">✕</button>
+                    </div>
+                    <p id="pop-name" class="font-semibold text-slate-800 text-xs mb-0.5"></p>
+                    <p id="pop-quad" class="text-[10px] mb-1"></p>
+                    <p class="text-[10px] text-slate-500 mb-2"><span id="pop-scores"></span></p>
+                    <div class="flex gap-1.5">
+                      <button onclick="closePopover()" class="text-[10px] bg-brand-primary text-white px-2 py-1 rounded font-semibold hover:bg-brand-primary-dark transition-colors">Ver en Cuestionario</button>
+                      <button onclick="closePopover()" class="text-[10px] border border-slate-200 text-slate-600 px-2 py-1 rounded font-semibold hover:bg-slate-50 transition-colors">Chat IA</button>
+                    </div>
+                  </div>
+                </div>
+                <!-- X axis ticks -->
+                <div class="absolute left-14 right-0 bottom-0 flex justify-between">
+                  <span class="text-[9px] text-slate-400 tabular-nums">0</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums">2</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums">4</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums">6</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums">8</span>
+                  <span class="text-[9px] text-slate-400 tabular-nums">10</span>
+                </div>
+                <div class="absolute bottom-0 left-14 right-0 flex justify-center">
+                  <span class="th">MATERIALIDAD FINANCIERA →</span>
+                </div>
+              </div>
+
+              <!-- IRO Index panel — right side -->
+              <div class="w-40 flex-shrink-0 border-l border-slate-100 pl-3 pt-1 space-y-0.5 overflow-y-auto thin-scroll" style="max-height:312px;">
+                <p class="th mb-2">Índice de IROs</p>
+                <div class="iro-index-item" onclick="openPopover(event,'E1','Cambio climático','Doble material','8.5 / 7.2')">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#f43f5e;flex-shrink:0"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">E1</span>
+                  <span class="text-[10px] text-slate-600 truncate">Cambio climático</span>
+                </div>
+                <div class="iro-index-item" onclick="openPopover(event,'E2','Contaminación','Doble material','7.0 / 6.1')">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#f43f5e;flex-shrink:0"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">E2</span>
+                  <span class="text-[10px] text-slate-600 truncate">Contaminación</span>
+                </div>
+                <div class="iro-index-item" onclick="openPopover(event,'S1','Fuerza laboral','Mat. impacto','6.5 / 4.8')">
+                  <div style="width:8px;height:8px;background:#f59e0b;transform:rotate(45deg);flex-shrink:0"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">S1</span>
+                  <span class="text-[10px] text-slate-600 truncate">Fuerza laboral</span>
+                </div>
+                <div class="iro-index-item" onclick="openPopover(event,'S2','Cadena de valor','Mat. impacto','6.0 / 4.2')">
+                  <div style="width:8px;height:8px;background:#f59e0b;transform:rotate(45deg);flex-shrink:0"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">S2</span>
+                  <span class="text-[10px] text-slate-600 truncate">Cadena de valor</span>
+                </div>
+                <div class="iro-index-item" onclick="openPopover(event,'E3','Recursos hídricos','Mat. financiero','3.5 / 6.5')">
+                  <div style="width:8px;height:8px;background:#0f766e;border-radius:1px;flex-shrink:0"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">E3</span>
+                  <span class="text-[10px] text-slate-600 truncate">Rec. hídricos</span>
+                </div>
+                <div class="iro-index-item" onclick="openPopover(event,'G1','Ética empresarial','Mat. financiero','2.8 / 7.8')">
+                  <div style="width:8px;height:8px;background:#0f766e;border-radius:1px;flex-shrink:0"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">G1</span>
+                  <span class="text-[10px] text-slate-600 truncate">Ética empresarial</span>
+                </div>
+                <div class="iro-index-item">
+                  <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:7px solid #94a3b8;flex-shrink:0;margin-top:1px"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">S4</span>
+                  <span class="text-[10px] text-slate-500 truncate">Comunidades</span>
+                </div>
+                <div class="iro-index-item">
+                  <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:7px solid #94a3b8;flex-shrink:0;margin-top:1px"></div>
+                  <span class="font-mono text-[10px] text-slate-400 font-bold w-5">E5</span>
+                  <span class="text-[10px] text-slate-500 truncate">Biodiversidad</span>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-100">
+                  <p class="text-[9px] text-slate-400 italic">Haz clic para ver scores y clasificación ESRS</p>
+                </div>
+              </div>
+
+            </div>
+            <!-- /scatter + index -->
+
+            <!-- Legend row -->
+            <div class="flex items-center gap-5 mt-3 pt-3 border-t border-slate-100 flex-wrap">
+              <div class="flex items-center gap-1.5">
+                <div style="width:10px;height:10px;background:#f43f5e;border-radius:50%"></div>
+                <span class="text-[10px] text-slate-600 font-medium">● Doble material <span class="text-slate-400">(E1, E2)</span></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div style="width:10px;height:10px;background:#f59e0b;transform:rotate(45deg)"></div>
+                <span class="text-[10px] text-slate-600 font-medium">◆ Mat. impacto <span class="text-slate-400">(S1, S2)</span></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div style="width:10px;height:10px;background:#0f766e;border-radius:2px"></div>
+                <span class="text-[10px] text-slate-600 font-medium">■ Mat. financiero <span class="text-slate-400">(E3, G1)</span></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #94a3b8"></div>
+                <span class="text-[10px] text-slate-600 font-medium">▲ Seguimiento <span class="text-slate-400">(S4, E5)</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <button onclick="goStage(3)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> IROs
+            </button>
+            <div id="dots-4" class="dot-bar-container"></div>
+            <button onclick="goStage(5)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
+              NIS / IBSO <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 5: NIS/IBSO -->
+      <div id="panel-5" class="stage-panel hidden fade-in" tabindex="-1">
+        <div class="bg-white border border-slate-200 rounded shadow-sm border-l-4 accent-data">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Brechas de información por área material</h2>
+              <p class="text-xs text-slate-500 mt-0.5">NIS/IBSO <span class="text-slate-400">(Normas de Información de Sostenibilidad / Indicadores de Brechas)</span> · disponibilidad y calidad por IRO material</p>
+            </div>
+            <div class="flex gap-2 flex-shrink-0 ml-3">
+              <span class="text-[10px] bg-rose-100 text-rose-800 px-2 py-1 rounded-sm font-bold whitespace-nowrap">1 brecha crítica</span>
+              <span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-1 rounded-sm font-bold whitespace-nowrap">2 parciales</span>
+            </div>
+          </div>
+          <div class="px-6 py-5">
+            <div class="overflow-x-auto thin-scroll">
+              <table class="min-w-full text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200">
+                    <th class="th text-left py-2 pr-3 w-44">Área IBSO</th>
+                    <th class="th text-center py-2 px-2 w-24">Categoría</th>
+                    <th class="th text-center py-2 px-2 w-28">Estado</th>
+                    <th class="th text-center py-2 px-2 w-20">Calidad</th>
+                    <th class="th text-left py-2 pl-3">Acción requerida</th>
+                    <th class="th text-center py-2 px-2 w-20">Plazo</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr class="row">
+                    <td class="py-2.5 pr-3 text-slate-700 font-semibold">Emisiones GEI Scope 1–2</td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">Ambiental</span></td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Parcial</span></td>
+                    <td class="py-2.5 px-2 text-center font-bold text-amber-600 tabular-nums">Media</td>
+                    <td class="py-2.5 pl-3 text-slate-600">Completar medición Scope 2 con proveedor energía</td>
+                    <td class="py-2.5 px-2 text-center"><span class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap">T3 2026</span></td>
+                  </tr>
+                  <tr class="row bg-rose-50/60">
+                    <td class="py-2.5 pr-3 text-slate-800 font-bold">Vertimientos de agua</td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">Ambiental</span></td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-rose-100 text-rose-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">No disponible</span></td>
+                    <td class="py-2.5 px-2 text-center font-bold text-rose-600 tabular-nums">Baja</td>
+                    <td class="py-2.5 pl-3 text-slate-700">Instalar sistema de monitoreo en planta principal</td>
+                    <td class="py-2.5 px-2 text-center"><span class="text-[9px] bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded-sm font-bold whitespace-nowrap">Urgente</span></td>
+                  </tr>
+                  <tr class="row">
+                    <td class="py-2.5 pr-3 text-slate-700 font-semibold">Rotación y capacitación</td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-blue-100 text-blue-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Social</span></td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Disponible</span></td>
+                    <td class="py-2.5 px-2 text-center font-bold text-emerald-600 tabular-nums">Alta</td>
+                    <td class="py-2.5 pl-3 text-slate-400 italic">Sin acción requerida</td>
+                    <td class="py-2.5 px-2 text-center text-slate-300">—</td>
+                  </tr>
+                  <tr class="row">
+                    <td class="py-2.5 pr-3 text-slate-700 font-semibold">Prácticas anticorrupción</td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-violet-100 text-violet-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Gobernanza</span></td>
+                    <td class="py-2.5 px-2 text-center"><span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Parcial</span></td>
+                    <td class="py-2.5 px-2 text-center font-bold text-amber-600 tabular-nums">Media</td>
+                    <td class="py-2.5 pl-3 text-slate-600">Documentar política de compliance vigente</td>
+                    <td class="py-2.5 px-2 text-center"><span class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap">T2 2026</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <button onclick="goStage(4)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Matriz
+            </button>
+            <div id="dots-5" class="dot-bar-container"></div>
+            <button onclick="goStage(6)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
+              Resumen ejecutivo <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 6: Resumen IA -->
+      <div id="panel-6" class="stage-panel hidden fade-in" tabindex="-1">
+        <div class="bg-white border border-slate-200 rounded shadow-sm border-l-4 accent-ai">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Resumen ejecutivo del estudio</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Síntesis generada por Elena — integra benchmark + IROs + brechas</p>
+            </div>
+            <!-- Ghost button — lower visual weight than forward CTA -->
+            <button onclick="confirmRegenerate()" class="flex items-center gap-1.5 border border-slate-200 text-slate-500 text-xs font-semibold px-3 py-1.5 rounded hover:bg-slate-50 hover:text-slate-700 transition-colors flex-shrink-0 ml-3 whitespace-nowrap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Regenerar síntesis
+            </button>
+          </div>
+          <div class="px-6 py-5 space-y-4">
+            <div class="border-l-4 border-slate-300 pl-4 py-3 bg-slate-50 rounded-r">
+              <p class="text-xs text-slate-700 leading-relaxed">
+                <strong>Nuvoil S.A. de C.V.</strong> enfrenta una exposición significativa a riesgos de transición climática en el sector petróleo y gas. El análisis identificó <strong>8 IROs prioritarios</strong>: 2 temas doble material (E1 Cambio climático · E2 Contaminación), 2 materiales por impacto (S1, S2), 2 materiales financieros (E3, G1) y 2 en seguimiento. La brecha más crítica es la ausencia de monitoreo de vertimientos de agua — ninguno de los 4 peers comparables presenta este faltante...
+              </p>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div class="p-3 bg-rose-50 border border-rose-100 rounded">
+                <p class="th text-rose-600 mb-1">Doble material</p>
+                <p class="text-xl font-bold text-rose-800 tabular-nums">2</p>
+                <p class="text-[10px] text-rose-600 mt-0.5">E1 · E2</p>
+              </div>
+              <div class="p-3 bg-amber-50 border border-amber-100 rounded">
+                <p class="th text-amber-600 mb-1">Mat. impacto</p>
+                <p class="text-xl font-bold text-amber-800 tabular-nums">2</p>
+                <p class="text-[10px] text-amber-600 mt-0.5">S1 · S2</p>
+              </div>
+              <div class="p-3 bg-brand-primary-light border border-emerald-100 rounded">
+                <p class="th text-brand-primary mb-1">Mat. financiero</p>
+                <p class="text-xl font-bold text-brand-primary tabular-nums">2</p>
+                <p class="text-[10px] text-brand-primary mt-0.5">E3 · G1</p>
+              </div>
+              <div class="p-3 bg-red-50 border border-red-100 rounded">
+                <p class="th text-red-600 mb-1">Brechas críticas</p>
+                <p class="text-xl font-bold text-red-700 tabular-nums">1</p>
+                <p class="text-[10px] text-red-600 mt-0.5">Vertimientos de agua</p>
+              </div>
+            </div>
+          </div>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <button onclick="goStage(5)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors whitespace-nowrap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> NIS/IBSO
+            </button>
+            <div id="dots-6" class="dot-bar-container"></div>
+            <button onclick="goStage(7)" class="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold px-4 py-2 rounded hover:bg-brand-primary-dark transition-colors whitespace-nowrap">
+              Generar reporte final <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 7: Reporte FINAL -->
+      <div id="panel-7" class="stage-panel hidden fade-in" tabindex="-1">
+        <div class="bg-white border border-slate-200 rounded shadow-sm border-l-4 accent-rep">
+          <div class="px-6 py-4 border-b border-slate-100">
+            <h2 class="text-lg font-semibold text-slate-900">Reporte de Doble Materialidad</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Entregable final · Elena · GRI Standards 2021 · ~8 páginas · ~90 segundos</p>
+          </div>
+          <div class="px-6 py-5 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p class="th mb-3">El reporte incluirá</p>
+                <div class="space-y-2">
+                  <div class="flex items-start gap-2">
+                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="text-xs text-slate-700">Contexto del negocio y metodología aplicada</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="text-xs text-slate-700">Benchmark vs 5 empresas del sector (Pemex, Repsol, Shell Méx., Valero)</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="text-xs text-slate-700">Matriz de doble materialidad con 8 IROs graficados (E1–G1)</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="text-xs text-slate-700">Análisis de brechas NIS/IBSO con plan de acción priorizado</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="w-4 h-4 bg-brand-primary-light rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span class="text-xs text-slate-700">Resumen ejecutivo y recomendaciones estratégicas (GRI-aligned)</span>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-slate-50 border border-slate-200 rounded p-4 space-y-3">
+                <p class="th mb-2">Insumos confirmados</p>
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2 text-xs text-slate-600">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Cuestionario 18/20 campos (90%)
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-slate-600">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Benchmark sectorial generado (5 empresas)
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-slate-600">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    9 IROs identificados, 8 calificados con scores
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-slate-600">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Matriz doble materialidad con 8 IROs
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-slate-600">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    4 brechas NIS/IBSO registradas
+                  </div>
+                </div>
+                <div class="pt-2 border-t border-slate-200">
+                  <p class="text-[10px] text-slate-400">Tiempo estimado de generación</p>
+                  <p class="text-sm font-bold text-slate-700 tabular-nums">~90 segundos</p>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="showConfirmModal()" class="w-full flex items-center justify-center gap-2 bg-brand-primary text-white text-sm font-semibold py-3 rounded hover:bg-brand-primary-dark transition-colors shadow-sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Generar reporte PDF — Elena
+            </button>
+            <p class="text-[10px] text-slate-400 text-center">Generado por Elena · incluido en tu plan · descarga automática al completar</p>
+          </div>
+          <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <button onclick="goStage(6)" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-2 rounded border border-slate-200 bg-white transition-colors whitespace-nowrap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Resumen ejecutivo
+            </button>
+            <div id="dots-7" class="dot-bar-container"></div>
+            <div class="invisible">
+              <button class="flex items-center gap-1.5 text-xs px-4 py-2">placeholder</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /max-w-5xl -->
+  </main>
+</div>
+
+<!-- ══ CONFIRM MODAL ══ -->
+<div id="confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="bg-white rounded-md shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+    <div class="px-6 pt-5 pb-4">
+      <h3 id="modal-title" class="text-sm font-semibold text-slate-900 mb-1">Generar reporte para Nuvoil S.A. de C.V.</h3>
+      <p class="text-xs text-slate-500 mb-3">Elena analizará toda la información y generará el PDF en ~90 segundos. La descarga iniciará automáticamente.</p>
+      <div class="bg-slate-50 border border-slate-200 rounded p-3 space-y-1 text-xs text-slate-600 mb-1">
+        <div class="flex items-center gap-2"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Cuestionario 18/20 campos (90%)</div>
+        <div class="flex items-center gap-2"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Benchmark sectorial generado (5 empresas)</div>
+        <div class="flex items-center gap-2"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> 9 IROs identificados, 8 calificados con scores</div>
+        <div class="flex items-center gap-2"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Matriz doble materialidad con 8 IROs</div>
+        <div class="flex items-center gap-2"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> 4 brechas NIS/IBSO registradas</div>
+      </div>
+    </div>
+    <div class="px-6 pb-5 flex gap-2 justify-end">
+      <button onclick="hideConfirmModal()" class="text-xs font-semibold text-slate-500 px-4 py-2 rounded border border-slate-200 hover:bg-slate-50 transition-colors">Cancelar</button>
+      <button onclick="hideConfirmModal()" class="text-xs font-bold text-white bg-brand-primary px-5 py-2 rounded hover:bg-brand-primary-dark transition-colors shadow-sm">Generar reporte PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let cur = 4;
+const TOTAL = 7;
+const DONE = new Set([1, 2, 3]); // stages with real completed data
+
+// Lock rule: stage 7 requires at least stages 1–3 done
+function isLocked(n) {
+  return n === 7 && DONE.size < 3;
+}
+
+// Completion count: done stages that are < current active stage, plus explicit DONE set
+function completedCount(active) {
+  let count = DONE.size;
+  // stages 4-6 become "done" once user advances past them
+  for (let i = 4; i < active; i++) {
+    if (!DONE.has(i)) count++;
+  }
+  return Math.min(count, TOTAL);
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function goStage(n, fromKeyboard) {
+  if (n < 1 || n > TOTAL) return;
+  if (isLocked(n)) return;
+
+  document.getElementById('panel-' + cur).classList.add('hidden');
+  const panel = document.getElementById('panel-' + n);
+  panel.classList.remove('hidden');
+  panel.classList.remove('fade-in');
+  requestAnimationFrame(() => panel.classList.add('fade-in'));
+
+  cur = n;
+  updateStepper(n);
+  renderDots(n);
+
+  // Scroll to top — instant for keyboard nav, smooth for clicks
+  document.getElementById('main').scrollTo({ top: 0, behavior: fromKeyboard ? 'instant' : 'smooth' });
+}
+
+// ── Stepper update ─────────────────────────────────────────────────────────
+function updateStepper(active) {
+  const done = completedCount(active);
+  const pct = Math.round((done / TOTAL) * 100);
+
+  // Progress header
+  document.getElementById('pfill').style.width = pct + '%';
+  document.getElementById('pct').textContent = done + '/' + TOTAL + ' completadas';
+  document.getElementById('dm-badge').textContent = done + '/' + TOTAL;
+
+  // Pills
+  for (let i = 1; i <= TOTAL; i++) {
+    const btn = document.querySelector('[data-stage="' + i + '"]');
+    if (!btn) continue;
+
+    const isDone = DONE.has(i) || (i < active && i >= 4);
+    const isActive = i === active;
+    const reallyLocked = isLocked(i);                          // truly blocked by prereqs
+    const locked = reallyLocked || (i === 7 && active < 7);   // visual "future" state for stage 7
+
+    // Reset all state classes
+    btn.classList.remove(
+      'bg-brand-primary', 'border-brand-primary', 'active',
+      'bg-slate-50', 'border-slate-200',
+      'opacity-50', 'locked', 'border-slate-100'
+    );
+
+    const inner = btn.querySelector('.pill-inner');
+    const sub = btn.querySelector('.pill-sub');
+
+    if (isActive) {
+      btn.classList.add('bg-brand-primary', 'border-brand-primary', 'active');
+      btn.setAttribute('aria-current', 'step');
+      if (inner) {
+        inner.innerHTML = '<span class="text-[11px] font-bold text-white whitespace-nowrap">' + btn.dataset.label + '</span>';
+      }
+      if (sub) { sub.textContent = 'En curso'; sub.className = 'pill-sub text-[9px] text-brand-primary-light'; }
+    } else if (isDone) {
+      btn.classList.add('bg-slate-50', 'border-slate-200');
+      btn.removeAttribute('aria-current');
+      if (inner) {
+        inner.innerHTML =
+          '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' +
+          '<span class="text-[11px] font-semibold text-brand-primary whitespace-nowrap">' + btn.dataset.label + '</span>';
+      }
+      if (sub) { sub.textContent = '8 may'; sub.className = 'pill-sub text-[9px] text-slate-500'; }
+    } else if (locked) {
+      btn.removeAttribute('aria-current');
+      if (reallyLocked) {
+        // Genuinely blocked — lock icon, dimmed, no pointer events
+        btn.classList.add('border-slate-100', 'opacity-50', 'locked');
+        if (inner) {
+          inner.innerHTML =
+            '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+            '<span class="text-[11px] font-medium text-slate-400 whitespace-nowrap">' + btn.dataset.label + '</span>';
+        }
+        if (sub) { sub.textContent = 'Requiere Bench. + IROs'; sub.className = 'pill-sub text-[9px] text-slate-300'; }
+      } else {
+        // Stage 7 unlocked but not yet visited — show as actionable pending
+        btn.classList.add('border-slate-200');
+        if (inner) {
+          inner.innerHTML = '<span class="text-[11px] font-medium text-slate-500 whitespace-nowrap">' + btn.dataset.label + '</span>';
+        }
+        if (sub) { sub.textContent = 'Listo para generar'; sub.className = 'pill-sub text-[9px] text-brand-primary font-semibold'; }
+      }
+    } else {
+      // pending
+      btn.classList.add('border-slate-200');
+      btn.removeAttribute('aria-current');
+      if (inner) {
+        inner.innerHTML = '<span class="text-[11px] font-medium text-slate-500 whitespace-nowrap">' + btn.dataset.label + '</span>';
+      }
+      if (sub) { sub.textContent = 'Pendiente'; sub.className = 'pill-sub text-[9px] text-slate-400'; }
+    }
+  }
+
+  // Connectors — 1-6
+  for (let i = 1; i <= 6; i++) {
+    const c = document.getElementById('c' + i);
+    if (c) c.classList.toggle('done', i < active || DONE.has(i));
+  }
+}
+
+// ── Dots (single source of truth) ─────────────────────────────────────────
+const DOT_CONTAINERS = ['dots-1','dots-2','dots-3','dots-4','dots-5','dots-6','dots-7'];
+
+function renderDots(active) {
+  const done = completedCount(active);
+
+  DOT_CONTAINERS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.className = 'dot-bar-container flex items-center gap-1';
+    el.innerHTML = '';
+
+    for (let i = 1; i <= TOTAL; i++) {
+      const isDone = DONE.has(i) || (i < active && i >= 4);
+      const isActive = i === active;
+      const locked = i === 7 && active < 7;
+
+      const d = document.createElement('div');
+      d.style.padding = '4px';  // expand hit area
+      d.style.cursor = locked ? 'not-allowed' : 'pointer';
+      d.style.lineHeight = '0';
+
+      const inner = document.createElement('div');
+      inner.style.borderRadius = '50%';
+      inner.style.transition = 'all .15s';
+
+      if (isActive) {
+        inner.style.width = '10px';
+        inner.style.height = '10px';
+        inner.style.background = '#134e4a';
+        inner.style.boxShadow = '0 0 0 2px rgba(15,118,110,.25)';
+      } else if (isDone) {
+        inner.style.width = '7px';
+        inner.style.height = '7px';
+        inner.style.background = '#0f766e';
+      } else if (locked) {
+        inner.style.width = '7px';
+        inner.style.height = '7px';
+        inner.style.background = '#e2e8f0';
+      } else {
+        inner.style.width = '7px';
+        inner.style.height = '7px';
+        inner.style.background = '#cbd5e1';
+      }
+
+      d.appendChild(inner);
+      if (!locked) d.onclick = () => goStage(i);
+      el.appendChild(d);
+    }
+  });
+}
+
+// ── Scatter popover ────────────────────────────────────────────────────────
+const QUAD_COLORS = {
+  'Doble material': 'text-rose-700 bg-rose-50',
+  'Mat. impacto':   'text-amber-700 bg-amber-50',
+  'Mat. financiero':'text-brand-primary bg-brand-primary-light',
+  'Seguimiento':    'text-slate-600 bg-slate-100',
+};
+
+function openPopover(event, code, name, quad, scores) {
+  event.stopPropagation();
+  const pop = document.getElementById('dot-popover');
+  document.getElementById('pop-code').textContent = code;
+  document.getElementById('pop-name').textContent = name;
+  const qEl = document.getElementById('pop-quad');
+  const qClass = QUAD_COLORS[quad] || 'text-slate-600 bg-slate-100';
+  qEl.innerHTML = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-sm ' + qClass + '">' + quad + '</span>';
+  document.getElementById('pop-scores').textContent = 'Impacto / Financiero: ' + scores;
+
+  // Position near cursor, within scatter bounds
+  const scatter = document.getElementById('scatter');
+  const sr = scatter.getBoundingClientRect();
+  const ex = event.clientX - sr.left;
+  const ey = event.clientY - sr.top;
+
+  pop.style.left = Math.min(ex - 10, sr.width - 200) + 'px';
+  pop.style.bottom = (sr.height - ey + 12) + 'px';
+  pop.style.top = 'auto';
+  pop.classList.add('open');
+}
+
+function closePopover() {
+  document.getElementById('dot-popover').classList.remove('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#dot-popover') && !e.target.closest('.dot') && !e.target.closest('.iro-index-item')) {
+    closePopover();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePopover();
+  if (e.key === 'ArrowRight' && cur < TOTAL) goStage(cur + 1, true);
+  if (e.key === 'ArrowLeft'  && cur > 1)     goStage(cur - 1, true);
+});
+
+// ── Confirm modal ──────────────────────────────────────────────────────────
+function showConfirmModal() {
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function hideConfirmModal() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+}
+document.getElementById('confirm-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('confirm-overlay')) hideConfirmModal();
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function confirmRegenerate() {
+  if (confirm('¿Generar nueva síntesis? La síntesis actual será reemplazada.')) {
+    // En producción: llamada a Elena para regenerar resumen
+    alert('Síntesis regenerada. En producción esto llama a Elena.');
+  }
+}
+
+function confirmLeaveStudy(e) {
+  e.preventDefault();
+  if (confirm('Saldrás del estudio en curso. ¿Continuar al cuestionario?')) {
+    // En producción: navegar al tab Cuestionario
+    alert('En producción: navega al tab Cuestionario.');
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+updateStepper(4);
+renderDots(4);
+</script>
+</body>
+</html>

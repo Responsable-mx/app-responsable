@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
+import { ClientAvatar } from "@/components/ClientAvatar";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/ui/Modal";
 import { SelectField } from "@/components/ui/SelectField";
@@ -53,6 +54,8 @@ type Row = Pick<
   | "updated_at"
   | "frameworks"
   | "certifications"
+  | "logo_url"
+  | "website_url"
 >;
 
 type ViewMode = "cards" | "table";
@@ -532,17 +535,20 @@ function exportClientsCsv(rows: Row[]) {
   URL.revokeObjectURL(url);
 }
 
+function parseDomain(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./, "");
+  } catch { return null; }
+}
+
 function ClientCard({ client }: { client: Row }) {
-  const initials = client.name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
   const updated = new Date(client.updated_at);
   const daysAgo = Math.floor((Date.now() - updated.getTime()) / 86400000);
   const updatedLabel =
     daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
+  const domain = parseDomain(client.website_url);
 
   return (
     <div className="group relative bg-white border border-slate-200 rounded shadow-sm hover:border-brand-primary/30 transition-all">
@@ -551,9 +557,7 @@ function ClientCard({ client }: { client: Row }) {
         className="block p-4"
       >
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-10 h-10 rounded bg-brand-primary-dark text-white font-bold flex items-center justify-center text-sm shrink-0">
-            {initials}
-          </div>
+          <ClientAvatar name={client.name} logoUrl={client.logo_url} size="md" />
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-slate-900 leading-tight group-hover:text-brand-primary-hover transition-colors flex items-center gap-1.5">
               <span className="truncate">{client.name}</span>
@@ -565,7 +569,7 @@ function ClientCard({ client }: { client: Row }) {
             </h3>
             <p className="text-[11px] text-slate-500 truncate mt-0.5">
               {client.sector ?? <span className="italic text-slate-400">Sin sector</span>}
-              {client.size ? ` · ${client.size}` : ""}
+              {domain && <span className="text-slate-400"> · {domain}</span>}
             </p>
           </div>
         </div>

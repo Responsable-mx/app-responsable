@@ -330,11 +330,11 @@ export function listClientsLight(filter?: {
   });
 }
 
-const TABLE_COLUMNS = "id,name,sector,countries,size,updated_at,frameworks,certifications,logo_url";
+const TABLE_COLUMNS = "id,name,sector,countries,size,updated_at,frameworks,certifications,logo_url,website_url";
 
 export type ClientRow = Pick<
   Client,
-  "id" | "name" | "sector" | "countries" | "size" | "updated_at" | "frameworks" | "certifications" | "logo_url"
+  "id" | "name" | "sector" | "countries" | "size" | "updated_at" | "frameworks" | "certifications" | "logo_url" | "website_url"
 >;
 
 export function listClientsForTable(filter?: {
@@ -343,8 +343,8 @@ export function listClientsForTable(filter?: {
 }): Promise<ClientRow[]> {
   return withDevModeFallback<ClientRow[]>({
     kind: "read",
-    fallback: DEV_SEED_CLIENTS.map(({ id, name, sector, countries, size, updated_at, frameworks, certifications, logo_url }) => ({
-      id, name, sector, countries, size, updated_at, frameworks, certifications, logo_url,
+    fallback: DEV_SEED_CLIENTS.map(({ id, name, sector, countries, size, updated_at, frameworks, certifications, logo_url, website_url }) => ({
+      id, name, sector, countries, size, updated_at, frameworks, certifications, logo_url, website_url,
     })),
     async run() {
       const admin = createAdminClient();

@@ -87,7 +87,7 @@ export function ResumenEjecutivoSection({ clientId }: Props) {
     } catch {
       pushToast("error", "No se pudo copiar");
     }
-  }, [resumen?.content, pushToast]);
+  }, [resumen, pushToast]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 

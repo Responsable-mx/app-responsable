@@ -1692,7 +1692,7 @@ function NisSection({
       {nisRows.length === 0 ? (
         <div className="border-l-4 border-l-slate-300 pl-4 py-2">
           <p className="text-xs text-slate-500">
-            Haz clic en "Auto-completar" para pre-llenar el mapa de brechas basado en el cuestionario del cliente.
+            Haz clic en &ldquo;Auto-completar&rdquo; para pre-llenar el mapa de brechas basado en el cuestionario del cliente.
           </p>
         </div>
       ) : (

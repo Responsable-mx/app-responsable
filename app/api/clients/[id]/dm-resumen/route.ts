@@ -35,13 +35,46 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const admin = createAdminClient();
   const { data } = await admin
     .from("dm_resumenes")
-    .select("status, content, created_at, error_msg")
+    .select("status, content, created_at, error_msg, reviewed_at")
     .eq("client_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
 
   return NextResponse.json({ data: data ?? null });
+}
+
+// ── PATCH: marcar como revisado ──────────────────────────────────────────────
+
+export async function PATCH(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const admin = createAdminClient();
+
+  // Obtener el último resumen done
+  const { data: latest } = await admin
+    .from("dm_resumenes")
+    .select("id")
+    .eq("client_id", id)
+    .eq("status", "done")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!latest) {
+    return NextResponse.json({ error: "No hay resumen generado para marcar" }, { status: 404 });
+  }
+
+  const { error } = await admin
+    .from("dm_resumenes")
+    .update({ reviewed_at: new Date().toISOString() })
+    .eq("id", latest.id);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
 }
 
 // ── POST: genera un nuevo resumen ejecutivo (síncrono, max 45s) ──────────────

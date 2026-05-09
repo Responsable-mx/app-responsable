@@ -16,6 +16,7 @@ type ResumenData = {
   content: string | null;
   created_at: string | null;
   error_msg: string | null;
+  reviewed_at: string | null;
 } | null;
 
 type QuadrantCounts = {
@@ -99,8 +100,7 @@ const KPI_CARDS: Array<{
 export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
   const { push: pushToast } = useToast();
   const [generating, setGenerating] = useState(false);
-  // Estado local de revisión — deriva a DB en sprint posterior (ver DEUDA.md)
-  const [isReviewed, setIsReviewed] = useState(false);
+  const [marking, setMarking] = useState(false);
 
   const { data, isLoading, mutate } = useSWR<{ data: ResumenData }>(
     `/api/clients/${clientId}/dm-resumen`,
@@ -110,10 +110,10 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
 
   const resumen = data?.data ?? null;
   const hasContent = resumen?.status === "done" && !!resumen.content;
+  const isReviewed = !!resumen?.reviewed_at;
 
   const handleGenerar = useCallback(async () => {
     setGenerating(true);
-    setIsReviewed(false); // nuevo borrador al regenerar
     try {
       const res = await fetch(`/api/clients/${clientId}/dm-resumen`, {
         method: "POST",
@@ -364,7 +364,21 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setIsReviewed(true)}
+              loading={marking}
+              disabled={marking}
+              onClick={async () => {
+                setMarking(true);
+                try {
+                  const res = await fetch(`/api/clients/${clientId}/dm-resumen`, { method: "PATCH" });
+                  if (!res.ok) throw new Error("Error al marcar");
+                  await mutate();
+                  pushToast("success", "Resumen marcado como revisado");
+                } catch {
+                  pushToast("error", "No se pudo marcar como revisado");
+                } finally {
+                  setMarking(false);
+                }
+              }}
             >
               <svg
                 className="w-3.5 h-3.5 mr-1.5"

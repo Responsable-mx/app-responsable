@@ -142,21 +142,21 @@ export function PromptEditor({
           <h2 className="text-lg font-semibold text-slate-900">
             {PROMPT_LABELS[promptKey]}
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {detail.has_override ? (
-              <>
-                Editado por{" "}
-                <strong>{detail.updated_by ?? "desconocido"}</strong>{" "}
-                {detail.updated_at
-                  ? `el ${new Date(detail.updated_at).toLocaleString("es-MX")}`
-                  : ""}
-              </>
-            ) : description ? (
-              description
-            ) : (
-              "Prompt original del sistema (sin ediciones)"
-            )}
-          </p>
+          {description && (
+            <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+          )}
+          {detail.has_override ? (
+            <p className="text-[10px] text-amber-700 mt-0.5">
+              Editado por <strong>{detail.updated_by ?? "desconocido"}</strong>
+              {detail.updated_at
+                ? ` el ${new Date(detail.updated_at).toLocaleString("es-MX")}`
+                : ""}
+            </p>
+          ) : (
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Prompt original del sistema (sin ediciones)
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">

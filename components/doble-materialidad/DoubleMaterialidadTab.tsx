@@ -253,72 +253,76 @@ function CollapsibleStageSection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`stage-lbl-${id}`} className={`border-l-4 ${accent}`}>
-      {/* Header clickable */}
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={`${id}-body`}
-        className="w-full flex items-center justify-between pl-3 pr-2 py-2 hover:bg-slate-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-r-sm"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            id={`stage-lbl-${id}`}
-            className="text-xs font-bold uppercase tracking-widest text-slate-600 truncate"
-          >
-            {stageNum}. {label}
-          </span>
-          {status === "done" && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 shrink-0">
-              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Completado
-            </span>
-          )}
-          {status === "active" && (
-            <span className="px-1.5 py-0.5 rounded-sm bg-brand-primary border border-brand-primary text-[10px] font-semibold text-white shrink-0">
-              En curso
-            </span>
-          )}
-          {status === "pending" && (
-            <span className="px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
-              Pendiente
-            </span>
-          )}
-        </div>
-        {/* Chevron toggle */}
-        <svg
-          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
-      </button>
+    <section id={id} aria-labelledby={`stage-lbl-${id}`}>
+      {/* Card blanca con border-l-4 accent — mismo patrón del mockup */}
+      <div className={`bg-white border border-slate-200 rounded shadow-sm border-l-4 ${accent}`}>
 
-      {/* Body expandible */}
-      {open && (
-        <div id={`${id}-body`} className="pl-3 pt-1 pb-4">
-          {children}
-          {nextSection && (
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => scrollToDmSection(nextSection.id)}
-                className="inline-flex items-center gap-1 text-xs text-brand-primary hover:underline font-medium focus:outline-none"
-              >
-                {nextSection.label}
-                <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+        {/* Header clickable */}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={`${id}-body`}
+          className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-r-sm"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span
+              id={`stage-lbl-${id}`}
+              className="text-sm font-semibold text-slate-800 truncate"
+            >
+              {stageNum}. {label}
+            </span>
+            {status === "done" && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 shrink-0">
+                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+                Completado
+              </span>
+            )}
+            {status === "active" && (
+              <span className="px-1.5 py-0.5 rounded-sm bg-brand-primary border border-brand-primary text-[10px] font-semibold text-white shrink-0">
+                En curso
+              </span>
+            )}
+            {status === "pending" && (
+              <span className="px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
+                Pendiente
+              </span>
+            )}
+          </div>
+          {/* Chevron toggle */}
+          <svg
+            className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+
+        {/* Body expandible */}
+        {open && (
+          <div id={`${id}-body`} className="border-t border-slate-100 px-5 py-4">
+            {children}
+            {nextSection && (
+              <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => scrollToDmSection(nextSection.id)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand-primary hover:underline focus:outline-none"
+                >
+                  {nextSection.label}
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -470,7 +474,7 @@ function HorizontesConfig({
   const HORIZON_KEYS:   Array<keyof DmHorizons> = ["corto_year", "mediano_year", "largo_year"];
 
   return (
-    <div className="border-l-4 border-l-slate-200 pl-4 py-2">
+    <div>
       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
         Horizontes temporales del estudio
       </p>
@@ -2370,7 +2374,7 @@ export function DoubleMaterialidadTab({
         const hasChips = validatedCompanies > 0 || iros.length > 0 || quadrantCounts.doble_material > 0 || quadrantCounts.solo_impacto > 0;
 
         return (
-          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-0 z-10">
+          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-2 z-10">
             {/* Cabecera progreso */}
             <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-3 min-w-0">
@@ -2472,9 +2476,6 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Horizontes temporales ── */}
-      <HorizontesConfig clientId={clientId} />
-
       {/* ── Etapa 2 ── */}
       <CollapsibleStageSection
         id="dm-sec-benchmark"
@@ -2486,6 +2487,10 @@ export function DoubleMaterialidadTab({
         onToggle={() => toggleSection("dm-sec-benchmark", stage2Status)}
         nextSection={{ id: "dm-sec-iros", label: "Siguiente: IROs" }}
       >
+        {/* Horizontes temporales — config del estudio, mismo panel que Benchmark */}
+        <div className="mb-5 pb-5 border-b border-slate-100">
+          <HorizontesConfig clientId={clientId} />
+        </div>
         <BenchmarkSection
           clientId={clientId}
           clientName={clientName}

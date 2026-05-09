@@ -30,10 +30,10 @@ export function isPublicHttpUrl(u: string): { ok: boolean; reason?: string } {
     if (/^(\d{1,3}\.){3}\d{1,3}$/.test(mapped)) {
       ipv4 = mapped; // ya en notación dotted decimal (entorno no-Node o versión futura)
     } else {
-      const parts = mapped.split(":");
-      if (parts.length !== 2) return { ok: true };
-      const hi = parseInt(parts[0], 16);
-      const lo = parseInt(parts[1], 16);
+      const [p0, p1, ...rest] = mapped.split(":");
+      if (!p0 || !p1 || rest.length > 0) return { ok: true };
+      const hi = parseInt(p0, 16);
+      const lo = parseInt(p1, 16);
       if (isNaN(hi) || isNaN(lo)) return { ok: true };
       ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
     }

@@ -47,10 +47,19 @@ const questionnaireFetcher = (url: string) =>
     return r.json() as Promise<{ data: QuestionnaireBundle }>;
   });
 
+// Type ligero — sólo campos usados en el tooltip del badge tab Documentos.
+// Endpoint devuelve más; pinear acá mantiene el SWR cache estrecho.
+type DocLite = {
+  id: string;
+  has_content: boolean;
+  parse_status: "pending" | "ok" | "failed";
+  kind: "general" | "sustainability_report" | "financial_report";
+  created_at: string;
+};
 const docsFetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json() as Promise<{ data: { id: string }[] }>;
+    return r.json() as Promise<{ data: DocLite[] }>;
   });
 
 
@@ -169,6 +178,27 @@ export function ClientTabs({
   );
   // null = aún cargando; 0 = sin documentos; N = N docs
   const docCount: number | null = docsData ? docsData.data.length : null;
+
+  // Métricas de cobertura para tooltip del badge tab Documentos.
+  // Vive en ClientTabs (no en DocumentsTab) para que el usuario las vea sin
+  // tener que estar dentro del tab — patrón Linear/Notion (info en badge).
+  const docsTooltip = (() => {
+    if (!docsData) return undefined;
+    const ds = docsData.data;
+    if (ds.length === 0) return "Sin documentos";
+    const withContent = ds.filter((d) => d.has_content).length;
+    const failed = ds.filter((d) => d.parse_status === "failed").length;
+    const last = ds[0]?.created_at;
+    const parts = [`${ds.length} doc${ds.length === 1 ? "" : "s"}`];
+    parts.push(`${withContent} con contenido`);
+    if (failed > 0) parts.push(`${failed} sin texto`);
+    if (last) {
+      parts.push(
+        `último ${new Date(last).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}`
+      );
+    }
+    return parts.join(" · ");
+  })();
 
   const questionnaireProgress = questionnaireResp?.data.progress
     ? {
@@ -378,7 +408,7 @@ export function ClientTabs({
           }
           label="Documentos"
           badge={docCount !== null && docCount > 0 ? String(docCount) : null}
-          badgeTitle={docCount !== null && docCount > 0 ? `${docCount} documento${docCount !== 1 ? "s" : ""} del cliente` : undefined}
+          badgeTitle={docsTooltip}
         />
         <TabButton
           active={tab === "cuestionario"}

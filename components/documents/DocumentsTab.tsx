@@ -347,10 +347,12 @@ export function DocumentsTab({
     financial_report: docs.filter((d) => d.kind === "financial_report").length,
   };
 
-  // Métricas de cobertura — strip 1 (info accionable en vez de label decorativo)
+  // Métricas de cobertura — strip 1 condicional (sólo render cuando hay alerta).
+  // El recap completo (N docs · X con contenido · último Y) vive en el tooltip
+  // del badge tab "Documentos [N]" en ClientTabs (siempre disponible sin ocupar
+  // pixels permanentes en este tab).
   const withContent = docs.filter((d) => d.has_content).length;
   const failedCount = docs.filter((d) => d.parse_status === "failed").length;
-  const lastCreatedAt = docs[0]?.created_at; // list devuelve desc
 
   async function handleUpload(files: FileList) {
     setUploading(true);
@@ -455,48 +457,54 @@ export function DocumentsTab({
         </div>
       )}
 
-      {/* Strip 1 — métricas de cobertura + CTAs (sin label decorativo, sin restricciones técnicas;
-          esas viven en el dropzone overlay y en el modal de subida) */}
+      {/* Strip 1 — sólo aparece la mitad izquierda cuando hay alerta accionable
+          (sin contenido, parse failed, o falta kind crítico). Caso todo-ok →
+          izquierda vacía. Métricas siempre disponibles vía tooltip del badge tab
+          "Documentos [N]" en ClientTabs. Reduce ruido cuando todo está bien. */}
       <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="text-xs text-slate-600 min-h-[18px]">
+        <div className="text-xs min-h-[18px] flex-1 min-w-0">
           {docs.length === 0 ? (
             <span className="text-slate-500">
               Sin documentos. Sube PDF, DOCX, XLSX… o usa &ldquo;Buscar con IA&rdquo;.
             </span>
-          ) : (
-            <span className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-semibold text-slate-800 tabular-nums">
-                {docs.length} doc{docs.length === 1 ? "" : "s"}
-              </span>
-              <span className="text-slate-300" aria-hidden="true">·</span>
-              <span title="Documentos con texto extraído disponible para alimentar a Aurora/Rebeca/Elena">
-                <span className="tabular-nums">{withContent}</span> con contenido
-              </span>
-              {failedCount > 0 && (
-                <>
-                  <span className="text-slate-300" aria-hidden="true">·</span>
-                  <span
-                    className="text-rose-600 font-medium"
-                    title="Parser falló — sin texto extraíble. Re-subir o cambiar de formato."
-                  >
-                    <span className="tabular-nums">{failedCount}</span> sin texto
+          ) : (() => {
+            // Alertas accionables — render sólo cuando algo está fuera de norma
+            const noContent = docs.length - withContent;
+            const alerts: { label: string; tone: "rose" | "amber" }[] = [];
+            if (failedCount > 0) {
+              alerts.push({ label: `${failedCount} sin texto extraíble`, tone: "rose" });
+            } else if (noContent > 0) {
+              alerts.push({ label: `${noContent} sin contenido aún`, tone: "amber" });
+            }
+            if (counts.financial_report === 0) {
+              alerts.push({ label: "falta informe financiero", tone: "amber" });
+            }
+            if (counts.sustainability_report === 0) {
+              alerts.push({ label: "falta informe sustentabilidad", tone: "amber" });
+            }
+            if (alerts.length === 0) return null; // todo-ok: izq vacío, sólo CTAs derecha
+            return (
+              <span className="flex items-center gap-1.5 flex-wrap">
+                <svg className="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {alerts.map((a, i) => (
+                  <span key={i} className="flex items-center gap-1.5">
+                    {i > 0 && <span className="text-slate-300" aria-hidden="true">·</span>}
+                    <span className={a.tone === "rose" ? "text-rose-700 font-medium" : "text-amber-800"}>{a.label}</span>
                   </span>
-                </>
-              )}
-              {lastCreatedAt && (
-                <>
-                  <span className="text-slate-300" aria-hidden="true">·</span>
-                  <span className="text-slate-500" title={new Date(lastCreatedAt).toLocaleString("es-MX")}>
-                    último{" "}
-                    {new Date(lastCreatedAt).toLocaleDateString("es-MX", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </span>
-                </>
-              )}
-            </span>
-          )}
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setDiscoverOpen(true)}
+                  className="ml-1 text-[11px] font-semibold text-brand-primary-dark hover:underline"
+                  title="Buscar con IA documentos públicos del cliente"
+                >
+                  Resolver →
+                </button>
+              </span>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-2">
           {/* Pegar texto — abre modal dedicado (antes panel inline colapsable) */}

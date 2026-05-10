@@ -484,10 +484,6 @@ function ContextoSection({
 
   return (
     <div className="py-2">
-      <p className="text-xs text-slate-600 mb-3">
-        El cuestionario de contexto es la base para que la IA entienda a tu cliente antes de ejecutar el benchmark.
-      </p>
-
       {/* KPI cards — Sector / Tamaño / Marcos */}
       {hasKpis && (
         <div className="grid grid-cols-3 gap-3 mb-4">
@@ -2305,11 +2301,23 @@ export function DoubleMaterialidadTab({
   const pollingNotified = useRef(false);
   const pollingStartId = useRef<string | null>(null);
 
-  // Ruta B: una etapa visible a la vez. Por defecto Contexto (Etapa 1).
-  const [activeStageId, setActiveStageId] = useState<string>("dm-sec-contexto");
+  // Ruta B: una etapa visible a la vez.
+  // Inicial: lee URL hash (#dm-sec-iros) si existe — permite deep-links y back/forward.
+  // Si no hay hash → Contexto. (Smart-jump al primer pendiente se aplica más abajo
+  // cuando ya tenemos los statuses calculados.)
+  const [activeStageId, setActiveStageId] = useState<string>(() => {
+    if (typeof window === "undefined") return "dm-sec-contexto";
+    const hash = window.location.hash.replace(/^#/, "");
+    return DM_SECTION_IDS.includes(hash) ? hash : "dm-sec-contexto";
+  });
   const navigateTo = useCallback((sectionId: string) => {
     if (!DM_SECTION_IDS.includes(sectionId)) return;
     setActiveStageId(sectionId);
+    // Sync URL hash sin scroll — permite back/forward + deep-link
+    if (typeof window !== "undefined") {
+      const newUrl = `${window.location.pathname}${window.location.search}#${sectionId}`;
+      window.history.replaceState(null, "", newUrl);
+    }
   }, []);
   // Registrar navigate en ref module-level — permite a `scrollToDmSection` cambiar panel
   useEffect(() => {
@@ -2318,6 +2326,16 @@ export function DoubleMaterialidadTab({
       _dmNavigateRef.current = null;
     };
   }, [navigateTo]);
+  // Sincronizar con cambios externos del hash (browser back/forward)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onHash = () => {
+      const h = window.location.hash.replace(/^#/, "");
+      if (DM_SECTION_IDS.includes(h)) setActiveStageId(h);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const [isIroPolling, setIsIroPolling] = useState(false);
   const pollingNotifiedIro = useRef(false);
@@ -2506,13 +2524,41 @@ export function DoubleMaterialidadTab({
   };
 
   // Badge [N/8] — notifica al padre cuántas etapas están completas
-  const dmDoneCount = [
+  const stageStatuses: StageStatus[] = [
     stage1Status, stage2Status, stage3Status, stage4Status,
     stage5Status, stage6Status, stage7Status, stage8Status,
-  ].filter((s) => s === "done").length;
+  ];
+  const dmDoneCount = stageStatuses.filter((s) => s === "done").length;
   useEffect(() => {
     onStagesProgress?.(dmDoneCount, 8);
   }, [dmDoneCount, onStagesProgress]);
+
+  // Smart-jump al primer pendiente — solo en mount inicial y sin hash en URL.
+  // Permite que un usuario que regresa caiga directo en su trabajo pendiente
+  // en vez de releer Contexto que ya completó.
+  const didSmartJumpRef = useRef(false);
+  useEffect(() => {
+    if (didSmartJumpRef.current) return;
+    if (typeof window === "undefined") return;
+    if (window.location.hash) {
+      didSmartJumpRef.current = true;
+      return;
+    }
+    // Si Contexto ya está done y el activeStageId aún es Contexto, salta al primer
+    // active/pending no-locked. Si todo está done, queda en Reporte.
+    if (activeStageId !== "dm-sec-contexto") {
+      didSmartJumpRef.current = true;
+      return;
+    }
+    const firstPendingIdx = stageStatuses.findIndex(
+      (s) => s === "active" || s === "pending"
+    );
+    if (firstPendingIdx > 0) {
+      didSmartJumpRef.current = true;
+      navigateTo(DM_SECTION_IDS[firstPendingIdx]!);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage1Status, stage2Status, stage3Status, stage4Status, stage5Status, stage6Status, stage7Status, stage8Status]);
 
   // Navegación por teclado ← → entre etapas (Ruta B — cambia panel activo)
   useEffect(() => {

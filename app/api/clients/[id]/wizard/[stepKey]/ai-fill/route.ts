@@ -149,10 +149,11 @@ PARA CADA CAMPO retorna:
 - source_type: "public" | "interpretation" | "consultor_only"
 - sources: [{url, title, date (YYYY-MM-DD)}] — vacío si consultor_only
 
-FORMATO DE RESPUESTA — OBLIGATORIO:
-Tu mensaje final DEBE empezar con { y terminar con }. Cero texto antes o después del JSON.
-No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
-{ "campo_key": { "value": "...", "source_type": "...", "sources": [{"url":"...","title":"...","date":"YYYY-MM-DD"}] }, ... }`;
+FLUJO DE TRABAJO:
+1. Revisa los DOCUMENTOS DEL CLIENTE del contexto (fuente primaria).
+2. Usa web_search para complementar (máx 2 búsquedas).
+3. Cuando termines la investigación, llama UNA SOLA VEZ la herramienta submit_responses con el objeto { responses: { campo_key: {...} } }.
+4. NO escribas texto plano con el JSON. SIEMPRE usa la herramienta submit_responses para entregar el resultado.`;
 
   // Contexto del cliente desde DB + pasos previos llenos
   const contextLines: string[] = [];
@@ -165,19 +166,27 @@ No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
     if (client.size) contextLines.push(`Tamaño: ${client.size}`);
   }
 
-  // Sprint B2: incluir contenido de informes públicos (sustentabilidad/financiero)
-  // como fuente primaria. Cita la URL real al usar datos de estos docs.
+  // Documentos del cliente como fuente primaria — incluye todos los tipos
+  // (sustainability_report, financial_report, general). Cita URL real cuando exista.
+  // Tope total ~150K chars para no inflar prompt; 30K máx por doc.
   const reportsContext: string[] = [];
   try {
     const { listDocumentsByClient } = await import("@/lib/documents/queries");
     const reports = await listDocumentsByClient(id);
+    let totalChars = 0;
+    const TOTAL_CAP = 150_000;
+    const PER_DOC_CAP = 30_000;
     for (const doc of reports) {
-      if (doc.kind === "general") continue;
       if (!doc.markdown_content || doc.parse_status !== "ok") continue;
-      const label = doc.kind === "sustainability_report" ? "INFORME DE SUSTENTABILIDAD" : "INFORME FINANCIERO";
+      const remaining = TOTAL_CAP - totalChars;
+      if (remaining <= 1000) break;
+      const label =
+        doc.kind === "sustainability_report" ? "INFORME DE SUSTENTABILIDAD" :
+        doc.kind === "financial_report"      ? "INFORME FINANCIERO" :
+                                                "DOCUMENTO DEL CLIENTE";
       const sourceUrl = doc.source_url ?? "doc-cliente";
-      // Tope conservador por doc para no inflar prompt: 30k chars c/u
-      const slice = doc.markdown_content.slice(0, 30_000);
+      const slice = doc.markdown_content.slice(0, Math.min(PER_DOC_CAP, remaining));
+      totalChars += slice.length;
       reportsContext.push(
         `\n[${label} — ${doc.file_name}]\nFuente: ${sourceUrl}\n\n${slice}\n`
       );
@@ -212,19 +221,20 @@ No incluyas explicaciones, razonamiento, ni markdown. Solo el objeto JSON.
 CONTEXTO YA CAPTURADO:
 ${contextLines.length ? contextLines.join("\n") : "(sin datos básicos)"}
 ${previousLines.join("\n")}
-${reportsContext.length > 0 ? `\n\nINFORMES PÚBLICOS DEL CLIENTE (FUENTE PRIMARIA — usa estos antes de web_search):\n${reportsContext.join("\n---\n")}\n` : ""}
+${reportsContext.length > 0 ? `\n\nDOCUMENTOS DEL CLIENTE (FUENTE PRIMARIA — usa estos antes de web_search):\n${reportsContext.join("\n---\n")}\n` : ""}
 PASO ACTUAL: ${step.title} — ${step.subtitle}
 
 Campos a llenar:
 ${fieldsList}
 
-${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como fuente principal. Cita la URL real del informe en sources.url. Si el dato no está en los informes, complementa con web_search." : ""}Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"} y retorna el JSON con los campos llenos siguiendo las 8 reglas operativas. No inventes URLs.`;
+${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba como fuente principal. Cita la URL real del documento en sources.url cuando exista. Si el dato no está en los documentos, complementa con web_search. " : ""}Investiga fuentes públicas verificables sobre ${client?.name ?? "este cliente"} y al terminar llama la herramienta submit_responses con las respuestas por campo. No inventes URLs.`;
 
   // Modelo desde config centralizada (Aurora = autor, mismo rol que llena cuestionarios).
   const modelCfg = getModelConfig("aurora");
   const anthropic = createAnthropicClient();
 
   let textOut = "";
+  let toolResponses: Record<string, unknown> | null = null;
   const citationsCollected: { url: string; title: string }[] = [];
   let inputTokens = 0;
   let outputTokens = 0;
@@ -241,7 +251,9 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
   try {
     const msg = await anthropic.messages.create({
       model: modelCfg.model,
-      max_tokens: 4096,
+      // Bump a 8192: con varios campos + sources + citations el output puede
+      // truncarse a 4096. submit_responses puede recibir hasta el cap del tool input.
+      max_tokens: 8192,
       // System prompt como bloque cacheable (ephemeral) — system prompt es
       // constante en todas las llamadas (8 reglas + fuentes). Hits subsequentes
       // pagan 10% del costo input por estos tokens. Ahorro ~80-90% en bulk fill.
@@ -261,7 +273,55 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
           name: "web_search",
           max_uses: 2,
         },
+        {
+          // Tool de salida estructurada — elimina parseo de JSON desde texto libre.
+          // El modelo DEBE llamar esta tool con el objeto de respuestas final.
+          name: "submit_responses",
+          description:
+            "Envía las respuestas finales por campo del paso del cuestionario. Llamar UNA SOLA VEZ al terminar la investigación.",
+          input_schema: {
+            type: "object",
+            properties: {
+              responses: {
+                type: "object",
+                description:
+                  "Mapa de field_key → {value, source_type, sources[]}. Una entrada por cada campo del paso.",
+                additionalProperties: {
+                  type: "object",
+                  properties: {
+                    value: {
+                      // JSON Schema admite union de tipos como array. Anthropic respeta.
+                      type: ["string", "number", "null"],
+                      description: "Contenido del campo (string máx 500 chars) o null si no hay fuente.",
+                    },
+                    source_type: {
+                      type: "string",
+                      enum: ["public", "interpretation", "consultor_only"],
+                    },
+                    sources: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          url: { type: "string" },
+                          title: { type: "string" },
+                          date: { type: "string", description: "YYYY-MM-DD o vacío" },
+                        },
+                        required: ["url", "title"],
+                      },
+                    },
+                  },
+                  required: ["value", "source_type"],
+                },
+              },
+            },
+            required: ["responses"],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+        },
       ],
+      // tool_choice auto deja al modelo decidir orden (web_search primero,
+      // luego submit_responses). System prompt fuerza llamada final.
       messages: [{ role: "user", content: userPrompt }],
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any, { signal: timeoutSignal });
@@ -280,6 +340,15 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
           for (const c of citations) {
             if (c.url && c.title) citationsCollected.push({ url: c.url, title: c.title });
           }
+        }
+      }
+      // Capturar input de submit_responses — output estructurado preferido.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (block.type === "tool_use" && (block as any).name === "submit_responses") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const input = (block as any).input as { responses?: unknown } | undefined;
+        if (input && typeof input === "object" && input.responses && typeof input.responses === "object") {
+          toolResponses = input.responses as Record<string, unknown>;
         }
       }
     }
@@ -321,26 +390,39 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los INFORMES PÚBLICOS arriba como
     error: null,
   });
 
-  // Extraer JSON del output. Prefiere code block; fallback a primer objeto balanceado.
-  const jsonText = extractJsonObject(textOut);
-  if (!jsonText) {
-    return NextResponse.json({ error: "Respuesta IA sin JSON parseable" }, { status: 502 });
-  }
-
-  let parsed: z.infer<typeof AiResponseSchema>;
-  try {
-    const raw = JSON.parse(jsonText);
-    const result = AiResponseSchema.safeParse(raw);
-    if (!result.success) {
+  // Output estructurado preferido (tool_use submit_responses).
+  // Fallback a parseo de texto si el modelo no llamó la tool.
+  let rawParsed: unknown;
+  if (toolResponses) {
+    rawParsed = toolResponses;
+  } else {
+    const jsonText = extractJsonObject(textOut);
+    if (!jsonText) {
+      const debug = textOut.slice(0, 200).replace(/\s+/g, " ");
       return NextResponse.json(
-        { error: `Schema IA inválido: ${result.error.issues.map((i) => i.message).join("; ")}` },
+        {
+          error: `IA no devolvió respuestas estructuradas (stop_reason=${stopReason ?? "?"}). Output: "${debug}…"`,
+        },
         { status: 502 }
       );
     }
-    parsed = result.data;
-  } catch {
-    return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
+    try {
+      rawParsed = JSON.parse(jsonText);
+    } catch {
+      return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
+    }
   }
+
+  const result_ = AiResponseSchema.safeParse(rawParsed);
+  if (!result_.success) {
+    return NextResponse.json(
+      {
+        error: `Schema IA inválido: ${result_.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+      },
+      { status: 502 }
+    );
+  }
+  const parsed = result_.data;
 
   // Construir FieldResponse por campo (solo campos del paso actual; descartar extras).
   const now = new Date().toISOString();

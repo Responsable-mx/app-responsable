@@ -2516,8 +2516,33 @@ export function DoubleMaterialidadTab({
     );
   }
 
+  // Porcentaje de completitud del cuestionario (0-100)
+  const questionnairePct =
+    questionnaireProgress && questionnaireProgress.total > 0
+      ? Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)
+      : null;
+
   return (
     <div className="space-y-6 py-4">
+      {/* Banner: cuestionario < 50% → calidad de análisis reducida */}
+      {questionnairePct !== null && questionnairePct < 50 && (
+        <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800" role="alert">
+          <svg className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p>
+            <strong>Cuestionario al {questionnairePct}%.</strong>{" "}
+            Un contexto incompleto reduce la calidad del análisis de materialidad — los temas e IROs generados serán menos precisos.{" "}
+            <button
+              type="button"
+              onClick={onGoToCuestionario}
+              className="underline font-semibold hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-sm"
+            >
+              Completar cuestionario →
+            </button>
+          </p>
+        </div>
+      )}
       {/* ── Stepper V3 — card con pill bar + progress + chips ── */}
       {(() => {
         const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null }> = [

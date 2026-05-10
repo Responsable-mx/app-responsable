@@ -42,12 +42,17 @@ export function QuestionnaireTab({
   initialStepIndex = 0,
   autoFillOnMount = false,
   reportUrls,
+  docCount,
+  onGoToDocumentos,
 }: {
   clientId: string;
   clientServices?: string[];
   initialStepIndex?: number;
   autoFillOnMount?: boolean;
   reportUrls?: { sustainability: string | null; financial: string | null };
+  /** null = aún cargando; 0 = sin docs; N = con docs */
+  docCount?: number | null;
+  onGoToDocumentos?: () => void;
 }) {
   const { data, error, isLoading, mutate } = useSWR(
     `/api/clients/${clientId}/questionnaire`,
@@ -66,7 +71,30 @@ export function QuestionnaireTab({
     );
   }
 
-  return <WizardEditor clientId={clientId} clientServices={clientServices} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} reportUrls={reportUrls} />;
+  return (
+    <>
+      {/* Banner: sin documentos del cliente → Aurora solo usará fuentes públicas */}
+      {docCount === 0 && onGoToDocumentos && (
+        <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800" role="alert">
+          <svg className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p>
+            <strong>Sin documentos del cliente.</strong>{" "}
+            Aurora usará solo fuentes públicas — los resultados pueden ser menos precisos.{" "}
+            <button
+              type="button"
+              onClick={onGoToDocumentos}
+              className="underline font-semibold hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-sm"
+            >
+              Subir documentos →
+            </button>
+          </p>
+        </div>
+      )}
+      <WizardEditor clientId={clientId} clientServices={clientServices} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} reportUrls={reportUrls} />
+    </>
+  );
 }
 
 function WizardEditor({

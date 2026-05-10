@@ -49,6 +49,12 @@ const questionnaireFetcher = (url: string) =>
     return r.json() as Promise<{ data: QuestionnaireBundle }>;
   });
 
+const docsFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<{ data: { id: string }[] }>;
+  });
+
 
 export function ClientTabs({
   client,
@@ -137,6 +143,15 @@ export function ClientTabs({
     };
   }, [checkTabScroll]);
 
+  // SWR docs — misma URL que DocumentsTab → SWR deduplica; sin llamada extra cuando ese tab ya cargó
+  const { data: docsData } = useSWR(
+    `/api/clients/${client.id}/documents`,
+    docsFetcher,
+    { revalidateOnFocus: false }
+  );
+  // null = aún cargando; 0 = sin documentos; N = N docs
+  const docCount: number | null = docsData ? docsData.data.length : null;
+
   const questionnaireProgress = questionnaireResp?.data.progress
     ? {
         filled: questionnaireResp.data.progress.filledFields,
@@ -194,6 +209,20 @@ export function ClientTabs({
           label="Resumen"
           badge={null}
         />
+        {/* Documentos primero — es el paso 1 del workflow (subir antes de llenar cuestionario) */}
+        <TabButton
+          active={tab === "documentos"}
+          tabId="documentos"
+          onClick={() => goToTab("documentos")}
+          icon={
+            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          }
+          label="Documentos"
+          badge={docCount !== null && docCount > 0 ? String(docCount) : null}
+          badgeTitle={docCount !== null && docCount > 0 ? `${docCount} documento${docCount !== 1 ? "s" : ""} del cliente` : undefined}
+        />
         <TabButton
           active={tab === "cuestionario"}
           tabId="cuestionario"
@@ -236,18 +265,6 @@ export function ClientTabs({
             </svg>
           }
           label="Equipo"
-          badge={null}
-        />
-        <TabButton
-          active={tab === "documentos"}
-          tabId="documentos"
-          onClick={() => goToTab("documentos")}
-          icon={
-            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          }
-          label="Documentos"
           badge={null}
         />
       </div>
@@ -302,6 +319,8 @@ export function ClientTabs({
                 sustainability: client.sustainability_report_url ?? null,
                 financial: client.financial_report_url ?? null,
               }}
+              docCount={docCount}
+              onGoToDocumentos={() => goToTab("documentos")}
             />
           </TabErrorBoundary>
         </div>

@@ -194,11 +194,12 @@ function StagePill({
   const pillBase =
     "flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm border transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40";
 
+  // Active pill: ring teal + sombra suave (mockup-v7 box-shadow)
   const pillStyle =
     status === "done"
       ? `${pillBase} bg-slate-50 border-slate-200 hover:bg-slate-100`
       : status === "active"
-      ? `${pillBase} bg-brand-primary border-brand-primary`
+      ? `${pillBase} bg-brand-primary border-brand-primary shadow-[0_0_0_2px_var(--color-brand-primary),0_1px_4px_rgba(15,118,110,0.18)]`
       : status === "locked"
       ? `${pillBase} border-slate-100 opacity-50 hover:opacity-70`
       : `${pillBase} border-slate-200 hover:border-slate-300`;
@@ -282,6 +283,9 @@ function CollapsibleStageSection({
   accent,
   isActive,
   lockReason,
+  subtitle,
+  narrativeTitle,
+  headerRight,
   children,
 }: {
   id: string;
@@ -293,6 +297,12 @@ function CollapsibleStageSection({
   isActive: boolean;
   /** Mensaje mostrado cuando status === "locked" — explica qué se necesita para desbloquear */
   lockReason?: string;
+  /** Subtitle pedagógico bajo el H2 (mockup-v7 pattern) */
+  subtitle?: string;
+  /** Override del H2 — narrativa ejecutiva en lugar de "N. Label" genérico (mockup-v7 pattern) */
+  narrativeTitle?: string;
+  /** Slot opcional en esquina derecha del header — chips de estado por etapa (count, severidad) */
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
   if (!isActive) return null;
@@ -303,47 +313,62 @@ function CollapsibleStageSection({
   const next = idx >= 0 && idx < DM_STAGES_META.length - 1 ? DM_STAGES_META[idx + 1] : null;
 
   return (
-    <section id={id} aria-labelledby={`stage-lbl-${id}`}>
+    <section
+      id={id}
+      aria-labelledby={`stage-lbl-${id}`}
+      key={id}
+      className="motion-safe:animate-[dmFadeIn_0.14s_ease-out]"
+    >
       <div className={`bg-white border border-slate-200 rounded shadow-sm border-l-4 ${accent}`}>
-        {/* Header (no colapsable en Ruta B) */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span
-              id={`stage-lbl-${id}`}
-              className="text-base font-semibold text-slate-800 truncate"
-            >
-              {stageNum}. {label}
-            </span>
-            {status === "done" && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 shrink-0">
-                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Completado
-              </span>
-            )}
-            {status === "active" && (
-              <span className="px-1.5 py-0.5 rounded-sm bg-brand-primary border border-brand-primary text-[10px] font-semibold text-white shrink-0">
-                En curso
-              </span>
-            )}
-            {status === "pending" && (
-              <span className="px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
-                Pendiente
-              </span>
-            )}
-            {status === "locked" && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
-                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                Bloqueada
-              </span>
+        {/* Header — H2 + subtitle + chips estado (mockup-v7 pattern) */}
+        <div className="flex items-start justify-between gap-3 px-5 py-3.5 border-b border-slate-100">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <h2
+                id={`stage-lbl-${id}`}
+                className="text-lg font-semibold text-slate-900 truncate"
+              >
+                {narrativeTitle ?? `${stageNum}. ${label}`}
+              </h2>
+              {status === "done" && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 shrink-0">
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Completado
+                </span>
+              )}
+              {status === "active" && (
+                <span className="px-1.5 py-0.5 rounded-sm bg-brand-primary border border-brand-primary text-[10px] font-semibold text-white shrink-0">
+                  En curso
+                </span>
+              )}
+              {status === "pending" && (
+                <span className="px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
+                  Pendiente
+                </span>
+              )}
+              {status === "locked" && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  Bloqueada
+                </span>
+              )}
+            </div>
+            {subtitle && (
+              <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+                {subtitle}
+              </p>
             )}
           </div>
-          <span className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">
-            Etapa {stageNum} de {DM_STAGES_META.length}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {headerRight}
+            <span className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">
+              Etapa {stageNum} de {DM_STAGES_META.length}
+            </span>
+          </div>
         </div>
 
         {/* Body */}
@@ -2521,7 +2546,9 @@ export function DoubleMaterialidadTab({
       : null;
 
   return (
-    <div className="space-y-6 py-4">
+    <div className="space-y-6 py-4 max-w-5xl mx-auto">
+      {/* Keyframe fade-in para transición entre paneles Ruta B (montado una vez) */}
+      <style>{`@keyframes dmFadeIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}`}</style>
       {/* Banner: cuestionario < 50% → calidad de análisis reducida */}
       {questionnairePct !== null && questionnairePct < 50 && (
         <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800" role="alert">
@@ -2661,6 +2688,14 @@ export function DoubleMaterialidadTab({
         status={stage1Status}
         accent="border-l-teal-500"
         isActive={activeStageId === "dm-sec-contexto"}
+        subtitle="Estado del llenado — base para el benchmark y los IROs"
+        headerRight={
+          questionnaireProgress && questionnaireProgress.total > 0 ? (
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
+              {questionnaireProgress.filled}/{questionnaireProgress.total} campos
+            </span>
+          ) : null
+        }
       >
         <ContextoSection
           progress={questionnaireProgress}
@@ -2679,6 +2714,14 @@ export function DoubleMaterialidadTab({
         status={stage2Status}
         accent="border-l-blue-600"
         isActive={activeStageId === "dm-sec-benchmark"}
+        subtitle="Selecciona empresas comparables y ejecuta el análisis sectorial"
+        headerRight={
+          companies.length > 0 ? (
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
+              {companies.filter((c) => c.validated).length} de {companies.length} validadas
+            </span>
+          ) : null
+        }
       >
         {/* Horizontes temporales — config del estudio, mismo panel que Benchmark */}
         <div className="mb-5 pb-5 border-b border-slate-100">
@@ -2707,6 +2750,14 @@ export function DoubleMaterialidadTab({
         status={stage3Status}
         accent="border-l-violet-600"
         isActive={activeStageId === "dm-sec-iros"}
+        subtitle="Impactos, Riesgos y Oportunidades identificados y calificados para inclusión en el estudio"
+        headerRight={
+          iros.length > 0 ? (
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
+              {scoredIncluded.length}/{iros.length} calificados
+            </span>
+          ) : null
+        }
       >
         <IroSection
           clientId={clientId}
@@ -2732,6 +2783,19 @@ export function DoubleMaterialidadTab({
         accent="border-l-brand-primary"
         isActive={activeStageId === "dm-sec-matriz"}
         lockReason="Registra y califica al menos 3 IROs con score de impacto y financiero para activar la matriz."
+        subtitle="Visualización X/Y de IROs · Impacto vs Materialidad financiera · Ejes 0–10"
+        narrativeTitle={
+          quadrantCounts.doble_material > 0
+            ? `${quadrantCounts.doble_material} tema${quadrantCounts.doble_material !== 1 ? "s" : ""} doble material · acción prioritaria`
+            : undefined
+        }
+        headerRight={
+          quadrantCounts.doble_material > 0 ? (
+            <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-1 rounded-sm font-bold whitespace-nowrap">
+              {quadrantCounts.doble_material} doble material
+            </span>
+          ) : null
+        }
       >
         <MatrizDM iros={iros.filter((i) => i.incluido)} />
       </CollapsibleStageSection>
@@ -2740,10 +2804,18 @@ export function DoubleMaterialidadTab({
       <CollapsibleStageSection
         id="dm-sec-nis"
         stageNum={5}
-        label="NIS / IBSO — Brechas de información"
+        label="Brechas de información por área material"
         status={stage5Status}
         accent="border-l-amber-600"
         isActive={activeStageId === "dm-sec-nis"}
+        subtitle="NIS/IBSO (Normas de Información de Sostenibilidad · Indicadores de Brechas) — disponibilidad y calidad por IRO material"
+        headerRight={
+          quadrantCounts.brechas_criticas > 0 ? (
+            <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-1 rounded-sm font-bold whitespace-nowrap">
+              {quadrantCounts.brechas_criticas} brecha{quadrantCounts.brechas_criticas !== 1 ? "s" : ""} crítica{quadrantCounts.brechas_criticas !== 1 ? "s" : ""}
+            </span>
+          ) : null
+        }
       >
         <NisSection
           clientId={clientId}
@@ -2763,6 +2835,7 @@ export function DoubleMaterialidadTab({
         accent="border-l-cyan-600"
         isActive={activeStageId === "dm-sec-resumen"}
         lockReason="Completa el inventario de IROs (Etapa 3) para generar el resumen ejecutivo con IA."
+        subtitle="Narrativa generada por IA con insights, trade-offs y recomendaciones estratégicas"
       >
         <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
       </CollapsibleStageSection>
@@ -2776,6 +2849,14 @@ export function DoubleMaterialidadTab({
         accent="border-l-rose-600"
         isActive={activeStageId === "dm-sec-validacion"}
         lockReason="Genera el resumen ejecutivo (Etapa 6) para iniciar la sesión de validación con el cliente."
+        subtitle="Decisiones del cliente sobre cada IRO incluido — aprobación, ajuste o descarte"
+        headerRight={
+          includedIros.length > 0 ? (
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
+              {includedIros.filter((i) => validacionRec?.iro_decisions[i.id]?.decision).length}/{includedIros.length} decididos
+            </span>
+          ) : null
+        }
       >
         <ValidacionSection clientId={clientId} iros={iros} />
       </CollapsibleStageSection>
@@ -2788,6 +2869,14 @@ export function DoubleMaterialidadTab({
         status={stage8Status}
         accent="border-l-emerald-600"
         isActive={activeStageId === "dm-sec-reporte"}
+        subtitle="Documento final consolidado · benchmark + IROs + matriz + validación cliente"
+        headerRight={
+          hasReport ? (
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-sm font-bold whitespace-nowrap">
+              Listo para descarga
+            </span>
+          ) : null
+        }
       >
         <ReporteSection
           clientId={clientId}

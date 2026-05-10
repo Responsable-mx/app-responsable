@@ -80,122 +80,115 @@ export default async function EditarClientePage({ params }: Props) {
 
   return (
     <>
-    <div className="px-6 py-4 pb-0 max-w-6xl mx-auto">
+    <div className="px-6 py-4 pb-0 max-w-7xl mx-auto">
       <ClientNavShortcuts prevId={prev?.id ?? null} nextId={next?.id ?? null} />
-      {/* Breadcrumb compacto — back button único (← Clientes ya está en sidebar nav).
-          Tooltip revela atajos de teclado. Nav prev/next visual solo si >10 clientes. */}
-      <div className="flex items-center justify-between gap-3 mb-4 text-xs">
-        <Link
-          href="/clientes"
-          className="inline-flex items-center gap-1.5 text-slate-600 hover:text-brand-primary-hover transition-colors font-medium min-w-0"
-          title="Volver a lista de clientes"
-        >
-          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          <span className="truncate">Clientes</span>
-        </Link>
-        {showNavVisual && counter && (
-          <div className="flex items-center gap-2 text-slate-600 shrink-0">
-            <span className="tabular-nums" title="Orden alfabético">{counter}</span>
-            <Link
-              href={prev ? `/clientes/${prev.id}` : "#"}
-              aria-disabled={!prev}
-              className={`p-1 rounded ${prev ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
-              title={prev ? `${prev.name} · Alt+←` : "Sin anterior"}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </Link>
-            <Link
-              href={next ? `/clientes/${next.id}` : "#"}
-              aria-disabled={!next}
-              className={`p-1 rounded ${next ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
-              title={next ? `${next.name} · Alt+→` : "Sin siguiente"}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Header Tier 1 — identidad compactada a 1 fila wrappeable.
-          Antes: 2 filas con pl-11 (avatar + nombre / chips + fecha indented).
-          Ahora: avatar + nombre + meta + chips + fecha en flex-wrap único.
-          ~30% menos altura sin sacrificar info. */}
+      {/* Header Tier 1 — fusiona breadcrumb + identidad en 1 fila wrappeable.
+          Saves ~28px vertical vs breadcrumb row separado. Atajos Alt+←/→ activos
+          via ClientNavShortcuts; nav visual solo si >10 clientes. */}
       <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0 flex items-center gap-x-3 gap-y-1 flex-wrap">
+        <div className="min-w-0 flex items-center gap-x-2 gap-y-1 flex-wrap">
+          {/* Back link inline — antes era breadcrumb separado */}
+          <Link
+            href="/clientes"
+            className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-brand-primary-hover transition-colors font-medium mr-1"
+            title="Volver a lista de clientes"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Clientes</span>
+          </Link>
+          <span className="text-slate-300 mr-1" aria-hidden="true">/</span>
           <ClientAvatar name={client.name} logoUrl={client.logo_url} />
-          <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
-          {sectorPill && (
-            <>
-              <span className="text-slate-300" aria-hidden="true">·</span>
+          <h1 className="text-xl font-bold text-slate-900 leading-none mr-1">{client.name}</h1>
+          {/* Sector + tamaño combinados en un solo pill con color del sector.
+              Antes: pill + "·" + plain text size = 3 elementos. Ahora: 1 chip cohesivo. */}
+          {(sectorPill || sizeLabel) && (
+            <Link
+              href={sectorPill ? `/clientes?sector=${encodeURIComponent(sectorPill)}` : "/clientes"}
+              className={`inline-flex items-center text-[10px] font-medium rounded-sm px-2 py-0.5 transition-colors hover:opacity-80 ${sectorPillClasses(sectorPill)}`}
+              title={metaTooltip || `Ver clientes del sector ${sectorPill ?? ""}`}
+            >
+              {[sectorPill, sizeLabel].filter(Boolean).join(" · ")}
+            </Link>
+          )}
+          {/* Chips de servicios — hasta 3 visibles (antes 2 + "+1 más" ocultaba el 3ro).
+              Si hay >3, muestra "+N más" con tooltip. */}
+          {visibleServices.length > 0 && visibleServices.slice(0, 3).map((s) => {
+            const tabMap: Record<string, string> = {
+              doble_materialidad: "materialidad",
+              doble_materialidad_ia: "doble-materialidad-ia",
+            };
+            const targetTab = tabMap[s];
+            const label = serviceLabels.get(s) ?? s;
+            const cls = "inline-flex items-center text-[10px] font-medium bg-slate-100 text-slate-700 rounded-sm px-2 py-0.5";
+            return targetTab ? (
               <Link
-                href={`/clientes?sector=${encodeURIComponent(sectorPill)}`}
-                className={`inline-flex items-center text-[10px] font-medium rounded-sm px-2 py-0.5 transition-colors hover:opacity-80 ${sectorPillClasses(sectorPill)}`}
-                title={`Ver otros clientes del sector ${sectorPill} (${metaTooltip})`}
+                key={s}
+                href={`?tab=${targetTab}`}
+                className={`${cls} hover:bg-slate-200 transition-colors`}
+                title={`Ir a ${label}`}
               >
-                {sectorPill}
+                {label}
               </Link>
-            </>
+            ) : (
+              <span key={s} className={cls}>{label}</span>
+            );
+          })}
+          {visibleServices.length > 3 && (
+            <span
+              className="text-[10px] text-slate-600"
+              title={visibleServices.slice(3).map((s) => serviceLabels.get(s) ?? s).join(" · ")}
+            >
+              +{visibleServices.length - 3} más
+            </span>
           )}
-          {sizeLabel && (
-            <>
-              <span className="text-slate-300" aria-hidden="true">·</span>
-              <span className="text-xs text-slate-600" title={metaTooltip}>{sizeLabel}</span>
-            </>
-          )}
-          {visibleServices.length > 0 && (
-            <>
-              <span className="text-slate-300" aria-hidden="true">·</span>
-              {visibleServices.slice(0, 2).map((s) => {
-                const tabMap: Record<string, string> = {
-                  doble_materialidad: "materialidad",
-                  doble_materialidad_ia: "doble-materialidad-ia",
-                };
-                const targetTab = tabMap[s];
-                const label = serviceLabels.get(s) ?? s;
-                // Chip de servicio: slate neutral (NO brand-primary-light, reservado para
-                // estados activos/progreso — evita choque visual con badges de tabs activos).
-                const cls = "inline-flex items-center text-[10px] font-medium bg-slate-100 text-slate-700 rounded-sm px-2 py-0.5";
-                return targetTab ? (
-                  <Link
-                    key={s}
-                    href={`?tab=${targetTab}`}
-                    className={`${cls} hover:bg-slate-200 transition-colors`}
-                    title={`Ir a ${label}`}
-                  >
-                    {label}
-                  </Link>
-                ) : (
-                  <span key={s} className={cls}>{label}</span>
-                );
-              })}
-              {visibleServices.length > 2 && (
-                <span className="text-[10px] text-slate-600" title={`${visibleServices.length - 2} servicio(s) adicional(es)`}>
-                  +{visibleServices.length - 2} más
-                </span>
-              )}
-            </>
-          )}
-          <span className="text-slate-300" aria-hidden="true">·</span>
+          {/* Fecha abreviada — icono ↻ + fecha. Tooltip muestra etiqueta completa.
+              Antes: "Cuestionario actualizado 10 may 2026" ~240px. Ahora: ~80px. */}
           <span
-            className="text-xs text-slate-600"
+            className="inline-flex items-center gap-1 text-xs text-slate-600 ml-1"
             title={`${updatedLabel}: ${new Date(updatedAt).toLocaleString("es-MX")}`}
           >
-            {updatedLabel} {new Date(updatedAt).toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+            <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="tabular-nums">
+              {new Date(updatedAt).toLocaleDateString("es-MX", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
           </span>
         </div>
-        {/* Acciones secundarias (Editar + Exportar PDF) consolidadas en kebab `⋯`.
-            Saves ~150px horizontal vs 2 botones inline. Atajos: E (editar) · P (PDF). */}
-        <div className="shrink-0 pt-0.5">
+        {/* Acciones derechas: nav prev/next (si >10 clientes) + Editar.
+            Nav inline aquí ahora que removimos el breadcrumb row. */}
+        <div className="shrink-0 pt-0.5 flex items-center gap-2">
+          {showNavVisual && counter && (
+            <div className="flex items-center gap-1 text-slate-600">
+              <span className="text-[11px] tabular-nums mr-1" title="Orden alfabético">{counter}</span>
+              <Link
+                href={prev ? `/clientes/${prev.id}` : "#"}
+                aria-disabled={!prev}
+                className={`p-1.5 rounded ${prev ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
+                title={prev ? `${prev.name} · Alt+←` : "Sin anterior"}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+              <Link
+                href={next ? `/clientes/${next.id}` : "#"}
+                aria-disabled={!next}
+                className={`p-1.5 rounded ${next ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
+                title={next ? `${next.name} · Alt+→` : "Sin siguiente"}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          )}
           <ClientHeaderActions
             clientId={client.id}
             clientName={client.name}

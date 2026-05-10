@@ -416,7 +416,7 @@ export function ClientTabs({
         ref={stripRef}
         className="sticky top-0 z-30 border-t-2 border-b border-slate-200 bg-white mb-0 shadow-sm"
       >
-        <div className={`max-w-6xl mx-auto flex items-center gap-3 flex-wrap ${stripCollapsed ? "py-1" : "py-2"}`}>
+        <div className={`max-w-7xl mx-auto flex items-center gap-3 flex-wrap ${stripCollapsed ? "py-1" : "py-2"}`}>
           {/* Nombre del cliente visible solo cuando el strip está pinned
               (Tier 1 fuera de viewport). Mantiene contexto al scrollear. */}
           {stripPinned && (
@@ -640,7 +640,7 @@ export function ClientTabs({
 
       {/* Tabs — border-b full-width, botones alineados con max-w-6xl del header */}
       <div className="border-b border-slate-200 mb-5">
-      <div className="max-w-6xl mx-auto relative">
+      <div className="max-w-7xl mx-auto relative">
       <div ref={tablistRef} role="tablist" aria-label="Secciones del cliente" className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Documentos primero — es el paso 1 del workflow (subir antes de llenar cuestionario) */}
         <TabButton
@@ -717,7 +717,7 @@ export function ClientTabs({
       </div>{/* /relative wrapper */}
       </div>{/* /border-b wrapper */}
 
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
       {tab === "cuestionario" && (
         <div role="tabpanel" id="panel-cuestionario" tabIndex={0} aria-labelledby="tab-cuestionario">
           <TabErrorBoundary tabName="Cuestionario">

@@ -205,17 +205,32 @@ export function ClientTabs({
   const stripCerts     = getFieldValue(sostResp["certificaciones"]);
   const stripModelo    = getFieldValue(sostResp["modelo_sostenibilidad"]);
 
-  function fmtKpi(v: FieldValue, maxLen = 22): string {
+  // Trunca por palabra (no por carácter) para no cortar mid-word como "Distintivo ESR (Empres…"
+  function truncateByWord(s: string, maxLen: number): string {
+    if (s.length <= maxLen) return s;
+    const slice = s.slice(0, maxLen);
+    const lastSpace = slice.lastIndexOf(" ");
+    const base = lastSpace > Math.floor(maxLen * 0.5) ? slice.slice(0, lastSpace) : slice;
+    return base.trimEnd() + "…";
+  }
+
+  function fmtKpi(v: FieldValue, maxLen = 24): string {
     if (v === null || v === undefined) return "—";
+    if (typeof v === "number") {
+      // Separador de miles es-MX: 3400 → "3,400"
+      return Number.isFinite(v) ? v.toLocaleString("es-MX") : "—";
+    }
     if (Array.isArray(v)) {
-      const joined = v.filter(Boolean).join(" · ");
+      const joined = v.filter(Boolean).map(String).join(" · ");
       if (!joined) return "—";
-      return joined.length > maxLen ? joined.slice(0, maxLen) + "…" : joined;
+      return truncateByWord(joined, maxLen);
     }
     if (typeof v === "boolean") return v ? "Sí" : "No";
-    const s = String(v).trim();
+    let s = String(v).trim();
     if (!s) return "—";
-    return s.length > maxLen ? s.slice(0, maxLen) + "…" : s;
+    // Numérico embebido (ej "3400 colaboradores") → reformatea
+    s = s.replace(/\b(\d{4,})\b/g, (m) => Number(m).toLocaleString("es-MX"));
+    return truncateByWord(s, maxLen);
   }
 
   return (

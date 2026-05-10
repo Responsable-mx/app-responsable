@@ -155,6 +155,18 @@ function scrollToDmSection(sectionId: string) {
   }
 }
 
+// Orden canónico de secciones — para navegación por teclado ← →
+const DM_SECTION_IDS = [
+  "dm-sec-contexto",
+  "dm-sec-benchmark",
+  "dm-sec-iros",
+  "dm-sec-matriz",
+  "dm-sec-nis",
+  "dm-sec-resumen",
+  "dm-sec-validacion",
+  "dm-sec-reporte",
+] as const;
+
 // ── Tipo de estado de etapa ──────────────────────────────────
 
 type StageStatus = "done" | "active" | "pending" | "locked";
@@ -2462,6 +2474,26 @@ export function DoubleMaterialidadTab({
     onStagesProgress?.(dmDoneCount, 8);
   }, [dmDoneCount, onStagesProgress]);
 
+  // Navegación por teclado ← → entre secciones DM
+  // Activo en toda la página; se salta si el foco está en un campo de texto.
+  const kbIdxRef = useRef(0);
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.key === "ArrowRight") {
+        kbIdxRef.current = Math.min(kbIdxRef.current + 1, DM_SECTION_IDS.length - 1);
+      } else {
+        kbIdxRef.current = Math.max(kbIdxRef.current - 1, 0);
+      }
+      scrollToDmSection(DM_SECTION_IDS[kbIdxRef.current]!);
+      e.preventDefault();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, []);
+
   if (loadingBenchmark) {
     return (
       <div className="py-6">
@@ -2511,6 +2543,12 @@ export function DoubleMaterialidadTab({
                   {doneCount}/{stagesData.length} completadas
                 </span>
               </div>
+              {/* Hint teclado — visible solo en sm+ */}
+              <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 shrink-0 select-none">
+                <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">←</kbd>
+                <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">→</kbd>
+                navegar
+              </span>
             </div>
 
             {/* Pill bar */}

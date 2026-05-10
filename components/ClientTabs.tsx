@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { Fragment, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import useSWR from "swr";
@@ -104,6 +104,8 @@ export function ClientTabs({
     if (t && VALID_TABS.includes(t)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync de URL → state, no loop
       setTab(t);
+      // Cerrar dropdown del strip si se navega a cuestionario (donde el botón no existe)
+      if (t === "cuestionario") setShowStripDropdown(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -120,9 +122,30 @@ export function ClientTabs({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Restaurar última tab visitada desde localStorage (solo si URL no trae ?tab=)
+  useEffect(() => {
+    if (rawTab) return; // URL gana sobre localStorage
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(`client-tab-${client.id}`) as Tab | null;
+      if (saved && VALID_TABS.includes(saved) && saved !== tab) {
+        setTab(saved);
+        router.replace(`?tab=${saved}`, { scroll: false });
+      }
+    } catch {}
+    // Solo al montar — restauración inicial
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function goToTab(t: Tab) {
     setTab(t);
     router.replace(`?tab=${t}`, { scroll: false });
+    // Cerrar dropdown del strip al cambiar de tab (evita estado huérfano si tab=cuestionario oculta botón)
+    setShowStripDropdown(false);
+    // Persist última tab por cliente — restaura al volver sin ?tab en URL
+    if (typeof window !== "undefined") {
+      try { window.localStorage.setItem(`client-tab-${client.id}`, t); } catch {}
+    }
   }
 
   // Badge [N/8] en tab DM-IA — se actualiza cuando DoubleMaterialidadTab monta
@@ -297,6 +320,24 @@ export function ClientTabs({
   const stripCerts     = cleanCert(getFieldValue(sostResp["certificaciones"]));
   const stripModelo    = getFieldValue(sostResp["modelo_sostenibilidad"]);
 
+  // KPI Presencia visible solo si hay >1 país (1 país solo = ya implícito en sector).
+  const showPresencia = (() => {
+    if (stripPaises === null || stripPaises === undefined) return true; // dejar como "—" CTA
+    if (Array.isArray(stripPaises)) return stripPaises.filter(Boolean).length > 1;
+    if (typeof stripPaises === "string") {
+      return stripPaises.split(/[,·]|\sy\s/i).map((s) => s.trim()).filter(Boolean).length > 1;
+    }
+    return true;
+  })();
+
+  // Jump a un paso específico del wizard — usado por KPIs vacíos y mini-dots.
+  function jumpToStep(stepKey: string) {
+    const idx = questionnaireSteps.findIndex((s) => s.key === stepKey);
+    if (idx < 0) return;
+    goToTab("cuestionario");
+    router.replace(`?tab=cuestionario&step=${idx + 1}`, { scroll: false });
+  }
+
   // Trunca por palabra Y antes de paréntesis abierto. Evita "Distintivo ESR (Empres…":
   // si hay '(' después del lastSpace, corta antes del '(' (deja paréntesis huérfano fuera).
   function truncateByWord(s: string, maxLen: number): string {
@@ -353,80 +394,151 @@ export function ClientTabs({
       >
         <div className={`max-w-6xl mx-auto flex items-center gap-3 flex-wrap ${stripCollapsed ? "py-1" : "py-2"}`}>
           {/* KPIs ejecutivos — sólo en modo expandido. Modo colapsado deja
-              progress global + toggle, ahorra ~40px en tabs heavy-data */}
+              progress global + toggle, ahorra ~40px en tabs heavy-data.
+              Empty KPI (valor "—") es clickeable → jump al wizard step relacionado. */}
           {!stripCollapsed && (
             <>
-              {/* KPI: Colaboradores */}
-              <div className="flex items-center gap-2 min-w-0">
-                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <div className="min-w-0 cursor-help" title={fmtKpi(stripEmpleados, 200)}>
-                  <div className="text-xs font-semibold text-slate-900 truncate tabular-nums">{fmtKpi(stripEmpleados)}</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Colaboradores</div>
-                </div>
-              </div>
-
-              <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
-
-              {/* KPI: Países */}
-              <div className="flex items-center gap-2 min-w-0">
-                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="min-w-0 cursor-help" title={fmtKpi(stripPaises, 200)}>
-                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripPaises)}</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Presencia</div>
-                </div>
-              </div>
-
-              <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
-
-              {/* KPI: Certificaciones — slot dinámico (max 26 chars), trunca limpio si excede */}
-              <div className="flex items-center gap-2 min-w-0 max-w-[26ch]">
-                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <div className="min-w-0 cursor-help" title={fmtKpi(stripCerts, 200)}>
-                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripCerts, 26)}</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Certificación</div>
-                </div>
-              </div>
-
-              <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
-
-              {/* KPI: Modelo ESG — slot dinámico (max 26 chars), trunca limpio si excede */}
-              <div className="flex items-center gap-2 min-w-0 max-w-[26ch]">
-                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <div className="min-w-0 cursor-help" title={fmtKpi(stripModelo, 200)}>
-                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripModelo, 26)}</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Modelo ESG</div>
-                </div>
-              </div>
+              {(() => {
+                const kpis: Array<{
+                  iconPath: string;
+                  label: string;
+                  value: string;
+                  full: string;
+                  stepKey: string;
+                  numeric?: boolean;
+                  show?: boolean;
+                }> = [
+                  {
+                    iconPath: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
+                    label: "Colaboradores",
+                    value: fmtKpi(stripEmpleados),
+                    full: fmtKpi(stripEmpleados, 200),
+                    stepKey: "informacion-general",
+                    numeric: true,
+                  },
+                  {
+                    iconPath: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                    label: "Presencia",
+                    value: fmtKpi(stripPaises),
+                    full: fmtKpi(stripPaises, 200),
+                    stepKey: "informacion-general",
+                    show: showPresencia,
+                  },
+                  {
+                    iconPath: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                    label: "Certificación",
+                    value: fmtKpi(stripCerts, 26),
+                    full: fmtKpi(stripCerts, 200),
+                    stepKey: "estrategia-y-madurez",
+                  },
+                  {
+                    iconPath: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
+                    label: "Modelo ESG",
+                    value: fmtKpi(stripModelo, 26),
+                    full: fmtKpi(stripModelo, 200),
+                    stepKey: "estrategia-y-madurez",
+                  },
+                ];
+                return kpis.filter((k) => k.show !== false).map((k, i, arr) => {
+                  const isEmpty = k.value === "—";
+                  const valueCls = `text-xs font-semibold truncate ${k.numeric ? "tabular-nums" : ""} ${isEmpty ? "text-slate-400" : "text-slate-900"}`;
+                  const inner = (
+                    <>
+                      <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={k.iconPath} />
+                      </svg>
+                      <div className="min-w-0">
+                        <div className={valueCls}>
+                          {isEmpty ? (
+                            <span className="inline-flex items-center gap-0.5">
+                              <span>—</span>
+                              <span className="text-brand-primary-dark text-[10px]" aria-hidden="true">+</span>
+                            </span>
+                          ) : (
+                            k.value
+                          )}
+                        </div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{k.label}</div>
+                      </div>
+                    </>
+                  );
+                  return (
+                    <Fragment key={k.label}>
+                      {isEmpty ? (
+                        <button
+                          type="button"
+                          onClick={() => jumpToStep(k.stepKey)}
+                          className="flex items-center gap-2 min-w-0 max-w-[26ch] hover:bg-slate-100 rounded-sm px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 transition-colors cursor-pointer"
+                          title={`Capturar ${k.label} ahora`}
+                          aria-label={`Capturar ${k.label} en cuestionario`}
+                        >
+                          {inner}
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 min-w-0 max-w-[26ch] cursor-help" title={k.full}>
+                          {inner}
+                        </div>
+                      )}
+                      {i < arr.length - 1 && <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />}
+                    </Fragment>
+                  );
+                });
+              })()}
             </>
           )}
 
-          {/* Progreso global + dropdown — visible siempre */}
-          <div className={`flex items-center gap-3 relative ${!stripCollapsed ? "ml-auto pl-5 border-l border-slate-200" : ""}`}>
+          {/* Progreso global — visible siempre. Dropdown solo cuando NO estamos
+              en tab Cuestionario (allí el sidebar del wizard ya muestra los 9
+              pasos con su progreso → dropdown sería redundante). Mini-dots
+              inline dan glance state. */}
+          <div className={`flex items-center gap-2 relative ${!stripCollapsed ? "ml-auto pl-5 border-l border-slate-200" : ""}`}>
             <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-1">Cuestionario</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mr-1">Cuestionario</span>
               {questionnaireProgress?.filled ?? "–"}/{questionnaireProgress?.total ?? "–"}
             </span>
-            <div className="w-24 h-1.5 bg-slate-200 shrink-0" aria-hidden="true">
+            <div className="w-20 h-1.5 bg-slate-200 shrink-0" aria-hidden="true">
               <div className="h-1.5 bg-brand-primary transition-all" style={{ width: `${overallPct}%` }} />
             </div>
-            <button
-              type="button"
-              onClick={() => setShowStripDropdown((v) => !v)}
-              className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm px-2 py-2 min-h-[40px] inline-flex items-center gap-1"
-              aria-expanded={showStripDropdown}
-              aria-haspopup="true"
-              title="Ver avance por paso"
-            >
-              {overallPct}% <span aria-hidden="true">▾</span>
-            </button>
+            {/* Mini-dots: 1 dot por paso, click → jump. Glance del estado de los 9 pasos sin abrir dropdown */}
+            {questionnaireSteps.length > 0 && (
+              <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label="Avance por paso (mini)">
+                {questionnaireSteps.map((step, i) => {
+                  const pct = sectionProg[step.key]?.pct ?? 0;
+                  const dotCls = pct === 100 ? "bg-brand-primary" : pct > 0 ? "bg-brand-accent" : "bg-slate-300";
+                  return (
+                    <button
+                      key={step.key}
+                      type="button"
+                      onClick={() => jumpToStep(step.key)}
+                      className={`w-2 h-2 rounded-full ${dotCls} hover:ring-2 hover:ring-brand-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/60 transition-shadow`}
+                      title={`${i + 1}. ${step.title} — ${pct}%`}
+                      aria-label={`Paso ${i + 1}: ${step.title}, ${pct} por ciento completado`}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {/* Dropdown desglose — oculto cuando tab=cuestionario (sidebar ya lo muestra) */}
+            {tab !== "cuestionario" && (
+              <button
+                type="button"
+                onClick={() => setShowStripDropdown((v) => !v)}
+                className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm px-2 py-2 min-h-[40px] inline-flex items-center gap-1"
+                aria-expanded={showStripDropdown}
+                aria-haspopup="true"
+                title="Ver avance por paso"
+              >
+                {overallPct}% <span aria-hidden="true">▾</span>
+              </button>
+            )}
+            {tab === "cuestionario" && (
+              <span
+                className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap px-2 py-2 min-h-[40px] inline-flex items-center"
+                title={`${overallPct}% global del cuestionario`}
+              >
+                {overallPct}%
+              </span>
+            )}
             {/* Toggle colapsar/expandir el strip — persiste por cliente */}
             <button
               type="button"
@@ -657,26 +769,29 @@ function TabButton({
   badgeTitle?: string;
   tabId: string;
 }) {
+  // aria-label compone label + badge para screen readers: "Cuestionario, 1 de 9 pasos completados"
+  const ariaFull = badge ? `${label}, ${badgeTitle ?? badge}` : label;
   return (
     <button
       role="tab"
       id={`tab-${tabId}`}
       aria-selected={active}
       aria-controls={`panel-${tabId}`}
-      aria-label={label}
+      aria-label={ariaFull}
       title={label}
       onClick={onClick}
       className={`px-3 py-2.5 border-b-2 -mb-px transition-colors flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 focus-visible:ring-inset ${
         active
           ? "border-brand-primary text-brand-primary-dark"
-          : "border-transparent text-slate-400 hover:text-slate-700"
+          : "border-transparent text-slate-500 hover:text-slate-800"
       }`}
     >
-      <span className={`${active ? "text-brand-primary-dark" : "text-slate-400"} w-[18px] h-[18px] flex items-center justify-center shrink-0`}>{icon}</span>
+      <span className={`${active ? "text-brand-primary-dark" : "text-slate-500"} w-[18px] h-[18px] flex items-center justify-center shrink-0`} aria-hidden="true">{icon}</span>
       <span className="text-xs font-medium">{label}</span>
       {badge !== null && (
         <span
           title={badgeTitle}
+          aria-hidden="true"
           className={`text-[10px] font-semibold rounded-sm px-1.5 py-0.5 tabular-nums ${
             active
               ? "bg-brand-primary-light text-brand-primary-dark"

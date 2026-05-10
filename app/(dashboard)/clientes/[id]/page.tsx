@@ -63,29 +63,37 @@ export default async function EditarClientePage({ params }: Props) {
   const idx = sorted.findIndex((c) => c.id === id);
   const prev = idx > 0 ? sorted[idx - 1] : null;
   const next = idx < sorted.length - 1 ? sorted[idx + 1] : null;
+  // Nav visual solo si >10 clientes — sub-10 los usuarios usan Alt+←/→ via ClientNavShortcuts
+  const showNavVisual = sorted.length > 10;
   const counter = idx >= 0 ? `${idx + 1}/${sorted.length}` : "";
+
+  // Updated label específico: cuestionario vs cliente. Tomar el más reciente y etiquetar.
+  const qUpdated = questionnaireBundle?.response?.updated_at;
+  const cUpdated = client.updated_at;
+  const updatedSource: "cuestionario" | "cliente" =
+    qUpdated && new Date(qUpdated) > new Date(cUpdated) ? "cuestionario" : "cliente";
+  const updatedAt = updatedSource === "cuestionario" ? qUpdated! : cUpdated;
+  const updatedLabel = updatedSource === "cuestionario" ? "Cuestionario actualizado" : "Cliente editado";
 
   return (
     <>
     <div className="px-6 py-4 pb-0 max-w-6xl mx-auto">
       <ClientNavShortcuts prevId={prev?.id ?? null} nextId={next?.id ?? null} />
-      {/* Breadcrumb compacto */}
+      {/* Breadcrumb compacto — back button único (← Clientes ya está en sidebar nav).
+          Tooltip revela atajos de teclado. Nav prev/next visual solo si >10 clientes. */}
       <div className="flex items-center justify-between gap-3 mb-4 text-xs">
-        <div className="flex items-center gap-2 min-w-0">
-          <Link
-            href="/clientes"
-            className="inline-flex items-center gap-1 text-slate-500 hover:text-brand-primary-hover transition-colors font-medium"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Clientes
-          </Link>
-          <span className="text-slate-300">/</span>
-          <span className="font-bold text-slate-900 truncate">{client.name}</span>
-        </div>
-        {counter && (
-          <div className="flex items-center gap-2 text-slate-500 shrink-0">
+        <Link
+          href="/clientes"
+          className="inline-flex items-center gap-1.5 text-slate-600 hover:text-brand-primary-hover transition-colors font-medium min-w-0"
+          title="Volver a lista de clientes"
+        >
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span className="truncate">Clientes</span>
+        </Link>
+        {showNavVisual && counter && (
+          <div className="flex items-center gap-2 text-slate-600 shrink-0">
             <span className="tabular-nums" title="Orden alfabético">{counter}</span>
             <Link
               href={prev ? `/clientes/${prev.id}` : "#"}
@@ -93,7 +101,7 @@ export default async function EditarClientePage({ params }: Props) {
               className={`p-1 rounded ${prev ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
               title={prev ? `${prev.name} · Alt+←` : "Sin anterior"}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
@@ -103,7 +111,7 @@ export default async function EditarClientePage({ params }: Props) {
               className={`p-1 rounded ${next ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
               title={next ? `${next.name} · Alt+→` : "Sin siguiente"}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </Link>
@@ -155,8 +163,11 @@ export default async function EditarClientePage({ params }: Props) {
             </>
           )}
           <span className="text-slate-300" aria-hidden="true">·</span>
-          <span className="text-xs text-slate-600">
-            Actualizado {new Date(client.updated_at).toLocaleDateString("es-MX", {
+          <span
+            className="text-xs text-slate-600"
+            title={`${updatedLabel}: ${new Date(updatedAt).toLocaleString("es-MX")}`}
+          >
+            {updatedLabel} {new Date(updatedAt).toLocaleDateString("es-MX", {
               day: "numeric",
               month: "short",
               year: "numeric",
@@ -168,12 +179,13 @@ export default async function EditarClientePage({ params }: Props) {
           {isAdmin && (
             <Link
               href={`/clientes/${client.id}/editar`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-colors"
+              className="inline-flex items-center justify-center w-9 h-9 text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors"
+              title="Editar cliente"
+              aria-label="Editar cliente"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              Editar
             </Link>
           )}
           <ExportPdfButton clientId={client.id} clientName={client.name} />

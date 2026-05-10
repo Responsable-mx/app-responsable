@@ -204,7 +204,7 @@ export function SourceDrawer({
       <div
         role="complementary"
         aria-label={`Fuentes — ${field.label}`}
-        className="sticky top-[68px] self-start bg-white border border-slate-200 rounded shadow-sm flex flex-col max-h-[calc(100vh-84px)] overflow-hidden"
+        className="sticky top-[60px] z-20 self-start bg-white border border-slate-200 rounded shadow-sm flex flex-col max-h-[calc(100vh-76px)] overflow-hidden"
       >
         <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="min-w-0 flex-1">

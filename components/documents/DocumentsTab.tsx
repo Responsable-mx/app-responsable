@@ -422,9 +422,9 @@ export function DocumentsTab({
     );
   }
 
-  // Filtros de categoría — solo mostrar las que tienen al menos 1 documento
+  // Filtros de categoría — solo categorías con docs. Sin pill "Todos" (redundante con
+  // search bar y badge de tab). Click en pill activa toggle a "all".
   const filterOptions = [
-    { k: "all" as const, label: `Todos (${counts.all})` },
     ...(counts.general > 0 ? [{ k: "general" as const, label: `General (${counts.general})` }] : []),
     ...(counts.sustainability_report > 0 ? [{ k: "sustainability_report" as const, label: `Sustentabilidad (${counts.sustainability_report})` }] : []),
     ...(counts.financial_report > 0 ? [{ k: "financial_report" as const, label: `Financiero (${counts.financial_report})` }] : []),
@@ -455,18 +455,48 @@ export function DocumentsTab({
         </div>
       )}
 
-      {/* Header con upload */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-            Documentos del cliente
-          </p>
-          <p className="text-xs text-slate-600 mt-0.5">
-            {docs.length} archivo{docs.length === 1 ? "" : "s"} · convertidos a Markdown como contexto IA
-          </p>
-          <p className="text-xs text-slate-600 mt-0.5">
-            PDF, DOCX, XLSX, PPTX, TXT · Máx. 25 MB · arrastra archivos aquí
-          </p>
+      {/* Strip 1 — métricas de cobertura + CTAs (sin label decorativo, sin restricciones técnicas;
+          esas viven en el dropzone overlay y en el modal de subida) */}
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="text-xs text-slate-600 min-h-[18px]">
+          {docs.length === 0 ? (
+            <span className="text-slate-500">
+              Sin documentos. Sube PDF, DOCX, XLSX… o usa &ldquo;Buscar con IA&rdquo;.
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-slate-800 tabular-nums">
+                {docs.length} doc{docs.length === 1 ? "" : "s"}
+              </span>
+              <span className="text-slate-300" aria-hidden="true">·</span>
+              <span title="Documentos con texto extraído disponible para alimentar a Aurora/Rebeca/Elena">
+                <span className="tabular-nums">{withContent}</span> con contenido
+              </span>
+              {failedCount > 0 && (
+                <>
+                  <span className="text-slate-300" aria-hidden="true">·</span>
+                  <span
+                    className="text-rose-600 font-medium"
+                    title="Parser falló — sin texto extraíble. Re-subir o cambiar de formato."
+                  >
+                    <span className="tabular-nums">{failedCount}</span> sin texto
+                  </span>
+                </>
+              )}
+              {lastCreatedAt && (
+                <>
+                  <span className="text-slate-300" aria-hidden="true">·</span>
+                  <span className="text-slate-500" title={new Date(lastCreatedAt).toLocaleString("es-MX")}>
+                    último{" "}
+                    {new Date(lastCreatedAt).toLocaleDateString("es-MX", {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </span>
+                </>
+              )}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Pegar texto — abre modal dedicado (antes panel inline colapsable) */}
@@ -492,14 +522,6 @@ export function DocumentsTab({
             </svg>
             Buscar con IA
           </Button>
-          {/* Multi-select de servicios — aplica al próximo archivo subido */}
-          {serviceOptions.length > 0 && (
-            <ServiceMultiSelect
-              options={serviceOptions}
-              selected={uploadServiceIds}
-              onChange={setUploadServiceIds}
-            />
-          )}
           <Button
             variant="primary"
             size="sm"
@@ -557,12 +579,13 @@ export function DocumentsTab({
               </button>
             )}
           </div>
-          {filterOptions.length > 1 &&
+          {filterOptions.length > 0 &&
             filterOptions.map((f) => (
               <button
                 key={f.k}
                 type="button"
-                onClick={() => setFilter(f.k)}
+                // Pill toggle: click sobre activa → vuelve a "all" (sin pill "Todos")
+                onClick={() => setFilter(filter === f.k ? "all" : f.k)}
                 className={`text-[11px] font-medium rounded-sm border px-2.5 py-2 transition-colors ${
                   filter === f.k
                     ? "bg-brand-primary-light border-brand-primary/30 text-brand-primary-dark"
@@ -573,6 +596,14 @@ export function DocumentsTab({
                 {f.label}
               </button>
             ))}
+          {/* Multi-select Servicios — todos los filtros agrupados en strip 2 */}
+          {serviceOptions.length > 0 && (
+            <ServiceMultiSelect
+              options={serviceOptions}
+              selected={uploadServiceIds}
+              onChange={setUploadServiceIds}
+            />
+          )}
         </div>
       )}
 

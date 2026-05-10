@@ -135,7 +135,7 @@ function scrollToDmSection(sectionId: string) {
 
 // ── Tipo de estado de etapa ──────────────────────────────────
 
-type StageStatus = "done" | "active" | "pending";
+type StageStatus = "done" | "active" | "pending" | "locked";
 
 // ── Pill del stepper ─────────────────────────────────────────
 // Reemplaza StageIndicator (círculo + número) con pill compacto
@@ -160,6 +160,8 @@ function StagePill({
       ? `${pillBase} bg-slate-50 border-slate-200 hover:bg-slate-100`
       : status === "active"
       ? `${pillBase} bg-brand-primary border-brand-primary`
+      : status === "locked"
+      ? `${pillBase} border-slate-100 opacity-40 cursor-not-allowed`
       : `${pillBase} border-slate-200 hover:border-slate-300`;
 
   const inner = (
@@ -203,6 +205,11 @@ function StagePill({
     </>
   );
 
+  // Locked: no-clickable div (siempre renderizado para no romper el stepper)
+  if (status === "locked") {
+    return <div className={pillStyle}>{inner}</div>;
+  }
+
   if (sectionId) {
     return (
       <button
@@ -240,6 +247,7 @@ function CollapsibleStageSection({
   open,
   onToggle,
   nextSection,
+  lockReason,
   children,
 }: {
   id: string;
@@ -250,8 +258,42 @@ function CollapsibleStageSection({
   open: boolean;
   onToggle: () => void;
   nextSection?: { id: string; label: string };
+  /** Mensaje mostrado cuando status === "locked" — explica qué se necesita para desbloquear */
+  lockReason?: string;
   children: React.ReactNode;
 }) {
+  // Estado bloqueado — siempre renderizado (preserva numerado y scroll targets),
+  // pero no expandible. Muestra razón de bloqueo.
+  if (status === "locked") {
+    return (
+      <section id={id} aria-labelledby={`stage-lbl-${id}`}>
+        <div className={`bg-white border border-slate-200 rounded shadow-sm border-l-4 ${accent} opacity-50`}>
+          <div className="flex items-center justify-between px-5 py-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span
+                id={`stage-lbl-${id}`}
+                className="text-sm font-semibold text-slate-800 truncate"
+              >
+                {stageNum}. {label}
+              </span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
+                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Bloqueada
+              </span>
+            </div>
+          </div>
+          {lockReason && (
+            <p className="px-5 pb-3 text-[11px] text-slate-400 italic">
+              {lockReason}
+            </p>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id={id} aria-labelledby={`stage-lbl-${id}`}>
       {/* Card blanca con border-l-4 accent — mismo patrón del mockup */}
@@ -2290,10 +2332,10 @@ export function DoubleMaterialidadTab({
     ? "active"
     : "pending";
 
-  // stage4 = Matriz (visualización IROs scored)
+  // stage4 = Matriz (visualización IROs scored) — locked si no hay IROs en inventario
   const stage4Status: StageStatus = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length >= 3
     ? "active"
-    : hasIros ? "pending" : "pending";
+    : hasIros ? "pending" : "locked";
 
   // stage5 = NIS / IBSO
   const stage5Status: StageStatus = hasNis
@@ -2302,13 +2344,13 @@ export function DoubleMaterialidadTab({
     ? "active"
     : "pending";
 
-  // stage6 = Resumen ejecutivo IA
+  // stage6 = Resumen ejecutivo IA — locked si no hay IROs calificados
   const hasResumen = resumenResp?.data?.status === "done";
   const stage6Status: StageStatus = hasResumen
     ? "done"
     : hasIros
     ? "active"
-    : "pending";
+    : "locked";
 
   // stage7 = Validación con el cliente
   const validacionRec = validacionResp?.data ?? null;
@@ -2316,11 +2358,12 @@ export function DoubleMaterialidadTab({
   const allIrosDecided =
     includedIros.length > 0 &&
     includedIros.every((i) => validacionRec?.iro_decisions[i.id]?.decision);
+  // stage7 = Validación — locked si no hay resumen ejecutivo generado
   const stage7Status: StageStatus = allIrosDecided
     ? "done"
     : hasResumen
     ? "active"
-    : "pending";
+    : "locked";
 
   // stage8 = Reporte (etapa final — requiere benchmark + IROs)
   const stage8Status: StageStatus = hasReport
@@ -2371,7 +2414,6 @@ export function DoubleMaterialidadTab({
         const doneCount = stagesData.filter((s) => s.status === "done").length;
         const pct = Math.round((doneCount / stagesData.length) * 100);
         const validatedCompanies = companies.filter((c) => c.validated).length;
-        const hasChips = validatedCompanies > 0 || iros.length > 0 || quadrantCounts.doble_material > 0 || quadrantCounts.solo_impacto > 0;
 
         return (
           <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-2 z-10">
@@ -2426,35 +2468,39 @@ export function DoubleMaterialidadTab({
               ))}
             </div>
 
-            {/* Context chips — solo si hay datos relevantes */}
-            {hasChips && (
-              <div className="border-t border-slate-100 px-5 py-2">
-                <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {validatedCompanies > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                      <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-                      {validatedCompanies} empresa{validatedCompanies !== 1 ? "s" : ""} benchmark
-                    </span>
+            {/* Context chips — siempre visibles; 0-count comunica acción pendiente */}
+            <div className="border-t border-slate-100 px-5 py-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {/* Benchmark chip — siempre */}
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                  {validatedCompanies > 0 ? (
+                    <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                  ) : (
+                    <svg className="w-2 h-2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                   )}
-                  {iros.length > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                      <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-                      {iros.length} IROs · {scoredIncluded.length} calificados
-                    </span>
+                  {validatedCompanies} empresa{validatedCompanies !== 1 ? "s" : ""} benchmark
+                </span>
+                {/* IROs chip — siempre */}
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                  {iros.length > 0 ? (
+                    <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                  ) : (
+                    <svg className="w-2 h-2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                   )}
-                  {quadrantCounts.doble_material > 0 && (
-                    <span className="inline-flex text-[10px] font-semibold bg-rose-50 border border-rose-200 text-rose-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                      {quadrantCounts.doble_material} doble material
-                    </span>
-                  )}
-                  {quadrantCounts.solo_impacto > 0 && (
-                    <span className="inline-flex text-[10px] font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                      {quadrantCounts.solo_impacto} mat. por impacto
-                    </span>
-                  )}
-                </div>
+                  {iros.length} IROs{iros.length > 0 ? ` · ${scoredIncluded.length} calificados` : ""}
+                </span>
+                {quadrantCounts.doble_material > 0 && (
+                  <span className="inline-flex text-[10px] font-semibold bg-rose-50 border border-rose-200 text-rose-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                    {quadrantCounts.doble_material} doble material
+                  </span>
+                )}
+                {quadrantCounts.solo_impacto > 0 && (
+                  <span className="inline-flex text-[10px] font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
+                    {quadrantCounts.solo_impacto} mat. por impacto
+                  </span>
+                )}
               </div>
-            )}
+            </div>
           </div>
         );
       })()}

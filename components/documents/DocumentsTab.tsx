@@ -82,6 +82,7 @@ export function DocumentsTab({
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<DocMeta | null>(null);
   const [previewing, setPreviewing] = useState<DocMeta | null>(null);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
   // Multi-select: IDs de servicios seleccionados para el próximo upload
   const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,6 +192,17 @@ export function DocumentsTab({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Agente de búsqueda de documentos */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setDiscoverOpen(true)}
+          >
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Buscar con IA
+          </Button>
           {/* Multi-select de servicios — aplica al próximo archivo subido */}
           {serviceOptions.length > 0 && (
             <ServiceMultiSelect
@@ -393,6 +405,14 @@ export function DocumentsTab({
         </div>
       )}
 
+      {discoverOpen && (
+        <DiscoverModal
+          clientId={clientId}
+          onClose={() => setDiscoverOpen(false)}
+          onIngested={() => { void mutate(); }}
+        />
+      )}
+
       {previewing && <PreviewModal clientId={clientId} doc={previewing} onClose={() => setPreviewing(null)} />}
 
       {deleting && (
@@ -407,6 +427,303 @@ export function DocumentsTab({
         />
       )}
     </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DiscoverModal: busca docs públicos del cliente con IA y los ingesta al aprobar
+// ──────────────────────────────────────────────────────────────────────────────
+type Candidate = {
+  url: string;
+  title: string;
+  year?: number | string | null;
+  kind: "sustainability_report" | "financial_report";
+};
+
+type DiscoverState =
+  | { status: "idle" }
+  | { status: "searching" }
+  | { status: "done"; candidates: Candidate[] }
+  | { status: "error"; message: string };
+
+function DiscoverModal({
+  clientId,
+  onClose,
+  onIngested,
+}: {
+  clientId: string;
+  onClose: () => void;
+  onIngested: () => void;
+}) {
+  const [state, setState] = useState<DiscoverState>({ status: "idle" });
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [kindOverride, setKindOverride] = useState<Record<number, Candidate["kind"]>>({});
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestResults, setIngestResults] = useState<{ idx: number; ok: boolean; msg?: string }[]>([]);
+  const toast = useToast();
+
+  async function handleSearch() {
+    setState({ status: "searching" });
+    setSelected(new Set());
+    setKindOverride({});
+    setIngestResults([]);
+    try {
+      // Busca ambos tipos en paralelo
+      const [susRes, finRes] = await Promise.allSettled([
+        fetch(`/api/clients/${clientId}/research-reports`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "sustainability_report" }),
+        }).then((r) => r.json()),
+        fetch(`/api/clients/${clientId}/research-reports`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "financial_report" }),
+        }).then((r) => r.json()),
+      ]);
+
+      const candidates: Candidate[] = [];
+      if (susRes.status === "fulfilled" && susRes.value?.data?.candidates) {
+        for (const c of susRes.value.data.candidates as Candidate[]) {
+          candidates.push({ ...c, kind: "sustainability_report" });
+        }
+      }
+      if (finRes.status === "fulfilled" && finRes.value?.data?.candidates) {
+        for (const c of finRes.value.data.candidates as Candidate[]) {
+          candidates.push({ ...c, kind: "financial_report" });
+        }
+      }
+
+      if (candidates.length === 0) {
+        setState({ status: "done", candidates: [] });
+      } else {
+        setState({ status: "done", candidates });
+        // Pre-seleccionar todos
+        setSelected(new Set(candidates.map((_, i) => i)));
+      }
+    } catch (e) {
+      setState({ status: "error", message: e instanceof Error ? e.message : "Error de red" });
+    }
+  }
+
+  async function handleIngest() {
+    if (state.status !== "done") return;
+    const toIngest = Array.from(selected);
+    setIngesting(true);
+    const results: { idx: number; ok: boolean; msg?: string }[] = [];
+
+    for (const idx of toIngest) {
+      const c = state.candidates[idx];
+      if (!c) continue;
+      const kind = kindOverride[idx] ?? c.kind;
+      try {
+        const res = await fetch(`/api/clients/${clientId}/ingest-report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind, url: c.url }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          results.push({ idx, ok: false, msg: j.error ?? `HTTP ${res.status}` });
+        } else {
+          results.push({ idx, ok: true });
+        }
+      } catch (e) {
+        results.push({ idx, ok: false, msg: e instanceof Error ? e.message : "Error" });
+      }
+    }
+
+    setIngesting(false);
+    setIngestResults(results);
+    const ok = results.filter((r) => r.ok).length;
+    const fail = results.filter((r) => !r.ok).length;
+    if (ok > 0) {
+      onIngested();
+      toast.push("success", `${ok} documento${ok > 1 ? "s" : ""} ingresado${ok > 1 ? "s" : ""}`);
+    }
+    if (fail === 0 && ok > 0) onClose();
+    else if (fail > 0) toast.push("warning", `${fail} fallaron — revisa los errores`);
+  }
+
+  const candidates = state.status === "done" ? state.candidates : [];
+  const resultMap = Object.fromEntries(ingestResults.map((r) => [r.idx, r]));
+
+  return (
+    <Modal open onClose={onClose} title="Buscar documentos con IA">
+      <div className="flex flex-col gap-4 min-w-[580px] max-w-2xl">
+        {/* Descripción */}
+        <p className="text-xs text-slate-600">
+          La IA busca en la web los documentos públicos del cliente: informes de sustentabilidad,
+          financieros, GRI, TCFD y código de ética. Valida y selecciona cuáles ingestar.
+        </p>
+
+        {/* Estado: idle */}
+        {state.status === "idle" && (
+          <div className="border border-dashed border-slate-300 rounded p-6 text-center">
+            <p className="text-sm text-slate-500 mb-3">
+              Presiona buscar para que la IA encuentre documentos públicos del cliente.
+            </p>
+            <Button variant="primary" size="sm" onClick={() => void handleSearch()}>
+              <svg className="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Iniciar búsqueda
+            </Button>
+          </div>
+        )}
+
+        {/* Estado: buscando */}
+        {state.status === "searching" && (
+          <div className="border border-slate-200 rounded p-6 text-center bg-slate-50">
+            <svg className="w-5 h-5 text-brand-primary mx-auto mb-2 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <p className="text-xs text-slate-600">
+              Buscando informes de sustentabilidad y financieros… puede tardar 30–90 s.
+            </p>
+          </div>
+        )}
+
+        {/* Estado: error */}
+        {state.status === "error" && (
+          <div className="border border-rose-200 rounded p-4 bg-rose-50 text-xs text-rose-700">
+            <p className="font-semibold mb-1">Error en la búsqueda</p>
+            <p>{state.message}</p>
+            <Button variant="secondary" size="sm" className="mt-3" onClick={() => void handleSearch()}>
+              Reintentar
+            </Button>
+          </div>
+        )}
+
+        {/* Estado: resultados */}
+        {state.status === "done" && candidates.length === 0 && (
+          <div className="border border-dashed border-slate-300 rounded p-6 text-center">
+            <p className="text-sm text-slate-500 mb-3">No se encontraron documentos públicos para este cliente.</p>
+            <Button variant="secondary" size="sm" onClick={() => void handleSearch()}>
+              Buscar de nuevo
+            </Button>
+          </div>
+        )}
+
+        {state.status === "done" && candidates.length > 0 && (
+          <>
+            <div className="overflow-x-auto border border-slate-200 rounded bg-white shadow-sm">
+              <table className="min-w-full w-max text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selected.size === candidates.length}
+                        onChange={(e) =>
+                          setSelected(e.target.checked ? new Set(candidates.map((_, i) => i)) : new Set())
+                        }
+                        className="rounded border-slate-300"
+                      />
+                    </th>
+                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Título</th>
+                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Año</th>
+                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tipo</th>
+                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {candidates.map((c, idx) => {
+                    const result = resultMap[idx];
+                    const isSelected = selected.has(idx);
+                    return (
+                      <tr
+                        key={idx}
+                        className={`transition-colors ${isSelected ? "bg-brand-primary-light/10" : "hover:bg-slate-50/70"}`}
+                      >
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={!!result}
+                            onChange={(e) => {
+                              const next = new Set(selected);
+                              if (e.target.checked) next.add(idx); else next.delete(idx);
+                              setSelected(next);
+                            }}
+                            className="rounded border-slate-300"
+                          />
+                        </td>
+                        <td className="px-3 py-2.5 max-w-[260px]">
+                          <a
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-brand-primary-dark hover:underline font-medium leading-snug line-clamp-2"
+                          >
+                            {c.title}
+                          </a>
+                          <span className="block text-[10px] text-slate-400 truncate mt-0.5">{c.url}</span>
+                        </td>
+                        <td className="px-3 py-2.5 tabular-nums text-slate-600">
+                          {c.year ?? "—"}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <select
+                            value={kindOverride[idx] ?? c.kind}
+                            onChange={(e) =>
+                              setKindOverride((p) => ({ ...p, [idx]: e.target.value as Candidate["kind"] }))
+                            }
+                            disabled={!!result}
+                            className="text-[11px] border border-slate-300 rounded px-1.5 py-1 bg-white text-slate-700"
+                          >
+                            <option value="sustainability_report">Sustentabilidad</option>
+                            <option value="financial_report">Financiero</option>
+                          </select>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {!result && <span className="text-[10px] text-slate-400">Pendiente</span>}
+                          {result?.ok && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Ingresado
+                            </span>
+                          )}
+                          {result && !result.ok && (
+                            <span className="text-[10px] text-rose-700 font-semibold" title={result.msg}>
+                              Error
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => void handleSearch()}
+                className="text-xs text-slate-500 hover:text-slate-700 underline"
+              >
+                Buscar de nuevo
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500">{selected.size} seleccionado{selected.size !== 1 ? "s" : ""}</span>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={ingesting}
+                  disabled={selected.size === 0}
+                  onClick={() => void handleIngest()}
+                >
+                  Ingestar seleccionados
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
 

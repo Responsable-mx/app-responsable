@@ -29,6 +29,33 @@ function formatFecha(iso: string): string {
   });
 }
 
+/** Humaniza claves internas del catálogo para mostrar al usuario */
+const FIELD_LABELS: Record<string, string> = {
+  name: "Nombre",
+  sector: "Sector",
+  size: "Tamaño",
+  services: "Servicios",
+  frameworks: "Marcos de referencia",
+  certifications: "Certificaciones",
+  material_topics: "Temas materiales",
+  stakeholders: "Grupos de interés",
+  business_model: "Modelo de negocio",
+  impacts: "Impactos",
+  regulatory_context: "Contexto regulatorio",
+  sustainability_strategy: "Estrategia de sustentabilidad",
+  logo_url: "Logo",
+  website: "Sitio web",
+  sustainability_report_url: "Informe de sustentabilidad",
+  financial_report_url: "Informe financiero",
+  description: "Descripción",
+  country: "País",
+  city: "Ciudad",
+  seniority_level: "Nivel de seniority",
+  short_horizon: "Horizonte corto",
+  medium_horizon: "Horizonte mediano",
+  long_horizon: "Horizonte largo",
+};
+
 function diffFields(
   before: Record<string, unknown> | null,
   after: Record<string, unknown> | null,
@@ -36,7 +63,8 @@ function diffFields(
   if (!before || !after) return "—";
   const changed = Object.keys(after).filter((k) => after[k] !== before[k]);
   if (changed.length === 0) return "—";
-  const joined = changed.join(", ");
+  const labels = changed.map((k) => FIELD_LABELS[k] ?? k);
+  const joined = labels.join(", ");
   return joined.length > 60 ? joined.slice(0, 57) + "…" : joined;
 }
 

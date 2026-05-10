@@ -172,6 +172,25 @@ export function ClientTabs({
     return () => document.removeEventListener("mousedown", onDown);
   }, [showStripDropdown]);
 
+  // Sticky-pinned detection via IntersectionObserver:
+  // sentinel está ANTES del strip Tier 2. Cuando el sentinel ya no está
+  // visible (scrolled out), el strip está "pinned" → renderiza nombre cliente
+  // dentro del strip para no perder contexto.
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [stripPinned, setStripPinned] = useState(false);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry) setStripPinned(!entry.isIntersecting);
+      },
+      { rootMargin: "0px 0px 0px 0px", threshold: 0 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   // Strip Tier 2: colapsable. Default expandido. Estado persistido por cliente
   // en localStorage — el consultor que ya conoce el contexto del cliente puede
   // colapsar para ganar ~40px verticales en todas las tabs.
@@ -384,6 +403,11 @@ export function ClientTabs({
 
   return (
     <div>
+      {/* Sentinel: 1px above strip — IntersectionObserver lo monitorea para detectar
+          cuando el strip queda "pinned". Cuando deja de ser visible → mostramos
+          nombre del cliente dentro del strip (Tier 1 ya scrolleó fuera). */}
+      <div ref={sentinelRef} className="h-px -mb-px" aria-hidden="true" />
+
       {/* Strip Tier 2 — contexto ejecutivo del cliente.
           Reemplaza el tab Resumen eliminado may-2026: 4 KPIs extraídos del cuestionario
           + progreso global con dropdown de avance por paso.
@@ -393,6 +417,13 @@ export function ClientTabs({
         className="sticky top-0 z-30 border-t-2 border-b border-slate-200 bg-white mb-0 shadow-sm"
       >
         <div className={`max-w-6xl mx-auto flex items-center gap-3 flex-wrap ${stripCollapsed ? "py-1" : "py-2"}`}>
+          {/* Nombre del cliente visible solo cuando el strip está pinned
+              (Tier 1 fuera de viewport). Mantiene contexto al scrollear. */}
+          {stripPinned && (
+            <div className="flex items-center gap-2 shrink-0 max-w-[180px] pr-2 border-r border-slate-200" aria-hidden="false">
+              <span className="text-xs font-semibold text-slate-900 truncate">{client.name}</span>
+            </div>
+          )}
           {/* KPIs ejecutivos — sólo en modo expandido. Modo colapsado deja
               progress global + toggle, ahorra ~40px en tabs heavy-data.
               Empty KPI (valor "—") es clickeable → jump al wizard step relacionado. */}

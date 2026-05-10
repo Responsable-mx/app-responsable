@@ -4,10 +4,11 @@ import { getClient, clientContextCompleteness, listClientsLight } from "@/lib/cl
 import { ClientTabs } from "@/components/ClientTabs";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { ClientNavShortcuts } from "@/components/ClientNavShortcuts";
-import { ExportPdfButton } from "@/components/ExportPdfButton";
+import { ClientHeaderActions } from "@/components/ClientHeaderActions";
 import { requireAdmin } from "@/lib/auth";
 import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import { listCatalog } from "@/lib/catalogs";
+import { sectorPillClasses } from "@/lib/sectors";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,9 @@ export default async function EditarClientePage({ params }: Props) {
 
   const completeness = clientContextCompleteness(client);
   const metaTooltip = [client.sector, client.subsector, client.size].filter(Boolean).join(" · ");
-  const meta = [client.sector, client.size].filter(Boolean).join(" · ");
+  // Sector y tamaño separados — sector va como pill con color, tamaño como plain text.
+  const sectorPill = client.sector ?? null;
+  const sizeLabel = client.size ?? null;
 
   // Dedupe Tier 1 vs Tier 2: si un servicio (chip Tier 1) ya aparece como
   // certificación en el cuestionario (KPI Certificación en strip Tier 2),
@@ -127,8 +130,24 @@ export default async function EditarClientePage({ params }: Props) {
         <div className="min-w-0 flex items-center gap-x-3 gap-y-1 flex-wrap">
           <ClientAvatar name={client.name} logoUrl={client.logo_url} />
           <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
-          {meta && <span className="text-slate-300" aria-hidden="true">·</span>}
-          {meta && <span className="text-xs text-slate-600" title={metaTooltip}>{meta}</span>}
+          {sectorPill && (
+            <>
+              <span className="text-slate-300" aria-hidden="true">·</span>
+              <Link
+                href={`/clientes?sector=${encodeURIComponent(sectorPill)}`}
+                className={`inline-flex items-center text-[10px] font-medium rounded-sm px-2 py-0.5 transition-colors hover:opacity-80 ${sectorPillClasses(sectorPill)}`}
+                title={`Ver otros clientes del sector ${sectorPill} (${metaTooltip})`}
+              >
+                {sectorPill}
+              </Link>
+            </>
+          )}
+          {sizeLabel && (
+            <>
+              <span className="text-slate-300" aria-hidden="true">·</span>
+              <span className="text-xs text-slate-600" title={metaTooltip}>{sizeLabel}</span>
+            </>
+          )}
           {visibleServices.length > 0 && (
             <>
               <span className="text-slate-300" aria-hidden="true">·</span>
@@ -174,21 +193,14 @@ export default async function EditarClientePage({ params }: Props) {
             })}
           </span>
         </div>
-        {/* CTAs — siempre a la derecha, no participan en el wrap */}
-        <div className="shrink-0 pt-0.5 flex items-center gap-2">
-          {isAdmin && (
-            <Link
-              href={`/clientes/${client.id}/editar`}
-              className="inline-flex items-center justify-center w-9 h-9 text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors"
-              title="Editar cliente"
-              aria-label="Editar cliente"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </Link>
-          )}
-          <ExportPdfButton clientId={client.id} clientName={client.name} />
+        {/* Acciones secundarias (Editar + Exportar PDF) consolidadas en kebab `⋯`.
+            Saves ~150px horizontal vs 2 botones inline. Atajos: E (editar) · P (PDF). */}
+        <div className="shrink-0 pt-0.5">
+          <ClientHeaderActions
+            clientId={client.id}
+            clientName={client.name}
+            isAdmin={isAdmin}
+          />
         </div>
       </div>
 

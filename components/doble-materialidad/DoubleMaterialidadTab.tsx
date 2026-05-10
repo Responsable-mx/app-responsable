@@ -2193,13 +2193,17 @@ export function DoubleMaterialidadTab({
   // Por defecto: solo la etapa "active" está abierta; done y pending colapsadas
   const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({});
   const isSectionOpen = useCallback(
-    (sectionId: string, status: StageStatus) =>
-      sectionId in sectionOpen ? sectionOpen[sectionId]! : status === "active",
+    (sectionId: string, status: StageStatus) => {
+      if (status === "locked") return false;
+      return sectionId in sectionOpen ? sectionOpen[sectionId]! : status === "active";
+    },
     [sectionOpen]
   );
   const toggleSection = useCallback(
-    (sectionId: string, status: StageStatus) =>
-      setSectionOpen((prev) => ({ ...prev, [sectionId]: !isSectionOpen(sectionId, status) })),
+    (sectionId: string, status: StageStatus) => {
+      if (status === "locked") return; // bloqueada — no toggle
+      setSectionOpen((prev) => ({ ...prev, [sectionId]: !isSectionOpen(sectionId, status) }));
+    },
     [isSectionOpen]
   );
 
@@ -2579,20 +2583,19 @@ export function DoubleMaterialidadTab({
       </CollapsibleStageSection>
 
       {/* ── Etapa 4 — Matriz de Doble Materialidad ── */}
-      {iros.filter((i) => i.incluido && i.score_impacto && i.score_financiero).length >= 3 && (
-        <CollapsibleStageSection
-          id="dm-sec-matriz"
-          stageNum={4}
-          label="Matriz de Doble Materialidad"
-          status={stage4Status}
-          accent="border-l-brand-primary"
-          open={isSectionOpen("dm-sec-matriz", stage4Status)}
-          onToggle={() => toggleSection("dm-sec-matriz", stage4Status)}
-          nextSection={{ id: "dm-sec-nis", label: "Siguiente: NIS/IBSO" }}
-        >
-          <MatrizDM iros={iros.filter((i) => i.incluido)} />
-        </CollapsibleStageSection>
-      )}
+      <CollapsibleStageSection
+        id="dm-sec-matriz"
+        stageNum={4}
+        label="Matriz de Doble Materialidad"
+        status={stage4Status}
+        accent="border-l-brand-primary"
+        open={isSectionOpen("dm-sec-matriz", stage4Status)}
+        onToggle={() => toggleSection("dm-sec-matriz", stage4Status)}
+        nextSection={{ id: "dm-sec-nis", label: "Siguiente: NIS/IBSO" }}
+        lockReason="Registra y califica al menos 3 IROs con score de impacto y financiero para activar la matriz."
+      >
+        <MatrizDM iros={iros.filter((i) => i.incluido)} />
+      </CollapsibleStageSection>
 
       {/* ── Etapa 5 — NIS / IBSO ── */}
       <CollapsibleStageSection
@@ -2615,36 +2618,34 @@ export function DoubleMaterialidadTab({
       </CollapsibleStageSection>
 
       {/* ── Etapa 6 — Resumen ejecutivo IA ── */}
-      {hasIros && (
-        <CollapsibleStageSection
-          id="dm-sec-resumen"
-          stageNum={6}
-          label="Resumen Ejecutivo (IA)"
-          status={stage6Status}
-          accent="border-l-cyan-600"
-          open={isSectionOpen("dm-sec-resumen", stage6Status)}
-          onToggle={() => toggleSection("dm-sec-resumen", stage6Status)}
-          nextSection={{ id: "dm-sec-validacion", label: "Siguiente: Validación" }}
-        >
-          <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
-        </CollapsibleStageSection>
-      )}
+      <CollapsibleStageSection
+        id="dm-sec-resumen"
+        stageNum={6}
+        label="Resumen Ejecutivo (IA)"
+        status={stage6Status}
+        accent="border-l-cyan-600"
+        open={isSectionOpen("dm-sec-resumen", stage6Status)}
+        onToggle={() => toggleSection("dm-sec-resumen", stage6Status)}
+        nextSection={{ id: "dm-sec-validacion", label: "Siguiente: Validación" }}
+        lockReason="Completa el inventario de IROs (Etapa 3) para generar el resumen ejecutivo con IA."
+      >
+        <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
+      </CollapsibleStageSection>
 
       {/* ── Etapa 7 — Validación con el cliente ── */}
-      {hasResumen && (
-        <CollapsibleStageSection
-          id="dm-sec-validacion"
-          stageNum={7}
-          label="Validación con el cliente"
-          status={stage7Status}
-          accent="border-l-rose-600"
-          open={isSectionOpen("dm-sec-validacion", stage7Status)}
-          onToggle={() => toggleSection("dm-sec-validacion", stage7Status)}
-          nextSection={{ id: "dm-sec-reporte", label: "Siguiente: Reporte final" }}
-        >
-          <ValidacionSection clientId={clientId} iros={iros} />
-        </CollapsibleStageSection>
-      )}
+      <CollapsibleStageSection
+        id="dm-sec-validacion"
+        stageNum={7}
+        label="Validación con el cliente"
+        status={stage7Status}
+        accent="border-l-rose-600"
+        open={isSectionOpen("dm-sec-validacion", stage7Status)}
+        onToggle={() => toggleSection("dm-sec-validacion", stage7Status)}
+        nextSection={{ id: "dm-sec-reporte", label: "Siguiente: Reporte final" }}
+        lockReason="Genera el resumen ejecutivo (Etapa 6) para iniciar la sesión de validación con el cliente."
+      >
+        <ValidacionSection clientId={clientId} iros={iros} />
+      </CollapsibleStageSection>
 
       {/* ── Etapa 8 — Reporte (etapa final) ── */}
       <CollapsibleStageSection

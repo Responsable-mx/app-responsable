@@ -286,12 +286,14 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 - **`STATUS_INLINE`**: objetos `{bg, fill, text}` hex en lugar de Tailwind classes. Necesario para estilos dinámicos inline.
 - **Razón de no usar Tailwind**: los valores de color en Timeline dependen de datos (status/client_id) — no se pueden expresar como clases estáticas de Tailwind.
 
-### ClientTabs — lazy loading (may-2026)
+### ClientTabs — lazy loading + strip Tier 2 (may-2026)
 
 3 tabs usan `next/dynamic` con fallback `<Skeleton>`:
 - `QuestionnaireTab`, `TeamTab`, `DocumentsTab`
-- `ClientResumen` eager (tab por defecto). `DoubleMaterialidadTab` lazy condicional (solo si hasDmService).
-- Tabs eliminadas (may-2026): `ChatWindow`, `ClientCronogramaTab`, `MaterialityTab` (removidas de ClientTabs; Chat accesible desde nav lateral).
+- `DoubleMaterialidadTab` lazy condicional (solo si hasDmService).
+- Tab por defecto: `cuestionario`.
+- Tabs eliminadas (may-2026): `ChatWindow`, `ClientCronogramaTab`, `MaterialityTab` (removidas de ClientTabs; Chat accesible desde nav lateral). **`Resumen` eliminado y reemplazado por strip Tier 2** (banda ejecutiva encima de las tabs con 4 KPIs extraídos del cuestionario — Colaboradores, Presencia, Certificación, Modelo ESG — + progreso global con dropdown de avance por paso). `?tab=resumen` redirige automáticamente a `cuestionario` (compat URLs viejos).
+- Badge `Cuestionario`: muestra `${completedSteps}/${totalSteps}` (pasos individuales del wizard, paridad con sidebar). Antes era `N/5` macro-grupos.
 - Patrón canónico: `components/ClientTabs.tsx`.
 
 ## Deploy — app-responsable (may-2026)

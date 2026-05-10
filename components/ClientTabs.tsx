@@ -5,9 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
-// ClientResumen es el tab default → eager (no lazy) para evitar skeleton en primera carga.
-import { ClientResumen } from "@/components/ClientResumen";
-import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
+import { getFieldValue, type FieldValue, type QuestionnaireBundle } from "@/lib/questionnaires/types";
 
 
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
@@ -32,7 +30,7 @@ const DoubleMaterialidadTab = dynamic(
   { loading: () => <SkeletonDetail />, ssr: false }
 );
 
-type Tab = "resumen" | "cuestionario" | "equipo" | "documentos" | "doble-materialidad-ia";
+type Tab = "cuestionario" | "equipo" | "documentos" | "doble-materialidad-ia";
 
 type Props = {
   client: Client;
@@ -84,10 +82,12 @@ export function ClientTabs({
   // Tab DM-IA visible cuando client.services incluye "doble_materialidad_ia".
   // Fuente de verdad única: perfil del cliente (editable desde /editar).
   const hasDmService = client.services?.includes("doble_materialidad_ia") ?? false;
-  const VALID_TABS: Tab[] = ["resumen", "cuestionario", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
-  const initialTab = (searchParams?.get("tab") as Tab | null) ?? "resumen";
+  const VALID_TABS: Tab[] = ["cuestionario", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
+  // Compat: ?tab=resumen redirige a cuestionario (tab eliminado may-2026, strip Tier 2 lo reemplaza)
+  const rawTab = searchParams?.get("tab") as Tab | "resumen" | null;
+  const initialTab: Tab = rawTab === "resumen" || !rawTab ? "cuestionario" : (rawTab as Tab);
   const [tab, setTab] = useState<Tab>(
-    VALID_TABS.includes(initialTab) ? initialTab : "resumen"
+    VALID_TABS.includes(initialTab) ? initialTab : "cuestionario"
   );
 
   useEffect(() => {
@@ -127,8 +127,18 @@ export function ClientTabs({
     goToTab("cuestionario");
   }
 
-  // Override de step desde Resumen (click en card macro → paso específico)
-  const [jumpToStep, setJumpToStep] = useState<number | null>(null);
+  // Strip Tier 2: estado del dropdown de avance por paso
+  const [showStripDropdown, setShowStripDropdown] = useState(false);
+  const stripRef = useRef<HTMLDivElement>(null);
+  // Cerrar dropdown al click fuera
+  useEffect(() => {
+    if (!showStripDropdown) return;
+    const onDown = (e: MouseEvent) => {
+      if (!stripRef.current?.contains(e.target as Node)) setShowStripDropdown(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showStripDropdown]);
 
   // Tab scroll indicator — muestra flecha derecha cuando hay overflow horizontal
   const tablistRef = useRef<HTMLDivElement>(null);
@@ -177,55 +187,166 @@ export function ClientTabs({
         }))
       : [];
 
-  // Resumen tab: 5 cards macro. Una card está completa si TODOS sus stepKeys están en completed_sections.
-  // Mapping idéntico al de ClientResumen.tsx
-  const MACRO_STEP_KEYS: Record<string, string[]> = {
-    "informacion-base": ["informacion-base"],
-    "contexto-general": ["informacion-general"],
-    "contexto-sostenibilidad": ["estrategia-y-madurez"],
-    "regulatorio": ["regulacion-y-sector"],
-    "modelo-negocio": [
-      "modelo-de-negocio-estructura",
-      "modelo-de-negocio-detalle",
-      "cadena-de-valor",
-      "riesgos-y-oportunidades",
-      "stakeholders",
-    ],
-  };
-  // Usa pct === 100 (misma fuente que los checkmarks en ClientResumen) para evitar
-  // que el badge "N/5" y los ✓ en las cards muestren valores distintos.
-  const completedMacro = (() => {
-    const sectionProg = questionnaireResp?.data.progress.sectionProgress ?? {};
-    let count = 0;
-    for (const stepKeys of Object.values(MACRO_STEP_KEYS)) {
-      const allComplete = stepKeys.every((sk) => {
-        const sp = sectionProg[sk];
-        return sp != null && sp.total > 0 && sp.pct === 100;
-      });
-      if (allComplete) count++;
+  // Badge Cuestionario: pasos individuales del wizard (X/9 — consistente con sidebar del wizard).
+  // Antes contaba 5 macro-grupos; el badge ahora refleja los pasos reales (paridad con sidebar).
+  const sectionProg = questionnaireResp?.data.progress.sectionProgress ?? {};
+  const wizardStepKeys = Object.keys(sectionProg);
+  const totalSteps = wizardStepKeys.length || null;
+  const completedSteps = wizardStepKeys.filter((k) => (sectionProg[k]?.pct ?? 0) === 100).length;
+  const overallPct = questionnaireResp?.data.progress.pct ?? 0;
+
+  // Strip Tier 2 — extracción de KPIs ejecutivos desde respuestas del cuestionario.
+  // Field keys del schema canónico Cuestionario_Contexto_Negocio.md.
+  const qResponses = questionnaireResp?.data.response?.responses ?? {};
+  const genResp = (qResponses["informacion-general"] ?? {}) as Record<string, unknown>;
+  const sostResp = (qResponses["estrategia-y-madurez"] ?? {}) as Record<string, unknown>;
+  const stripEmpleados = getFieldValue(genResp["empleados"]);
+  const stripPaises    = getFieldValue(genResp["paises"]);
+  const stripCerts     = getFieldValue(sostResp["certificaciones"]);
+  const stripModelo    = getFieldValue(sostResp["modelo_sostenibilidad"]);
+
+  function fmtKpi(v: FieldValue, maxLen = 22): string {
+    if (v === null || v === undefined) return "—";
+    if (Array.isArray(v)) {
+      const joined = v.filter(Boolean).join(" · ");
+      if (!joined) return "—";
+      return joined.length > maxLen ? joined.slice(0, maxLen) + "…" : joined;
     }
-    return count;
-  })();
-  const totalMacro = Object.keys(MACRO_STEP_KEYS).length;
+    if (typeof v === "boolean") return v ? "Sí" : "No";
+    const s = String(v).trim();
+    if (!s) return "—";
+    return s.length > maxLen ? s.slice(0, maxLen) + "…" : s;
+  }
 
   return (
     <div>
+      {/* Strip Tier 2 — contexto ejecutivo del cliente.
+          Reemplaza el tab Resumen eliminado may-2026: 4 KPIs extraídos del cuestionario
+          + progreso global con dropdown de avance por paso. */}
+      <div ref={stripRef} className="border-b border-slate-200 bg-slate-50 mb-0">
+        <div className="max-w-6xl mx-auto py-2.5 flex items-center gap-4 flex-wrap">
+          {/* KPI: Colaboradores */}
+          <div className="flex items-center gap-2 min-w-0">
+            <svg className="w-3.5 h-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-slate-700 truncate tabular-nums" title={fmtKpi(stripEmpleados, 200)}>{fmtKpi(stripEmpleados)}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Colaboradores</div>
+            </div>
+          </div>
+
+          <div className="w-px h-6 bg-slate-200 shrink-0" aria-hidden="true" />
+
+          {/* KPI: Países */}
+          <div className="flex items-center gap-2 min-w-0">
+            <svg className="w-3.5 h-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-slate-700 truncate" title={fmtKpi(stripPaises, 200)}>{fmtKpi(stripPaises)}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Presencia</div>
+            </div>
+          </div>
+
+          <div className="w-px h-6 bg-slate-200 shrink-0" aria-hidden="true" />
+
+          {/* KPI: Certificaciones */}
+          <div className="flex items-center gap-2 min-w-0">
+            <svg className="w-3.5 h-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-slate-700 truncate" title={fmtKpi(stripCerts, 200)}>{fmtKpi(stripCerts)}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Certificación</div>
+            </div>
+          </div>
+
+          <div className="w-px h-6 bg-slate-200 shrink-0" aria-hidden="true" />
+
+          {/* KPI: Modelo ESG */}
+          <div className="flex items-center gap-2 min-w-0">
+            <svg className="w-3.5 h-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-slate-700 truncate" title={fmtKpi(stripModelo, 200)}>{fmtKpi(stripModelo)}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Modelo ESG</div>
+            </div>
+          </div>
+
+          {/* Progreso global + dropdown desglose por paso */}
+          <div className="ml-auto flex items-center gap-3 pl-4 border-l border-slate-200 relative">
+            <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
+              {questionnaireProgress?.filled ?? "–"}/{questionnaireProgress?.total ?? "–"} campos
+            </span>
+            <div className="w-24 h-1 bg-slate-200 shrink-0" aria-hidden="true">
+              <div className="h-1 bg-brand-primary transition-all" style={{ width: `${overallPct}%` }} />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowStripDropdown((v) => !v)}
+              className="text-[11px] font-bold text-brand-primary-dark tabular-nums whitespace-nowrap hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm px-1"
+              aria-expanded={showStripDropdown}
+              aria-haspopup="true"
+              title="Ver avance por paso"
+            >
+              {overallPct}% <span aria-hidden="true">▾</span>
+            </button>
+
+            {showStripDropdown && (
+              <div
+                role="dialog"
+                aria-label="Avance por paso"
+                className="absolute top-full right-0 mt-2 w-72 bg-white border border-slate-200 rounded shadow-sm z-50 p-3"
+              >
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Avance por paso</div>
+                {questionnaireSteps.length === 0 && (
+                  <div className="text-xs text-slate-500 italic">Sin datos del cuestionario.</div>
+                )}
+                {questionnaireSteps.map((step, i) => {
+                  const prog = sectionProg[step.key];
+                  const pct = prog?.pct ?? 0;
+                  const colorCls = pct === 100 ? "bg-brand-primary" : pct > 0 ? "bg-brand-accent" : "bg-slate-200";
+                  const textCls = pct === 100 ? "text-brand-primary-dark" : pct > 0 ? "text-amber-700" : "text-slate-500";
+                  return (
+                    <button
+                      key={step.key}
+                      type="button"
+                      onClick={() => {
+                        setShowStripDropdown(false);
+                        goToTab("cuestionario");
+                        router.replace(`?tab=cuestionario&step=${i + 1}`, { scroll: false });
+                      }}
+                      className="w-full flex items-center gap-2 mb-1.5 hover:bg-slate-50 rounded-sm px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
+                    >
+                      <span className="text-[10px] font-bold text-slate-400 tabular-nums w-4 shrink-0">{i + 1}</span>
+                      <span className="text-xs text-slate-700 flex-1 truncate">{step.title}</span>
+                      <div className="w-12 h-1 bg-slate-100 shrink-0" aria-hidden="true">
+                        <div className={`h-1 ${colorCls} transition-all`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className={`text-[10px] tabular-nums w-10 text-right font-semibold ${textCls}`}>
+                        {prog ? `${prog.filled}/${prog.total}` : "—"}
+                      </span>
+                    </button>
+                  );
+                })}
+                <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-600 tabular-nums">
+                  <span>Total: {questionnaireProgress?.filled ?? 0}/{questionnaireProgress?.total ?? 0} campos</span>
+                  {totalSteps !== null && completedSteps < totalSteps && (
+                    <span className="text-brand-berry font-semibold">{totalSteps - completedSteps} pasos pendientes</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Tabs — border-b full-width, botones alineados con max-w-6xl del header */}
       <div className="border-b border-slate-200 mb-5">
       <div className="max-w-6xl mx-auto relative">
       <div ref={tablistRef} role="tablist" aria-label="Secciones del cliente" className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <TabButton
-          active={tab === "resumen"}
-          tabId="resumen"
-          onClick={() => goToTab("resumen")}
-          icon={
-            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          }
-          label="Resumen"
-          badge={null}
-        />
         {/* Documentos primero — es el paso 1 del workflow (subir antes de llenar cuestionario) */}
         <TabButton
           active={tab === "documentos"}
@@ -250,10 +371,10 @@ export function ClientTabs({
             </svg>
           }
           label="Cuestionario"
-          badge={questionnaireResp?.data ? `${completedMacro}/${totalMacro}` : null}
+          badge={totalSteps ? `${completedSteps}/${totalSteps}` : null}
           badgeTitle={
-            questionnaireResp?.data
-              ? `${completedMacro} de ${totalMacro} secciones con todas sus preguntas respondidas`
+            totalSteps
+              ? `${completedSteps} de ${totalSteps} pasos con todas sus preguntas respondidas`
               : undefined
           }
         />
@@ -302,31 +423,14 @@ export function ClientTabs({
       </div>{/* /border-b wrapper */}
 
       <div className="max-w-6xl mx-auto">
-      {tab === "resumen" && (
-        <div role="tabpanel" id="panel-resumen" tabIndex={0} aria-labelledby="tab-resumen">
-          <TabErrorBoundary tabName="Resumen">
-            <ClientResumen
-              questionnaire={questionnaireResp?.data ?? null}
-              onJumpToCuestionario={(firstStepKey) => {
-                goToTab("cuestionario");
-                if (firstStepKey && schema && "steps" in schema) {
-                  const idx = schema.steps.findIndex((s) => s.key === firstStepKey);
-                  if (idx >= 0) setJumpToStep(idx);
-                }
-              }}
-            />
-          </TabErrorBoundary>
-        </div>
-      )}
       {tab === "cuestionario" && (
         <div role="tabpanel" id="panel-cuestionario" tabIndex={0} aria-labelledby="tab-cuestionario">
           <TabErrorBoundary tabName="Cuestionario">
             <QuestionnaireTab
-              key={`q-${jumpToStep ?? "default"}`}
+              key="q-cuestionario"
               clientId={client.id}
               clientServices={client.services ?? []}
               initialStepIndex={(() => {
-                if (jumpToStep !== null) return jumpToStep;
                 const s = searchParams?.get("step");
                 const n = s ? parseInt(s, 10) - 1 : 0;
                 return isNaN(n) || n < 0 ? 0 : n;

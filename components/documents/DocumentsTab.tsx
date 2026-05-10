@@ -549,8 +549,8 @@ function DiscoverModal({
   const resultMap = Object.fromEntries(ingestResults.map((r) => [r.idx, r]));
 
   return (
-    <Modal open onClose={onClose} title="Buscar documentos con IA">
-      <div className="flex flex-col gap-4 min-w-[580px] max-w-2xl">
+    <Modal open onClose={onClose} title="Buscar documentos con IA" size="lg">
+      <div className="flex flex-col gap-4">
         {/* Descripción */}
         <p className="text-xs text-slate-600">
           La IA busca en la web los documentos públicos del cliente: informes de sustentabilidad,

@@ -22,12 +22,15 @@ export function Modal({
   title,
   children,
   footer,
+  size = "md",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** md = max-w-lg (default) · lg = max-w-2xl */
+  size?: "md" | "lg";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -99,7 +102,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="bg-white rounded shadow-xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col focus:outline-none"
+        className={`bg-white rounded shadow-xl w-full max-h-[85vh] overflow-hidden flex flex-col focus:outline-none ${size === "lg" ? "max-w-2xl" : "max-w-lg"}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">

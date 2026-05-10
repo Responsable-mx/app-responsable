@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { RELATION_LABELS, RELATION_ORDER, type CompanyRelation } from "@/lib/dm/fields";
+import { CATALOG_SEEDS } from "@/lib/catalogs/seeds";
 import { SelectField } from "@/components/ui/SelectField";
 import type { DmIroConfig } from "@/lib/dm/iros";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
@@ -24,6 +25,21 @@ const MatrizDM = dynamic(
     ssr: false,
   }
 );
+
+// ── Catálogo lookup (cliente) ─────────────────────────────────
+
+const _CATALOG_MAP = (() => {
+  const m: Record<string, Record<string, string>> = {};
+  for (const s of CATALOG_SEEDS) {
+    if (!m[s.category]) m[s.category] = {};
+    m[s.category]![s.value] = s.label;
+  }
+  return m;
+})();
+
+function catalogLabel(category: string, value: string): string {
+  return _CATALOG_MAP[category]?.[value] ?? value;
+}
 
 // ── Tipos ────────────────────────────────────────────────────
 
@@ -108,6 +124,12 @@ type Props = {
   clientName: string;
   questionnaireProgress: { filled: number; total: number } | null;
   onGoToCuestionario: () => void;
+  /** Callback para badge [N/8] en el tab de ClientTabs */
+  onStagesProgress?: (done: number, total: number) => void;
+  /** Campos del cliente para KPI cards en Etapa 1 */
+  clientSector?: string | null;
+  clientSize?: string | null;
+  clientFrameworks?: string[] | null;
 };
 
 // ── Fetcher ──────────────────────────────────────────────────
@@ -415,17 +437,51 @@ function lookupComparisonValue(
 function ContextoSection({
   progress,
   onGoToCuestionario,
+  sector,
+  size,
+  frameworks,
 }: {
   progress: Props["questionnaireProgress"];
   onGoToCuestionario: () => void;
+  sector?: string | null;
+  size?: string | null;
+  frameworks?: string[] | null;
 }) {
   const isComplete = progress && progress.filled >= progress.total && progress.total > 0;
+  const hasKpis = sector || size || (frameworks && frameworks.length > 0);
 
   return (
     <div className="py-2">
       <p className="text-xs text-slate-600 mb-3">
         El cuestionario de contexto es la base para que la IA entienda a tu cliente antes de ejecutar el benchmark.
       </p>
+
+      {/* KPI cards — Sector / Tamaño / Marcos */}
+      {hasKpis && (
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Sector</p>
+            <p className="text-xs font-semibold text-slate-700 truncate">
+              {sector ? catalogLabel("sectors", sector) : "—"}
+            </p>
+          </div>
+          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tamaño</p>
+            <p className="text-xs font-semibold text-slate-700 truncate">
+              {size ? catalogLabel("client_sizes", size) : "—"}
+            </p>
+          </div>
+          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos</p>
+            <p className="text-xs font-semibold text-slate-700 leading-relaxed">
+              {frameworks && frameworks.length > 0
+                ? frameworks.map((f) => catalogLabel("frameworks", f)).join(", ")
+                : "—"}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         {progress ? (
           <span
@@ -2176,6 +2232,10 @@ export function DoubleMaterialidadTab({
   clientName,
   questionnaireProgress,
   onGoToCuestionario,
+  onStagesProgress,
+  clientSector,
+  clientSize,
+  clientFrameworks,
 }: Props) {
   const benchmarkKey   = `/api/clients/${clientId}/dm-benchmark`;
   const irosKey        = `/api/clients/${clientId}/dm-iros`;
@@ -2393,6 +2453,15 @@ export function DoubleMaterialidadTab({
     brechas_criticas: nisRows.filter((i) => i.estado === "no_identificado").length,
   };
 
+  // Badge [N/8] — notifica al padre cuántas etapas están completas
+  const dmDoneCount = [
+    stage1Status, stage2Status, stage3Status, stage4Status,
+    stage5Status, stage6Status, stage7Status, stage8Status,
+  ].filter((s) => s === "done").length;
+  useEffect(() => {
+    onStagesProgress?.(dmDoneCount, 8);
+  }, [dmDoneCount, onStagesProgress]);
+
   if (loadingBenchmark) {
     return (
       <div className="py-6">
@@ -2523,6 +2592,9 @@ export function DoubleMaterialidadTab({
         <ContextoSection
           progress={questionnaireProgress}
           onGoToCuestionario={onGoToCuestionario}
+          sector={clientSector}
+          size={clientSize}
+          frameworks={clientFrameworks}
         />
       </CollapsibleStageSection>
 

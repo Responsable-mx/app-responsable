@@ -110,6 +110,9 @@ export function ClientTabs({
     router.replace(`?tab=${t}`, { scroll: false });
   }
 
+  // Badge [N/8] en tab DM-IA — se actualiza cuando DoubleMaterialidadTab monta
+  const [dmProgress, setDmProgress] = useState<{ done: number; total: number } | null>(null);
+
   // Override de step desde Resumen (click en card macro → paso específico)
   const [jumpToStep, setJumpToStep] = useState<number | null>(null);
 
@@ -219,7 +222,8 @@ export function ClientTabs({
               </svg>
             }
             label="D. Materialidad IA"
-            badge={null}
+            badge={dmProgress ? `${dmProgress.done}/${dmProgress.total}` : null}
+            badgeTitle={dmProgress ? `${dmProgress.done} de ${dmProgress.total} etapas completadas` : undefined}
           />
         )}
         <TabButton
@@ -324,6 +328,10 @@ export function ClientTabs({
               clientName={client.name}
               questionnaireProgress={questionnaireProgress}
               onGoToCuestionario={() => goToTab("cuestionario")}
+              onStagesProgress={(done, total) => setDmProgress({ done, total })}
+              clientSector={client.sector}
+              clientSize={client.size}
+              clientFrameworks={client.frameworks}
             />
           </TabErrorBoundary>
         </div>

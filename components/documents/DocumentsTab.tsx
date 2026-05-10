@@ -584,26 +584,32 @@ export function DocumentsTab({
         {/* ml-auto empuja CTAs a la derecha — siempre presentes para que el usuario
             no tenga que volver a un strip vacío para subir. */}
         <div className="ml-auto flex items-center gap-2">
+          {/* CTAs secundarios — labels colapsan a icon-only en viewports ≤lg para
+              que el strip único entre en 1 fila en 1264px. "Subir archivo"
+              mantiene label siempre (acción primaria, debe ser inmediato) */}
           {canExtract && (
             <Button
               variant="secondary"
               size="sm"
               onClick={() => setPasteModalOpen(true)}
               title="Pegar texto para extracción al cuestionario"
+              aria-label="Pegar texto"
             >
-              <IconPaste className="w-3.5 h-3.5 mr-1" />
-              Pegar texto
+              <IconPaste className="w-3.5 h-3.5 lg:mr-1" />
+              <span className="hidden lg:inline">Pegar texto</span>
             </Button>
           )}
           <Button
             variant="secondary"
             size="sm"
             onClick={() => setDiscoverOpen(true)}
+            title="Buscar documentos públicos del cliente con IA"
+            aria-label="Buscar con IA"
           >
-            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <svg className="w-3.5 h-3.5 lg:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            Buscar con IA
+            <span className="hidden lg:inline">Buscar con IA</span>
           </Button>
           <Button
             variant="primary"

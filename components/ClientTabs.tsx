@@ -149,6 +149,33 @@ export function ClientTabs({
     return () => document.removeEventListener("mousedown", onDown);
   }, [showStripDropdown]);
 
+  // Strip Tier 2: colapsable. Default expandido. Estado persistido por cliente
+  // en localStorage — el consultor que ya conoce el contexto del cliente puede
+  // colapsar para ganar ~40px verticales en todas las tabs.
+  const stripKey = `clientStripCollapsed:${client.id}`;
+  const [stripCollapsed, setStripCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(stripKey);
+      if (stored === "1") setStripCollapsed(true);
+    } catch {
+      /* localStorage no disponible (SSR/private mode) — usa default */
+    }
+    // Solo al cambiar de cliente
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id]);
+  function toggleStripCollapsed() {
+    setStripCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(stripKey, next ? "1" : "0");
+      } catch {
+        /* no-op */
+      }
+      return next;
+    });
+  }
+
   // Tab scroll indicator — muestra flecha derecha cuando hay overflow horizontal
   const tablistRef = useRef<HTMLDivElement>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -235,14 +262,22 @@ export function ClientTabs({
   const stripCerts     = getFieldValue(sostResp["certificaciones"]);
   const stripModelo    = getFieldValue(sostResp["modelo_sostenibilidad"]);
 
-  // Trunca por palabra (no por carácter) para no cortar mid-word como "Distintivo ESR (Empres…"
+  // Trunca por palabra Y antes de paréntesis abierto. Evita "Distintivo ESR (Empres…":
+  // si hay '(' después del lastSpace, corta antes del '(' (deja paréntesis huérfano fuera).
   function truncateByWord(s: string, maxLen: number): string {
     if (s.length <= maxLen) return s;
     const slice = s.slice(0, maxLen);
     const lastSpace = slice.lastIndexOf(" ");
-    const base = lastSpace > Math.floor(maxLen * 0.5) ? slice.slice(0, lastSpace) : slice;
-    return base.trimEnd() + "…";
+    const lastParen = slice.lastIndexOf("(");
+    const cut = Math.max(lastSpace, lastParen);
+    const base = cut > Math.floor(maxLen * 0.5) ? slice.slice(0, cut) : slice;
+    // Limpia trailing: comas, dos puntos, paréntesis sueltos, espacios
+    return base.replace(/[\s,;:(]+$/, "") + "…";
   }
+
+  // Disclaimers IA que aparecen como valor en campos research — no son KPIs reales.
+  // Si el campo empieza con uno de estos, mejor mostrar "—" en el strip.
+  const DISCLAIMER_PREFIXES = /^(basado en (info|datos)|estimado|sujeto a|pendiente de|informaci[óo]n p[úu]blica|no disponible|no aplica|sin informaci[óo]n|por confirmar|n\/a)\b/i;
 
   function fmtKpi(v: FieldValue, maxLen = 24): string {
     if (v === null || v === undefined) return "—";
@@ -253,11 +288,13 @@ export function ClientTabs({
     if (Array.isArray(v)) {
       const joined = v.filter(Boolean).map(String).join(" · ");
       if (!joined) return "—";
+      if (DISCLAIMER_PREFIXES.test(joined)) return "—";
       return truncateByWord(joined, maxLen);
     }
     if (typeof v === "boolean") return v ? "Sí" : "No";
     let s = String(v).trim();
     if (!s) return "—";
+    if (DISCLAIMER_PREFIXES.test(s)) return "—";
     // Numérico embebido (ej "3400 colaboradores") → reformatea
     s = s.replace(/\b(\d{4,})\b/g, (m) => Number(m).toLocaleString("es-MX"));
     return truncateByWord(s, maxLen);
@@ -273,61 +310,68 @@ export function ClientTabs({
         ref={stripRef}
         className="sticky top-0 z-30 border-y border-slate-200 bg-white mb-0 shadow-sm"
       >
-        <div className="max-w-6xl mx-auto py-2 flex items-center gap-3 flex-wrap">
-          {/* KPI: Colaboradores */}
-          <div className="flex items-center gap-2 min-w-0">
-            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <div className="min-w-0 cursor-help" title={fmtKpi(stripEmpleados, 200)}>
-              <div className="text-xs font-semibold text-slate-900 truncate tabular-nums">{fmtKpi(stripEmpleados)}</div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Colaboradores</div>
-            </div>
-          </div>
+        <div className={`max-w-6xl mx-auto flex items-center gap-3 flex-wrap ${stripCollapsed ? "py-1" : "py-2"}`}>
+          {/* KPIs ejecutivos — sólo en modo expandido. Modo colapsado deja
+              progress global + toggle, ahorra ~40px en tabs heavy-data */}
+          {!stripCollapsed && (
+            <>
+              {/* KPI: Colaboradores */}
+              <div className="flex items-center gap-2 min-w-0">
+                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <div className="min-w-0 cursor-help" title={fmtKpi(stripEmpleados, 200)}>
+                  <div className="text-xs font-semibold text-slate-900 truncate tabular-nums">{fmtKpi(stripEmpleados)}</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Colaboradores</div>
+                </div>
+              </div>
 
-          <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
+              <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
 
-          {/* KPI: Países */}
-          <div className="flex items-center gap-2 min-w-0">
-            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="min-w-0 cursor-help" title={fmtKpi(stripPaises, 200)}>
-              <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripPaises)}</div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Presencia</div>
-            </div>
-          </div>
+              {/* KPI: Países */}
+              <div className="flex items-center gap-2 min-w-0">
+                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="min-w-0 cursor-help" title={fmtKpi(stripPaises, 200)}>
+                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripPaises)}</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Presencia</div>
+                </div>
+              </div>
 
-          <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
+              <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
 
-          {/* KPI: Certificaciones */}
-          <div className="flex items-center gap-2 min-w-[160px] max-w-[220px]">
-            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <div className="min-w-0 cursor-help" title={fmtKpi(stripCerts, 200)}>
-              <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripCerts, 28)}</div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Certificación</div>
-            </div>
-          </div>
+              {/* KPI: Certificaciones */}
+              <div className="flex items-center gap-2 min-w-[160px] max-w-[220px]">
+                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <div className="min-w-0 cursor-help" title={fmtKpi(stripCerts, 200)}>
+                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripCerts, 28)}</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Certificación</div>
+                </div>
+              </div>
 
-          <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
+              <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
 
-          {/* KPI: Modelo ESG */}
-          <div className="flex items-center gap-2 min-w-[160px] max-w-[220px]">
-            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <div className="min-w-0 cursor-help" title={fmtKpi(stripModelo, 200)}>
-              <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripModelo, 28)}</div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Modelo ESG</div>
-            </div>
-          </div>
+              {/* KPI: Modelo ESG */}
+              <div className="flex items-center gap-2 min-w-[160px] max-w-[220px]">
+                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <div className="min-w-0 cursor-help" title={fmtKpi(stripModelo, 200)}>
+                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripModelo, 28)}</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Modelo ESG</div>
+                </div>
+              </div>
+            </>
+          )}
 
-          {/* Progreso global + dropdown desglose por paso */}
-          <div className="ml-auto flex items-center gap-3 pl-5 border-l border-slate-200 relative">
+          {/* Progreso global + dropdown — visible siempre */}
+          <div className={`flex items-center gap-3 relative ${!stripCollapsed ? "ml-auto pl-5 border-l border-slate-200" : ""}`}>
             <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
-              {questionnaireProgress?.filled ?? "–"}/{questionnaireProgress?.total ?? "–"} campos
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-1">Cuestionario</span>
+              {questionnaireProgress?.filled ?? "–"}/{questionnaireProgress?.total ?? "–"}
             </span>
             <div className="w-24 h-1.5 bg-slate-200 shrink-0" aria-hidden="true">
               <div className="h-1.5 bg-brand-primary transition-all" style={{ width: `${overallPct}%` }} />
@@ -341,6 +385,24 @@ export function ClientTabs({
               title="Ver avance por paso"
             >
               {overallPct}% <span aria-hidden="true">▾</span>
+            </button>
+            {/* Toggle colapsar/expandir el strip — persiste por cliente */}
+            <button
+              type="button"
+              onClick={toggleStripCollapsed}
+              className="text-slate-400 hover:text-slate-700 rounded-sm p-2 min-h-[40px] min-w-[40px] inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
+              aria-label={stripCollapsed ? "Expandir contexto del cliente" : "Colapsar contexto del cliente"}
+              title={stripCollapsed ? "Expandir contexto (KPIs)" : "Colapsar — más espacio para la tabla"}
+            >
+              <svg
+                className={`w-3.5 h-3.5 transition-transform ${stripCollapsed ? "" : "rotate-180"}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
 
             {showStripDropdown && (

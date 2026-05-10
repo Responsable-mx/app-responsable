@@ -536,15 +536,19 @@ function WizardEditor({
       await Promise.all(batch.map(fillOne));
     }
 
-    // D-16: usar functional update para obtener el estado ACTUAL de responses al
-    // momento del merge final — evita stale closure si el consultor editó campos
-    // manualmente mientras el bulk AI corría en paralelo.
+    // Merge final: usar responsesRef.current (siempre sincronizado vía
+    // useEffect[responses]) en lugar de setResponses updater. Razón crítica:
+    // setResponses(updater) es asíncrono en React 18 — el updater puede no
+    // haber ejecutado cuando `await save(mergedForSave)` lee la variable.
+    // Resultado del bug previo: mergedForSave={} → PATCH responses vacío →
+    // anti-wipe guard 409 → banner "Conflicto de edición" engañoso →
+    // data IA NUNCA se guarda en DB.
     if (Object.keys(accum).length > 0) {
-      let mergedForSave: QuestionnaireResponseData = {};
-      setResponses((prev) => {
-        mergedForSave = { ...prev, ...accum };
-        return mergedForSave;
-      });
+      const mergedForSave: QuestionnaireResponseData = { ...responsesRef.current, ...accum };
+      setResponses(mergedForSave);
+      // Espejar ref inmediato para que save() lea el merge correcto aunque
+      // el useEffect[responses] aún no haya corrido.
+      responsesRef.current = mergedForSave;
       dirty.current = true;
       await save(mergedForSave);
     }

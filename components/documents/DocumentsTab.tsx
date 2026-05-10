@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -85,6 +85,7 @@ export function DocumentsTab({
   const serviceLabelById = Object.fromEntries(serviceOptions.map((s) => [s.id, s.label]));
 
   const [filter, setFilter] = useState<"all" | DocMeta["kind"]>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<DocMeta | null>(null);
   const [previewing, setPreviewing] = useState<DocMeta | null>(null);
@@ -151,10 +152,15 @@ export function DocumentsTab({
   }
 
   const docs = data?.data ?? [];
-  // Filtro por kind + por servicio (uploadServiceIds sirve también como filtro activo)
+  // Auto-hide columnas vacías cuando no aportan información
+  const hasAnyService = docs.some((d) => d.service_ids.length > 0);
+  const hasNonOkStatus = docs.some((d) => d.parse_status !== "ok");
+  // Filtro por kind + por servicio (uploadServiceIds sirve también como filtro activo) + búsqueda por nombre
+  const q = searchQuery.trim().toLowerCase();
   const filtered = docs
     .filter((d) => filter === "all" || d.kind === filter)
-    .filter((d) => uploadServiceIds.length === 0 || uploadServiceIds.some((sid) => d.service_ids.includes(sid)));
+    .filter((d) => uploadServiceIds.length === 0 || uploadServiceIds.some((sid) => d.service_ids.includes(sid)))
+    .filter((d) => !q || d.file_name.toLowerCase().includes(q) || (d.source_url ?? "").toLowerCase().includes(q));
 
   const counts = {
     all: docs.length,
@@ -301,23 +307,52 @@ export function DocumentsTab({
         </div>
       </div>
 
-      {/* Filtros por kind — solo categorías con documentos */}
-      {docs.length > 0 && filterOptions.length > 1 && (
-        <div className="flex gap-1.5 mb-3">
-          {filterOptions.map((f) => (
-            <button
-              key={f.k}
-              type="button"
-              onClick={() => setFilter(f.k)}
-              className={`text-[11px] font-medium rounded-sm border px-2 py-1 transition-colors ${
-                filter === f.k
-                  ? "bg-brand-primary border-brand-primary text-white"
-                  : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
-              }`}
+      {/* Búsqueda + filtros por kind — solo cuando hay documentos */}
+      {docs.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {/* Search input */}
+          <div className="relative flex-1 min-w-[220px] max-w-[420px]">
+            <svg
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              {f.label}
-            </button>
-          ))}
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nombre o URL…"
+              className="font-sans w-full text-xs border border-slate-300 rounded pl-8 pr-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-[10px] px-1"
+                aria-label="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {filterOptions.length > 1 &&
+            filterOptions.map((f) => (
+              <button
+                key={f.k}
+                type="button"
+                onClick={() => setFilter(f.k)}
+                className={`text-[11px] font-medium rounded-sm border px-2.5 py-2 transition-colors ${
+                  filter === f.k
+                    ? "bg-brand-primary border-brand-primary text-white"
+                    : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
         </div>
       )}
 
@@ -391,10 +426,14 @@ export function DocumentsTab({
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tipo</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Nombre</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Categoría</th>
-                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Servicio</th>
+                {hasAnyService && (
+                  <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Servicio</th>
+                )}
                 <th className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tamaño</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Fecha</th>
-                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Estado</th>
+                {hasNonOkStatus && (
+                  <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Estado</th>
+                )}
                 <th className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Acciones</th>
               </tr>
             </thead>
@@ -437,102 +476,79 @@ export function DocumentsTab({
                         {KIND_LABEL[d.kind]}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5">
-                      {d.service_ids.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {d.service_ids.map((sid) => (
-                            <span
-                              key={sid}
-                              className="text-[10px] font-semibold rounded-sm px-1.5 py-0.5 bg-brand-primary-light/40 text-brand-primary-dark whitespace-nowrap"
-                            >
-                              {serviceLabelById[sid] ?? sid}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-slate-300">—</span>
-                      )}
-                    </td>
+                    {hasAnyService && (
+                      <td className="px-3 py-2.5">
+                        {d.service_ids.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {d.service_ids.map((sid) => (
+                              <span
+                                key={sid}
+                                className="text-[10px] font-semibold rounded-sm px-1.5 py-0.5 bg-brand-primary-light/40 text-brand-primary-dark whitespace-nowrap"
+                              >
+                                {serviceLabelById[sid] ?? sid}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">—</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-3 py-2.5 text-xs text-slate-600 text-right tabular-nums">
                       {formatSize(d.size_bytes)}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-600 tabular-nums">
+                    <td
+                      className="px-3 py-2.5 text-xs text-slate-600 tabular-nums"
+                      title={d.uploaded_by ? `Subido por ${d.uploaded_by}` : undefined}
+                    >
                       {new Date(d.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
                     </td>
-                    <td className="px-3 py-2.5">
-                      {d.parse_status === "ok" && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Convertido
-                        </span>
-                      )}
-                      {d.parse_status === "pending" && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
-                          <svg className="w-3.5 h-3.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                          Procesando
-                        </span>
-                      )}
-                      {d.parse_status === "failed" && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 font-semibold">
-                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
-                          Falló
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditingServices(d)}
-                          className="text-[11px] text-slate-600 hover:text-slate-900 hover:underline px-2 min-h-[40px] inline-flex items-center rounded transition-colors"
-                          title="Editar servicios"
-                        >
-                          Servicios
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => d.has_content ? setPreviewing(d) : undefined}
-                          disabled={!d.has_content}
-                          className={`text-[11px] px-2 min-h-[40px] inline-flex items-center transition-colors rounded ${
-                            d.has_content
-                              ? "text-brand-primary-dark hover:underline"
-                              : "text-slate-300 cursor-default"
-                          }`}
-                          title={d.has_content ? "Ver Markdown" : "Sin contenido extraído"}
-                        >
-                          Ver
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDownload(d)}
-                          className="text-[11px] text-slate-600 hover:text-slate-900 hover:underline px-2 min-h-[40px] inline-flex items-center rounded transition-colors"
-                          title="Descargar original"
-                        >
-                          Descargar
-                        </button>
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => setDeleting(d)}
-                            className="text-[11px] text-rose-600 hover:underline px-2 min-h-[40px] inline-flex items-center rounded transition-colors"
-                            title="Eliminar (solo admin)"
-                          >
-                            Borrar
-                          </button>
+                    {hasNonOkStatus && (
+                      <td className="px-3 py-2.5">
+                        {d.parse_status === "ok" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Convertido
+                          </span>
                         )}
-                      </div>
+                        {d.parse_status === "pending" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
+                            <svg className="w-3.5 h-3.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Procesando
+                          </span>
+                        )}
+                        {d.parse_status === "failed" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 font-semibold">
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            Falló
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-3 py-2.5 text-right">
+                      <RowActions
+                        doc={d}
+                        isAdmin={isAdmin}
+                        onPreview={() => setPreviewing(d)}
+                        onEditServices={() => setEditingServices(d)}
+                        onDownload={() => void handleDownload(d)}
+                        onDelete={() => setDeleting(d)}
+                      />
                     </td>
                   </tr>
                   {/* Error expandido inline — visible cuando parse falló */}
                   {d.parse_status === "failed" && d.parse_error && (
                     <tr className="bg-rose-50/50">
-                      <td colSpan={canExtract ? 9 : 8} className="px-3 py-2 text-[11px] text-rose-700">
+                      <td
+                        colSpan={6 + (canExtract ? 1 : 0) + (hasAnyService ? 1 : 0) + (hasNonOkStatus ? 1 : 0)}
+                        className="px-3 py-2 text-[11px] text-rose-700"
+                      >
                         <span className="font-semibold">Error de conversión:</span> {d.parse_error}
                       </td>
                     </tr>
@@ -544,9 +560,9 @@ export function DocumentsTab({
         </div>
       )}
 
-      {/* Footer extracción desde docs seleccionados */}
+      {/* Footer extracción desde docs seleccionados — sticky para no perder affordance al scrollear */}
       {canExtract && selectedDocIds.size > 0 && (
-        <div className="mt-3 flex items-center gap-3 px-4 py-3 bg-brand-primary/5 border border-brand-primary/20 rounded">
+        <div className="sticky bottom-3 z-10 mt-3 flex items-center gap-3 px-4 py-3 bg-white/95 backdrop-blur-sm border border-brand-primary/30 rounded shadow-md ring-1 ring-brand-primary/10">
           <span className="text-xs text-brand-primary-dark font-semibold shrink-0">
             {selectedDocIds.size} doc{selectedDocIds.size !== 1 ? "s" : ""} seleccionado{selectedDocIds.size !== 1 ? "s" : ""}
           </span>
@@ -1076,6 +1092,101 @@ function ServiceMultiSelect({
               className="w-full text-left px-3 py-1.5 text-[11px] text-slate-400 hover:text-slate-600 border-t border-slate-100 mt-1"
             >
               Limpiar selección
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// RowActions: Ver inline + kebab dropdown con Servicios/Descargar/Borrar
+// Reduce densidad de 4 botones a 2, evita scroll horizontal en tabla.
+// ──────────────────────────────────────────────────────────────────────────────
+function RowActions({
+  doc,
+  isAdmin,
+  onPreview,
+  onEditServices,
+  onDownload,
+  onDelete,
+}: {
+  doc: DocMeta;
+  isAdmin: boolean;
+  onPreview: () => void;
+  onEditServices: () => void;
+  onDownload: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative inline-flex items-center justify-end gap-0.5">
+      <button
+        type="button"
+        onClick={() => doc.has_content && onPreview()}
+        disabled={!doc.has_content}
+        className={`text-[11px] px-2 min-h-[40px] inline-flex items-center transition-colors rounded ${
+          doc.has_content
+            ? "text-brand-primary-dark hover:underline"
+            : "text-slate-300 cursor-default"
+        }`}
+        title={doc.has_content ? "Ver Markdown extraído" : "Sin contenido extraído"}
+      >
+        Ver
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Más acciones"
+        aria-expanded={open}
+        className="min-h-[40px] min-w-[32px] inline-flex items-center justify-center rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+        title="Más acciones"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded shadow-md min-w-[160px] py-1">
+          <button
+            type="button"
+            onClick={() => { onEditServices(); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            Servicios
+          </button>
+          <button
+            type="button"
+            onClick={() => { onDownload(); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            Descargar
+          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => { onDelete(); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 border-t border-slate-100"
+            >
+              Borrar
             </button>
           )}
         </div>

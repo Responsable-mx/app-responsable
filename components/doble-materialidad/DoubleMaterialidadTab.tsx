@@ -306,7 +306,7 @@ function CollapsibleStageSection({
             <div className="flex items-center gap-2.5 min-w-0">
               <span
                 id={`stage-lbl-${id}`}
-                className="text-sm font-semibold text-slate-800 truncate"
+                className="text-base font-semibold text-slate-800 truncate"
               >
                 {stageNum}. {label}
               </span>
@@ -344,7 +344,7 @@ function CollapsibleStageSection({
           <div className="flex items-center gap-2.5 min-w-0">
             <span
               id={`stage-lbl-${id}`}
-              className="text-sm font-semibold text-slate-800 truncate"
+              className="text-base font-semibold text-slate-800 truncate"
             >
               {stageNum}. {label}
             </span>
@@ -383,11 +383,11 @@ function CollapsibleStageSection({
           <div id={`${id}-body`} className="border-t border-slate-100 px-5 py-4">
             {children}
             {nextSection && (
-              <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+              <div className="mt-5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => scrollToDmSection(nextSection.id)}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand-primary hover:underline focus:outline-none"
+                  className="w-full flex items-center justify-center gap-1.5 bg-brand-primary text-white text-xs font-semibold py-2.5 rounded hover:bg-brand-primary-dark transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
                 >
                   {nextSection.label}
                   <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -473,19 +473,19 @@ function ContextoSection({
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Sector</p>
-            <p className="text-xs font-semibold text-slate-700 truncate">
+            <p className="text-sm font-semibold text-slate-800 truncate">
               {sector ? catalogLabel("sectors", sector) : "—"}
             </p>
           </div>
           <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tamaño</p>
-            <p className="text-xs font-semibold text-slate-700 truncate">
+            <p className="text-sm font-semibold text-slate-800 truncate">
               {size ? catalogLabel("client_sizes", size) : "—"}
             </p>
           </div>
           <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos</p>
-            <p className="text-xs font-semibold text-slate-700 leading-relaxed">
+            <p className="text-sm font-semibold text-slate-800 leading-relaxed">
               {frameworks && frameworks.length > 0
                 ? frameworks.map((f) => catalogLabel("frameworks", f)).join(", ")
                 : "—"}
@@ -494,31 +494,45 @@ function ContextoSection({
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        {progress ? (
-          <span
-            className={`text-xs font-bold px-2 py-0.5 rounded ${
-              isComplete
-                ? "bg-emerald-50 text-emerald-700"
-                : progress.filled > 0
-                ? "bg-amber-50 text-amber-700"
-                : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {isComplete ? "Completo" : `${progress.filled} / ${progress.total} preguntas`}
-          </span>
-        ) : (
-          <button
-            onClick={onGoToCuestionario}
-            className="text-xs text-brand-primary hover:underline"
-          >
-            El cuestionario está vacío. Complétalo primero →
+      {/* Barra de progreso — igual que mockup-v7 */}
+      {progress ? (
+        <div className="mb-3">
+          <div className="flex justify-between text-xs text-slate-600 mb-1.5">
+            <span className="font-medium">Campos completados</span>
+            <span className={`font-bold tabular-nums ${isComplete ? "text-emerald-600" : "text-brand-primary"}`}>
+              {progress.filled} / {progress.total}
+            </span>
+          </div>
+          <div className="h-[3px] bg-slate-200 overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 ${isComplete ? "bg-emerald-500" : "bg-brand-primary"}`}
+              style={{ width: `${Math.round((progress.filled / progress.total) * 100)}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={onGoToCuestionario}
+          className="text-xs text-brand-primary hover:underline mb-3 block"
+        >
+          El cuestionario está vacío. Complétalo primero →
+        </button>
+      )}
+
+      {/* Warning banner — campos pendientes (mockup-v7 pattern) */}
+      {progress && !isComplete && progress.filled > 0 && (
+        <div className="p-3 bg-amber-50 border border-amber-100 rounded text-xs text-amber-800 mb-3">
+          <strong>{progress.total - progress.filled} campos pendientes.</strong>{" "}
+          Completarlos mejora la calidad del reporte final.{" "}
+          <button onClick={onGoToCuestionario} className="underline font-semibold ml-0.5 hover:text-amber-900">
+            Ir al cuestionario →
           </button>
-        )}
-        <Button size="sm" variant="secondary" onClick={onGoToCuestionario}>
-          {isComplete ? "Ver cuestionario" : "Completar cuestionario"}
-        </Button>
-      </div>
+        </div>
+      )}
+
+      <Button size="sm" variant="secondary" onClick={onGoToCuestionario}>
+        {isComplete ? "Ver cuestionario" : "Completar cuestionario"}
+      </Button>
     </div>
   );
 }
@@ -2547,7 +2561,7 @@ export function DoubleMaterialidadTab({
               <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 shrink-0 select-none">
                 <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">←</kbd>
                 <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">→</kbd>
-                navegar
+                teclado
               </span>
             </div>
 

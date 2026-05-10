@@ -308,7 +308,7 @@ export function ClientTabs({
           Sticky: cuando Tier 1 sale de viewport, el strip queda fijo arriba con KPIs + progreso. */}
       <div
         ref={stripRef}
-        className="sticky top-0 z-30 border-y border-slate-200 bg-white mb-0 shadow-sm"
+        className="sticky top-0 z-30 border-t-2 border-b border-slate-200 bg-white mb-0 shadow-sm"
       >
         <div className={`max-w-6xl mx-auto flex items-center gap-3 flex-wrap ${stripCollapsed ? "py-1" : "py-2"}`}>
           {/* KPIs ejecutivos — sólo en modo expandido. Modo colapsado deja
@@ -341,26 +341,26 @@ export function ClientTabs({
 
               <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
 
-              {/* KPI: Certificaciones */}
-              <div className="flex items-center gap-2 min-w-[160px] max-w-[220px]">
+              {/* KPI: Certificaciones — slot dinámico (max 26 chars), trunca limpio si excede */}
+              <div className="flex items-center gap-2 min-w-0 max-w-[26ch]">
                 <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
                 <div className="min-w-0 cursor-help" title={fmtKpi(stripCerts, 200)}>
-                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripCerts, 28)}</div>
+                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripCerts, 26)}</div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Certificación</div>
                 </div>
               </div>
 
               <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
 
-              {/* KPI: Modelo ESG */}
-              <div className="flex items-center gap-2 min-w-[160px] max-w-[220px]">
+              {/* KPI: Modelo ESG — slot dinámico (max 26 chars), trunca limpio si excede */}
+              <div className="flex items-center gap-2 min-w-0 max-w-[26ch]">
                 <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 <div className="min-w-0 cursor-help" title={fmtKpi(stripModelo, 200)}>
-                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripModelo, 28)}</div>
+                  <div className="text-xs font-semibold text-slate-900 truncate">{fmtKpi(stripModelo, 26)}</div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Modelo ESG</div>
                 </div>
               </div>

@@ -201,6 +201,25 @@ function WizardEditor({
       // el componente ya no esté montado.
       if (dirty.current) {
         const snap = responsesRef.current;
+        // Guardrail anti-wipe: si el snap está vacío y la DB tenía data (sabemos
+        // porque lastServerUpdatedAt no es null), no enviar el PATCH. Defensa
+        // contra unmount keepalive con responsesRef stale o race condition que
+        // borre data legítima del usuario.
+        let filledCount = 0;
+        for (const stepKey in snap) {
+          const stepObj = snap[stepKey] as Record<string, unknown> | undefined;
+          if (!stepObj || typeof stepObj !== "object") continue;
+          for (const fieldKey in stepObj) {
+            const raw = stepObj[fieldKey];
+            if (isFieldResponse(raw) && isFieldFilled(raw.value)) filledCount++;
+          }
+        }
+        if (filledCount === 0 && lastServerUpdatedAt.current) {
+          // Skip flush: snap vacío sobre DB no-vacía = casi seguro stale/race.
+          // Mejor perder un cambio reciente que borrar todo lo guardado.
+          console.warn("[questionnaire] Unmount flush skipped — empty snap over non-empty DB (anti-wipe)");
+          return;
+        }
         const prog = computeProgress(schema, snap);
         const completedSections = steps
           .filter((s) => prog.sectionProgress[s.key]?.pct === 100 && s.fields.length > 0)

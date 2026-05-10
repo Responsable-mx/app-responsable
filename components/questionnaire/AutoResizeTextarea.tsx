@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 interface Props {
   value: string;
@@ -19,9 +19,22 @@ export function AutoResizeTextarea({ value, placeholder, className, onChange }: 
     el.style.height = el.scrollHeight + "px";
   }
 
-  useEffect(() => {
+  // useLayoutEffect corre tras DOM mount/value change antes del paint — evita
+  // flash de altura mínima al cargar valores largos del cuestionario.
+  useLayoutEffect(() => {
     resize();
   }, [value]);
+
+  // ResizeObserver re-mide cuando cambia el ancho del textarea (drawer abre/cierra
+  // y el grid pasa de 2→3 cols → textarea ancho baja → contenido reflowa más
+  // líneas). Sin esto, overflow-hidden + height stale truncan el texto visible.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => resize());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
     <textarea

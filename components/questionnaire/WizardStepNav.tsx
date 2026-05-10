@@ -25,7 +25,7 @@ export function WizardStepNav({
   onSelect,
 }: WizardStepNavProps) {
   return (
-    <aside className="space-y-1 sticky top-4 self-start max-h-[calc(100vh-6rem)] overflow-y-auto">
+    <aside className="space-y-1 sticky top-[68px] self-start max-h-[calc(100vh-84px)] overflow-y-auto">
       {steps.map((s, i) => {
         const sp = sectionProgress[s.key] ?? { filled: 0, total: s.fields.length, pct: 0 };
         const complete = sp.pct === 100 && s.fields.length > 0;

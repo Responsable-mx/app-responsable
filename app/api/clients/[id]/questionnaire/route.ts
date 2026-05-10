@@ -19,6 +19,21 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const DEFAULT_SERVICE = "doble-materialidad";
 
+// Cuenta campos con value no-vacío en un objeto de respuestas del cuestionario.
+// Usado por guardrail anti-wipe del PATCH.
+function countFilledFields(responses: QuestionnaireResponseData | Record<string, unknown>): number {
+  let count = 0;
+  for (const stepKey in responses) {
+    const step = (responses as Record<string, unknown>)[stepKey];
+    if (typeof step !== "object" || !step) continue;
+    for (const fieldKey in step as Record<string, unknown>) {
+      const raw = (step as Record<string, unknown>)[fieldKey];
+      if (isFieldResponse(raw) && isFieldFilled(raw.value)) count++;
+    }
+  }
+  return count;
+}
+
 export async function GET(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const user = await requireConsultorForClient(id);
@@ -129,6 +144,32 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         { error: validationErrors.join(" · "), validation_errors: validationErrors },
         { status: 422 }
       );
+    }
+
+    // Guardrail anti-wipe: bloquea PATCH que reduce drásticamente la cantidad
+    // de campos llenos. Defensa contra unmount keepalive con responsesRef
+    // stale o autosave race con state vacío. Si el consultor realmente quiere
+    // vaciar el cuestionario, debe hacerlo paso por paso (no en un PATCH masivo).
+    // Forzar reset solo con ?force=clear en query string.
+    const url = new URL(req.url);
+    const force = url.searchParams.get("force") === "clear";
+    if (!force) {
+      const beforeFilled = countFilledFields(before.response?.responses ?? {});
+      const afterFilled = countFilledFields(responsesIn);
+      // Umbral: si DB tenía >5 campos llenos y el PATCH deja <=1, bloquear.
+      // Permite cambios incrementales normales (1 campo a la vez) y permite
+      // borrar pequeñas secciones; bloquea wipes masivos.
+      if (beforeFilled > 5 && afterFilled <= 1) {
+        return NextResponse.json(
+          {
+            error: `Operación bloqueada: este PATCH reduciría de ${beforeFilled} a ${afterFilled} campos llenos. Si es intencional, repórtalo al equipo. (Anti-wipe accidental.)`,
+            wipe_blocked: true,
+            before_filled: beforeFilled,
+            after_filled: afterFilled,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const saved = await upsertQuestionnaireResponse({

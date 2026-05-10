@@ -525,7 +525,7 @@ export function ClientTabs({
           <div className={`flex items-center gap-2 relative ${!stripCollapsed ? "ml-auto pl-5 border-l border-slate-200" : ""}`}>
             <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mr-1">Cuestionario</span>
-              {questionnaireProgress?.filled ?? "–"}/{questionnaireProgress?.total ?? "–"}
+              {completedSteps}/{totalSteps ?? "–"}
             </span>
             <div className="w-20 h-1.5 bg-slate-200 shrink-0" aria-hidden="true">
               <div className="h-1.5 bg-brand-primary transition-all" style={{ width: `${overallPct}%` }} />

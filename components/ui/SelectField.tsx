@@ -33,9 +33,7 @@ export function SelectField({
   const uid = useId();
   const listId = `${externalId ?? uid}-listbox`;
 
-  // Todas las opciones incluyendo placeholder como índice 0
-  const allOptions: SelectOption[] = [{ value: "", label: placeholder }, ...options];
-
+  // Placeholder solo vive en el trigger (estado vacío). El listbox solo muestra opciones reales.
   // Click fuera → cerrar. No llamamos setFocusedIdx en el cuerpo del efecto
   // para evitar react-hooks/set-state-in-effect; el reset se hace dentro del callback.
   useEffect(() => {
@@ -57,18 +55,18 @@ export function SelectField({
       if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         setOpen(true);
-        setFocusedIdx(Math.max(0, allOptions.findIndex(o => o.value === value)));
+        setFocusedIdx(Math.max(0, options.findIndex(o => o.value === value)));
       }
     } else {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusedIdx(i => Math.min(i + 1, allOptions.length - 1));
+        setFocusedIdx(i => Math.min(i + 1, options.length - 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setFocusedIdx(i => Math.max(i - 1, 0));
       } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        if (focusedIdx >= 0) onChange(allOptions[focusedIdx]!.value);
+        if (focusedIdx >= 0) onChange(options[focusedIdx]!.value);
         setOpen(false); setFocusedIdx(-1);
       } else if (e.key === "Escape") {
         setOpen(false); setFocusedIdx(-1);
@@ -117,9 +115,9 @@ export function SelectField({
           tabIndex={-1}
           className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded shadow-sm min-w-full max-h-52 overflow-y-auto focus:outline-none"
         >
-          {allOptions.map((o, i) => (
+          {options.map((o, i) => (
             <li
-              key={o.value === "" ? "__placeholder__" : o.value}
+              key={o.value}
               id={`${externalId ?? uid}-opt-${i}`}
               role="option"
               aria-selected={value === o.value}

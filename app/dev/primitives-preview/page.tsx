@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SelectField } from "@/components/ui/SelectField";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import {
   SkeletonCard,
@@ -22,6 +23,7 @@ function PreviewInner() {
   const [openModal, setOpenModal] = useState(false);
   const [openConfirm, setOpenConfirm] = useState(false);
   const [inputErr, setInputErr] = useState(false);
+  const [selVal, setSelVal] = useState("");
 
   return (
     <main id="main-content" className="max-w-4xl mx-auto p-8 space-y-12">
@@ -67,6 +69,29 @@ function PreviewInner() {
             placeholder="forzar error"
             onChange={(e) => setInputErr(!e.target.value.includes("@"))}
           />
+        </div>
+      </section>
+
+      <section className="space-y-3" data-testid="selectfield-section">
+        <h2 className="text-xl font-semibold text-slate-700">SelectField</h2>
+        <p className="text-xs text-slate-600">
+          Placeholder solo en trigger. Listbox solo opciones reales.
+        </p>
+        <div className="max-w-xs">
+          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+            Paso del cuestionario
+          </label>
+          <SelectField
+            value={selVal}
+            onChange={setSelVal}
+            placeholder="Selecciona un paso…"
+            options={[
+              { value: "info-base", label: "Información base" },
+              { value: "gobierno", label: "Gobierno" },
+              { value: "ambiental", label: "Ambiental" },
+            ]}
+          />
+          <p className="mt-2 text-xs text-slate-600">value: {selVal || "(vacío)"}</p>
         </div>
       </section>
 

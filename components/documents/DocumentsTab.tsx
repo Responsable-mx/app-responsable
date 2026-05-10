@@ -90,7 +90,10 @@ export function DocumentsTab({
   const toast = useToast();
 
   const docs = data?.data ?? [];
-  const filtered = filter === "all" ? docs : docs.filter((d) => d.kind === filter);
+  // Filtro por kind + por servicio (uploadServiceIds sirve también como filtro activo)
+  const filtered = docs
+    .filter((d) => filter === "all" || d.kind === filter)
+    .filter((d) => uploadServiceIds.length === 0 || uploadServiceIds.some((sid) => d.service_ids.includes(sid)));
 
   const counts = {
     all: docs.length,
@@ -873,7 +876,7 @@ function ServiceMultiSelect({
 
   const label =
     selected.length === 0
-      ? "Sin servicio"
+      ? "Todos los servicios"
       : selected.length === 1
       ? (options.find((o) => o.id === selected[0])?.label ?? "1 servicio")
       : `${selected.length} servicios`;

@@ -51,6 +51,36 @@ const TYPE_BADGE: Record<DocMeta["file_type"], string> = {
   md: "MD",
 };
 
+// ── Iconos SVG inline (reemplazan emojis ✕ ⚠ ↗ — coherencia con design system) ──
+function IconX({ className = "w-3 h-3" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+function IconWarn({ className = "w-3 h-3" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+  );
+}
+function IconExtLink({ className = "w-3 h-3" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    </svg>
+  );
+}
+function IconPaste({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+  );
+}
+
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -101,12 +131,21 @@ export function DocumentsTab({
   // Muestra UI cuando el prop existe; el selector de pasos maneja el caso vacío/cargando.
   const canExtract = !!onExtractForStep;
   const hasSteps = (questionnaireSteps?.length ?? 0) > 0;
-  const [pasteOpen, setPasteOpen] = useState(false);
-  const [pasteText, setPasteText] = useState("");
+  // Paste flow ahora vive en modal dedicado (antes panel inline colapsable).
+  const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [extractStepKey, setExtractStepKey] = useState<string>("");
   const [extracting, setExtracting] = useState(false);
-  // Docs seleccionados para extracción desde biblioteca
+  // Docs seleccionados para extracción + bulk actions
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  // Bulk actions sobre selección
+  const [bulkKindOpen, setBulkKindOpen] = useState(false);
+  const [bulkServicesOpen, setBulkServicesOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const bulkMenuRef = useRef<HTMLDivElement>(null);
+  // Drag & drop upload
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepth = useRef(0);
 
   async function fetchDocContent(docId: string): Promise<string | null> {
     const res = await fetch(`/api/clients/${clientId}/documents/${docId}?mode=content`);
@@ -145,17 +184,147 @@ export function DocumentsTab({
     }
   }
 
-  function handleExtractPaste() {
-    if (!pasteText.trim() || !extractStepKey || !onExtractForStep) return;
-    onExtractForStep(extractStepKey, pasteText.trim().slice(0, 50_000));
-    setPasteOpen(false);
-    setPasteText("");
+  function handleExtractPaste(text: string, stepKey: string) {
+    if (!text.trim() || !stepKey || !onExtractForStep) return;
+    onExtractForStep(stepKey, text.trim().slice(0, 50_000));
+    setPasteModalOpen(false);
   }
 
+  // Bulk: cambiar kind de N documentos seleccionados
+  async function handleBulkKind(newKind: DocMeta["kind"]) {
+    const ids = Array.from(selectedDocIds);
+    if (ids.length === 0) return;
+    setBulkKindOpen(false);
+    let ok = 0;
+    const failures: string[] = [];
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/clients/${clientId}/documents/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: newKind }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          failures.push(j.error ?? `HTTP ${res.status}`);
+        } else {
+          ok++;
+        }
+      } catch (e) {
+        failures.push(e instanceof Error ? e.message : "error");
+      }
+    }
+    void mutate();
+    setSelectedDocIds(new Set());
+    if (ok > 0 && failures.length === 0) toast.push("success", `${ok} documento(s) actualizados`);
+    else if (ok > 0) toast.push("warning", `${ok} OK · ${failures.length} fallaron`);
+    else toast.push("error", failures[0] ?? "Error en bulk update");
+  }
+
+  // Bulk: cambiar service_ids de N documentos seleccionados
+  async function handleBulkServices(serviceIds: string[]) {
+    const ids = Array.from(selectedDocIds);
+    if (ids.length === 0) return;
+    setBulkServicesOpen(false);
+    let ok = 0;
+    const failures: string[] = [];
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/clients/${clientId}/documents/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ service_ids: serviceIds }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          failures.push(j.error ?? `HTTP ${res.status}`);
+        } else {
+          ok++;
+        }
+      } catch (e) {
+        failures.push(e instanceof Error ? e.message : "error");
+      }
+    }
+    void mutate();
+    setSelectedDocIds(new Set());
+    if (ok > 0 && failures.length === 0) toast.push("success", `${ok} documento(s) actualizados`);
+    else if (ok > 0) toast.push("warning", `${ok} OK · ${failures.length} fallaron`);
+    else toast.push("error", failures[0] ?? "Error en bulk update");
+  }
+
+  // Bulk: eliminar N documentos seleccionados (solo admin)
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedDocIds);
+    if (ids.length === 0) return;
+    setBulkDeleteOpen(false);
+    let ok = 0;
+    const failures: string[] = [];
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/clients/${clientId}/documents/${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          failures.push(j.error ?? `HTTP ${res.status}`);
+        } else {
+          ok++;
+        }
+      } catch (e) {
+        failures.push(e instanceof Error ? e.message : "error");
+      }
+    }
+    void mutate();
+    setSelectedDocIds(new Set());
+    if (ok > 0 && failures.length === 0) toast.push("success", `${ok} documento(s) eliminados`);
+    else if (ok > 0) toast.push("warning", `${ok} OK · ${failures.length} fallaron`);
+    else toast.push("error", failures[0] ?? "Error al eliminar");
+  }
+
+  // Drag & drop upload — overlay sobre toda la tab
+  function onDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    if (!e.dataTransfer.types.includes("Files")) return;
+    dragDepth.current++;
+    setIsDragging(true);
+  }
+  function onDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current--;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setIsDragging(false);
+    }
+  }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setIsDragging(false);
+    if (e.dataTransfer.files?.length) void handleUpload(e.dataTransfer.files);
+  }
+
+  // Cerrar menú bulk al click fuera o Escape
+  useEffect(() => {
+    if (!bulkMenuOpen) return;
+    function onClickOutside(ev: MouseEvent) {
+      if (bulkMenuRef.current && !bulkMenuRef.current.contains(ev.target as Node)) setBulkMenuOpen(false);
+    }
+    function onEsc(ev: KeyboardEvent) {
+      if (ev.key === "Escape") setBulkMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [bulkMenuOpen]);
+
   const docs = data?.data ?? [];
-  // Auto-hide columnas vacías cuando no aportan información
-  const hasAnyService = docs.some((d) => d.service_ids.length > 0);
-  const hasNonOkStatus = docs.some((d) => d.parse_status !== "ok");
+  // Columnas Servicio + Estado siempre renderizadas (layout estable — el usuario no se confunde
+  // con cambios de columnas según data). Si vacío → "—".
   // Detección de duplicados — un hash que aparece 2+ veces marca todas sus filas
   const dupHashes = (() => {
     const counts = new Map<string, number>();
@@ -177,6 +346,11 @@ export function DocumentsTab({
     sustainability_report: docs.filter((d) => d.kind === "sustainability_report").length,
     financial_report: docs.filter((d) => d.kind === "financial_report").length,
   };
+
+  // Métricas de cobertura — strip 1 (info accionable en vez de label decorativo)
+  const withContent = docs.filter((d) => d.has_content).length;
+  const failedCount = docs.filter((d) => d.parse_status === "failed").length;
+  const lastCreatedAt = docs[0]?.created_at; // list devuelve desc
 
   async function handleUpload(files: FileList) {
     setUploading(true);
@@ -257,28 +431,63 @@ export function DocumentsTab({
   ];
 
   return (
-    <div className="px-1">
+    <div
+      className="px-1 relative"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      {/* Drag & drop overlay — visible solo cuando el usuario arrastra archivos sobre la tab */}
+      {isDragging && (
+        <div
+          className="absolute inset-0 z-40 flex items-center justify-center bg-brand-primary-light/95 border-2 border-dashed border-brand-primary rounded pointer-events-none"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="text-center">
+            <svg className="w-10 h-10 text-brand-primary-dark mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p className="text-sm font-semibold text-brand-primary-dark">Suelta para subir</p>
+            <p className="text-xs text-brand-primary-dark/70 mt-0.5">PDF, DOCX, XLSX, PPTX, TXT · Máx. 25 MB</p>
+          </div>
+        </div>
+      )}
+
       {/* Header con upload */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
             Documentos del cliente
           </p>
           <p className="text-xs text-slate-600 mt-0.5">
             {docs.length} archivo{docs.length === 1 ? "" : "s"} · convertidos a Markdown como contexto IA
           </p>
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            PDF, DOCX, XLSX, PPTX, TXT · Máx. 25 MB por archivo
+          <p className="text-xs text-slate-600 mt-0.5">
+            PDF, DOCX, XLSX, PPTX, TXT · Máx. 25 MB · arrastra archivos aquí
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Pegar texto — abre modal dedicado (antes panel inline colapsable) */}
+          {canExtract && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPasteModalOpen(true)}
+              title="Pegar texto para extracción al cuestionario"
+            >
+              <IconPaste className="w-3.5 h-3.5 mr-1" />
+              Pegar texto
+            </Button>
+          )}
           {/* Agente de búsqueda de documentos */}
           <Button
             variant="secondary"
             size="sm"
             onClick={() => setDiscoverOpen(true)}
           >
-            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             Buscar con IA
@@ -297,7 +506,7 @@ export function DocumentsTab({
             loading={uploading}
             onClick={() => fileInputRef.current?.click()}
           >
-            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
             </svg>
             Subir archivo
@@ -326,6 +535,7 @@ export function DocumentsTab({
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -340,10 +550,10 @@ export function DocumentsTab({
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-[10px] px-1"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded"
                 aria-label="Limpiar búsqueda"
               >
-                ✕
+                <IconX className="w-3 h-3" />
               </button>
             )}
           </div>
@@ -355,66 +565,14 @@ export function DocumentsTab({
                 onClick={() => setFilter(f.k)}
                 className={`text-[11px] font-medium rounded-sm border px-2.5 py-2 transition-colors ${
                   filter === f.k
-                    ? "bg-brand-primary border-brand-primary text-white"
+                    ? "bg-brand-primary-light border-brand-primary/30 text-brand-primary-dark"
                     : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
                 }`}
+                aria-pressed={filter === f.k}
               >
                 {f.label}
               </button>
             ))}
-        </div>
-      )}
-
-      {/* ── Zona extracción — solo visible cuando hay pasos de cuestionario disponibles ── */}
-      {canExtract && (
-        <div className="mb-4 border border-slate-200 rounded bg-white shadow-sm">
-          <button
-            type="button"
-            onClick={() => setPasteOpen((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 transition-colors rounded"
-          >
-            <span className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-              <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Pegar texto para extracción
-            </span>
-            <svg className={`w-4 h-4 text-slate-400 transition-transform ${pasteOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {pasteOpen && (
-            <div className="px-4 pb-4 pt-2 space-y-3 border-t border-slate-100">
-              <p className="text-xs text-slate-500">
-                Pega transcripción, notas o texto copiado. Aurora extraerá los campos del paso seleccionado.
-              </p>
-              <textarea
-                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-y min-h-[140px] max-h-[320px]"
-                placeholder="Pega aquí…"
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-400 tabular-nums -mt-1">{pasteText.length.toLocaleString()} / 50,000 chars</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <SelectField
-                    value={extractStepKey}
-                    onChange={setExtractStepKey}
-                    options={(questionnaireSteps ?? []).map((s) => ({ value: s.key, label: s.title }))}
-                    placeholder={hasSteps ? "Selecciona un paso…" : "Cargando pasos…"}
-                  />
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={!pasteText.trim() || pasteText.length < 10 || !extractStepKey || !hasSteps}
-                  onClick={handleExtractPaste}
-                >
-                  Extraer y llenar →
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -435,14 +593,11 @@ export function DocumentsTab({
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tipo</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Nombre</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Categoría</th>
-                {hasAnyService && (
-                  <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Servicio</th>
-                )}
+                {/* Columnas Servicio + Estado siempre renderizadas (layout estable). Si vacío → "—" */}
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Servicio</th>
                 <th className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tamaño</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Fecha</th>
-                {hasNonOkStatus && (
-                  <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Estado</th>
-                )}
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Estado</th>
                 <th className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Acciones</th>
               </tr>
             </thead>
@@ -463,19 +618,20 @@ export function DocumentsTab({
                       </td>
                     )}
                     <td className="px-3 py-2.5">
-                      <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
+                      <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-700 rounded-sm px-1.5 py-0.5">
                         {TYPE_BADGE[d.file_type]}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-800 font-medium max-w-[280px]">
+                    <td className="px-3 py-2.5 max-w-[280px]">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate">{d.file_name}</span>
+                        <span className="text-sm font-semibold text-slate-900 truncate">{d.file_name}</span>
                         {d.content_hash && dupHashes.has(d.content_hash) && (
                           <span
-                            className="shrink-0 text-[9px] font-bold uppercase tracking-wider rounded-sm px-1.5 py-0.5 bg-amber-100 text-amber-800 whitespace-nowrap"
+                            className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-sm px-1.5 py-0.5 bg-amber-100 text-amber-800 whitespace-nowrap"
                             title="Otro documento del cliente tiene el mismo contenido (hash MD5 idéntico). Considera borrar uno para no inflar el contexto IA."
                           >
-                            ⚠ Duplicado
+                            <IconWarn className="w-3 h-3" />
+                            Duplicado
                           </span>
                         )}
                       </div>
@@ -484,10 +640,11 @@ export function DocumentsTab({
                           href={d.source_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block text-[10px] text-slate-500 hover:text-slate-800 hover:underline truncate"
+                          className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:underline truncate max-w-full mt-0.5"
                           title={d.source_url}
                         >
-                          ↗ {d.source_url}
+                          <IconExtLink className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{d.source_url}</span>
                         </a>
                       )}
                     </td>
@@ -496,61 +653,55 @@ export function DocumentsTab({
                         {KIND_LABEL[d.kind]}
                       </span>
                     </td>
-                    {hasAnyService && (
-                      <td className="px-3 py-2.5">
-                        {d.service_ids.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {d.service_ids.map((sid) => (
-                              <span
-                                key={sid}
-                                className="text-[10px] font-semibold rounded-sm px-1.5 py-0.5 bg-brand-primary-light/40 text-brand-primary-dark whitespace-nowrap"
-                              >
-                                {serviceLabelById[sid] ?? sid}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">—</span>
-                        )}
-                      </td>
-                    )}
-                    <td className="px-3 py-2.5 text-xs text-slate-600 text-right tabular-nums">
+                    <td className="px-3 py-2.5">
+                      {d.service_ids.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {d.service_ids.map((sid) => (
+                            <span
+                              key={sid}
+                              className="text-[10px] font-semibold rounded-sm px-1.5 py-0.5 bg-slate-100 text-slate-700 whitespace-nowrap"
+                            >
+                              {serviceLabelById[sid] ?? sid}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-slate-700 text-right tabular-nums">
                       {formatSize(d.size_bytes)}
                     </td>
                     <td
-                      className="px-3 py-2.5 text-xs text-slate-600 tabular-nums"
+                      className="px-3 py-2.5 text-xs text-slate-700 tabular-nums"
                       title={d.uploaded_by ? `Subido por ${d.uploaded_by}` : undefined}
                     >
                       {new Date(d.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
                     </td>
-                    {hasNonOkStatus && (
-                      <td className="px-3 py-2.5">
-                        {d.parse_status === "ok" && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Convertido
-                          </span>
-                        )}
-                        {d.parse_status === "pending" && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
-                            <svg className="w-3.5 h-3.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Procesando
-                          </span>
-                        )}
-                        {d.parse_status === "failed" && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 font-semibold">
-                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            Falló
-                          </span>
-                        )}
-                      </td>
-                    )}
+                    <td className="px-3 py-2.5">
+                      {d.parse_status === "ok" && (
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold">
+                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Convertido
+                        </span>
+                      )}
+                      {d.parse_status === "pending" && (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-700 font-semibold">
+                          <svg className="w-3.5 h-3.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Procesando
+                        </span>
+                      )}
+                      {d.parse_status === "failed" && (
+                        <span className="inline-flex items-center gap-1 text-xs text-rose-700 font-semibold">
+                          <IconWarn className="w-3.5 h-3.5 shrink-0" />
+                          Falló
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-right">
                       <RowActions
                         doc={d}
@@ -566,8 +717,8 @@ export function DocumentsTab({
                   {d.parse_status === "failed" && d.parse_error && (
                     <tr className="bg-rose-50/50">
                       <td
-                        colSpan={6 + (canExtract ? 1 : 0) + (hasAnyService ? 1 : 0) + (hasNonOkStatus ? 1 : 0)}
-                        className="px-3 py-2 text-[11px] text-rose-700"
+                        colSpan={8 + (canExtract ? 1 : 0)}
+                        className="px-3 py-2 text-xs text-rose-700"
                       >
                         <span className="font-semibold">Error de conversión:</span> {d.parse_error}
                       </td>
@@ -580,33 +731,91 @@ export function DocumentsTab({
         </div>
       )}
 
-      {/* Footer extracción desde docs seleccionados — sticky para no perder affordance al scrollear */}
-      {canExtract && selectedDocIds.size > 0 && (
-        <div className="sticky bottom-3 z-10 mt-3 flex items-center gap-3 px-4 py-3 bg-white/95 backdrop-blur-sm border border-brand-primary/30 rounded shadow-md ring-1 ring-brand-primary/10">
+      {/* Footer sticky — visible cuando hay selección. Combina extracción + bulk actions
+          (cambiar categoría, cambiar servicios, borrar admin) sobre la selección. */}
+      {selectedDocIds.size > 0 && (
+        <div
+          className="sticky bottom-3 z-10 mt-3 flex items-center gap-3 px-4 py-3 bg-white/95 backdrop-blur-sm border border-brand-primary/30 rounded shadow-sm ring-1 ring-brand-primary/10"
+          role="region"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <span className="text-xs text-brand-primary-dark font-semibold shrink-0">
             {selectedDocIds.size} doc{selectedDocIds.size !== 1 ? "s" : ""} seleccionado{selectedDocIds.size !== 1 ? "s" : ""}
           </span>
-          <div className="flex-1">
-            <SelectField
-              value={extractStepKey}
-              onChange={setExtractStepKey}
-              options={(questionnaireSteps ?? []).map((s) => ({ value: s.key, label: s.title }))}
-              placeholder={hasSteps ? "Selecciona un paso…" : "Cargando pasos…"}
-            />
+          {canExtract && (
+            <>
+              <div className="flex-1 min-w-[180px]">
+                <SelectField
+                  value={extractStepKey}
+                  onChange={setExtractStepKey}
+                  options={(questionnaireSteps ?? []).map((s) => ({ value: s.key, label: s.title }))}
+                  placeholder={hasSteps ? "Selecciona un paso…" : "Cargando pasos…"}
+                />
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={extracting}
+                disabled={!extractStepKey || !hasSteps}
+                onClick={() => void handleExtractFromDocs()}
+              >
+                Extraer y llenar →
+              </Button>
+            </>
+          )}
+          {/* Bulk actions menu — categoría / servicios / borrar */}
+          <div ref={bulkMenuRef} className="relative">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setBulkMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={bulkMenuOpen}
+            >
+              Más acciones
+              <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
+            {bulkMenuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 bottom-full mb-1 z-30 bg-white border border-slate-200 rounded shadow-sm min-w-[200px] py-1"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setBulkKindOpen(true); setBulkMenuOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  Cambiar categoría
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setBulkServicesOpen(true); setBulkMenuOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  Cambiar servicios
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setBulkDeleteOpen(true); setBulkMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 border-t border-slate-100"
+                  >
+                    Borrar seleccionados
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <Button
-            variant="primary"
-            size="sm"
-            loading={extracting}
-            disabled={!extractStepKey || !hasSteps}
-            onClick={() => void handleExtractFromDocs()}
-          >
-            Extraer y llenar →
-          </Button>
           <button
             type="button"
             onClick={() => setSelectedDocIds(new Set())}
-            className="text-xs text-slate-400 hover:text-slate-600 shrink-0"
+            className="text-xs text-slate-600 hover:text-slate-900 shrink-0 underline-offset-2 hover:underline"
           >
             Limpiar
           </button>
@@ -647,7 +856,218 @@ export function DocumentsTab({
           onCancel={() => setDeleting(null)}
         />
       )}
+
+      {/* Modal: pegar texto para extracción al cuestionario (antes panel inline colapsable) */}
+      {pasteModalOpen && canExtract && (
+        <PasteExtractModal
+          questionnaireSteps={questionnaireSteps ?? []}
+          initialStepKey={extractStepKey}
+          onExtract={(text, stepKey) => {
+            setExtractStepKey(stepKey);
+            handleExtractPaste(text, stepKey);
+          }}
+          onClose={() => setPasteModalOpen(false)}
+        />
+      )}
+
+      {/* Modal: bulk cambiar categoría de N documentos */}
+      {bulkKindOpen && (
+        <BulkKindModal
+          count={selectedDocIds.size}
+          onConfirm={handleBulkKind}
+          onClose={() => setBulkKindOpen(false)}
+        />
+      )}
+
+      {/* Modal: bulk cambiar servicios de N documentos */}
+      {bulkServicesOpen && (
+        <BulkServicesModal
+          count={selectedDocIds.size}
+          serviceOptions={serviceOptions}
+          onConfirm={handleBulkServices}
+          onClose={() => setBulkServicesOpen(false)}
+        />
+      )}
+
+      {/* Confirm: bulk delete (solo admin) */}
+      {bulkDeleteOpen && (
+        <ConfirmModal
+          open
+          title={`Eliminar ${selectedDocIds.size} documento${selectedDocIds.size !== 1 ? "s" : ""}`}
+          description="Se borrarán del Storage y la base de datos. Acción irreversible."
+          tone="destructive"
+          confirmLabel="Eliminar"
+          onConfirm={async () => handleBulkDelete()}
+          onCancel={() => setBulkDeleteOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// PasteExtractModal — reemplaza panel colapsable inline (UX: single source of truth)
+// ──────────────────────────────────────────────────────────────────────────────
+function PasteExtractModal({
+  questionnaireSteps,
+  initialStepKey,
+  onExtract,
+  onClose,
+}: {
+  questionnaireSteps: { key: string; title: string }[];
+  initialStepKey: string;
+  onExtract: (text: string, stepKey: string) => void;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [stepKey, setStepKey] = useState(initialStepKey);
+  const hasSteps = questionnaireSteps.length > 0;
+  const canSubmit = text.trim().length >= 10 && !!stepKey && hasSteps;
+  return (
+    <Modal open onClose={onClose} title="Pegar texto para extracción">
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-slate-600">
+          Pega transcripción, notas o texto copiado. Aurora extraerá los campos del paso seleccionado.
+        </p>
+        <textarea
+          className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-y min-h-[180px] max-h-[360px]"
+          placeholder="Pega aquí…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          autoFocus
+        />
+        <p className="text-[11px] text-slate-500 tabular-nums -mt-1">
+          {text.length.toLocaleString()} / 50,000 chars
+        </p>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+            Paso del cuestionario
+          </p>
+          <SelectField
+            value={stepKey}
+            onChange={setStepKey}
+            options={questionnaireSteps.map((s) => ({ value: s.key, label: s.title }))}
+            placeholder={hasSteps ? "Selecciona un paso…" : "Cargando pasos…"}
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!canSubmit}
+            onClick={() => onExtract(text, stepKey)}
+          >
+            Extraer y llenar →
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// BulkKindModal — cambia el `kind` de N documentos seleccionados
+// ──────────────────────────────────────────────────────────────────────────────
+function BulkKindModal({
+  count,
+  onConfirm,
+  onClose,
+}: {
+  count: number;
+  onConfirm: (kind: DocMeta["kind"]) => void;
+  onClose: () => void;
+}) {
+  const [kind, setKind] = useState<DocMeta["kind"]>("general");
+  return (
+    <Modal open onClose={onClose} title={`Cambiar categoría de ${count} documento${count !== 1 ? "s" : ""}`}>
+      <div className="flex flex-col gap-4">
+        <p className="text-xs text-slate-600">
+          La categoría afecta cómo la IA prioriza estos documentos. Reversible.
+        </p>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+            Nueva categoría
+          </p>
+          <SelectField
+            value={kind}
+            onChange={(v) => setKind(v as DocMeta["kind"])}
+            options={[
+              { value: "general", label: "General" },
+              { value: "sustainability_report", label: "Sustentabilidad" },
+              { value: "financial_report", label: "Financiero" },
+            ]}
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" size="sm" onClick={() => onConfirm(kind)}>
+            Aplicar a {count}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// BulkServicesModal — reemplaza service_ids de N documentos seleccionados
+// ──────────────────────────────────────────────────────────────────────────────
+function BulkServicesModal({
+  count,
+  serviceOptions,
+  onConfirm,
+  onClose,
+}: {
+  count: number;
+  serviceOptions: ServiceOption[];
+  onConfirm: (ids: string[]) => void;
+  onClose: () => void;
+}) {
+  const [selected, setSelected] = useState<string[]>([]);
+  return (
+    <Modal open onClose={onClose} title={`Cambiar servicios de ${count} documento${count !== 1 ? "s" : ""}`}>
+      <div className="flex flex-col gap-4">
+        <p className="text-xs text-slate-600">
+          Reemplaza por completo la lista de servicios en los documentos seleccionados.
+          Deja vacío para limpiar todas las asociaciones.
+        </p>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+            Servicios
+          </p>
+          {serviceOptions.length === 0 ? (
+            <p className="text-xs text-slate-600">Cargando catálogo…</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {serviceOptions.map((o) => (
+                <label key={o.id} className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.id)}
+                    onChange={(e) =>
+                      setSelected(
+                        e.target.checked
+                          ? [...selected, o.id]
+                          : selected.filter((s) => s !== o.id)
+                      )
+                    }
+                    className="rounded border-slate-300 text-brand-primary"
+                  />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" size="sm" onClick={() => onConfirm(selected)}>
+            Aplicar a {count}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -696,16 +1116,16 @@ function EditServicesModal({
     <Modal open onClose={onClose} title="Editar servicios del documento">
       <div className="flex flex-col gap-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Documento</p>
-          <p className="text-sm font-medium text-slate-800 truncate">{doc.file_name}</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Documento</p>
+          <p className="text-sm font-semibold text-slate-900 truncate">{doc.file_name}</p>
         </div>
 
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
             Servicios que usa este documento
           </p>
           {serviceOptions.length === 0 ? (
-            <p className="text-xs text-slate-400">Cargando catálogo…</p>
+            <p className="text-xs text-slate-600">Cargando catálogo…</p>
           ) : (
             <div className="flex flex-col gap-1.5">
               {serviceOptions.map((o) => (
@@ -936,6 +1356,7 @@ function DiscoverModal({
                           setSelected(e.target.checked ? new Set(candidates.map((_, i) => i)) : new Set())
                         }
                         className="rounded border-slate-300"
+                        aria-label={selected.size === candidates.length ? "Deseleccionar todos" : "Seleccionar todos"}
                       />
                     </th>
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Título</th>
@@ -965,6 +1386,7 @@ function DiscoverModal({
                               setSelected(next);
                             }}
                             className="rounded border-slate-300"
+                            aria-label={`Seleccionar ${c.title}`}
                           />
                         </td>
                         <td className="px-3 py-2.5 max-w-[260px]">
@@ -972,27 +1394,27 @@ function DiscoverModal({
                             href={c.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-brand-primary-dark hover:underline font-medium leading-snug line-clamp-2"
+                            className="text-brand-primary-dark hover:underline font-semibold leading-snug line-clamp-2"
                           >
                             {c.title}
                           </a>
-                          <span className="block text-[10px] text-slate-400 truncate mt-0.5">{c.url}</span>
+                          <span className="block text-xs text-slate-600 truncate mt-0.5">{c.url}</span>
                         </td>
-                        <td className="px-3 py-2.5 tabular-nums text-slate-600">
+                        <td className="px-3 py-2.5 tabular-nums text-slate-700 text-xs">
                           {c.year ?? "—"}
                         </td>
-                        <td className="px-3 py-2.5">
-                          <select
+                        <td className="px-3 py-2.5 min-w-[160px]">
+                          <SelectField
                             value={kindOverride[idx] ?? c.kind}
-                            onChange={(e) =>
-                              setKindOverride((p) => ({ ...p, [idx]: e.target.value as Candidate["kind"] }))
+                            onChange={(v) =>
+                              setKindOverride((p) => ({ ...p, [idx]: v as Candidate["kind"] }))
                             }
                             disabled={!!result}
-                            className="text-[11px] border border-slate-300 rounded px-1.5 py-1 bg-white text-slate-700"
-                          >
-                            <option value="sustainability_report">Sustentabilidad</option>
-                            <option value="financial_report">Financiero</option>
-                          </select>
+                            options={[
+                              { value: "sustainability_report", label: "Sustentabilidad" },
+                              { value: "financial_report", label: "Financiero" },
+                            ]}
+                          />
                         </td>
                         <td className="px-3 py-2.5">
                           {serviceOptions.length > 0 && (
@@ -1004,17 +1426,17 @@ function DiscoverModal({
                           )}
                         </td>
                         <td className="px-3 py-2.5">
-                          {!result && <span className="text-[10px] text-slate-400">Pendiente</span>}
+                          {!result && <span className="text-xs text-slate-500">Pendiente</span>}
                           {result?.ok && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                               </svg>
                               Ingresado
                             </span>
                           )}
                           {result && !result.ok && (
-                            <span className="text-[10px] text-rose-700 font-semibold" title={result.msg}>
+                            <span className="text-xs text-rose-700 font-semibold" title={result.msg}>
                               Error
                             </span>
                           )}
@@ -1035,7 +1457,7 @@ function DiscoverModal({
                 Buscar de nuevo
               </button>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-500">{selected.size} seleccionado{selected.size !== 1 ? "s" : ""}</span>
+                <span className="text-xs text-slate-700" aria-live="polite">{selected.size} seleccionado{selected.size !== 1 ? "s" : ""}</span>
                 <Button
                   variant="primary"
                   size="sm"
@@ -1109,7 +1531,7 @@ function ServiceMultiSelect({
             <button
               type="button"
               onClick={() => onChange([])}
-              className="w-full text-left px-3 py-1.5 text-[11px] text-slate-400 hover:text-slate-600 border-t border-slate-100 mt-1"
+              className="w-full text-left px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900 border-t border-slate-100 mt-1"
             >
               Limpiar selección
             </button>
@@ -1185,7 +1607,7 @@ function RowActions({
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded shadow-md min-w-[160px] py-1">
+        <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded shadow-sm min-w-[160px] py-1">
           <button
             type="button"
             onClick={() => { onEditServices(); setOpen(false); }}
@@ -1229,10 +1651,10 @@ function PreviewModal({ clientId, doc, onClose }: { clientId: string; doc: DocMe
   return (
     <Modal open onClose={onClose} title={`Vista previa: ${doc.file_name}`}>
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 uppercase tracking-widest">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
           Markdown extraído · {doc.file_type.toUpperCase()} · {(doc.size_bytes / 1024).toFixed(0)} KB
         </p>
-        {isLoading && <p className="text-sm text-slate-500">Cargando contenido…</p>}
+        {isLoading && <p className="text-sm text-slate-600">Cargando contenido…</p>}
         {error && <p className="text-sm text-rose-700">Error al cargar contenido</p>}
         {data && (
           <pre className="font-mono text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded p-3 max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words">

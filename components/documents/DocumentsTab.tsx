@@ -96,7 +96,9 @@ export function DocumentsTab({
   const toast = useToast();
 
   // ── Extracción hacia cuestionario ─────────────────────────────────────────
-  const canExtract = !!onExtractForStep && (questionnaireSteps?.length ?? 0) > 0;
+  // Muestra UI cuando el prop existe; el selector de pasos maneja el caso vacío/cargando.
+  const canExtract = !!onExtractForStep;
+  const hasSteps = (questionnaireSteps?.length ?? 0) > 0;
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [extractStepKey, setExtractStepKey] = useState<string>("");
@@ -355,13 +357,13 @@ export function DocumentsTab({
                     value={extractStepKey}
                     onChange={setExtractStepKey}
                     options={(questionnaireSteps ?? []).map((s) => ({ value: s.key, label: s.title }))}
-                    placeholder="Selecciona un paso…"
+                    placeholder={hasSteps ? "Selecciona un paso…" : "Cargando pasos…"}
                   />
                 </div>
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={!pasteText.trim() || pasteText.length < 10 || !extractStepKey}
+                  disabled={!pasteText.trim() || pasteText.length < 10 || !extractStepKey || !hasSteps}
                   onClick={handleExtractPaste}
                 >
                   Extraer y llenar →
@@ -553,14 +555,14 @@ export function DocumentsTab({
               value={extractStepKey}
               onChange={setExtractStepKey}
               options={(questionnaireSteps ?? []).map((s) => ({ value: s.key, label: s.title }))}
-              placeholder="Selecciona un paso…"
+              placeholder={hasSteps ? "Selecciona un paso…" : "Cargando pasos…"}
             />
           </div>
           <Button
             variant="primary"
             size="sm"
             loading={extracting}
-            disabled={!extractStepKey}
+            disabled={!extractStepKey || !hasSteps}
             onClick={() => void handleExtractFromDocs()}
           >
             Extraer y llenar →

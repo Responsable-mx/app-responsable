@@ -1,15 +1,22 @@
 "use client";
 
 import { Fragment, useEffect, useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import useSWR from "swr";
 import type { Client } from "@/lib/clients";
 import { getFieldValue, type FieldValue, type QuestionnaireBundle } from "@/lib/questionnaires/types";
+import { ClientAvatar } from "@/components/ClientAvatar";
+import { ClientHeaderActions } from "@/components/ClientHeaderActions";
+import { sectorPillClasses } from "@/lib/sectors";
 
 
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
 import { SkeletonDetail, SkeletonTable } from "@/components/ui/Skeleton";
+
+// Mini reference (cliente list) — usado para nav prev/next en el header fusionado
+type NavRef = { id: string; name: string } | null;
 
 // Los 6 tabs restantes son lazy: su JS (incluyendo react-markdown, swr fetchers,
 // scatter plot) solo descarga cuando el usuario abre el tab por primera vez.
@@ -39,6 +46,16 @@ type Props = {
   // Datos prefetched server-side. SWR los usa como fallback inicial y revalida
   // en background. Evita waterfall de 2 fetches al montar tabs.
   initialQuestionnaire?: QuestionnaireBundle | null;
+  // Header fusionado (Tier 1+2 en 1 fila). Datos antes en page.tsx.
+  serviceLabels?: Map<string, string>;
+  visibleServices?: string[];
+  prev?: NavRef;
+  next?: NavRef;
+  counter?: string;
+  showNavVisual?: boolean;
+  updatedLabel?: string;
+  updatedAt?: string;
+  metaTooltip?: string;
 };
 
 const questionnaireFetcher = (url: string) =>
@@ -68,6 +85,15 @@ export function ClientTabs({
   completeness,
   isAdmin = false,
   initialQuestionnaire,
+  serviceLabels,
+  visibleServices = [],
+  prev = null,
+  next = null,
+  counter = "",
+  showNavVisual = false,
+  updatedLabel = "",
+  updatedAt = "",
+  metaTooltip = "",
 }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -191,32 +217,8 @@ export function ClientTabs({
     return () => obs.disconnect();
   }, []);
 
-  // Strip Tier 2: colapsable. Default expandido. Estado persistido por cliente
-  // en localStorage — el consultor que ya conoce el contexto del cliente puede
-  // colapsar para ganar ~40px verticales en todas las tabs.
-  const stripKey = `clientStripCollapsed:${client.id}`;
-  const [stripCollapsed, setStripCollapsed] = useState(false);
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(stripKey);
-      if (stored === "1") setStripCollapsed(true);
-    } catch {
-      /* localStorage no disponible (SSR/private mode) — usa default */
-    }
-    // Solo al cambiar de cliente
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client.id]);
-  function toggleStripCollapsed() {
-    setStripCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(stripKey, next ? "1" : "0");
-      } catch {
-        /* no-op */
-      }
-      return next;
-    });
-  }
+  // (stripCollapsed feature removida en mayo-2026 al fusionar Tier 1+2.
+  // El header fusionado ya es lo suficientemente compacto y no necesita colapso.)
 
   // Tab scroll indicator — muestra flecha derecha cuando hay overflow horizontal
   const tablistRef = useRef<HTMLDivElement>(null);
@@ -408,188 +410,230 @@ export function ClientTabs({
           nombre del cliente dentro del strip (Tier 1 ya scrolleó fuera). */}
       <div ref={sentinelRef} className="h-px -mb-px" aria-hidden="true" />
 
-      {/* Strip Tier 2 — contexto ejecutivo del cliente.
-          Reemplaza el tab Resumen eliminado may-2026: 4 KPIs extraídos del cuestionario
-          + progreso global con dropdown de avance por paso.
-          Sticky: cuando Tier 1 sale de viewport, el strip queda fijo arriba con KPIs + progreso. */}
+      {/* Header fusionado (Tier 1+2 en 1 fila — Variante D del mockup).
+          Identidad izquierda + KPIs middle + bloque progreso ml-auto derecha.
+          Sticky: queda fijo arriba al scrollear. */}
       <div
         ref={stripRef}
-        className="sticky top-0 z-30 border-t-2 border-b border-slate-200 bg-white mb-0 shadow-sm"
+        className="sticky top-0 z-30 border-b border-slate-200 bg-white mb-0 shadow-sm"
       >
-        <div className={`max-w-7xl mx-auto flex items-center gap-3 flex-wrap ${stripCollapsed ? "py-1" : "py-2"}`}>
-          {/* Nombre del cliente visible solo cuando el strip está pinned
-              (Tier 1 fuera de viewport). Mantiene contexto al scrollear. */}
-          {stripPinned && (
-            <div className="flex items-center gap-2 shrink-0 max-w-[180px] pr-2 border-r border-slate-200" aria-hidden="false">
-              <span className="text-xs font-semibold text-slate-900 truncate">{client.name}</span>
-            </div>
+        <div className="max-w-7xl mx-auto flex items-center gap-2 flex-wrap px-1 py-2">
+          {/* ── Identidad ── breadcrumb + avatar + name + sector + size */}
+          <Link
+            href="/clientes"
+            className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-brand-primary-hover hover:bg-slate-50 rounded-sm px-1.5 py-1 transition-colors font-medium shrink-0"
+            title="Volver a lista de clientes"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Clientes</span>
+          </Link>
+          <span className="text-slate-300 shrink-0" aria-hidden="true">/</span>
+          <ClientAvatar name={client.name} logoUrl={client.logo_url} size="sm" />
+          <h1 className="text-base font-bold text-slate-900 leading-none whitespace-nowrap shrink-0">{client.name}</h1>
+          {client.sector && (
+            <Link
+              href={`/clientes?sector=${encodeURIComponent(client.sector)}`}
+              className={`inline-flex items-center text-[10px] font-medium rounded-sm px-2 py-0.5 transition-colors hover:opacity-80 shrink-0 ${sectorPillClasses(client.sector)}`}
+              title={metaTooltip || `Ver clientes del sector ${client.sector}`}
+            >
+              {client.sector}
+            </Link>
           )}
-          {/* KPIs ejecutivos — sólo en modo expandido. Modo colapsado deja
-              progress global + toggle, ahorra ~40px en tabs heavy-data.
-              Empty KPI (valor "—") es clickeable → jump al wizard step relacionado. */}
-          {!stripCollapsed && (
-            <>
-              {(() => {
-                const kpis: Array<{
-                  iconPath: string;
-                  label: string;
-                  value: string;
-                  full: string;
-                  stepKey: string;
-                  numeric?: boolean;
-                  show?: boolean;
-                }> = [
-                  {
-                    iconPath: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
-                    label: "Colaboradores",
-                    value: fmtKpi(stripEmpleados),
-                    full: fmtKpi(stripEmpleados, 200),
-                    stepKey: "informacion-general",
-                    numeric: true,
-                  },
-                  {
-                    iconPath: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-                    label: "Presencia",
-                    value: fmtKpi(stripPaises),
-                    full: fmtKpi(stripPaises, 200),
-                    stepKey: "informacion-general",
-                    show: showPresencia,
-                  },
-                  {
-                    iconPath: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-                    label: "Certificación",
-                    value: fmtKpi(stripCerts, 26),
-                    full: fmtKpi(stripCerts, 200),
-                    stepKey: "estrategia-y-madurez",
-                  },
-                  {
-                    iconPath: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
-                    label: "Modelo ESG",
-                    value: fmtKpi(stripModelo, 26),
-                    full: fmtKpi(stripModelo, 200),
-                    stepKey: "estrategia-y-madurez",
-                  },
-                ];
-                return kpis.filter((k) => k.show !== false).map((k, i, arr) => {
-                  const isEmpty = k.value === "—";
-                  const valueCls = `text-xs font-semibold truncate ${k.numeric ? "tabular-nums" : ""} ${isEmpty ? "text-slate-400" : "text-slate-900"}`;
-                  const inner = (
-                    <>
-                      <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={k.iconPath} />
-                      </svg>
-                      <div className="min-w-0">
-                        <div className={valueCls}>
-                          {isEmpty ? (
-                            <span className="inline-flex items-center gap-0.5">
-                              <span>—</span>
-                              <span className="text-brand-primary-dark text-[10px]" aria-hidden="true">+</span>
-                            </span>
-                          ) : (
-                            k.value
-                          )}
-                        </div>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{k.label}</div>
-                      </div>
-                    </>
-                  );
-                  return (
-                    <Fragment key={k.label}>
-                      {isEmpty ? (
-                        <button
-                          type="button"
-                          onClick={() => jumpToStep(k.stepKey)}
-                          className="flex items-center gap-2 min-w-0 max-w-[26ch] hover:bg-slate-100 rounded-sm px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 transition-colors cursor-pointer"
-                          title={`Capturar ${k.label} ahora`}
-                          aria-label={`Capturar ${k.label} en cuestionario`}
-                        >
-                          {inner}
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2 min-w-0 max-w-[26ch] cursor-help" title={k.full}>
-                          {inner}
-                        </div>
-                      )}
-                      {i < arr.length - 1 && <div className="w-px h-7 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />}
-                    </Fragment>
-                  );
-                });
-              })()}
-            </>
+          {client.size && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-medium rounded-sm px-2 py-0.5 bg-violet-50 text-violet-800 ring-1 ring-violet-200/60 shrink-0"
+              title={`Tamaño: ${client.size}`}
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              {client.size}
+            </span>
           )}
 
-          {/* Progreso global — visible siempre. Dropdown solo cuando NO estamos
-              en tab Cuestionario (allí el sidebar del wizard ya muestra los 9
-              pasos con su progreso → dropdown sería redundante). Mini-dots
-              inline dan glance state. */}
-          <div className={`flex items-center gap-2 relative ${!stripCollapsed ? "ml-auto pl-5 border-l border-slate-200" : ""}`}>
-            <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mr-1">Cuestionario</span>
-              {completedSteps}/{totalSteps ?? "–"}
-            </span>
-            <div className="w-20 h-1.5 bg-slate-200 shrink-0" aria-hidden="true">
-              <div className="h-1.5 bg-brand-primary transition-all" style={{ width: `${overallPct}%` }} />
+          {/* ── Divider entre identidad y KPIs ── */}
+          <div className="w-px h-6 bg-slate-200 shrink-0 mx-1" aria-hidden="true" />
+
+          {/* ── KPIs icon-only (label en tooltip) ── */}
+          {(() => {
+            const kpis: Array<{
+              iconPath: string;
+              label: string;
+              value: string;
+              full: string;
+              stepKey: string;
+              numeric?: boolean;
+              show?: boolean;
+            }> = [
+              {
+                iconPath: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
+                label: "Colaboradores",
+                value: fmtKpi(stripEmpleados),
+                full: fmtKpi(stripEmpleados, 200),
+                stepKey: "informacion-general",
+                numeric: true,
+              },
+              {
+                iconPath: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                label: "Presencia",
+                value: fmtKpi(stripPaises),
+                full: fmtKpi(stripPaises, 200),
+                stepKey: "informacion-general",
+                show: showPresencia,
+              },
+              {
+                iconPath: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                label: "Certificación",
+                value: fmtKpi(stripCerts, 22),
+                full: fmtKpi(stripCerts, 200),
+                stepKey: "estrategia-y-madurez",
+              },
+              {
+                iconPath: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
+                label: "Modelo ESG",
+                value: fmtKpi(stripModelo, 22),
+                full: fmtKpi(stripModelo, 200),
+                stepKey: "estrategia-y-madurez",
+              },
+            ];
+            return kpis.filter((k) => k.show !== false).map((k) => {
+              const isEmpty = k.value === "—";
+              const valueCls = `text-xs font-semibold ${k.numeric ? "tabular-nums" : ""} ${isEmpty ? "text-slate-400 italic" : "text-slate-900"}`;
+              const inner = (
+                <>
+                  <svg className="w-3.5 h-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={k.iconPath} />
+                  </svg>
+                  <span className={valueCls}>{k.value}</span>
+                  {isEmpty && <span className="text-brand-primary-dark text-[11px] font-bold" aria-hidden="true">+</span>}
+                </>
+              );
+              const wrapperCls = "inline-flex items-center gap-1.5 px-2 py-1 rounded-sm transition-colors max-w-[22ch] shrink-0";
+              return isEmpty ? (
+                <button
+                  key={k.label}
+                  type="button"
+                  onClick={() => jumpToStep(k.stepKey)}
+                  className={`${wrapperCls} hover:bg-amber-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40`}
+                  title={`${k.label} · No capturado — click para llenar`}
+                  aria-label={`Capturar ${k.label} en cuestionario`}
+                >
+                  {inner}
+                </button>
+              ) : (
+                <span
+                  key={k.label}
+                  className={`${wrapperCls} hover:bg-slate-50 cursor-help`}
+                  title={`${k.label} · ${k.full}`}
+                >
+                  {inner}
+                </span>
+              );
+            });
+          })()}
+
+          {/* ── Bloque progreso agrupado (ml-auto flota derecha) ──
+              Contiene: count + bar + dots + 29% + ↻ date + pencil edit
+              Cluster cohesivo con bg-slate-50 + border. */}
+          <div className="ml-auto flex items-center gap-2 shrink-0 relative">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded px-2 py-1">
+              <span className="text-[11px] text-slate-700 tabular-nums whitespace-nowrap">
+                {questionnaireProgress?.filled ?? "–"}/{questionnaireProgress?.total ?? "–"}
+              </span>
+              <div className="w-16 h-1 bg-slate-200 shrink-0" aria-hidden="true">
+                <div className="h-1 bg-brand-primary transition-all" style={{ width: `${overallPct}%` }} />
+              </div>
+              {/* Mini-dots: 1 por paso, click → jump. Glance del estado sin abrir dropdown */}
+              {questionnaireSteps.length > 0 && (
+                <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label="Avance por paso (mini)">
+                  {questionnaireSteps.map((step, i) => {
+                    const pct = sectionProg[step.key]?.pct ?? 0;
+                    const dotCls = pct === 100 ? "bg-brand-primary" : pct > 0 ? "bg-brand-accent" : "bg-slate-300";
+                    return (
+                      <button
+                        key={step.key}
+                        type="button"
+                        onClick={() => jumpToStep(step.key)}
+                        className={`w-1.5 h-1.5 rounded-full ${dotCls} hover:ring-2 hover:ring-brand-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/60 transition-shadow`}
+                        title={`${i + 1}. ${step.title} — ${pct}%`}
+                        aria-label={`Paso ${i + 1}: ${step.title}, ${pct} por ciento completado`}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {/* % visible siempre. Si tab != cuestionario, clickeable abre dropdown desglose */}
+              {tab !== "cuestionario" ? (
+                <button
+                  type="button"
+                  onClick={() => setShowStripDropdown((v) => !v)}
+                  className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm px-1 inline-flex items-center gap-0.5"
+                  aria-expanded={showStripDropdown}
+                  aria-haspopup="true"
+                  title="Ver avance por paso"
+                >
+                  {overallPct}% <span aria-hidden="true">▾</span>
+                </button>
+              ) : (
+                <span
+                  className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap px-1 inline-flex items-center"
+                  title={`${overallPct}% global del cuestionario`}
+                >
+                  {overallPct}%
+                </span>
+              )}
+              {/* Fecha actualización abreviada — ↻ + dd mmm */}
+              {updatedAt && (
+                <>
+                  <span className="w-px h-3 bg-slate-300 mx-0.5" aria-hidden="true" />
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] text-slate-600 tabular-nums whitespace-nowrap cursor-help"
+                    title={`${updatedLabel}: ${new Date(updatedAt).toLocaleString("es-MX")}`}
+                  >
+                    <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {new Date(updatedAt).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                  </span>
+                </>
+              )}
             </div>
-            {/* Mini-dots: 1 dot por paso, click → jump. Glance del estado de los 9 pasos sin abrir dropdown */}
-            {questionnaireSteps.length > 0 && (
-              <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label="Avance por paso (mini)">
-                {questionnaireSteps.map((step, i) => {
-                  const pct = sectionProg[step.key]?.pct ?? 0;
-                  const dotCls = pct === 100 ? "bg-brand-primary" : pct > 0 ? "bg-brand-accent" : "bg-slate-300";
-                  return (
-                    <button
-                      key={step.key}
-                      type="button"
-                      onClick={() => jumpToStep(step.key)}
-                      className={`w-2 h-2 rounded-full ${dotCls} hover:ring-2 hover:ring-brand-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/60 transition-shadow`}
-                      title={`${i + 1}. ${step.title} — ${pct}%`}
-                      aria-label={`Paso ${i + 1}: ${step.title}, ${pct} por ciento completado`}
-                    />
-                  );
-                })}
+
+            {/* Nav prev/next solo si >10 clientes */}
+            {showNavVisual && counter && (
+              <div className="flex items-center gap-0.5 text-slate-600 shrink-0">
+                <span className="text-[11px] tabular-nums mr-1" title="Orden alfabético">{counter}</span>
+                <Link
+                  href={prev ? `/clientes/${prev.id}` : "#"}
+                  aria-disabled={!prev}
+                  className={`p-1 rounded ${prev ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
+                  title={prev ? `${prev.name} · Alt+←` : "Sin anterior"}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Link>
+                <Link
+                  href={next ? `/clientes/${next.id}` : "#"}
+                  aria-disabled={!next}
+                  className={`p-1 rounded ${next ? "hover:bg-slate-100" : "opacity-30 pointer-events-none"}`}
+                  title={next ? `${next.name} · Alt+→` : "Sin siguiente"}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               </div>
             )}
-            {/* Dropdown desglose — oculto cuando tab=cuestionario (sidebar ya lo muestra) */}
-            {tab !== "cuestionario" && (
-              <button
-                type="button"
-                onClick={() => setShowStripDropdown((v) => !v)}
-                className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm px-2 py-2 min-h-[40px] inline-flex items-center gap-1"
-                aria-expanded={showStripDropdown}
-                aria-haspopup="true"
-                title="Ver avance por paso"
-              >
-                {overallPct}% <span aria-hidden="true">▾</span>
-              </button>
-            )}
-            {tab === "cuestionario" && (
-              <span
-                className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap px-2 py-2 min-h-[40px] inline-flex items-center"
-                title={`${overallPct}% global del cuestionario`}
-              >
-                {overallPct}%
-              </span>
-            )}
-            {/* Toggle colapsar/expandir el strip — persiste por cliente */}
-            <button
-              type="button"
-              onClick={toggleStripCollapsed}
-              className="text-slate-400 hover:text-slate-700 rounded-sm p-2 min-h-[40px] min-w-[40px] inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
-              aria-label={stripCollapsed ? "Expandir contexto del cliente" : "Colapsar contexto del cliente"}
-              title={stripCollapsed ? "Expandir contexto (KPIs)" : "Colapsar — más espacio para la tabla"}
-            >
-              <svg
-                className={`w-3.5 h-3.5 transition-transform ${stripCollapsed ? "" : "rotate-180"}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
 
-            {showStripDropdown && (
+            {/* Pencil editar — atajo E */}
+            <ClientHeaderActions clientId={client.id} clientName={client.name} isAdmin={isAdmin} />
+
+            {/* Dropdown desglose — relativo al wrapper ml-auto.
+                Solo visible cuando tab != cuestionario (allí el wizard sidebar ya muestra). */}
+            {showStripDropdown && tab !== "cuestionario" && (
               <div
                 role="dialog"
                 aria-label="Avance por paso"

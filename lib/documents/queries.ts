@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { detectFileType, parseToMarkdown, truncateMarkdown, type FileType } from "@/lib/documents/parsers";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 const BUCKET = "client-documents";
 
@@ -20,6 +20,7 @@ export type ClientDocument = {
   parse_status: "pending" | "ok" | "failed";
   parse_error: string | null;
   service_ids: string[];
+  content_hash: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -44,6 +45,10 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
   const sb = createAdminClient();
   const safeName = opts.fileName.replace(/[^\w\-.]+/g, "_").slice(0, 120);
   const storagePath = `${opts.clientId}/${randomUUID()}-${safeName}`;
+
+  // Hash MD5 del contenido binario — base de detección de duplicados por cliente.
+  // No es seguro criptográficamente; se usa solo como fingerprint, no para auth.
+  const contentHash = createHash("md5").update(opts.buffer).digest("hex");
 
   // 1. Subir a Storage
   const upload = await sb.storage.from(BUCKET).upload(storagePath, opts.buffer, {
@@ -88,6 +93,7 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
       parse_status: parseStatus,
       parse_error: parseError,
       service_ids: opts.serviceIds ?? [],
+      content_hash: contentHash,
     })
     .select("*")
     .single();

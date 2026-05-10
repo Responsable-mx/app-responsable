@@ -50,6 +50,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     parse_error: d.parse_error,
     has_content: !!d.markdown_content,
     service_ids: d.service_ids ?? [],
+    content_hash: d.content_hash ?? null,
     created_at: d.created_at,
     updated_at: d.updated_at,
   }));

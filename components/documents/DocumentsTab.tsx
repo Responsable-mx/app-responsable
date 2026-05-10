@@ -23,6 +23,7 @@ type DocMeta = {
   parse_error: string | null;
   has_content: boolean;
   service_ids: string[];
+  content_hash: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -155,6 +156,14 @@ export function DocumentsTab({
   // Auto-hide columnas vacías cuando no aportan información
   const hasAnyService = docs.some((d) => d.service_ids.length > 0);
   const hasNonOkStatus = docs.some((d) => d.parse_status !== "ok");
+  // Detección de duplicados — un hash que aparece 2+ veces marca todas sus filas
+  const dupHashes = (() => {
+    const counts = new Map<string, number>();
+    for (const d of docs) {
+      if (d.content_hash) counts.set(d.content_hash, (counts.get(d.content_hash) ?? 0) + 1);
+    }
+    return new Set(Array.from(counts.entries()).filter(([, n]) => n > 1).map(([h]) => h));
+  })();
   // Filtro por kind + por servicio (uploadServiceIds sirve también como filtro activo) + búsqueda por nombre
   const q = searchQuery.trim().toLowerCase();
   const filtered = docs
@@ -458,14 +467,25 @@ export function DocumentsTab({
                         {TYPE_BADGE[d.file_type]}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-800 font-medium max-w-[280px] truncate">
-                      {d.file_name}
+                    <td className="px-3 py-2.5 text-xs text-slate-800 font-medium max-w-[280px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{d.file_name}</span>
+                        {d.content_hash && dupHashes.has(d.content_hash) && (
+                          <span
+                            className="shrink-0 text-[9px] font-bold uppercase tracking-wider rounded-sm px-1.5 py-0.5 bg-amber-100 text-amber-800 whitespace-nowrap"
+                            title="Otro documento del cliente tiene el mismo contenido (hash MD5 idéntico). Considera borrar uno para no inflar el contexto IA."
+                          >
+                            ⚠ Duplicado
+                          </span>
+                        )}
+                      </div>
                       {d.source_url && (
                         <a
                           href={d.source_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block text-[10px] text-slate-400 hover:underline truncate"
+                          className="block text-[10px] text-slate-500 hover:text-slate-800 hover:underline truncate"
+                          title={d.source_url}
                         >
                           ↗ {d.source_url}
                         </a>

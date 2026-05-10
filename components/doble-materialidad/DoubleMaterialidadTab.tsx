@@ -497,10 +497,17 @@ function ContextoSection({
       {/* Barra de progreso — igual que mockup-v7 */}
       {progress ? (
         <div className="mb-3">
-          <div className="flex justify-between text-xs text-slate-600 mb-1.5">
+          <div className="flex justify-between items-center text-xs text-slate-600 mb-1.5">
             <span className="font-medium">Campos completados</span>
-            <span className={`font-bold tabular-nums ${isComplete ? "text-emerald-600" : "text-brand-primary"}`}>
-              {progress.filled} / {progress.total}
+            <span className="flex items-center gap-2">
+              <span className={`font-bold tabular-nums ${isComplete ? "text-emerald-600" : "text-brand-primary"}`}>
+                {progress.filled} / {progress.total}
+              </span>
+              {!isComplete && progress.total > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-sm tabular-nums whitespace-nowrap">
+                  {progress.total - progress.filled} pendientes
+                </span>
+              )}
             </span>
           </div>
           <div className="h-[3px] bg-slate-200 overflow-hidden">
@@ -530,9 +537,12 @@ function ContextoSection({
         </div>
       )}
 
-      <Button size="sm" variant="secondary" onClick={onGoToCuestionario}>
-        {isComplete ? "Ver cuestionario" : "Completar cuestionario"}
-      </Button>
+      {/* Solo mostrar botón si ya está completo (no competir con amber banner) */}
+      {isComplete && (
+        <Button size="sm" variant="secondary" onClick={onGoToCuestionario}>
+          Ver cuestionario
+        </Button>
+      )}
     </div>
   );
 }

@@ -111,12 +111,14 @@ export default async function EditarClientePage({ params }: Props) {
                   };
                   const targetTab = tabMap[s];
                   const label = serviceLabels.get(s) ?? s;
-                  const cls = "inline-flex items-center text-[10px] font-medium bg-brand-primary-light text-brand-primary-dark rounded-sm px-2 py-0.5";
+                  // Chip de servicio: slate neutral (NO brand-primary-light, reservado para
+                  // estados activos/progreso — evita choque visual con badges de tabs activos).
+                  const cls = "inline-flex items-center text-[10px] font-medium bg-slate-100 text-slate-700 rounded-sm px-2 py-0.5";
                   return targetTab ? (
                     <Link
                       key={s}
                       href={`?tab=${targetTab}`}
-                      className={`${cls} hover:bg-brand-primary/20 transition-colors`}
+                      className={`${cls} hover:bg-slate-200 transition-colors`}
                       title={`Ir a ${label}`}
                     >
                       {label}
@@ -126,7 +128,7 @@ export default async function EditarClientePage({ params }: Props) {
                   );
                 })}
                 {client.services.length > 2 && (
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] text-slate-600">
                     +{client.services.length - 2} más
                   </span>
                 )}

@@ -33,6 +33,29 @@ export default async function EditarClientePage({ params }: Props) {
   const metaTooltip = [client.sector, client.subsector, client.size].filter(Boolean).join(" · ");
   const meta = [client.sector, client.size].filter(Boolean).join(" · ");
 
+  // Dedupe Tier 1 vs Tier 2: si un servicio (chip Tier 1) ya aparece como
+  // certificación en el cuestionario (KPI Certificación en strip Tier 2),
+  // suprimir el chip para evitar duplicación visual (ej. chip "ESR" + KPI
+  // "ESR 2025" en cert). El KPI Tier 2 gana por aportar más contexto (año).
+  const certsTextLower = (() => {
+    const r = questionnaireBundle?.response?.responses?.["estrategia-y-madurez"];
+    if (!r) return "";
+    const raw = (r as Record<string, unknown>)["certificaciones"];
+    const extract = (val: unknown): string => {
+      if (typeof val === "string") return val;
+      if (Array.isArray(val)) return val.map(extract).join(" ");
+      if (val && typeof val === "object" && "value" in val) return extract((val as { value: unknown }).value);
+      return "";
+    };
+    return extract(raw).toLowerCase();
+  })();
+  const visibleServices = (client.services ?? []).filter((s) => {
+    const label = (serviceLabels.get(s) ?? s).toLowerCase().trim();
+    if (!label) return true;
+    // Si la cert KPI contiene la sigla/label del servicio → suprimir chip
+    return !certsTextLower.includes(label);
+  });
+
   // Nav prev/next por orden alfabético
   const sorted = [...allClients].sort((a, b) =>
     a.name.localeCompare(b.name, "es-MX", { sensitivity: "base" })
@@ -98,10 +121,10 @@ export default async function EditarClientePage({ params }: Props) {
           <h1 className="text-xl font-bold text-slate-900 leading-none">{client.name}</h1>
           {meta && <span className="text-slate-300" aria-hidden="true">·</span>}
           {meta && <span className="text-xs text-slate-600" title={metaTooltip}>{meta}</span>}
-          {client.services && client.services.length > 0 && (
+          {visibleServices.length > 0 && (
             <>
               <span className="text-slate-300" aria-hidden="true">·</span>
-              {client.services.slice(0, 2).map((s) => {
+              {visibleServices.slice(0, 2).map((s) => {
                 const tabMap: Record<string, string> = {
                   doble_materialidad: "materialidad",
                   doble_materialidad_ia: "doble-materialidad-ia",
@@ -124,9 +147,9 @@ export default async function EditarClientePage({ params }: Props) {
                   <span key={s} className={cls}>{label}</span>
                 );
               })}
-              {client.services.length > 2 && (
-                <span className="text-[10px] text-slate-600">
-                  +{client.services.length - 2} más
+              {visibleServices.length > 2 && (
+                <span className="text-[10px] text-slate-600" title={`${visibleServices.length - 2} servicio(s) adicional(es)`}>
+                  +{visibleServices.length - 2} más
                 </span>
               )}
             </>

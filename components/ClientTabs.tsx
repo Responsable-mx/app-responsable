@@ -257,9 +257,44 @@ export function ClientTabs({
   const qResponses = questionnaireResp?.data.response?.responses ?? {};
   const genResp = (qResponses["informacion-general"] ?? {}) as Record<string, unknown>;
   const sostResp = (qResponses["estrategia-y-madurez"] ?? {}) as Record<string, unknown>;
-  const stripEmpleados = getFieldValue(genResp["empleados"]);
+
+  // ─ Limpieza de redundancias: el label de cada KPI carga la unidad/contexto,
+  //   así que el value no debe repetirla. "3,400 colaboradores" + label
+  //   "COLABORADORES" = duplicado → mostrar solo "3,400". "Distintivo ESR
+  //   (Empresa Socialmente Responsable)" + label "CERTIFICACIÓN" + chip "ESR"
+  //   en Tier 1 = triplicado → mostrar solo "ESR" (limpio).
+
+  // Empleados: extrae primer número significativo o limpia sustantivos redundantes.
+  function cleanCount(v: FieldValue): FieldValue {
+    if (typeof v === "number") return v;
+    if (typeof v !== "string") return v;
+    const numMatch = v.match(/[\d][\d.,\s]*\d|\d/);
+    if (numMatch) {
+      const n = parseInt(numMatch[0].replace(/[^\d]/g, ""), 10);
+      if (!isNaN(n)) return n;
+    }
+    // Fallback: quita sustantivos comunes que duplican el label
+    return v.replace(/\b(colaborador(?:es)?|empleado(?:s)?|persona(?:s)?|trabajador(?:es)?|miembro(?:s)?)\b/gi, "").replace(/\s+/g, " ").trim();
+  }
+
+  // Certificaciones: quita prefijo "Distintivo " + paréntesis explicativos.
+  // "Distintivo ESR (Empresa Socialmente Responsable) 2025" → "ESR 2025"
+  function cleanCert(v: FieldValue): FieldValue {
+    function clean(s: string): string {
+      return s
+        .replace(/^\s*distintivo\s+/i, "")
+        .replace(/\s*\([^)]*\)\s*/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    if (typeof v === "string") return clean(v);
+    if (Array.isArray(v)) return (v as unknown[]).map((x) => (typeof x === "string" ? clean(x) : String(x))) as string[];
+    return v;
+  }
+
+  const stripEmpleados = cleanCount(getFieldValue(genResp["empleados"]));
   const stripPaises    = getFieldValue(genResp["paises"]);
-  const stripCerts     = getFieldValue(sostResp["certificaciones"]);
+  const stripCerts     = cleanCert(getFieldValue(sostResp["certificaciones"]));
   const stripModelo    = getFieldValue(sostResp["modelo_sostenibilidad"]);
 
   // Trunca por palabra Y antes de paréntesis abierto. Evita "Distintivo ESR (Empres…":

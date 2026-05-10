@@ -58,6 +58,7 @@ export function ImportModal({
   const [tab, setTab] = useState<Tab>("paste");
   const [pasteText, setPasteText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadKind, setUploadKind] = useState<"general" | "sustainability_report" | "financial_report">("sustainability_report");
   const [extracting, setExtracting] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +76,7 @@ export function ImportModal({
       setPasteText("");
       setSelectedDocIds(new Set());
       setTab("paste");
+      setUploadKind("sustainability_report");
     }
   }, [open]);
 
@@ -85,7 +87,7 @@ export function ImportModal({
     for (const file of Array.from(files)) {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("kind", "general");
+      fd.append("kind", uploadKind);
       try {
         const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
         if (!res.ok) {
@@ -227,6 +229,37 @@ export function ImportModal({
           <p className="text-xs text-slate-600">
             Sube PDF, Word, PowerPoint, Excel, TXT o Markdown (máx 25MB cada uno). Se convierten a texto y se guardan en el cliente para referencia futura.
           </p>
+          {/* Selector de tipo */}
+          <div className="flex gap-2">
+            {(
+              [
+                { k: "sustainability_report", label: "Sustentabilidad" },
+                { k: "financial_report", label: "Financiero" },
+                { k: "general", label: "General" },
+              ] as { k: typeof uploadKind; label: string }[]
+            ).map((opt) => (
+              <button
+                key={opt.k}
+                type="button"
+                onClick={() => setUploadKind(opt.k)}
+                className={`px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest transition-colors ${
+                  uploadKind === opt.k
+                    ? "bg-brand-primary text-white"
+                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400">
+            {uploadKind === "sustainability_report"
+              ? "Informe de sustentabilidad — Aurora lo usará como fuente primaria."
+              : uploadKind === "financial_report"
+              ? "Informe financiero — Aurora lo usará como fuente primaria."
+              : "Documento general — disponible en “Mis documentos” para pegar manualmente."}
+          </p>
+
           <div
             className="border-2 border-dashed border-slate-300 rounded p-6 text-center hover:border-brand-primary/50 transition-colors cursor-pointer"
             onClick={() => fileInputRef.current?.click()}

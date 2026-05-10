@@ -83,6 +83,7 @@ export function DocumentsTab({
   const [deleting, setDeleting] = useState<DocMeta | null>(null);
   const [previewing, setPreviewing] = useState<DocMeta | null>(null);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [editingServices, setEditingServices] = useState<DocMeta | null>(null);
   // Multi-select: IDs de servicios seleccionados para el próximo upload
   const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -358,6 +359,14 @@ export function DocumentsTab({
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
+                          onClick={() => setEditingServices(d)}
+                          className="text-[11px] text-slate-600 hover:text-slate-900 hover:underline px-2 min-h-[40px] inline-flex items-center rounded transition-colors"
+                          title="Editar servicios"
+                        >
+                          Servicios
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => d.has_content ? setPreviewing(d) : undefined}
                           disabled={!d.has_content}
                           className={`text-[11px] px-2 min-h-[40px] inline-flex items-center transition-colors rounded ${
@@ -405,6 +414,19 @@ export function DocumentsTab({
         </div>
       )}
 
+      {editingServices && (
+        <EditServicesModal
+          clientId={clientId}
+          doc={editingServices}
+          serviceOptions={serviceOptions}
+          onClose={() => setEditingServices(null)}
+          onSaved={() => {
+            setEditingServices(null);
+            void mutate();
+          }}
+        />
+      )}
+
       {discoverOpen && (
         <DiscoverModal
           clientId={clientId}
@@ -431,6 +453,95 @@ export function DocumentsTab({
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// EditServicesModal: edita service_ids de un documento existente
+// ──────────────────────────────────────────────────────────────────────────────
+function EditServicesModal({
+  clientId,
+  doc,
+  serviceOptions,
+  onClose,
+  onSaved,
+}: {
+  clientId: string;
+  doc: DocMeta;
+  serviceOptions: ServiceOption[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(doc.service_ids);
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_ids: selected }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error ?? `HTTP ${res.status}`);
+      }
+      toast.push("success", "Servicios actualizados");
+      onSaved();
+    } catch (e) {
+      toast.push("error", e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Editar servicios del documento">
+      <div className="flex flex-col gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Documento</p>
+          <p className="text-sm font-medium text-slate-800 truncate">{doc.file_name}</p>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+            Servicios que usa este documento
+          </p>
+          {serviceOptions.length === 0 ? (
+            <p className="text-xs text-slate-400">Cargando catálogo…</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {serviceOptions.map((o) => (
+                <label key={o.id} className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.id)}
+                    onChange={(e) =>
+                      setSelected(
+                        e.target.checked
+                          ? [...selected, o.id]
+                          : selected.filter((s) => s !== o.id)
+                      )
+                    }
+                    className="rounded border-slate-300 text-brand-primary"
+                  />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" size="sm" loading={saving} onClick={() => void handleSave()}>
+            Guardar
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // DiscoverModal: busca docs públicos del cliente con IA y los ingesta al aprobar
 // ──────────────────────────────────────────────────────────────────────────────
 type Candidate = {
@@ -438,6 +549,7 @@ type Candidate = {
   title: string;
   year?: number | string | null;
   kind: "sustainability_report" | "financial_report";
+  serviceIds?: string[];
 };
 
 type DiscoverState =
@@ -458,6 +570,12 @@ function DiscoverModal({
   const [state, setState] = useState<DiscoverState>({ status: "idle" });
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [kindOverride, setKindOverride] = useState<Record<number, Candidate["kind"]>>({});
+  const [serviceOverride, setServiceOverride] = useState<Record<number, string[]>>({});
+  const { data: catalogData } = useSWR<{ data: { id: string; value: string; label: string }[] }>(
+    `/api/catalogs?category=services`,
+    fetcher
+  );
+  const serviceOptions: ServiceOption[] = (catalogData?.data ?? []).map((c) => ({ id: c.id, label: c.label }));
   const [ingesting, setIngesting] = useState(false);
   const [ingestResults, setIngestResults] = useState<{ idx: number; ok: boolean; msg?: string }[]>([]);
   const toast = useToast();
@@ -520,7 +638,7 @@ function DiscoverModal({
         const res = await fetch(`/api/clients/${clientId}/ingest-report`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind, url: c.url }),
+          body: JSON.stringify({ kind, url: c.url, service_ids: serviceOverride[idx] ?? c.serviceIds ?? [] }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -624,6 +742,7 @@ function DiscoverModal({
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Título</th>
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Año</th>
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tipo</th>
+                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Servicio</th>
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Estado</th>
                   </tr>
                 </thead>
@@ -675,6 +794,15 @@ function DiscoverModal({
                             <option value="sustainability_report">Sustentabilidad</option>
                             <option value="financial_report">Financiero</option>
                           </select>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {serviceOptions.length > 0 && (
+                            <ServiceMultiSelect
+                              options={serviceOptions}
+                              selected={serviceOverride[idx] ?? []}
+                              onChange={(ids) => setServiceOverride((p) => ({ ...p, [idx]: ids }))}
+                            />
+                          )}
                         </td>
                         <td className="px-3 py-2.5">
                           {!result && <span className="text-[10px] text-slate-400">Pendiente</span>}

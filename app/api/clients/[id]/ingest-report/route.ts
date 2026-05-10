@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const RequestSchema = z.object({
   kind: z.enum(["sustainability_report", "financial_report"]),
   url: z.string().url(),
+  service_ids: z.array(z.string().uuid()).optional().default([]),
 });
 
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Body inválido" }, { status: 400 });
   }
-  const { kind, url } = parsed.data;
+  const { kind, url, service_ids } = parsed.data;
 
   const ssrfCheck = isPublicHttpUrl(url);
   if (!ssrfCheck.ok) {
@@ -150,6 +151,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       buffer: finalBuffer,
       kind,
       sourceUrl: url,
+      serviceIds: service_ids,
     });
   } catch (e) {
     return NextResponse.json(

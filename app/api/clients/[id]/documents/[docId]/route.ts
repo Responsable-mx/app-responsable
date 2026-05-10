@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireConsultorForClient, requireAdmin } from "@/lib/auth";
 import { deleteDocument, getDocument, getSignedUrl } from "@/lib/documents/queries";
 import { logChange } from "@/lib/audit-log";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +54,52 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       created_at: doc.created_at,
     },
   });
+}
+
+const PatchSchema = z.object({
+  service_ids: z.array(z.string().uuid()).optional(),
+});
+
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { id, docId } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const doc = await getDocument(docId);
+  if (!doc || doc.client_id !== id) {
+    return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
+  }
+
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+  const parsed = PatchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Body inválido" }, { status: 400 });
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.service_ids !== undefined) patch.service_ids = parsed.data.service_ids;
+
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "Sin campos para actualizar" }, { status: 400 });
+  }
+
+  const sb = createAdminClient();
+  const { error } = await sb.from("client_documents").update(patch).eq("id", docId);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  void logChange({
+    actorEmail: user,
+    entityType: "client_document",
+    entityId: docId,
+    action: "update",
+    before: { service_ids: doc.service_ids },
+    after: patch,
+  });
+
+  return NextResponse.json({ data: { id: docId, ...patch } });
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {

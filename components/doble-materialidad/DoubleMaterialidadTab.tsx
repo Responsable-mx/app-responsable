@@ -140,32 +140,37 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
-// ── Scroll helper ────────────────────────────────────────────
+// ── Navegación de panel activo (Ruta B — wizard) ─────────────
+// Catálogo canónico de etapas con id + label para prev/next
+const DM_STAGES_META = [
+  { id: "dm-sec-contexto",   label: "Contexto" },
+  { id: "dm-sec-benchmark",  label: "Benchmark" },
+  { id: "dm-sec-iros",       label: "IROs" },
+  { id: "dm-sec-matriz",     label: "Matriz" },
+  { id: "dm-sec-nis",        label: "NIS/IBSO" },
+  { id: "dm-sec-resumen",    label: "Resumen IA" },
+  { id: "dm-sec-validacion", label: "Validación" },
+  { id: "dm-sec-reporte",    label: "Reporte" },
+] as const;
+
+const DM_SECTION_IDS = DM_STAGES_META.map((s) => s.id) as readonly string[];
+
+// Ref module-level — el componente la registra; helpers la invocan sin estar dentro del componente
+const _dmNavigateRef: { current: ((id: string) => void) | null } = { current: null };
 
 function scrollToDmSection(sectionId: string) {
-  const el = document.getElementById(sectionId);
-  if (!el) return;
+  // Ruta B: cambiar panel activo + scroll al tope del stepper sticky
+  _dmNavigateRef.current?.(sectionId);
   const main = document.querySelector("main");
-  if (main) {
-    // 120px offset: compensa el stepper sticky + header de la app
-    const top = el.getBoundingClientRect().top + main.scrollTop - 120;
-    main.scrollTo({ top, behavior: "smooth" });
-  } else {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  // Scroll a top del stepper tras render del nuevo panel
+  requestAnimationFrame(() => {
+    if (main) {
+      main.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  });
 }
-
-// Orden canónico de secciones — para navegación por teclado ← →
-const DM_SECTION_IDS = [
-  "dm-sec-contexto",
-  "dm-sec-benchmark",
-  "dm-sec-iros",
-  "dm-sec-matriz",
-  "dm-sec-nis",
-  "dm-sec-resumen",
-  "dm-sec-validacion",
-  "dm-sec-reporte",
-] as const;
 
 // ── Tipo de estado de etapa ──────────────────────────────────
 
@@ -195,7 +200,7 @@ function StagePill({
       : status === "active"
       ? `${pillBase} bg-brand-primary border-brand-primary`
       : status === "locked"
-      ? `${pillBase} border-slate-100 opacity-40 cursor-not-allowed`
+      ? `${pillBase} border-slate-100 opacity-50 hover:opacity-70`
       : `${pillBase} border-slate-200 hover:border-slate-300`;
 
   const inner = (
@@ -239,11 +244,8 @@ function StagePill({
     </>
   );
 
-  // Locked: no-clickable div (siempre renderizado para no romper el stepper)
-  if (status === "locked") {
-    return <div className={pillStyle}>{inner}</div>;
-  }
-
+  // Ruta B: TODOS los pills son clickables (incluso locked — navegan al panel
+  // que muestra la razón de bloqueo). Sólo el pill sin sectionId queda inerte.
   if (sectionId) {
     return (
       <button
@@ -270,7 +272,7 @@ function formatStageDate(iso: string | null | undefined): string {
   });
 }
 
-// ── Sección colapsable de etapa ───────────────────────────────
+// ── Panel de etapa (Ruta B — wizard, una etapa visible a la vez) ─────────
 
 function CollapsibleStageSection({
   id,
@@ -278,9 +280,7 @@ function CollapsibleStageSection({
   label,
   status,
   accent,
-  open,
-  onToggle,
-  nextSection,
+  isActive,
   lockReason,
   children,
 }: {
@@ -289,58 +289,24 @@ function CollapsibleStageSection({
   label: string;
   status: StageStatus;
   accent: string;
-  open: boolean;
-  onToggle: () => void;
-  nextSection?: { id: string; label: string };
+  /** Sólo se renderiza si isActive=true (Ruta B wizard) */
+  isActive: boolean;
   /** Mensaje mostrado cuando status === "locked" — explica qué se necesita para desbloquear */
   lockReason?: string;
   children: React.ReactNode;
 }) {
-  // Estado bloqueado — siempre renderizado (preserva numerado y scroll targets),
-  // pero no expandible. Muestra razón de bloqueo.
-  if (status === "locked") {
-    return (
-      <section id={id} aria-labelledby={`stage-lbl-${id}`}>
-        <div className={`bg-white border border-slate-200 rounded shadow-sm border-l-4 ${accent} opacity-50`}>
-          <div className="flex items-center justify-between px-5 py-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span
-                id={`stage-lbl-${id}`}
-                className="text-base font-semibold text-slate-800 truncate"
-              >
-                {stageNum}. {label}
-              </span>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
-                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                Bloqueada
-              </span>
-            </div>
-          </div>
-          {lockReason && (
-            <p className="px-5 pb-3 text-[11px] text-slate-400 italic">
-              {lockReason}
-            </p>
-          )}
-        </div>
-      </section>
-    );
-  }
+  if (!isActive) return null;
+
+  // Derivar prev/next desde DM_STAGES_META por id
+  const idx = DM_STAGES_META.findIndex((s) => s.id === id);
+  const prev = idx > 0 ? DM_STAGES_META[idx - 1] : null;
+  const next = idx >= 0 && idx < DM_STAGES_META.length - 1 ? DM_STAGES_META[idx + 1] : null;
 
   return (
     <section id={id} aria-labelledby={`stage-lbl-${id}`}>
-      {/* Card blanca con border-l-4 accent — mismo patrón del mockup */}
       <div className={`bg-white border border-slate-200 rounded shadow-sm border-l-4 ${accent}`}>
-
-        {/* Header clickable */}
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          aria-controls={`${id}-body`}
-          className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-r-sm"
-        >
+        {/* Header (no colapsable en Ruta B) */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5 min-w-0">
             <span
               id={`stage-lbl-${id}`}
@@ -366,38 +332,67 @@ function CollapsibleStageSection({
                 Pendiente
               </span>
             )}
-          </div>
-          {/* Chevron toggle */}
-          <svg
-            className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        </button>
-
-        {/* Body expandible */}
-        {open && (
-          <div id={`${id}-body`} className="border-t border-slate-100 px-5 py-4">
-            {children}
-            {nextSection && (
-              <div className="mt-5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => scrollToDmSection(nextSection.id)}
-                  className="w-full flex items-center justify-center gap-1.5 bg-brand-primary text-white text-xs font-semibold py-2.5 rounded hover:bg-brand-primary-dark transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
-                >
-                  {nextSection.label}
-                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
+            {status === "locked" && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-400 shrink-0">
+                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Bloqueada
+              </span>
             )}
           </div>
-        )}
+          <span className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">
+            Etapa {stageNum} de {DM_STAGES_META.length}
+          </span>
+        </div>
+
+        {/* Body */}
+        <div id={`${id}-body`} className="px-5 py-4">
+          {status === "locked" ? (
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+              <svg className="w-10 h-10 text-slate-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <p className="text-sm text-slate-600 max-w-md">
+                {lockReason ?? "Completa las etapas anteriores para desbloquear esta sección."}
+              </p>
+            </div>
+          ) : (
+            children
+          )}
+        </div>
+
+        {/* Footer navegación prev / next */}
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-slate-100 bg-slate-50">
+          {prev ? (
+            <button
+              type="button"
+              onClick={() => scrollToDmSection(prev.id)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-brand-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm px-1"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              {prev.label}
+            </button>
+          ) : (
+            <span />
+          )}
+          {next ? (
+            <button
+              type="button"
+              onClick={() => scrollToDmSection(next.id)}
+              className="inline-flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold py-2 px-4 rounded hover:bg-brand-primary-dark transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
+            >
+              Siguiente: {next.label}
+              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+          ) : (
+            <span className="text-[11px] text-slate-400 italic">Última etapa</span>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -2285,23 +2280,19 @@ export function DoubleMaterialidadTab({
   const pollingNotified = useRef(false);
   const pollingStartId = useRef<string | null>(null);
 
-  // Estado de colapso por sección — key=sectionId, value=abierto
-  // Por defecto: solo la etapa "active" está abierta; done y pending colapsadas
-  const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({});
-  const isSectionOpen = useCallback(
-    (sectionId: string, status: StageStatus) => {
-      if (status === "locked") return false;
-      return sectionId in sectionOpen ? sectionOpen[sectionId]! : status === "active";
-    },
-    [sectionOpen]
-  );
-  const toggleSection = useCallback(
-    (sectionId: string, status: StageStatus) => {
-      if (status === "locked") return; // bloqueada — no toggle
-      setSectionOpen((prev) => ({ ...prev, [sectionId]: !isSectionOpen(sectionId, status) }));
-    },
-    [isSectionOpen]
-  );
+  // Ruta B: una etapa visible a la vez. Por defecto Contexto (Etapa 1).
+  const [activeStageId, setActiveStageId] = useState<string>("dm-sec-contexto");
+  const navigateTo = useCallback((sectionId: string) => {
+    if (!DM_SECTION_IDS.includes(sectionId)) return;
+    setActiveStageId(sectionId);
+  }, []);
+  // Registrar navigate en ref module-level — permite a `scrollToDmSection` cambiar panel
+  useEffect(() => {
+    _dmNavigateRef.current = navigateTo;
+    return () => {
+      _dmNavigateRef.current = null;
+    };
+  }, [navigateTo]);
 
   const [isIroPolling, setIsIroPolling] = useState(false);
   const pollingNotifiedIro = useRef(false);
@@ -2498,25 +2489,22 @@ export function DoubleMaterialidadTab({
     onStagesProgress?.(dmDoneCount, 8);
   }, [dmDoneCount, onStagesProgress]);
 
-  // Navegación por teclado ← → entre secciones DM
-  // Activo en toda la página; se salta si el foco está en un campo de texto.
-  const kbIdxRef = useRef(0);
+  // Navegación por teclado ← → entre etapas (Ruta B — cambia panel activo)
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      if (e.key === "ArrowRight") {
-        kbIdxRef.current = Math.min(kbIdxRef.current + 1, DM_SECTION_IDS.length - 1);
-      } else {
-        kbIdxRef.current = Math.max(kbIdxRef.current - 1, 0);
-      }
-      scrollToDmSection(DM_SECTION_IDS[kbIdxRef.current]!);
+      const curIdx = DM_SECTION_IDS.indexOf(activeStageId);
+      const nextIdx = e.key === "ArrowRight"
+        ? Math.min(curIdx + 1, DM_SECTION_IDS.length - 1)
+        : Math.max(curIdx - 1, 0);
+      scrollToDmSection(DM_SECTION_IDS[nextIdx]!);
       e.preventDefault();
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [activeStageId]);
 
   if (loadingBenchmark) {
     return (
@@ -2672,9 +2660,7 @@ export function DoubleMaterialidadTab({
         label="Contexto del cliente"
         status={stage1Status}
         accent="border-l-teal-500"
-        open={isSectionOpen("dm-sec-contexto", stage1Status)}
-        onToggle={() => toggleSection("dm-sec-contexto", stage1Status)}
-        nextSection={{ id: "dm-sec-benchmark", label: "Siguiente: Benchmark" }}
+        isActive={activeStageId === "dm-sec-contexto"}
       >
         <ContextoSection
           progress={questionnaireProgress}
@@ -2692,9 +2678,7 @@ export function DoubleMaterialidadTab({
         label="Benchmark competitivo"
         status={stage2Status}
         accent="border-l-blue-600"
-        open={isSectionOpen("dm-sec-benchmark", stage2Status)}
-        onToggle={() => toggleSection("dm-sec-benchmark", stage2Status)}
-        nextSection={{ id: "dm-sec-iros", label: "Siguiente: IROs" }}
+        isActive={activeStageId === "dm-sec-benchmark"}
       >
         {/* Horizontes temporales — config del estudio, mismo panel que Benchmark */}
         <div className="mb-5 pb-5 border-b border-slate-100">
@@ -2722,9 +2706,7 @@ export function DoubleMaterialidadTab({
         label="Inventario de IROs"
         status={stage3Status}
         accent="border-l-violet-600"
-        open={isSectionOpen("dm-sec-iros", stage3Status)}
-        onToggle={() => toggleSection("dm-sec-iros", stage3Status)}
-        nextSection={{ id: "dm-sec-matriz", label: "Siguiente: Matriz" }}
+        isActive={activeStageId === "dm-sec-iros"}
       >
         <IroSection
           clientId={clientId}
@@ -2748,9 +2730,7 @@ export function DoubleMaterialidadTab({
         label="Matriz de Doble Materialidad"
         status={stage4Status}
         accent="border-l-brand-primary"
-        open={isSectionOpen("dm-sec-matriz", stage4Status)}
-        onToggle={() => toggleSection("dm-sec-matriz", stage4Status)}
-        nextSection={{ id: "dm-sec-nis", label: "Siguiente: NIS/IBSO" }}
+        isActive={activeStageId === "dm-sec-matriz"}
         lockReason="Registra y califica al menos 3 IROs con score de impacto y financiero para activar la matriz."
       >
         <MatrizDM iros={iros.filter((i) => i.incluido)} />
@@ -2763,9 +2743,7 @@ export function DoubleMaterialidadTab({
         label="NIS / IBSO — Brechas de información"
         status={stage5Status}
         accent="border-l-amber-600"
-        open={isSectionOpen("dm-sec-nis", stage5Status)}
-        onToggle={() => toggleSection("dm-sec-nis", stage5Status)}
-        nextSection={{ id: "dm-sec-resumen", label: "Siguiente: Resumen ejecutivo" }}
+        isActive={activeStageId === "dm-sec-nis"}
       >
         <NisSection
           clientId={clientId}
@@ -2783,9 +2761,7 @@ export function DoubleMaterialidadTab({
         label="Resumen Ejecutivo (IA)"
         status={stage6Status}
         accent="border-l-cyan-600"
-        open={isSectionOpen("dm-sec-resumen", stage6Status)}
-        onToggle={() => toggleSection("dm-sec-resumen", stage6Status)}
-        nextSection={{ id: "dm-sec-validacion", label: "Siguiente: Validación" }}
+        isActive={activeStageId === "dm-sec-resumen"}
         lockReason="Completa el inventario de IROs (Etapa 3) para generar el resumen ejecutivo con IA."
       >
         <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
@@ -2798,9 +2774,7 @@ export function DoubleMaterialidadTab({
         label="Validación con el cliente"
         status={stage7Status}
         accent="border-l-rose-600"
-        open={isSectionOpen("dm-sec-validacion", stage7Status)}
-        onToggle={() => toggleSection("dm-sec-validacion", stage7Status)}
-        nextSection={{ id: "dm-sec-reporte", label: "Siguiente: Reporte final" }}
+        isActive={activeStageId === "dm-sec-validacion"}
         lockReason="Genera el resumen ejecutivo (Etapa 6) para iniciar la sesión de validación con el cliente."
       >
         <ValidacionSection clientId={clientId} iros={iros} />
@@ -2813,8 +2787,7 @@ export function DoubleMaterialidadTab({
         label="Reporte de Doble Materialidad"
         status={stage8Status}
         accent="border-l-emerald-600"
-        open={isSectionOpen("dm-sec-reporte", stage8Status)}
-        onToggle={() => toggleSection("dm-sec-reporte", stage8Status)}
+        isActive={activeStageId === "dm-sec-reporte"}
       >
         <ReporteSection
           clientId={clientId}

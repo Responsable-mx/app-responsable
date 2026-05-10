@@ -457,57 +457,133 @@ export function DocumentsTab({
         </div>
       )}
 
-      {/* Strip 1 — sólo aparece la mitad izquierda cuando hay alerta accionable
-          (sin contenido, parse failed, o falta kind crítico). Caso todo-ok →
-          izquierda vacía. Métricas siempre disponibles vía tooltip del badge tab
-          "Documentos [N]" en ClientTabs. Reduce ruido cuando todo está bien. */}
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="text-xs min-h-[18px] flex-1 min-w-0">
-          {docs.length === 0 ? (
-            <span className="text-slate-500">
-              Sin documentos. Sube PDF, DOCX, XLSX… o usa &ldquo;Buscar con IA&rdquo;.
-            </span>
-          ) : (() => {
-            // Alertas accionables — render sólo cuando algo está fuera de norma
-            const noContent = docs.length - withContent;
-            const alerts: { label: string; tone: "rose" | "amber" }[] = [];
-            if (failedCount > 0) {
-              alerts.push({ label: `${failedCount} sin texto extraíble`, tone: "rose" });
-            } else if (noContent > 0) {
-              alerts.push({ label: `${noContent} sin contenido aún`, tone: "amber" });
-            }
-            if (counts.financial_report === 0) {
-              alerts.push({ label: "falta informe financiero", tone: "amber" });
-            }
-            if (counts.sustainability_report === 0) {
-              alerts.push({ label: "falta informe sustentabilidad", tone: "amber" });
-            }
-            if (alerts.length === 0) return null; // todo-ok: izq vacío, sólo CTAs derecha
-            return (
-              <span className="flex items-center gap-1.5 flex-wrap">
-                <svg className="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                {alerts.map((a, i) => (
-                  <span key={i} className="flex items-center gap-1.5">
-                    {i > 0 && <span className="text-slate-300" aria-hidden="true">·</span>}
-                    <span className={a.tone === "rose" ? "text-rose-700 font-medium" : "text-amber-800"}>{a.label}</span>
-                  </span>
-                ))}
+      {/* Banner alerta — sólo cuando hay condición accionable. Vive arriba del
+          strip fusionado para que el ojo lo capte primero. Caso todo-ok: no
+          renderiza, ahorra ~32px. */}
+      {docs.length > 0 && (() => {
+        const noContent = docs.length - withContent;
+        const alerts: { label: string; tone: "rose" | "amber" }[] = [];
+        if (failedCount > 0) {
+          alerts.push({ label: `${failedCount} sin texto extraíble`, tone: "rose" });
+        } else if (noContent > 0) {
+          alerts.push({ label: `${noContent} sin contenido aún`, tone: "amber" });
+        }
+        if (counts.financial_report === 0) {
+          alerts.push({ label: "falta informe financiero", tone: "amber" });
+        }
+        if (counts.sustainability_report === 0) {
+          alerts.push({ label: "falta informe sustentabilidad", tone: "amber" });
+        }
+        if (alerts.length === 0) return null;
+        const isCritical = alerts.some((a) => a.tone === "rose");
+        return (
+          <div
+            className={`mb-3 px-3 py-2 rounded border text-xs flex items-center gap-2 flex-wrap ${
+              isCritical
+                ? "bg-rose-50 border-rose-200"
+                : "bg-amber-50 border-amber-200"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <svg
+              className={`w-3.5 h-3.5 shrink-0 ${isCritical ? "text-rose-600" : "text-amber-600"}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {alerts.map((a, i) => (
+              <span key={i} className="flex items-center gap-2">
+                {i > 0 && <span className="text-slate-300" aria-hidden="true">·</span>}
+                <span className={a.tone === "rose" ? "text-rose-700 font-medium" : "text-amber-800"}>
+                  {a.label}
+                </span>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={() => setDiscoverOpen(true)}
+              className="ml-auto text-[11px] font-semibold text-brand-primary-dark hover:underline"
+              title="Buscar con IA documentos públicos del cliente"
+            >
+              Resolver →
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Strip único fusionado — search + pills + servicios + CTAs en 1 fila.
+          flex-wrap permite wrap natural en viewport ≤1280px sin overflow.
+          Ahorra ~36px verticales vs los 2 strips separados anteriores. */}
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        {docs.length > 0 && (
+          <>
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-[360px]">
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por nombre o URL…"
+                className="font-sans w-full text-xs border border-slate-300 rounded pl-8 pr-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+              />
+              {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setDiscoverOpen(true)}
-                  className="ml-1 text-[11px] font-semibold text-brand-primary-dark hover:underline"
-                  title="Buscar con IA documentos públicos del cliente"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded"
+                  aria-label="Limpiar búsqueda"
                 >
-                  Resolver →
+                  <IconX className="w-3 h-3" />
                 </button>
-              </span>
-            );
-          })()}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Pegar texto — abre modal dedicado (antes panel inline colapsable) */}
+              )}
+            </div>
+            {/* Pills kind toggle */}
+            {filterOptions.map((f) => (
+              <button
+                key={f.k}
+                type="button"
+                onClick={() => setFilter(filter === f.k ? "all" : f.k)}
+                className={`text-[11px] font-medium rounded-sm border px-2.5 py-2 transition-colors ${
+                  filter === f.k
+                    ? "bg-brand-primary-light border-brand-primary/30 text-brand-primary-dark"
+                    : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
+                }`}
+                aria-pressed={filter === f.k}
+              >
+                {f.label}
+              </button>
+            ))}
+            {/* Multi-select Servicios */}
+            {serviceOptions.length > 0 && (
+              <ServiceMultiSelect
+                options={serviceOptions}
+                selected={uploadServiceIds}
+                onChange={setUploadServiceIds}
+              />
+            )}
+          </>
+        )}
+        {docs.length === 0 && (
+          <span className="text-xs text-slate-500">
+            Sin documentos. Sube PDF, DOCX, XLSX… o usa &ldquo;Buscar con IA&rdquo;.
+          </span>
+        )}
+        {/* ml-auto empuja CTAs a la derecha — siempre presentes para que el usuario
+            no tenga que volver a un strip vacío para subir. */}
+        <div className="ml-auto flex items-center gap-2">
           {canExtract && (
             <Button
               variant="secondary"
@@ -519,7 +595,6 @@ export function DocumentsTab({
               Pegar texto
             </Button>
           )}
-          {/* Agente de búsqueda de documentos */}
           <Button
             variant="secondary"
             size="sm"
@@ -554,66 +629,6 @@ export function DocumentsTab({
           />
         </div>
       </div>
-
-      {/* Búsqueda + filtros por kind — solo cuando hay documentos */}
-      {docs.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          {/* Search input */}
-          <div className="relative flex-1 min-w-[220px] max-w-[420px]">
-            <svg
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nombre o URL…"
-              className="font-sans w-full text-xs border border-slate-300 rounded pl-8 pr-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded"
-                aria-label="Limpiar búsqueda"
-              >
-                <IconX className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-          {filterOptions.length > 0 &&
-            filterOptions.map((f) => (
-              <button
-                key={f.k}
-                type="button"
-                // Pill toggle: click sobre activa → vuelve a "all" (sin pill "Todos")
-                onClick={() => setFilter(filter === f.k ? "all" : f.k)}
-                className={`text-[11px] font-medium rounded-sm border px-2.5 py-2 transition-colors ${
-                  filter === f.k
-                    ? "bg-brand-primary-light border-brand-primary/30 text-brand-primary-dark"
-                    : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
-                }`}
-                aria-pressed={filter === f.k}
-              >
-                {f.label}
-              </button>
-            ))}
-          {/* Multi-select Servicios — todos los filtros agrupados en strip 2 */}
-          {serviceOptions.length > 0 && (
-            <ServiceMultiSelect
-              options={serviceOptions}
-              selected={uploadServiceIds}
-              onChange={setUploadServiceIds}
-            />
-          )}
-        </div>
-      )}
 
       {filtered.length === 0 ? (
         <div className="border border-dashed border-slate-300 rounded p-8 text-center">

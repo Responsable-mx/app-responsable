@@ -119,6 +119,14 @@ export function ClientTabs({
   // Badge [N/8] en tab DM-IA — se actualiza cuando DoubleMaterialidadTab monta
   const [dmProgress, setDmProgress] = useState<{ done: number; total: number } | null>(null);
 
+  // Extracción disparada desde DocumentsTab → QuestionnaireTab la consume
+  const [pendingDocExtract, setPendingDocExtract] = useState<{ stepKey: string; text: string } | null>(null);
+
+  function handleExtractForStep(stepKey: string, text: string) {
+    setPendingDocExtract({ stepKey, text });
+    goToTab("cuestionario");
+  }
+
   // Override de step desde Resumen (click en card macro → paso específico)
   const [jumpToStep, setJumpToStep] = useState<number | null>(null);
 
@@ -159,6 +167,15 @@ export function ClientTabs({
       }
     : null;
   const schema = questionnaireResp?.data.template.schema;
+
+  // Lista de pasos para el selector de extracción en DocumentsTab
+  const questionnaireSteps: { key: string; title: string }[] =
+    schema && "steps" in schema
+      ? (schema as { steps: { key: string; title: string }[] }).steps.map((s) => ({
+          key: s.key,
+          title: s.title,
+        }))
+      : [];
 
   // Resumen tab: 5 cards macro. Una card está completa si TODOS sus stepKeys están en completed_sections.
   // Mapping idéntico al de ClientResumen.tsx
@@ -321,6 +338,8 @@ export function ClientTabs({
               }}
               docCount={docCount}
               onGoToDocumentos={() => goToTab("documentos")}
+              pendingExtract={pendingDocExtract}
+              onExtractDone={() => setPendingDocExtract(null)}
             />
           </TabErrorBoundary>
         </div>
@@ -335,7 +354,12 @@ export function ClientTabs({
       {tab === "documentos" && (
         <div role="tabpanel" id="panel-documentos" tabIndex={0} aria-labelledby="tab-documentos">
           <TabErrorBoundary tabName="Documentos">
-            <DocumentsTab clientId={client.id} isAdmin={isAdmin} />
+            <DocumentsTab
+              clientId={client.id}
+              isAdmin={isAdmin}
+              questionnaireSteps={questionnaireSteps}
+              onExtractForStep={handleExtractForStep}
+            />
           </TabErrorBoundary>
         </div>
       )}

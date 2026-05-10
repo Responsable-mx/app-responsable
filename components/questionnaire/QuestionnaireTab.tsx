@@ -22,7 +22,6 @@ import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { WizardStepNav } from "@/components/questionnaire/WizardStepNav";
 import { AiBulkBanner } from "@/components/questionnaire/AiBulkBanner";
-import { ImportModal } from "@/components/questionnaire/ImportModal";
 import { SaveIndicator } from "@/components/questionnaire/SaveIndicator";
 import { FieldRow } from "@/components/questionnaire/FieldRow";
 import { SourceDrawer } from "@/components/questionnaire/SourceDrawer";
@@ -44,6 +43,8 @@ export function QuestionnaireTab({
   reportUrls,
   docCount,
   onGoToDocumentos,
+  pendingExtract,
+  onExtractDone,
 }: {
   clientId: string;
   clientServices?: string[];
@@ -53,6 +54,9 @@ export function QuestionnaireTab({
   /** null = aún cargando; 0 = sin docs; N = con docs */
   docCount?: number | null;
   onGoToDocumentos?: () => void;
+  /** Extracción disparada desde DocumentsTab — navega al paso y llena */
+  pendingExtract?: { stepKey: string; text: string } | null;
+  onExtractDone?: () => void;
 }) {
   const { data, error, isLoading, mutate } = useSWR(
     `/api/clients/${clientId}/questionnaire`,
@@ -92,7 +96,17 @@ export function QuestionnaireTab({
           </p>
         </div>
       )}
-      <WizardEditor clientId={clientId} clientServices={clientServices} initial={data.data} mutate={() => mutate()} initialStepIndex={initialStepIndex} autoFillOnMount={autoFillOnMount} reportUrls={reportUrls} />
+      <WizardEditor
+        clientId={clientId}
+        clientServices={clientServices}
+        initial={data.data}
+        mutate={() => mutate()}
+        initialStepIndex={initialStepIndex}
+        autoFillOnMount={autoFillOnMount}
+        reportUrls={reportUrls}
+        pendingExtract={pendingExtract}
+        onExtractDone={onExtractDone}
+      />
     </>
   );
 }
@@ -105,6 +119,8 @@ function WizardEditor({
   initialStepIndex = 0,
   autoFillOnMount = false,
   reportUrls,
+  pendingExtract,
+  onExtractDone,
 }: {
   clientId: string;
   clientServices?: string[];
@@ -113,6 +129,8 @@ function WizardEditor({
   initialStepIndex?: number;
   autoFillOnMount?: boolean;
   reportUrls?: { sustainability: string | null; financial: string | null };
+  pendingExtract?: { stepKey: string; text: string } | null;
+  onExtractDone?: () => void;
 }) {
   const { template } = initial;
   const schema = template.schema;
@@ -128,8 +146,6 @@ function WizardEditor({
   const [drawerField, setDrawerField] = useState<{ stepKey: string; fieldKey: string } | null>(null);
   const [aiFilling, setAiFilling] = useState<string | null>(null); // step.key
   const [aiBulkProgress, setAiBulkProgress] = useState<{ current: number; total: number; stepTitle: string } | null>(null);
-  // Estado del modal "Importar" (tabs: pegar texto / subir archivo / mis docs).
-  const [docFillOpen, setDocFillOpen] = useState(false);
   const [confirmBulkFill, setConfirmBulkFill] = useState(false);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   // Staging de AI fill por paso: guarda propuesta IA para que el consultor valide antes de aplicar.
@@ -413,6 +429,17 @@ function WizardEditor({
     setStagedFill(null);
   }
 
+  // Extracción disparada desde DocumentsTab — navega al paso y ejecuta docFill automáticamente.
+  useEffect(() => {
+    if (!pendingExtract) return;
+    const idx = steps.findIndex((s) => s.key === pendingExtract.stepKey);
+    if (idx >= 0) setActiveStep(idx);
+    void docFill(pendingExtract.stepKey, pendingExtract.text).finally(() => {
+      onExtractDone?.();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingExtract]);
+
   // Llena el paso activo con texto/markdown extraído (de paste o de docs subidos).
   // Reutiliza merge/save de aiFill — misma respuesta {data: Record<string, FieldResponse>}.
   async function docFill(stepKey: string, text: string) {
@@ -433,7 +460,6 @@ function WizardEditor({
       dirty.current = true;
       await save(merged);
       toast.push("success", "Documento procesado — campos del paso actualizados");
-      setDocFillOpen(false);
       mutate();
     } catch (e) {
       toast.push("error", e instanceof Error ? e.message : "Error al importar");
@@ -664,19 +690,6 @@ function WizardEditor({
           <div className="flex flex-col items-end gap-2 shrink-0">
             <SaveIndicator state={saveState} errorMsg={errorMsg} />
             <div className="flex items-center gap-2">
-              {/* Botón "Importar" — abre modal con tabs (pegar / subir / mis docs) */}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setDocFillOpen(true)}
-                disabled={!!aiBulkProgress || !!aiFilling}
-                title="Pegar texto, subir PDF/Word/Excel/PPT o reusar documentos del cliente"
-              >
-                <svg className="w-3.5 h-3.5 mr-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Importar
-              </Button>
               {step.ai_can_fill && (() => {
                 const stepHasData = stepProgress.filled > 0;
                 return (
@@ -810,14 +823,6 @@ function WizardEditor({
           />
         );
       })()}
-
-      <ImportModal
-        open={docFillOpen}
-        onClose={() => setDocFillOpen(false)}
-        clientId={clientId}
-        stepTitle={step.title}
-        onExtract={(text) => docFill(step.key, text)}
-      />
 
       {/* Modal de staging: IA propone, consultor valida campo por campo antes de aplicar */}
       {stagedFill && (() => {

@@ -59,9 +59,15 @@ const fetcher = (url: string) =>
 export function DocumentsTab({
   clientId,
   isAdmin,
+  questionnaireSteps,
+  onExtractForStep,
 }: {
   clientId: string;
   isAdmin: boolean;
+  /** Pasos del cuestionario para el selector de extracción */
+  questionnaireSteps?: { key: string; title: string }[];
+  /** Callback: texto + stepKey → ClientTabs navega a Cuestionario y llena */
+  onExtractForStep?: (stepKey: string, text: string) => void;
 }) {
   const { data, error, isLoading, mutate } = useSWR<{ data: DocMeta[] }>(
     `/api/clients/${clientId}/documents`,
@@ -88,6 +94,59 @@ export function DocumentsTab({
   const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+
+  // ── Extracción hacia cuestionario ─────────────────────────────────────────
+  const canExtract = !!onExtractForStep && (questionnaireSteps?.length ?? 0) > 0;
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [extractStepKey, setExtractStepKey] = useState<string>("");
+  const [extracting, setExtracting] = useState(false);
+  // Docs seleccionados para extracción desde biblioteca
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+
+  async function fetchDocContent(docId: string): Promise<string | null> {
+    const res = await fetch(`/api/clients/${clientId}/documents/${docId}?mode=content`);
+    if (!res.ok) return null;
+    const j = (await res.json()) as { data: { markdown_content: string | null } };
+    return j.data.markdown_content;
+  }
+
+  function toggleDocSelect(id: string) {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleExtractFromDocs() {
+    if (selectedDocIds.size === 0 || !extractStepKey || !onExtractForStep) return;
+    setExtracting(true);
+    try {
+      const parts: string[] = [];
+      for (const id of Array.from(selectedDocIds)) {
+        const md = await fetchDocContent(id);
+        const doc = docs.find((d) => d.id === id);
+        if (md) parts.push(`# ${doc?.file_name ?? id}\n\n${md}`);
+      }
+      const combined = parts.join("\n\n---\n\n").slice(0, 50_000);
+      if (!combined.trim()) {
+        toast.push("error", "Los documentos seleccionados no tienen contenido extraíble");
+        return;
+      }
+      onExtractForStep(extractStepKey, combined);
+      setSelectedDocIds(new Set());
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  function handleExtractPaste() {
+    if (!pasteText.trim() || !extractStepKey || !onExtractForStep) return;
+    onExtractForStep(extractStepKey, pasteText.trim().slice(0, 50_000));
+    setPasteOpen(false);
+    setPasteText("");
+  }
 
   const docs = data?.data ?? [];
   // Filtro por kind + por servicio (uploadServiceIds sirve también como filtro activo)
@@ -260,6 +319,59 @@ export function DocumentsTab({
         </div>
       )}
 
+      {/* ── Zona extracción — solo visible cuando hay pasos de cuestionario disponibles ── */}
+      {canExtract && (
+        <div className="mb-4 border border-slate-200 rounded bg-white shadow-sm">
+          <button
+            type="button"
+            onClick={() => setPasteOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 transition-colors rounded"
+          >
+            <span className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Pegar texto para extracción
+            </span>
+            <svg className={`w-4 h-4 text-slate-400 transition-transform ${pasteOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {pasteOpen && (
+            <div className="px-4 pb-4 pt-2 space-y-3 border-t border-slate-100">
+              <p className="text-xs text-slate-500">
+                Pega transcripción, notas o texto copiado. Aurora extraerá los campos del paso seleccionado.
+              </p>
+              <textarea
+                className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-y min-h-[140px] max-h-[320px]"
+                placeholder="Pega aquí…"
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+              />
+              <p className="text-[10px] text-slate-400 tabular-nums -mt-1">{pasteText.length.toLocaleString()} / 50,000 chars</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <SelectField
+                    value={extractStepKey}
+                    onChange={setExtractStepKey}
+                    options={(questionnaireSteps ?? []).map((s) => ({ value: s.key, label: s.title }))}
+                    placeholder="Selecciona un paso…"
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!pasteText.trim() || pasteText.length < 10 || !extractStepKey}
+                  onClick={handleExtractPaste}
+                >
+                  Extraer y llenar →
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <div className="border border-dashed border-slate-300 rounded p-8 text-center">
           <p className="text-sm text-slate-500">
@@ -273,6 +385,7 @@ export function DocumentsTab({
           <table className="min-w-full w-max">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                {canExtract && <th className="px-3 py-2 w-8" />}
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tipo</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Nombre</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Categoría</th>
@@ -286,7 +399,19 @@ export function DocumentsTab({
             <tbody className="divide-y divide-slate-100">
               {filtered.map((d) => (
                 <Fragment key={d.id}>
-                  <tr className="hover:bg-slate-50/70 transition-colors">
+                  <tr className={`hover:bg-slate-50/70 transition-colors ${selectedDocIds.has(d.id) ? "bg-brand-primary/5" : ""}`}>
+                    {canExtract && (
+                      <td className="px-3 py-2.5 w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedDocIds.has(d.id)}
+                          disabled={!d.has_content || d.parse_status !== "ok"}
+                          onChange={() => toggleDocSelect(d.id)}
+                          className="accent-brand-primary"
+                          aria-label={`Seleccionar ${d.file_name}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-3 py-2.5">
                       <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
                         {TYPE_BADGE[d.file_type]}
@@ -405,7 +530,7 @@ export function DocumentsTab({
                   {/* Error expandido inline — visible cuando parse falló */}
                   {d.parse_status === "failed" && d.parse_error && (
                     <tr className="bg-rose-50/50">
-                      <td colSpan={8} className="px-3 py-2 text-[11px] text-rose-700">
+                      <td colSpan={canExtract ? 9 : 8} className="px-3 py-2 text-[11px] text-rose-700">
                         <span className="font-semibold">Error de conversión:</span> {d.parse_error}
                       </td>
                     </tr>
@@ -414,6 +539,39 @@ export function DocumentsTab({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Footer extracción desde docs seleccionados */}
+      {canExtract && selectedDocIds.size > 0 && (
+        <div className="mt-3 flex items-center gap-3 px-4 py-3 bg-brand-primary/5 border border-brand-primary/20 rounded">
+          <span className="text-xs text-brand-primary-dark font-semibold shrink-0">
+            {selectedDocIds.size} doc{selectedDocIds.size !== 1 ? "s" : ""} seleccionado{selectedDocIds.size !== 1 ? "s" : ""}
+          </span>
+          <div className="flex-1">
+            <SelectField
+              value={extractStepKey}
+              onChange={setExtractStepKey}
+              options={(questionnaireSteps ?? []).map((s) => ({ value: s.key, label: s.title }))}
+              placeholder="Selecciona un paso…"
+            />
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={extracting}
+            disabled={!extractStepKey}
+            onClick={() => void handleExtractFromDocs()}
+          >
+            Extraer y llenar →
+          </Button>
+          <button
+            type="button"
+            onClick={() => setSelectedDocIds(new Set())}
+            className="text-xs text-slate-400 hover:text-slate-600 shrink-0"
+          >
+            Limpiar
+          </button>
         </div>
       )}
 

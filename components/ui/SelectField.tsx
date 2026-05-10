@@ -5,7 +5,21 @@
 // Este componente usa un listbox custom: fuente Inter garantizada.
 // Sesión 10: + role=combobox, aria-expanded, arrow key navigation, disabled prop, shadow-sm.
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+
+// Estimación del alto máximo del listbox (max-h-72 = 18rem ≈ 288px) + margin.
+const LISTBOX_MAX_H = 296;
+
+// Sube por el árbol buscando el primer ancestro con overflow auto/scroll.
+function findScrollParent(el: HTMLElement | null): HTMLElement | null {
+  let node: HTMLElement | null = el?.parentElement ?? null;
+  while (node && node !== document.body) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") return node;
+    node = node.parentElement;
+  }
+  return null;
+}
 
 export type SelectOption = { value: string; label: string };
 
@@ -28,10 +42,37 @@ export function SelectField({
 }) {
   const [open, setOpen] = useState(false);
   const [focusedIdx, setFocusedIdx] = useState(-1);
+  const [dropUp, setDropUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const uid = useId();
   const listId = `${externalId ?? uid}-listbox`;
+
+  // Flip: si no cabe el listbox debajo del trigger, abrir hacia arriba.
+  // Considera el contenedor scrollable más cercano (modal, panel) además del viewport,
+  // porque dentro de un modal `overflow-y-auto` el bound real es el body del modal, no la ventana.
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const scrollParent = findScrollParent(triggerRef.current);
+    const containerBottom = scrollParent
+      ? scrollParent.getBoundingClientRect().bottom
+      : window.innerHeight;
+    const containerTop = scrollParent
+      ? scrollParent.getBoundingClientRect().top
+      : 0;
+    const spaceBelow = containerBottom - rect.bottom;
+    const spaceAbove = rect.top - containerTop;
+    setDropUp(spaceBelow < LISTBOX_MAX_H && spaceAbove > spaceBelow);
+  }, [open]);
+
+  // Auto-scroll del item focused al navegar con teclado.
+  useLayoutEffect(() => {
+    if (!open || focusedIdx < 0 || !listRef.current) return;
+    const item = listRef.current.children[focusedIdx] as HTMLElement | undefined;
+    item?.scrollIntoView({ block: "nearest" });
+  }, [focusedIdx, open]);
 
   // Placeholder solo vive en el trigger (estado vacío). El listbox solo muestra opciones reales.
   // Click fuera → cerrar. No llamamos setFocusedIdx en el cuerpo del efecto
@@ -110,10 +151,13 @@ export function SelectField({
 
       {open && (
         <ul
+          ref={listRef}
           id={listId}
           role="listbox"
           tabIndex={-1}
-          className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded shadow-sm min-w-full max-h-52 overflow-y-auto focus:outline-none"
+          className={`absolute left-0 z-50 bg-white border border-slate-200 rounded shadow-md min-w-full max-h-72 overflow-y-auto focus:outline-none ${
+            dropUp ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
         >
           {options.map((o, i) => (
             <li
@@ -122,7 +166,7 @@ export function SelectField({
               role="option"
               aria-selected={value === o.value}
               onClick={() => { onChange(o.value); setOpen(false); setFocusedIdx(-1); }}
-              className={`text-xs px-3 py-1.5 cursor-pointer transition-colors ${
+              className={`text-xs px-3 py-2.5 cursor-pointer transition-colors ${
                 i === focusedIdx || value === o.value
                   ? "bg-brand-primary-light text-brand-primary-dark font-medium"
                   : "text-slate-700 hover:bg-slate-50"

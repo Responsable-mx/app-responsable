@@ -312,7 +312,8 @@ export function ClientTabs({
 
   // Disclaimers IA que aparecen como valor en campos research — no son KPIs reales.
   // Si el campo empieza con uno de estos, mejor mostrar "—" en el strip.
-  const DISCLAIMER_PREFIXES = /^(basado en (info|datos)|estimado|sujeto a|pendiente de|informaci[óo]n p[úu]blica|no disponible|no aplica|sin informaci[óo]n|por confirmar|n\/a)\b/i;
+  // Nota: \w* en lugar de \b para capturar "información", "informaciones", etc.
+  const DISCLAIMER_PREFIXES = /^(basado en (info\w*|datos)|estimado|sujeto a|pendiente de|informaci[óo]n p[úu]blica|no disponible|no aplica|sin informaci[óo]n|por confirmar|n\/a\b)/i;
 
   function fmtKpi(v: FieldValue, maxLen = 24): string {
     if (v === null || v === undefined) return "—";
@@ -330,8 +331,13 @@ export function ClientTabs({
     let s = String(v).trim();
     if (!s) return "—";
     if (DISCLAIMER_PREFIXES.test(s)) return "—";
-    // Numérico embebido (ej "3400 colaboradores") → reformatea
-    s = s.replace(/\b(\d{4,})\b/g, (m) => Number(m).toLocaleString("es-MX"));
+    // Numérico embebido (ej "3400 colaboradores") → reformatea con separador miles.
+    // EXCLUYE años (1900-2099): no queremos "2,025" en lugar de "2025".
+    s = s.replace(/\b(\d{4,})\b/g, (m) => {
+      const n = Number(m);
+      if (n >= 1900 && n <= 2099) return m; // año, sin separador
+      return n.toLocaleString("es-MX");
+    });
     return truncateByWord(s, maxLen);
   }
 

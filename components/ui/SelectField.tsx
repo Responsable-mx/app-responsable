@@ -43,15 +43,17 @@ export function SelectField({
   const [open, setOpen] = useState(false);
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const [dropUp, setDropUp] = useState(false);
+  const [maxH, setMaxH] = useState<number>(LISTBOX_MAX_H);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const uid = useId();
   const listId = `${externalId ?? uid}-listbox`;
 
-  // Flip: si no cabe el listbox debajo del trigger, abrir hacia arriba.
-  // Considera el contenedor scrollable más cercano (modal, panel) además del viewport,
-  // porque dentro de un modal `overflow-y-auto` el bound real es el body del modal, no la ventana.
+  // Flip + cap dinámico de max-height al espacio real disponible.
+  // Considera el contenedor scrollable más cercano (modal, panel) además del viewport.
+  // Dentro de un modal `overflow-y-auto` el bound real es el body del modal, no la ventana —
+  // si no cappeamos, el listbox absoluto excede el body y queda recortado por el overflow.
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
@@ -62,9 +64,11 @@ export function SelectField({
     const containerTop = scrollParent
       ? scrollParent.getBoundingClientRect().top
       : 0;
-    const spaceBelow = containerBottom - rect.bottom;
-    const spaceAbove = rect.top - containerTop;
-    setDropUp(spaceBelow < LISTBOX_MAX_H && spaceAbove > spaceBelow);
+    const spaceBelow = containerBottom - rect.bottom - 8;
+    const spaceAbove = rect.top - containerTop - 8;
+    const flip = spaceBelow < LISTBOX_MAX_H && spaceAbove > spaceBelow;
+    setDropUp(flip);
+    setMaxH(Math.max(80, Math.min(LISTBOX_MAX_H, flip ? spaceAbove : spaceBelow)));
   }, [open]);
 
   // Auto-scroll del item focused al navegar con teclado.
@@ -155,7 +159,8 @@ export function SelectField({
           id={listId}
           role="listbox"
           tabIndex={-1}
-          className={`absolute left-0 z-50 bg-white border border-slate-200 rounded shadow-md min-w-full max-h-72 overflow-y-auto focus:outline-none ${
+          style={{ maxHeight: maxH }}
+          className={`absolute left-0 z-50 bg-white border border-slate-200 rounded shadow-md min-w-full overflow-y-auto focus:outline-none ${
             dropUp ? "bottom-full mb-1" : "top-full mt-1"
           }`}
         >

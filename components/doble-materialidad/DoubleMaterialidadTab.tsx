@@ -74,6 +74,9 @@ type Props = {
   onGoToCuestionario: () => void;
   /** Callback para badge [N/7] en el tab de ClientTabs */
   onStagesProgress?: (done: number, total: number) => void;
+  clientSector?: string | null;
+  clientSize?: string | null;
+  clientFrameworks?: string[] | null;
 };
 
 // ── Fetcher ──────────────────────────────────────────────────
@@ -162,6 +165,9 @@ export function DoubleMaterialidadTab({
   questionnaireProgress,
   onGoToCuestionario,
   onStagesProgress,
+  clientSector,
+  clientSize,
+  clientFrameworks,
 }: Props) {
   const benchmarkKey   = `/api/clients/${clientId}/dm-benchmark`;
   const irosKey        = `/api/clients/${clientId}/dm-iros`;

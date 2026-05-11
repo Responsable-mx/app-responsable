@@ -29,6 +29,7 @@ type Popover = {
 
 type Props = {
   iros: IroInventoryItem[];
+  onGoToIros?: () => void;
 };
 
 // ── Constantes de layout SVG ──────────────────────────────────────────────────
@@ -236,7 +237,7 @@ function MiniShape({ quadrant }: { quadrant: Quadrant }) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function MatrizDM({ iros }: Props) {
+export function MatrizDM({ iros, onGoToIros }: Props) {
   const [activeFilter, setActiveFilter] = useState<"todos" | Quadrant>("todos");
   const [popover, setPopover]           = useState<Popover | null>(null);
   const [hovered, setHovered]           = useState<string | null>(null);
@@ -551,6 +552,7 @@ export function MatrizDM({ iros }: Props) {
               popover={popover}
               svgRef={svgRef}
               onClose={() => setPopover(null)}
+              onGoToIros={onGoToIros}
             />
           )}
         </div>
@@ -619,10 +621,12 @@ function PopoverCard({
   popover,
   svgRef,
   onClose,
+  onGoToIros,
 }: {
   popover: Popover;
   svgRef: React.RefObject<SVGSVGElement | null>;
   onClose: () => void;
+  onGoToIros?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const { tema } = popover;
@@ -710,6 +714,18 @@ function PopoverCard({
           </svg>
           Posición ajustada manualmente
         </p>
+      )}
+
+      {/* CTAs de acción */}
+      {onGoToIros && (
+        <div className="mt-3 pt-2 border-t border-slate-100 flex gap-2">
+          <button
+            onClick={() => { onClose(); onGoToIros(); }}
+            className="flex-1 text-[10px] font-semibold bg-brand-primary text-white px-2 py-1.5 rounded-sm hover:bg-brand-primary-dark transition-colors"
+          >
+            Ver en IROs
+          </button>
+        </div>
       )}
 
       {/* Número del tema */}

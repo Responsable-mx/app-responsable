@@ -76,9 +76,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **Pre-requisitos extraer BenchmarkSection**: branch dedicado · revisión 2 desarrolladores · smoke test propose+compare+add_manual+remove+polling con cliente real.
 - **Esfuerzo restante**: 1 sprint (4h refactor + 2h smoke test).
 
-### 🟡 D-151 — 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado
-- **Descripción**: reduce safety TS. No urgente, fix incremental por archivo.
-- **Esfuerzo**: gradual (5min por ocurrencia)
+### ~~🟡 D-151 — 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado~~ ✅ RESUELTO (sesión 27)
+- 35 disables con razón contextual aplicados. Adicional sesión 28: 8 `cache_control as any` eliminados por completo (SDK 0.95 types reales).
 
 ### ~~🟢 D-152 — 3 tests `apply-sql-safety.test.ts` timeout 5s (OneDrive Files-On-Demand)~~ ✅ RESUELTO (sesión 25)
 - 3 tests (`permite ALTER TABLE ADD COLUMN IF NOT EXISTS`, `permite CREATE TABLE IF NOT EXISTS`, `permite COMMENT ON COLUMN`) ahora con `{ timeout: 30000 }` por test. Razón: spawn de helper Node.js sobre path con espacios + OneDrive puede tardar 5-15s la primera vez.

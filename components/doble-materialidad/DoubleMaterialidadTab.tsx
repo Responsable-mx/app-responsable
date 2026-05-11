@@ -431,6 +431,15 @@ function lookupComparisonValue(
   );
 }
 
+function abbrevCompanyName(name: string): string {
+  if (name.length <= 16) return name;
+  const words = name.split(/[\s()/]+/).filter((w) => w.length > 1);
+  const caps = words.filter((w) => /^[A-ZÁÉÍÓÚÑ]/.test(w));
+  if (caps.length >= 3) return caps.map((w) => w[0]).join("").slice(0, 6);
+  if (caps.length === 2) return `${caps[0]!.slice(0, 6)} ${caps[1]!.slice(0, 5)}`;
+  return name.slice(0, 14) + "…";
+}
+
 // ── Etapa 1: Contexto ────────────────────────────────────────
 
 // ContextoSection movido a ContextoSection.tsx (D-150 sesión 27)
@@ -1112,27 +1121,28 @@ function BenchmarkSection({
             {clientName} vs {latestResult!.companies_snapshot.length} empresa
             {latestResult!.companies_snapshot.length !== 1 ? "s" : ""} — posición por dimensión ESG
           </p>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="min-w-full w-max text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap">
+                  <th className="sticky left-0 z-10 bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                     Dimensión
                   </th>
                   {/* Columna cliente — highlight */}
                   <th className="text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light/30 px-3 rounded-t text-brand-primary-dark">
                     {clientName}
-                    <span className="ml-1 font-normal normal-case text-brand-primary/60">· Cliente</span>
+                    <span className="ml-1 font-normal normal-case text-[10px] text-brand-primary/60">· Cliente</span>
                   </th>
                   {/* Columnas competidores */}
                   {latestResult!.companies_snapshot.map((company) => (
                     <th
                       key={company.name}
+                      title={company.name}
                       className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap"
                     >
-                      {company.name}
+                      {abbrevCompanyName(company.name)}
                       {company.relation && (
-                        <span className="ml-1 font-normal normal-case text-slate-400">
+                        <span className="ml-1 font-normal normal-case text-[10px] text-slate-400">
                           · {RELATION_LABELS[company.relation as CompanyRelation] ?? company.relation}
                         </span>
                       )}
@@ -1144,9 +1154,9 @@ function BenchmarkSection({
                 {latestResult!.fields_snapshot.map((field) => (
                   <tr
                     key={field.key}
-                    className="even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
+                    className="group even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
                   >
-                    <td className="py-3 pr-6 font-medium text-slate-700 whitespace-nowrap align-top">
+                    <td className="sticky left-0 z-10 bg-white group-even:bg-slate-50/60 group-hover:bg-brand-primary-light/20 py-3 pr-6 font-medium text-slate-700 whitespace-nowrap align-top shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                       {field.label}
                     </td>
                     {/* Celda cliente — highlight */}
@@ -1168,6 +1178,11 @@ function BenchmarkSection({
               </tbody>
             </table>
           </div>
+          {latestResult!.companies_snapshot.length > 2 && (
+            <p className="text-[10px] text-slate-400 mt-1 text-right">
+              ← desliza para ver todas las empresas
+            </p>
+          )}
         </div>
       )}
 
@@ -1610,7 +1625,7 @@ export function DoubleMaterialidadTab({
         const validatedCompanies = companies.filter((c) => c.validated).length;
 
         return (
-          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-2 z-10 transition-all">
+          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-10 transition-all">
             {/* Cabecera progreso — solo visible cuando el stepper NO está pinned (modo expandido) */}
             {!stepperCompact && (
             <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-slate-100">
@@ -1673,7 +1688,23 @@ export function DoubleMaterialidadTab({
               ))}
             </div>
 
-            {/* Context chips — ocultos en modo compact para reducir altura sticky */}
+            {/* Context chips — strip completo en expandido, mínimo en compact */}
+            {stepperCompact && (iros.length > 0 || validatedCompanies > 0) && (
+            <div className="border-t border-slate-100 px-5 py-1.5 flex items-center gap-3 text-[10px] text-slate-500">
+              {validatedCompanies > 0 && (
+                <span className="whitespace-nowrap tabular-nums font-medium">{validatedCompanies} empresas</span>
+              )}
+              {iros.length > 0 && (
+                <span className="whitespace-nowrap tabular-nums font-medium">{scoredIncluded.length}/{iros.length} IROs</span>
+              )}
+              {quadrantCounts.doble_material > 0 && (
+                <span className="whitespace-nowrap font-semibold text-rose-600">{quadrantCounts.doble_material} doble mat.</span>
+              )}
+              {quadrantCounts.solo_impacto > 0 && (
+                <span className="whitespace-nowrap font-medium text-amber-600">{quadrantCounts.solo_impacto} impacto</span>
+              )}
+            </div>
+            )}
             {!stepperCompact && (
             <div className="border-t border-slate-100 px-5 py-2">
               <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1841,7 +1872,10 @@ export function DoubleMaterialidadTab({
           ) : null
         }
       >
-        <MatrizDM iros={iros.filter((i) => i.incluido)} />
+        <MatrizDM
+          iros={iros.filter((i) => i.incluido)}
+          onGoToIros={() => scrollToDmSection("dm-sec-iros")}
+        />
       </CollapsibleStageSection>
 
       {/* ── Etapa 5 — NIS / IBSO ── */}

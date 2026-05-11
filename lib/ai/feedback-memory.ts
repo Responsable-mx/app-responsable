@@ -29,6 +29,30 @@ export type FeedbackMemoryOptions = {
 };
 
 /**
+ * Cuenta cuántos rechazos vigentes hay para mostrar al consultor.
+ * Útil para badge "memoria IA: 5 rechazos activos".
+ */
+export async function countActiveFeedback(opts: FeedbackMemoryOptions): Promise<number> {
+  const limit = Math.min(opts.limit ?? 5, 10);
+  const admin = createAdminClient();
+  let query = admin
+    .from("ia_feedback")
+    .select("id", { count: "exact", head: true })
+    .eq("role", opts.role)
+    .eq("rating", "down")
+    .not("reason_code", "is", null)
+    .limit(limit);
+  if (opts.clientId) {
+    query = query.eq("client_id", opts.clientId);
+  } else {
+    query = query.is("client_id", null);
+  }
+  const { count, error } = await query;
+  if (error || count === null) return 0;
+  return Math.min(count, limit);
+}
+
+/**
  * Devuelve texto formateado con los últimos rechazos. Vacío si no hay.
  * Se inyecta como tercer bloque del system prompt — sin cache_control
  * para que refleje feedback nuevo sin invalidar bloques cacheados.

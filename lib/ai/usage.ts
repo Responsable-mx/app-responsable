@@ -23,6 +23,12 @@ export type UsageByModel = {
   cost_usd: number;
 };
 
+export type FeedbackReasonBucket = {
+  role: string;
+  reason_code: string;
+  count: number;
+};
+
 export type UsageSummary = {
   window_days: number;
   total_calls: number;
@@ -36,6 +42,9 @@ export type UsageSummary = {
   by_day_role: UsageRow[];
   top_users: Array<{ user_email: string; calls: number }>;
   top_clients: Array<{ client_id: string; calls: number; client_name: string | null }>;
+  /** Wave 4 (D dashboard): top razones de rechazo IA */
+  feedback_top_reasons: FeedbackReasonBucket[];
+  feedback_total_down: number;
 };
 
 export async function getUsageSummary(
@@ -54,6 +63,8 @@ export async function getUsageSummary(
     by_day_role: [],
     top_users: [],
     top_clients: [],
+    feedback_top_reasons: [],
+    feedback_total_down: 0,
   };
   if (isDevMode()) return empty;
 
@@ -168,6 +179,33 @@ export async function getUsageSummary(
     client_name: nameById.get(id) ?? null,
   }));
 
+  // Wave 4 (D dashboard): top razones de rechazo IA en ventana
+  const { data: feedbackRows } = await admin
+    .from("ia_feedback")
+    .select("role, reason_code")
+    .eq("rating", "down")
+    .gte("created_at", since)
+    .not("reason_code", "is", null)
+    .limit(5000);
+
+  const feedbackBuckets = new Map<string, FeedbackReasonBucket>();
+  let totalDown = 0;
+  for (const r of feedbackRows ?? []) {
+    if (!r.reason_code) continue;
+    totalDown++;
+    const key = `${r.role}|${r.reason_code}`;
+    const bucket = feedbackBuckets.get(key) ?? {
+      role: r.role as string,
+      reason_code: r.reason_code as string,
+      count: 0,
+    };
+    bucket.count++;
+    feedbackBuckets.set(key, bucket);
+  }
+  const feedbackTopReasons = Array.from(feedbackBuckets.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
   return {
     window_days: windowDays,
     total_calls: totalCalls,
@@ -181,5 +219,7 @@ export async function getUsageSummary(
     by_day_role: (byDayRole ?? []) as UsageRow[],
     top_users: topUsers,
     top_clients: topClients,
+    feedback_top_reasons: feedbackTopReasons,
+    feedback_total_down: totalDown,
   };
 }

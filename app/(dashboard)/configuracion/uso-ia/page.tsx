@@ -247,6 +247,50 @@ export default async function UsoIaPage() {
             </div>
           )}
 
+          {s.feedback_total_down > 0 && (
+            <div className="mb-6">
+              <Panel title={`Razones de rechazo IA (${s.feedback_total_down} 👎 últimos 30 días)`}>
+                <p className="text-[11px] text-slate-600 mb-3 leading-relaxed">
+                  Cada rechazo se inyecta al system prompt del rol + cliente correspondiente como ejemplo
+                  a evitar. La IA aprende automáticamente de estos rechazos.
+                </p>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                      <th className="pb-1.5 text-left">Rol</th>
+                      <th className="pb-1.5 text-left">Razón</th>
+                      <th className="pb-1.5 text-right">Rechazos</th>
+                      <th className="pb-1.5 text-right">% del total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {s.feedback_top_reasons.map((r, i) => {
+                      const pct = Math.round((r.count / s.feedback_total_down) * 100);
+                      const reasonLabel = ({
+                        factually_wrong: "Datos incorrectos",
+                        sector_off: "Sector equivocado",
+                        bad_format: "Mal formato",
+                        language: "Idioma raro",
+                        too_generic: "Muy genérico",
+                        missed_context: "Ignoró contexto",
+                        other: "Otro",
+                      } as Record<string, string>)[r.reason_code] ?? r.reason_code;
+                      const roleLabel = r.role.charAt(0).toUpperCase() + r.role.slice(1);
+                      return (
+                        <tr key={i}>
+                          <td className="py-1.5 font-medium text-slate-800">{roleLabel}</td>
+                          <td className="py-1.5 text-slate-700">{reasonLabel}</td>
+                          <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{r.count}</td>
+                          <td className="py-1.5 text-right text-slate-500 tabular-nums">{pct}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Panel>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Panel title="Top consultores">
               {s.top_users.length === 0 ? (

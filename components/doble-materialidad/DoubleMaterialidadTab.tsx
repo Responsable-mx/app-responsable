@@ -4,10 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
-import { Button } from "@/components/ui/Button";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonList } from "@/components/ui/Skeleton";
-import { SelectField } from "@/components/ui/SelectField";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 import { ResumenEjecutivoSection } from "@/components/doble-materialidad/ResumenEjecutivoSection";
 import { ValidacionSection } from "@/components/doble-materialidad/ValidacionSection";
@@ -426,6 +423,7 @@ export function DoubleMaterialidadTab({
   const [activeStageId, setActiveStageId] = useState<string>("dm-sec-contexto");
   useEffect(() => {
     const hash = window.location.hash.replace(/^#/, "");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR-safe: estado inicial "dm-sec-contexto" evita mismatch de hidratación (#418); hash solo disponible en cliente
     if (DM_SECTION_IDS.includes(hash)) setActiveStageId(hash);
   }, []);
   const navigateTo = useCallback((sectionId: string) => {

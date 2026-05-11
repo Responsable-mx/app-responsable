@@ -1,117 +1,58 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-10 (sesión 25 — audit + audit-health + audit-ia + audit-refactor + simplify)
-**Calificación global:** 9.5 / 10 (vs 9.6 sesión 22; D-148/152/154/D-149 cerrados, D-150/151/153 diferidos como deuda planificada)
+**Fecha:** 2026-05-10 (sesión 26 — audit + audit-health + audit-ia + audit-refactor + simplify post-deploy)
+**Calificación global:** 9.5 / 10 (vs 9.4 audit pre-fix; 4 hallazgos cerrados, 1 diferido)
 
 ---
 
-## Hallazgos sesión 25 — estado final tras "limpiar todo"
+## Hallazgos sesión 26 — estado final tras "limpiar y propagar todo"
 
 | ID | Sev | Descripción | Estado |
 |----|-----|-------------|--------|
-| D-148 | 🔴 | 7 ESLint errors `react-hooks` (rules-of-hooks + TDZ + setState in effect) | ✅ Resuelto |
-| D-149 | 🟡 | Mockups `/dev/` 235KB con doc desincronizado en CLAUDE.md | ✅ Resuelto (CLAUDE.md actualizado, mockups SIGUEN activos como playground dev) |
-| D-150 | 🟡 | `DoubleMaterialidadTab.tsx` monolito 2988L / 129KB | Diferido (1 sprint refactor) |
-| D-151 | 🟡 | 35 ocurrencias `any` sin justificar | Diferido (gradual) |
-| D-152 | 🟢 | 3 tests `apply-sql-safety` timeout 5s (OneDrive) | ✅ Resuelto (`{ timeout: 30000 }`) |
-| D-153 | 🟢 | `DocumentsTab.tsx` 74KB + `ServiceGantt.tsx` 55KB monolitos secundarios | Diferido (post D-150) |
-| D-154 | 🟢 | 7 ESLint warnings unused vars | ✅ Resuelto |
+| D-155 | 🟡 | 5 mutaciones DM-IA sin `logChange()` (dm-validacion + dm-config + dm-nis + dm-resumen + dm-benchmark PATCH) | ✅ Resuelto (7 handlers con audit log) |
+| D-156 | 🟢 | `console.log` debug raw AI response 800 chars en dm-benchmark:419 | ✅ Resuelto |
+| D-157 | 🟢 | ClientForm 686L + ClientsList 618L | Diferido (refactor con D-150) |
 
 ---
 
-## Detalle D-148 — ESLint react-hooks errors
+## Detalle D-155 — Audit log mutaciones DM-IA
 
-**Síntoma**: `npx eslint .` reporta 7 errors + 7 warnings. Errors críticos pueden producir bugs runtime intermitentes (orden hook depende de path, setState cascading).
+**Patrón canónico aplicado**: CLAUDE.md "Audit log de mutaciones admin" extendido a **mutaciones consultor sobre entregables auditados externos**. Razón: Doble Materialidad IA es entregable cliente con escrutinio externo (auditor ESG, GRI, regulador). Cliente puede impugnar "¿quién cambió esta decisión IRO el 15 de agosto?" — sin trazabilidad no hay respuesta.
 
-| Archivo:línea | Error | Por qué importa |
-|---------------|-------|-----------------|
-| `QuestionnaireTab.tsx:452` | `useEffect` después de early return → react-hooks/rules-of-hooks | Orden de hooks inconsistente entre renders → bugs aleatorios |
-| `QuestionnaireTab.tsx:248` | `aiFillAll` accessed before declared (decl L488) | TDZ runtime cuando effect lee función no declarada |
-| `QuestionnaireTab.tsx:455-456` | `docFill` accessed before declared (decl L464) | Mismo patrón |
-| `ClientTabs.tsx:134` | `setShowStripDropdown` accessed before declared (decl L189) | Effect callback referencia setState antes de useState |
-| `ClientTabs.tsx:158` | `setState` síncrono dentro de effect body | Cascading renders, perf degradada |
-| `DoubleMaterialidadTab.tsx:2575` | `navigateTo()` (con setState) en effect body | Mismo patrón |
+| Endpoint | Handler | Acción audit | Antes/Después |
+|----------|---------|--------------|---------------|
+| `dm-validacion/route.ts` | PATCH (upsert) | `update` o `create` | iro_decisions before, payload after |
+| `dm-config/route.ts` | PATCH | `update` | dm_horizons before, merged after |
+| `dm-nis/route.ts` | POST (genera desde cuestionario) | `create` | inserted_count + sector |
+| `dm-nis/route.ts` | PATCH (edita fila) | `update` | ibso_key + estado/calidad/accion before+after |
+| `dm-resumen/route.ts` | PATCH (review) | `review` | reviewed_at before/after |
+| `dm-resumen/route.ts` | POST (genera) | `create` | model + latencyMs |
+| `dm-benchmark/route.ts` | PATCH (rejection/reports_publicly) | `update` | updatePayload after |
 
-**Fix sugerido**: mover declaraciones (`useState`, `function aiFillAll`, etc.) ANTES de cada `useEffect` que las consuma. Para `setState in effect`: si necesitas sincronizar estado externo, usar `useSyncExternalStore` o derivar valor durante render.
-
----
-
-## Detalle D-149 — Mockups dev no eliminados
-
-CLAUDE.md sección "Consolidación mayo-2026 — eliminación del mockup `/dev/app-preview`" afirma:
-
-> El mockup `app/dev/app-preview/AppShell.tsx` fue eliminado.
-
-Realidad (`ls app/dev/`):
-
-```
-app-preview/         (AppShell.tsx 114KB)
-chat-preview/
-client-tabs-mockup/
-clientes-wizard-preview/  (WizardShell.tsx 72KB + mock-data.ts 49KB)
-dm-nav-mockup/
-primitives-preview/
-```
-
-Middleware en `lib/supabase/middleware.ts:60-61` bloquea `/dev/*` en producción:
-```ts
-if (pathname.startsWith("/dev/") && process.env.NODE_ENV !== "production")
-```
-
-✅ Sin riesgo en prod. Pero:
-- Contamina dev build (slow HMR en archivos 100KB+)
-- Inflar `node_modules` cache + Vercel build time
-- Doc desincronizado → confusión para colaboradores
-
-**Decisión pendiente**:
-1. Eliminar mockups (si son referenciables por git history) → quita 235KB del repo
-2. Actualizar CLAUDE.md para reflejar que `/dev/app-preview` sigue activo en dev como referencia (justificar uso)
+`AuditEntityType` ya incluía `dm_validacion`, `dm_config`, `dm_nis`, `dm_resumen`, `dm_benchmark_company` — solo faltaba el call a `logChange()`.
 
 ---
 
-## Detalle D-150 — DoubleMaterialidadTab monolito
-
-| Métrica | Valor |
-|---------|-------|
-| Líneas | 2988 |
-| Tamaño | 129KB |
-| Secciones | 8 stages + chat + benchmark + IROs + reporte preview |
-| ESLint errors directos | 1 (setState in effect L2575) |
-| Componentes ya extraídos | `ValidacionSection.tsx`, `MatrizDM.tsx` |
-
-**Fix sugerido**: dividir por sección manteniendo orchestrator delgado:
-- `DoubleMaterialidadTab.tsx` (orchestrator + state shared)
-- `BenchmarkSection.tsx`
-- `IROsSection.tsx`
-- `ReportPreviewSection.tsx`
-- `Stage<N>.tsx` × 8
-
-Pattern ya validado por `ValidacionSection.tsx`. ROI: cambios pequeños no rompen partes alejadas + tests por sección.
-
----
-
-## Áreas verificadas sin hallazgos nuevos sesión 25
+## Áreas verificadas sin hallazgos nuevos sesión 26
 
 | Área | Resultado |
 |------|-----------|
-| Auth `requireConsultorOrAdmin` en chat/route.ts | ✅ |
-| Rate limit chat 30/5min DB-backed + AbortSignal 45s + circuit breaker | ✅ |
-| Rate limit DB en 8 endpoints IA (ai-fill, doc-fill, dm-*, research-reports, extract-profile) | ✅ |
-| `logAiCall` con cache tokens en 9/9 routes IA | ✅ |
-| Cache breakpoints ephemeral 2× en `lib/ai/roles.ts buildSystemBlocks` | ✅ |
-| Middleware `/dev/*` bloqueado en prod | ✅ |
-| SSRF guard unificado (`isPublicHttpUrl` cubre IPv4-mapped IPv6) | ✅ |
-| `getModelConfig()` única fuente — sin hardcodes en routes (post D-110) | ✅ |
-| Sentry client+server+instrumentation+CSP `connect-src` ingest | ✅ |
-| TypeScript `--noEmit`: 0 errores | ✅ |
-| Tests: 315/318 verdes (3 timeouts D-152) | ✅ |
-| `npm audit`: 0 high, 3 moderate preexistentes (anthropic SDK + postcss/next) | ✅ |
-| STACK.md cache strategy: 12 entries documentadas (`revalidate` correcto) | ✅ |
-| Audit log `logChange()` en mutaciones admin | ✅ |
+| Cron security: `verifyCron(req)` en 4/4 + middleware bypass `Authorization: Bearer CRON_SECRET` | ✅ |
+| `/clientes/[id]/page.tsx`: Promise.all 5 queries paralelas | ✅ |
+| `/clientes/[id]/editar`: requireAdmin + redirect | ✅ |
+| `/api/clients` GET: rate limit 60/min DB + listClientsLight catalog | ✅ |
+| RBAC `requireConsultorForClient` en 13 endpoints DM-IA | ✅ |
+| Services/stages GET con `requireUser` (alineado RLS abierto STACK.md) | ✅ |
+| Sentry client+server con `release: VERCEL_GIT_COMMIT_SHA` | ✅ |
+| Secrets: 0 leaks en client code | ✅ |
+| Hardcoded URLs: solo User-Agent + fallbacks `process.env.X || "https://..."` | ✅ |
+| `dm-export-iros`: ExcelJS server-side, requireConsultorForClient | ✅ |
+| `freeze-baseline`: requireAdmin + logChange ✓ | ✅ |
+| Auto-deploy push 8a3ed08 → app.responsable.net HTTP 200 | ✅ |
 
 ---
 
-## Pendientes activos post-sesión 25 (después de "limpiar todo")
+## Pendientes activos post-sesión 26
 
 | ID | Sev | Descripción |
 |----|-----|-------------|
@@ -119,47 +60,42 @@ Pattern ya validado por `ValidacionSection.tsx`. ROI: cambios pequeños no rompe
 | D-151 | 🟡 | 35 `any` sin justificar (gradual) |
 | D-04  | 🟡 | Metodología ResponSable (decisión negocio, arrastre) |
 | D-153 | 🟢 | DocumentsTab 74KB + ServiceGantt 55KB (post D-150) |
+| D-157 | 🟢 | ClientForm 686L + ClientsList 618L (con D-150) |
 | D-147 | 🟢 | Cache in-memory extract-profile (aceptado MVP) |
 
-## Validación post-fixes (2026-05-10 sesión 25)
+## Validación post-fixes (2026-05-10 sesión 26)
 
 | Check | Resultado |
 |-------|-----------|
 | `npx tsc --noEmit` | ✅ 0 errores |
 | `npx eslint .` | ✅ exit 0 — 0 errors, 0 warnings |
-| `npx vitest run` | ✅ 318/318 tests verde (incluye 3 timeouts arreglados) |
-| `npm audit` | 3 moderate preexistentes (anthropic SDK + postcss/next, sin fix upstream) |
+| `npx vitest run` | ✅ 318/318 tests verde |
 
-## Archivos tocados sesión 25 (limpiar todo)
+## Archivos tocados sesión 26
 
 | Archivo | Cambio |
 |---------|--------|
-| `components/ClientTabs.tsx` | useState/useRef movidos antes de useEffects (D-148); 3 props prefix `_` (D-154); `setStripPinned` destructured `[, ...]` (D-154); `set-state-in-effect` disable con justificación restauración localStorage one-shot (D-148) |
-| `components/questionnaire/QuestionnaireTab.tsx` | useEffect `pendingExtract` movido antes de early return `if (!isWizard)` (D-148 rules-of-hooks); `reportUrls` prefix `_` (D-154); `set-state-in-effect` disable con justificación nav inducida por prop (D-148) |
-| `components/doble-materialidad/DoubleMaterialidadTab.tsx` | `set-state-in-effect` disable con justificación smart jump único (ref previene loop) (D-148) |
-| `components/doble-materialidad/ValidacionSection.tsx` | `decisions` envuelto en `useMemo` para estabilidad de deps de `useCallback` (D-154); import `useMemo` añadido |
-| `__tests__/scripts/apply-sql-safety.test.ts` | 3 tests con `{ timeout: 30000 }` (D-152) |
-| `CLAUDE.md` | Sección "Consolidación mayo-2026 — eliminación del mockup" → "Mockups `/dev/*` — playground dev" + tabla por carpeta + regla de cleanup (D-149) |
+| `app/api/clients/[id]/dm-benchmark/route.ts` | rm console.log debug L419 (D-156) + import logChange + PATCH `update` audit (D-155) |
+| `app/api/clients/[id]/dm-validacion/route.ts` | import logChange + PATCH `update`/`create` audit con before iro_decisions (D-155) |
+| `app/api/clients/[id]/dm-config/route.ts` | import logChange + PATCH `update` audit con before/after dm_horizons (D-155) |
+| `app/api/clients/[id]/dm-nis/route.ts` | import logChange + POST `create` audit + PATCH `update` audit con before fila (D-155) |
+| `app/api/clients/[id]/dm-resumen/route.ts` | import logChange + PATCH `review` audit + POST `create` audit con model/latency (D-155) |
+
+## Score sesión 26
+
+| Dimensión | Audit pre-fix | Post-fix |
+|-----------|---------------|----------|
+| Seguridad | 9.7 | 9.7 |
+| Confiabilidad | 9.7 | 9.8 (D-156 leak removido) |
+| UX | 9.2 | 9.2 |
+| Arquitectura | 9.6 | 9.6 |
+| Rendimiento | 9.2 | 9.2 |
+| Calidad de código | 9.6 | 9.6 |
+| Observabilidad | 9.3 | 9.6 (D-155 7 audit logs nuevos) |
+| Deuda técnica | 9.1 | 9.4 (2 cerrados, 1 diferido) |
+| **Global** | **9.4** | **9.5** |
 
 ---
 
-## Score sesión 25
-
-| Dimensión | Post-22 | Audit pre-fix | Post-fix (limpiar todo) |
-|-----------|---------|---------------|-------------------------|
-| Seguridad | 9.7 | 9.7 | 9.7 |
-| Confiabilidad | 9.8 | 9.4 | 9.8 (D-148 cerrado) |
-| UX | 9.2 | 9.2 | 9.2 |
-| Arquitectura | 9.8 | 9.4 | 9.6 (D-149 doc resuelto, D-150 diferido como deuda planificada) |
-| Rendimiento | 9.2 | 9.2 | 9.2 |
-| Calidad de código | 9.8 | 8.8 | 9.6 (ESLint 0/0, D-151 35 `any` diferido) |
-| Observabilidad | 9.5 | 9.5 | 9.5 |
-| Deuda técnica | 9.6 | 9.0 | 9.4 (4 cerrados, 3 diferidos) |
-| **Global** | **9.6** | **9.3** | **9.5** |
-
-> Nota: "limpiar todo" cerró D-148 (🔴 critical) + D-149 + D-152 + D-154. Diferidos D-150/D-151/D-153 (refactor grandes, esfuerzo 1+ sprint cada uno). Validación final: TS 0 errores, ESLint 0/0, 318/318 tests verde.
-
----
-
-## Auditoría anterior: 2026-05-08 (sesión 22)
-**Score:** 9.6/10 — D-144/146 resueltos, D-145/147 pendientes (D-145 cerrado en sesión 24).
+## Auditoría anterior: 2026-05-10 (sesión 25)
+**Score post-cleanup:** 9.5/10 — D-148 hooks + D-149 doc + D-152 timeout + D-154 unused vars cerrados.

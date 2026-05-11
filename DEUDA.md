@@ -16,6 +16,21 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-155–D-157 — Hallazgos auditoría sesión 26 (2026-05-10 post-cleanup s25)
+
+### ~~🟡 D-155 — 5 mutaciones DM-IA sin audit log~~ ✅ RESUELTO (sesión 26)
+- **Antes**: dm-validacion PATCH (decisiones IRO + acta junta), dm-config PATCH (horizontes), dm-nis POST + PATCH (Núcleos Impacto/Sostenibilidad), dm-resumen PATCH + POST (resúmenes ejecutivos), dm-benchmark PATCH (modificar empresas/decisiones) — sin `logChange()`. Trazabilidad rota para entregable consultoría auditado externo.
+- **Fix sesión 26**: `logChange()` agregado en 7 mutation handlers con entityType nuevos (`dm_validacion`, `dm_config`, `dm_nis`, `dm_resumen`, `dm_benchmark_company`). Antes/después serializados. AuditEntityType ya tenía los tipos definidos.
+- **Patrón canónico**: CLAUDE.md "Audit log de mutaciones admin" extendido a mutaciones consultor sobre entregables auditados (DM-IA). Aplica a app-responsable + replicable.
+
+### ~~🟢 D-156 — `console.log` debug raw AI response en dm-benchmark/route.ts:419~~ ✅ RESUELTO (sesión 26)
+- 800 chars de respuesta IA loggeados en cada call propose → Vercel logs verbose + posible info leak. Eliminado.
+
+### 🟢 D-157 — `ClientForm.tsx` 686 LOC + `ClientsList.tsx` 618 LOC
+- Componentes grandes pero no monolitos críticos como D-150. Diferido: refactor cuando se toque D-150 (mismo sprint).
+
+---
+
 ### Bloque D-148–D-154 — Hallazgos auditoría sesión 25 (2026-05-10)
 
 ### ~~🔴 D-148 — 7 ESLint errors react-hooks (rules-of-hooks + TDZ + setState in effect)~~ ✅ RESUELTO (sesión 25)

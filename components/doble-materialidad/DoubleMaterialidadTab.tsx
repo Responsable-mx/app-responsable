@@ -711,6 +711,24 @@ export function DoubleMaterialidadTab({
     return () => document.removeEventListener("keydown", handleKey);
   }, [activeStageId]);
 
+  // Stepper compacto al scroll — colapsa progress header + chips para evitar
+  // doble sticky stack con el header de ClientTabs. Sentinel arriba del stepper:
+  // cuando deja de ser visible → stepper está pinned → modo compacto.
+  // IMPORTANTE: estos hooks deben ir ANTES del early return de loadingBenchmark
+  // para que el conteo de hooks sea constante en todo render (#310).
+  const stepperSentinelRef = useRef<HTMLDivElement>(null);
+  const [stepperCompact, setStepperCompact] = useState(false);
+  useEffect(() => {
+    const el = stepperSentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry) setStepperCompact(!entry.isIntersecting); },
+      { rootMargin: "-80px 0px 0px 0px", threshold: 0 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   if (loadingBenchmark) {
     return (
       <div className="py-6">
@@ -724,22 +742,6 @@ export function DoubleMaterialidadTab({
     questionnaireProgress && questionnaireProgress.total > 0
       ? Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)
       : null;
-
-  // Stepper compacto al scroll — colapsa progress header + chips para evitar
-  // doble sticky stack con el header de ClientTabs. Sentinel arriba del stepper:
-  // cuando deja de ser visible → stepper está pinned → modo compacto.
-  const stepperSentinelRef = useRef<HTMLDivElement>(null);
-  const [stepperCompact, setStepperCompact] = useState(false);
-  useEffect(() => {
-    const el = stepperSentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry) setStepperCompact(!entry.isIntersecting); },
-      { rootMargin: "-80px 0px 0px 0px", threshold: 0 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
 
   return (
     <div className="space-y-6 py-4 max-w-5xl mx-auto">

@@ -12,6 +12,7 @@ import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 import { SelectField } from "@/components/ui/SelectField";
 import { type NarrativeBlockKey } from "@/lib/clients/narrative-schemas";
 import { normalizeUrl } from "@/lib/clients/url-utils";
+import { ClientRelationsSelect } from "@/components/ClientRelationsSelect";
 
 type Props =
   | { mode: "create"; initial?: undefined; initialEngagements?: undefined }
@@ -52,7 +53,7 @@ type FormState = {
   has_sustainability_strategy: boolean | null;
 
   // Relación con otras empresas
-  related_companies: string;
+  related_companies: string[];
 
   // Logo
   logo_url: string;
@@ -136,7 +137,7 @@ export function ClientForm(props: Props) {
     has_double_materiality: toBool(props.initial?.has_double_materiality),
     has_sustainability_report: toBool(props.initial?.has_sustainability_report),
     has_sustainability_strategy: toBool(props.initial?.has_sustainability_strategy),
-    related_companies: props.initial?.related_companies ?? "",
+    related_companies: props.initial?.related_companies ?? [],
     logo_url: props.initial?.logo_url ?? "",
     sustainability_strategy_url: props.initial?.sustainability_strategy_url ?? "",
     sustainability_report_url: props.initial?.sustainability_report_url ?? "",
@@ -241,7 +242,7 @@ export function ClientForm(props: Props) {
         sustainability_report_url: form.sustainability_report_url.trim() || null,
         financial_report_url: form.financial_report_url.trim() || null,
         double_materiality_url: form.double_materiality_url.trim() || null,
-        related_companies: form.related_companies.trim() || null,
+        related_companies: form.related_companies.length > 0 ? form.related_companies : null,
         info_general_json: form.blocks.info_general,
         business_model_json: form.blocks.business_model,
         impacts_json: form.blocks.impacts,
@@ -381,7 +382,7 @@ export function ClientForm(props: Props) {
         </div>
 
         {/* Fila 2: Sector + Subsector + Tamaño */}
-        <div className="grid grid-cols-[1fr_1fr_148px] gap-3">
+        <div className="grid grid-cols-[160px_1fr_148px] gap-3">
           <MultiSelectCombobox
             category="sectors"
             label="Sector"
@@ -558,12 +559,11 @@ export function ClientForm(props: Props) {
 
       {/* ═══ Relaciones organizacionales ═════════════════════ */}
       <Section title="Relaciones organizacionales">
-        <Field label="Relación con otras empresas del sistema">
-          <input
+        <Field label="Empresas relacionadas en el sistema">
+          <ClientRelationsSelect
             value={form.related_companies}
-            onChange={(e) => update("related_companies", e.target.value)}
-            className={inputCls}
-            placeholder="Ej: Filial de Grupo X · Empresa independiente"
+            onChange={(v) => update("related_companies", v)}
+            excludeId={props.mode === "edit" ? props.initial.id : undefined}
           />
           <p className="text-[10px] text-slate-400 mt-1">
             Madre / hija / hermana con otros clientes en ResponSable — si aplica.

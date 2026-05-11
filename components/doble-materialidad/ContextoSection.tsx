@@ -13,6 +13,20 @@ const bundleFetcher = (url: string) =>
     return r.json() as Promise<{ data: QuestionnaireBundle }>;
   });
 
+type ClientEngagement = {
+  id: string;
+  service_key: string;
+  year: number | null;
+  alcance: string | null;
+  status: "active" | "completed";
+};
+
+const engagementsFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<{ data: ClientEngagement[] }>;
+  });
+
 type SchemaField = { key: string; label: string };
 type SchemaStep = {
   key: string;
@@ -92,6 +106,17 @@ export function ContextoSection({
     { revalidateOnFocus: false }
   );
 
+  const { data: engagementsResp } = useSWR<{ data: ClientEngagement[] }>(
+    `/api/clients/${clientId}/engagements`,
+    engagementsFetcher,
+    { revalidateOnFocus: false }
+  );
+
+  // Engagement DM activo más reciente (ordenado por year desc desde la API)
+  const dmEngagement = (engagementsResp?.data ?? []).find(
+    (e) => e.service_key === "doble_materialidad_ia"
+  ) ?? null;
+
   const responses = (bundleResp?.data?.response?.responses ?? {}) as Record<string, Record<string, unknown>>;
 
   // Los campos guardados por AI-fill son objetos { value, sources, validated, updated_at, source_type }.
@@ -106,8 +131,11 @@ export function ContextoSection({
     return null;
   }
 
-  const alcanceGeo = extractStr(responses["informacion-base"]?.["alcance_geografico"]);
-  const periodoInforme = extractStr(responses["estrategia-y-madurez"]?.["periodo_informe"]);
+  // Fuente canónica: engagement (editado en ficha cliente). Fallback: cuestionario.
+  const alcanceGeo = dmEngagement?.alcance || extractStr(responses["informacion-base"]?.["alcance_geografico"]);
+  const periodoInforme =
+    (dmEngagement?.year != null ? String(dmEngagement.year) : null) ||
+    extractStr(responses["estrategia-y-madurez"]?.["periodo_informe"]);
 
   const missingByStep = extractMissingByStep(bundleResp?.data);
   const hasKpis = sector || size || (frameworks && frameworks.length > 0) || alcanceGeo || periodoInforme;

@@ -154,8 +154,8 @@ export const ClientInputSchema = z.object({
     .optional()
     .nullable(),
 
-  // Relación con otras empresas del sistema ResponSable
-  related_companies: z.string().trim().max(500).optional().nullable(),
+  // Relación con otras empresas del sistema ResponSable (IDs de clientes)
+  related_companies: z.array(z.string().uuid()).optional().nullable(),
 
   // Narrativa legacy — text libre (se conserva durante transición)
   info_general: z.string().max(20000).optional().nullable(),

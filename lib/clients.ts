@@ -56,7 +56,7 @@ export type Client = {
   website_url?: string | null;
 
   // Relación con otras empresas del sistema ResponSable
-  related_companies: string | null;
+  related_companies: string[] | null;
 
   // URLs de documentos clave (opcionales)
   sustainability_strategy_url: string | null;

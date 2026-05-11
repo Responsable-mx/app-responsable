@@ -55,6 +55,9 @@ export type Client = {
   // Sitio web corporativo (fuente primaria para IA)
   website_url?: string | null;
 
+  // Relación con otras empresas del sistema ResponSable
+  related_companies: string | null;
+
   // URLs de documentos clave (opcionales)
   sustainability_strategy_url: string | null;
   sustainability_report_url: string | null;
@@ -119,7 +122,7 @@ const ALL_COLUMNS = [
   "business_segments,frameworks,applicable_regulations,policies_in_place",
   "certifications,material_topics,maturity_level",
   "has_double_materiality,has_sustainability_report,has_sustainability_strategy",
-  "sustainability_strategy_url,sustainability_report_url,financial_report_url,double_materiality_url",
+  "sustainability_strategy_url,sustainability_report_url,financial_report_url,double_materiality_url,related_companies",
   "info_general,business_model,impacts,regulatory_context,sustainability_strategy,stakeholders",
   "info_general_json,business_model_json,impacts_json",
   "regulatory_context_json,sustainability_strategy_json,stakeholders_json",
@@ -150,6 +153,7 @@ const DEV_SEED_CLIENTS: Client[] = [
     sustainability_report_url: "https://www.heinekenmexico.com/reporte-2023.pdf",
     financial_report_url: null,
     double_materiality_url: null,
+    related_companies: null,
     info_general: null,
     business_model: null,
     impacts: null,
@@ -255,6 +259,7 @@ const DEV_SEED_CLIENTS: Client[] = [
     sustainability_report_url: null,
     financial_report_url: null,
     double_materiality_url: null,
+    related_companies: null,
     info_general: null,
     business_model: null,
     impacts: null,
@@ -433,6 +438,7 @@ function coerceInput(input: Partial<ClientInput>): Record<string, unknown> {
     "sustainability_report_url",
     "financial_report_url",
     "double_materiality_url",
+    "related_companies",
     ...NARRATIVE_BLOCKS,
     ...JSON_BLOCKS,
   ] as const;

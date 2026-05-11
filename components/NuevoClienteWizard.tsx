@@ -24,7 +24,6 @@ type FormState = {
   servicio: string;
   alcance: string;
   website_url: string;
-  relacion: string;
 };
 
 export function NuevoClienteWizard() {
@@ -36,7 +35,6 @@ export function NuevoClienteWizard() {
     servicio: "",
     alcance: "",
     website_url: "",
-    relacion: "",
   });
   const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
 
@@ -78,7 +76,6 @@ export function NuevoClienteWizard() {
             nombre_empresa: form.nombre,
             servicio_contratado: form.servicio,
             alcance_geografico: form.alcance,
-            relacion_empresas: form.relacion || null,
           },
         }),
       });
@@ -107,7 +104,7 @@ export function NuevoClienteWizard() {
           <div className="text-xs text-slate-700 leading-relaxed">
             <p className="font-bold text-slate-900 mb-1">Captura mínima del paso 1</p>
             <p>
-              Este paso (5 campos) lo llena el asesor. Los pasos 2-9 (~80 campos) se llenarán
+              Este paso (3 campos) lo llena el asesor. Los pasos 2-9 (~80 campos) se llenarán
               automáticamente con datos públicos verificables y citados, siguiendo las reglas operativas
               del cuestionario. Tú validas, ajustas y completas lo no público.
             </p>
@@ -115,7 +112,7 @@ export function NuevoClienteWizard() {
         </div>
       </div>
 
-      <Section title="Información base" subtitle="Captura del asesor — 5 campos" stepLabel="Paso 1 · Datos del asesor">
+      <Section title="Información base" subtitle="Captura del asesor — 3 campos" stepLabel="Paso 1 · Datos del asesor">
         <Input
           label="Nombre de la empresa *"
           value={form.nombre}
@@ -157,13 +154,6 @@ export function NuevoClienteWizard() {
           helper="Dominio que usará la IA como fuente primaria para los pasos 2-9"
         />
 
-        <Input
-          label="Relación con otras empresas del sistema"
-          value={form.relacion}
-          onChange={(e) => set("relacion", e.target.value)}
-          placeholder="Empresa independiente o relación"
-          helper="Madre / hija / hermana — si aplica"
-        />
       </Section>
 
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">

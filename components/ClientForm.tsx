@@ -39,6 +39,9 @@ type FormState = {
   has_sustainability_report: boolean | null;
   has_sustainability_strategy: boolean | null;
 
+  // Relación con otras empresas
+  related_companies: string;
+
   // Logo
   logo_url: string;
 
@@ -96,6 +99,7 @@ export function ClientForm(props: Props) {
     has_double_materiality: toBool(props.initial?.has_double_materiality),
     has_sustainability_report: toBool(props.initial?.has_sustainability_report),
     has_sustainability_strategy: toBool(props.initial?.has_sustainability_strategy),
+    related_companies: props.initial?.related_companies ?? "",
     logo_url: props.initial?.logo_url ?? "",
     sustainability_strategy_url: props.initial?.sustainability_strategy_url ?? "",
     sustainability_report_url: props.initial?.sustainability_report_url ?? "",
@@ -173,6 +177,7 @@ export function ClientForm(props: Props) {
         sustainability_report_url: form.sustainability_report_url.trim() || null,
         financial_report_url: form.financial_report_url.trim() || null,
         double_materiality_url: form.double_materiality_url.trim() || null,
+        related_companies: form.related_companies.trim() || null,
         info_general_json: form.blocks.info_general,
         business_model_json: form.blocks.business_model,
         impacts_json: form.blocks.impacts,
@@ -327,6 +332,18 @@ export function ClientForm(props: Props) {
           value={form.services}
           onChange={(v) => update("services", (v as string[]) ?? [])}
         />
+
+        <Field label="Relación con otras empresas del sistema">
+          <input
+            value={form.related_companies}
+            onChange={(e) => update("related_companies", e.target.value)}
+            className={inputCls}
+            placeholder="Ej: Filial de Grupo X · Empresa independiente"
+          />
+          <p className="text-[10px] text-slate-400 mt-1">
+            Madre / hija / hermana con otros clientes en ResponSable — si aplica.
+          </p>
+        </Field>
 
         {/* Logo — al final: dato cosmético */}
         <div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
@@ -19,9 +20,22 @@ export type ChatMessageBubbleProps = {
   onRate: (idx: number, rating: "up" | "down") => void;
   onCopy: (idx: number, text: string) => void;
   onRetry: () => void;
+  /** Wave 3c (D): registrar razón cuando consultor da 👎 */
+  onDownReason?: (idx: number, reasonCode: string, reasonText?: string) => void;
   /** D-10: clientId para convertir [campo:key] en links al cuestionario. */
   clientId?: string;
 };
+
+// Wave 3c (D): razones de rechazo predefinidas. Códigos = enum en migración 0075.
+const DOWN_REASONS: Array<{ code: string; label: string }> = [
+  { code: "factually_wrong",  label: "Datos incorrectos" },
+  { code: "sector_off",       label: "Sector equivocado" },
+  { code: "bad_format",       label: "Mal formato" },
+  { code: "too_generic",      label: "Muy genérico" },
+  { code: "missed_context",   label: "Ignoró contexto" },
+  { code: "language",         label: "Idioma raro" },
+  { code: "other",            label: "Otro" },
+];
 
 /**
  * D-10: Convierte citas [campo:key] del LLM en links Markdown al cuestionario.
@@ -50,9 +64,34 @@ export function ChatMessageBubble({
   onRate,
   onCopy,
   onRetry,
+  onDownReason,
   clientId,
 }: ChatMessageBubbleProps) {
   const isUser = m.role === "user";
+  // Wave 3c (D): cuando rating=down, se muestra picker de razón inline.
+  // showReasonPicker queda abierto hasta que consultor elija razón o cancele.
+  const [showReasonPicker, setShowReasonPicker] = useState(false);
+  const [reasonRecorded, setReasonRecorded] = useState(false);
+
+  function handleRate(idx: number, rating: "up" | "down") {
+    onRate(idx, rating);
+    if (rating === "down" && m.rating !== "down") {
+      // Acaba de marcar down → abrir picker
+      setShowReasonPicker(true);
+      setReasonRecorded(false);
+    }
+    if (rating === "down" && m.rating === "down") {
+      // Toggle off → cerrar picker
+      setShowReasonPicker(false);
+    }
+  }
+
+  function handleReasonPick(reasonCode: string) {
+    onDownReason?.(i, reasonCode);
+    setReasonRecorded(true);
+    // Cerrar después de 1.5s para que vea confirmación
+    setTimeout(() => setShowReasonPicker(false), 1500);
+  }
   const showActions = !isUser && !!m.content && !streaming;
   const tsLabel = m.ts
     ? new Date(m.ts).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
@@ -136,7 +175,7 @@ export function ChatMessageBubble({
           {showActions && (
             <div className="flex items-center mt-2 -mx-1">
               <button
-                onClick={() => onRate(i, "up")}
+                onClick={() => handleRate(i, "up")}
                 className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "up" ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}
                 title="Útil"
               >
@@ -145,7 +184,7 @@ export function ChatMessageBubble({
                 </svg>
               </button>
               <button
-                onClick={() => onRate(i, "down")}
+                onClick={() => handleRate(i, "down")}
                 className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded transition-colors ${m.rating === "down" ? "text-rose-500" : "text-slate-300 hover:text-slate-500"}`}
                 title="No útil"
               >
@@ -176,6 +215,39 @@ export function ChatMessageBubble({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>
+              )}
+            </div>
+          )}
+          {/* Wave 3c (D): picker razón cuando consultor da 👎 */}
+          {showReasonPicker && !isUser && (
+            <div className="mt-2 pt-2 border-t border-slate-100" role="group" aria-label="Motivo del rechazo">
+              {reasonRecorded ? (
+                <p className="text-xs text-emerald-700">✓ Guardado. La IA aprenderá de esto.</p>
+              ) : (
+                <>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+                    ¿Por qué no fue útil?
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DOWN_REASONS.map((r) => (
+                      <button
+                        key={r.code}
+                        type="button"
+                        onClick={() => handleReasonPick(r.code)}
+                        className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm hover:border-rose-300 hover:text-rose-600 transition-colors"
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setShowReasonPicker(false)}
+                      className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1"
+                    >
+                      Omitir
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )}

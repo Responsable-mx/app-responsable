@@ -480,6 +480,43 @@ export function ChatWindow({
         i === idx ? { ...msg, rating: msg.rating === rating ? undefined : rating } : msg
       )
     );
+    // Wave 3c (D): persistir feedback en /api/ia-feedback para memoria IA.
+    // Up se guarda inmediato. Down se guarda inicial; reason picker dispara
+    // un INSERT adicional cuando consultor elige razón.
+    const msg = messages[idx];
+    if (!msg || msg.role !== "assistant") return;
+    // Toggle off (rating ya estaba puesto e iguala el clic) → no persistir
+    if (msg.rating === rating) return;
+    void fetch("/api/ia-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: msg.roleId ?? role,
+        client_id: clientId || null,
+        session_id: sessionId,
+        message_excerpt: msg.content.slice(0, 500),
+        rating,
+      }),
+    }).catch(() => { /* fire-and-forget — fallo no debe romper UX */ });
+  }
+
+  // Wave 3c (D): registra razón adicional cuando consultor da 👎 + selecciona motivo
+  function submitDownReason(idx: number, reasonCode: string, reasonText?: string) {
+    const msg = messages[idx];
+    if (!msg || msg.role !== "assistant") return;
+    void fetch("/api/ia-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: msg.roleId ?? role,
+        client_id: clientId || null,
+        session_id: sessionId,
+        message_excerpt: msg.content.slice(0, 500),
+        rating: "down",
+        reason_code: reasonCode,
+        reason_text: reasonText ?? null,
+      }),
+    }).catch(() => {});
   }
 
   function copyMessage(idx: number, text: string) {
@@ -723,6 +760,7 @@ export function ChatWindow({
               onRate={rateMessage}
               onCopy={copyMessage}
               onRetry={retryLast}
+              onDownReason={submitDownReason}
               clientId={clientId || undefined}
             />
           ))}

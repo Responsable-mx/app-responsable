@@ -7,6 +7,7 @@ import { getModelConfig } from "@/lib/ai/models";
 import { buildSystemBlocks } from "@/lib/ai/roles";
 import { logAiCall } from "@/lib/ai/logging";
 import { validateAiResponse } from "@/lib/ai/response-validator";
+import { buildFeedbackMemoryBlock } from "@/lib/ai/feedback-memory";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 import { ChatRequestSchema } from "@/lib/validation";
@@ -114,7 +115,14 @@ export async function POST(req: NextRequest) {
     clientId ? getQuestionnaireBundle(clientId, "doble-materialidad").catch(() => null) : Promise.resolve(null),
   ]);
   const config = getModelConfig(role);
-  const systemBlocks = await buildSystemBlocks(role, client, questionnaire);
+  const baseSystemBlocks = await buildSystemBlocks(role, client, questionnaire);
+  // Wave 3c (D): memoria de feedback negativo del consultor para este rol+cliente.
+  // Se agrega como 3er bloque SIN cache_control — refleja feedback nuevo sin
+  // invalidar los 2 bloques cacheados (contexto cliente + reglas del rol).
+  const feedbackText = await buildFeedbackMemoryBlock({ role, clientId: clientId || null }).catch(() => "");
+  const systemBlocks = feedbackText
+    ? [...baseSystemBlocks, { type: "text" as const, text: feedbackText }]
+    : baseSystemBlocks;
 
   // Circuit breaker: rechazar inmediatamente si Anthropic está en cascada de fallos
   if (anthropicBreaker.isOpen) {

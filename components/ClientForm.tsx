@@ -8,13 +8,7 @@ import type { Client } from "@/lib/clients";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
-import { StructuredBlockEditor } from "@/components/StructuredBlockEditor";
-import { BoolTriField } from "@/components/fields/BoolTriField";
-import { ReportIaButton } from "@/components/clients/ReportIaButton";
-import {
-  NARRATIVE_SCHEMAS,
-  type NarrativeBlockKey,
-} from "@/lib/clients/narrative-schemas";
+import { type NarrativeBlockKey } from "@/lib/clients/narrative-schemas";
 
 type Props =
   | { mode: "create"; initial?: undefined }
@@ -111,13 +105,6 @@ export function ClientForm(props: Props) {
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function updateBlock(block: NarrativeBlockKey, next: BlockValue) {
-    setForm((prev) => ({
-      ...prev,
-      blocks: { ...prev.blocks, [block]: next },
-    }));
   }
 
   async function handleFillProfile() {
@@ -390,175 +377,6 @@ export function ClientForm(props: Props) {
         </div>
       </Section>
 
-      {/* ═══ Atributos de sostenibilidad ═════════════════════ */}
-      <Section title="Atributos de sostenibilidad">
-        <div className="grid grid-cols-2 gap-4">
-          <MultiSelectCombobox
-            category="business_segments"
-            label="Segmentos de negocio"
-            hint="B2B / B2C / mixto. Divisiones internas → Bloque 1 · Divisiones y líneas."
-            value={form.business_segments}
-            onChange={(v) => update("business_segments", (v as string[]) ?? [])}
-          />
-          <MultiSelectCombobox
-            category="maturity_levels"
-            label="Madurez en sostenibilidad"
-            mode="single"
-            value={form.maturity_level}
-            onChange={(v) => update("maturity_level", (v as string) ?? "")}
-          />
-        </div>
-
-        <MultiSelectCombobox
-          category="frameworks"
-          label="Marcos de sostenibilidad reportados"
-          hint="Frameworks activos (GRI, ISSB, CSRD…). Historial de reportes por año → Bloque 5."
-          value={form.frameworks}
-          onChange={(v) => update("frameworks", (v as string[]) ?? [])}
-          hasGroups
-        />
-
-        <MultiSelectCombobox
-          category="applicable_regulations"
-          label="Regulaciones aplicables"
-          value={form.applicable_regulations}
-          onChange={(v) =>
-            update("applicable_regulations", (v as string[]) ?? [])
-          }
-          hasGroups
-        />
-
-        <MultiSelectCombobox
-          category="policies"
-          label="Políticas formalizadas"
-          value={form.policies_in_place}
-          onChange={(v) => update("policies_in_place", (v as string[]) ?? [])}
-        />
-
-        <MultiSelectCombobox
-          category="certifications"
-          label="Certificaciones vigentes"
-          value={form.certifications}
-          onChange={(v) => update("certifications", (v as string[]) ?? [])}
-          hasGroups
-        />
-
-        <MultiSelectCombobox
-          category="material_topics"
-          label="Temas materiales priorizados"
-          hint="Temas resultantes del estudio de materialidad, incluyendo biodiversidad si aplica."
-          value={form.material_topics}
-          onChange={(v) => update("material_topics", (v as string[]) ?? [])}
-          hasGroups
-        />
-
-        {/* Booleanos: toggles en grid, URLs debajo para no desbalancear columnas */}
-        <div className="space-y-3 pt-1">
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <div className="text-xs font-medium text-slate-700 mb-1.5">
-                Tiene estrategia de sostenibilidad
-              </div>
-              <BoolTriField
-                value={form.has_sustainability_strategy}
-                onChange={(v) => update("has_sustainability_strategy", v)}
-              />
-            </div>
-            <div>
-              <div className="text-xs font-medium text-slate-700 mb-1.5">
-                Publica reporte de sostenibilidad
-              </div>
-              <BoolTriField
-                value={form.has_sustainability_report}
-                onChange={(v) => update("has_sustainability_report", v)}
-              />
-            </div>
-            <div>
-              <div className="text-xs font-medium text-slate-700 mb-1.5">
-                Tiene estudio de doble materialidad
-              </div>
-              <BoolTriField
-                value={form.has_double_materiality}
-                onChange={(v) => update("has_double_materiality", v)}
-              />
-            </div>
-          </div>
-
-          {/* URLs condicionales — ancho completo para evitar desbalanceo del grid */}
-          {form.has_sustainability_strategy === true && (
-            <UrlField
-              label="URL de la estrategia de sostenibilidad"
-              value={form.sustainability_strategy_url}
-              onChange={(v) => update("sustainability_strategy_url", v)}
-            />
-          )}
-          {form.has_sustainability_report === true && (
-            <div className="space-y-1">
-              <UrlField
-                label="URL del informe de sustentabilidad"
-                value={form.sustainability_report_url}
-                onChange={(v) => update("sustainability_report_url", v)}
-              />
-              <ReportIaButton
-                clientId={props.initial?.id}
-                kind="sustainability_report"
-                currentUrl={form.sustainability_report_url}
-                onUrlChange={(v) => update("sustainability_report_url", v)}
-              />
-              <p className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded px-3 py-2 mt-2">
-                Multi-año + marcos: usa{" "}
-                <strong className="text-slate-700">Bloque 5 · Reportes publicados</strong>.
-              </p>
-            </div>
-          )}
-          {form.has_double_materiality === true && (
-            <UrlField
-              label="URL del estudio de doble materialidad"
-              value={form.double_materiality_url}
-              onChange={(v) => update("double_materiality_url", v)}
-            />
-          )}
-        </div>
-
-        {/* Reporte financiero anual */}
-        <div>
-          <UrlField
-            label="URL del reporte financiero anual"
-            value={form.financial_report_url}
-            onChange={(v) => update("financial_report_url", v)}
-          />
-          <ReportIaButton
-            clientId={props.initial?.id}
-            kind="financial_report"
-            currentUrl={form.financial_report_url}
-            onUrlChange={(v) => update("financial_report_url", v)}
-          />
-          <p className="text-[10px] text-slate-400 mt-1">
-            Usado por los roles IA para cruzar datos financieros con métricas de sostenibilidad.
-          </p>
-        </div>
-      </Section>
-
-      {/* ═══ Narrativa (6 bloques con sub-campos) ═══════════ */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
-            Narrativa detallada
-          </h2>
-          <p className="text-xs text-slate-600 mt-0.5">
-            6 bloques con preguntas específicas. Cada respuesta se guarda por
-            separado para que los roles IA la usen directamente.
-          </p>
-        </div>
-        {NARRATIVE_SCHEMAS.map((schema) => (
-          <StructuredBlockEditor
-            key={schema.block}
-            schema={schema}
-            value={form.blocks[schema.block]}
-            onChange={(v) => updateBlock(schema.block, v)}
-          />
-        ))}
-      </div>
 
       {/* ═══ Footer sticky ══════════════════════════════════ */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-slate-200">
@@ -618,9 +436,6 @@ function normalizeUrl(url: string): string {
 const inputCls =
   "w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
 
-const urlInputCls =
-  "w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent";
-
 function Section({
   title,
   action,
@@ -660,27 +475,3 @@ function Field({
   );
 }
 
-function UrlField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label className="block text-[10px] font-medium text-slate-600 mb-0.5">
-        {label}
-      </label>
-      <input
-        type="url"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="https:// … o liga al PDF"
-        className={urlInputCls}
-      />
-    </div>
-  );
-}

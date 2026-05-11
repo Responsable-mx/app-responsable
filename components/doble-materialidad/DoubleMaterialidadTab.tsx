@@ -1361,11 +1361,13 @@ export function DoubleMaterialidadTab({
   // Inicial: lee URL hash (#dm-sec-iros) si existe — permite deep-links y back/forward.
   // Si no hay hash → Contexto. (Smart-jump al primer pendiente se aplica más abajo
   // cuando ya tenemos los statuses calculados.)
-  const [activeStageId, setActiveStageId] = useState<string>(() => {
-    if (typeof window === "undefined") return "dm-sec-contexto";
+  // Siempre iniciar con valor SSR-safe; leer hash en useEffect para evitar
+  // mismatch de hidratación (#418) cuando la URL tiene un hash al recargar.
+  const [activeStageId, setActiveStageId] = useState<string>("dm-sec-contexto");
+  useEffect(() => {
     const hash = window.location.hash.replace(/^#/, "");
-    return DM_SECTION_IDS.includes(hash) ? hash : "dm-sec-contexto";
-  });
+    if (DM_SECTION_IDS.includes(hash)) setActiveStageId(hash);
+  }, []);
   const navigateTo = useCallback((sectionId: string) => {
     if (!DM_SECTION_IDS.includes(sectionId)) return;
     setActiveStageId(sectionId);

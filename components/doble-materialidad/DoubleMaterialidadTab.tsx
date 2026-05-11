@@ -270,10 +270,10 @@ export function DoubleMaterialidadTab({
     iro_decisions: Record<string, { decision: string | null }>;
   } | null }>(validacionKey, fetcher, { revalidateOnFocus: false });
 
-  const companies    = benchmarkResp?.data.companies ?? [];
-  const latestResult = benchmarkResp?.data.latest_result ?? null;
-  const irosStatus  = irosResp?.data.status ?? "idle";
-  const iros        = irosResp?.data.iros ?? [];
+  const companies    = benchmarkResp?.data?.companies ?? [];
+  const latestResult = benchmarkResp?.data?.latest_result ?? null;
+  const irosStatus  = irosResp?.data?.status ?? "idle";
+  const iros        = irosResp?.data?.iros ?? [];
   const nisRows     = nisResp?.data ?? [];
   const latestReport = reportResp?.data ?? null;
 

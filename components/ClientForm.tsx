@@ -3,17 +3,30 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
-import type { Client } from "@/lib/clients";
+import type { Client, ClientEngagement } from "@/lib/clients";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
+import { SelectField } from "@/components/ui/SelectField";
 import { type NarrativeBlockKey } from "@/lib/clients/narrative-schemas";
 import { normalizeUrl } from "@/lib/clients/url-utils";
 
 type Props =
-  | { mode: "create"; initial?: undefined }
-  | { mode: "edit"; initial: Client };
+  | { mode: "create"; initial?: undefined; initialEngagements?: undefined }
+  | { mode: "edit"; initial: Client; initialEngagements: ClientEngagement[] };
+
+type EngagementRow = {
+  _key: string;
+  id?: string;
+  service_key: string;
+  year: string;
+  alcance: string;
+  status: "active" | "completed";
+  _dirty: boolean;
+  _deleted: boolean;
+};
 
 type BlockValue = Record<string, unknown>;
 
@@ -33,7 +46,6 @@ type FormState = {
   policies_in_place: string[];
   certifications: string[];
   material_topics: string[];
-  services: string[];
   maturity_level: string;
   has_double_materiality: boolean | null;
   has_sustainability_report: boolean | null;
@@ -74,12 +86,38 @@ function initialBlocks(
   };
 }
 
+const catalogFetcher = (url: string) =>
+  fetch(url).then((r) => r.json()).then((j) => (j.data ?? []) as { value: string; label: string }[]);
+
+function engagementToRow(e: ClientEngagement): EngagementRow {
+  return {
+    _key: e.id,
+    id: e.id,
+    service_key: e.service_key,
+    year: e.year ? String(e.year) : "",
+    alcance: e.alcance ?? "",
+    status: e.status,
+    _dirty: false,
+    _deleted: false,
+  };
+}
+
 export function ClientForm(props: Props) {
   const router = useRouter();
   const { push } = useToast();
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [fillingProfile, setFillingProfile] = useState(false);
+
+  const [engagements, setEngagements] = useState<EngagementRow[]>(
+    () => (props.initialEngagements ?? []).map(engagementToRow)
+  );
+
+  const { data: serviceOptions = [] } = useSWR<{ value: string; label: string }[]>(
+    "/api/catalogs?category=services",
+    catalogFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
+  );
 
   const [form, setForm] = useState<FormState>({
     name: props.initial?.name ?? "",
@@ -94,7 +132,6 @@ export function ClientForm(props: Props) {
     policies_in_place: props.initial?.policies_in_place ?? [],
     certifications: props.initial?.certifications ?? [],
     material_topics: props.initial?.material_topics ?? [],
-    services: props.initial?.services ?? [],
     maturity_level: props.initial?.maturity_level ?? "",
     has_double_materiality: toBool(props.initial?.has_double_materiality),
     has_sustainability_report: toBool(props.initial?.has_sustainability_report),
@@ -150,10 +187,38 @@ export function ClientForm(props: Props) {
     }
   }
 
+  function addEngagement() {
+    setEngagements((prev) => [
+      ...prev,
+      {
+        _key: crypto.randomUUID(),
+        service_key: "",
+        year: String(new Date().getFullYear()),
+        alcance: "",
+        status: "active",
+        _dirty: true,
+        _deleted: false,
+      },
+    ]);
+  }
+
+  function updateEngagement(key: string, field: keyof Pick<EngagementRow, "service_key" | "year" | "alcance" | "status">, value: string) {
+    setEngagements((prev) =>
+      prev.map((r) => r._key === key ? { ...r, [field]: value, _dirty: true } : r)
+    );
+  }
+
+  function removeEngagement(key: string) {
+    setEngagements((prev) =>
+      prev.map((r) => r._key === key ? { ...r, _deleted: true } : r)
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
+      // 1. PATCH/POST client (services synced by engagement API)
       const payload = {
         name: form.name.trim(),
         website_url: normalizeUrl(form.website_url.trim()) || null,
@@ -167,7 +232,6 @@ export function ClientForm(props: Props) {
         policies_in_place: form.policies_in_place,
         certifications: form.certifications,
         material_topics: form.material_topics,
-        services: form.services,
         maturity_level: form.maturity_level || null,
         has_double_materiality: form.has_double_materiality,
         has_sustainability_report: form.has_sustainability_report,
@@ -186,12 +250,12 @@ export function ClientForm(props: Props) {
         stakeholders_json: form.blocks.stakeholders,
       };
 
-      const url =
+      const clientUrl =
         props.mode === "create"
           ? "/api/clients"
           : `/api/clients/${props.initial.id}`;
       const method = props.mode === "create" ? "POST" : "PATCH";
-      const res = await fetch(url, {
+      const res = await fetch(clientUrl, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -202,6 +266,37 @@ export function ClientForm(props: Props) {
         setSaving(false);
         return;
       }
+
+      const clientId = props.mode === "edit" ? props.initial.id : data.data?.id;
+
+      // 2. Mutaciones de engagements en paralelo
+      if (clientId) {
+        const mutations = engagements.map(async (row) => {
+          const body = {
+            service_key: row.service_key,
+            year: row.year ? parseInt(row.year, 10) : null,
+            alcance: row.alcance.trim() || null,
+            status: row.status,
+          };
+          if (row._deleted && row.id) {
+            await fetch(`/api/clients/${clientId}/engagements/${row.id}`, { method: "DELETE" });
+          } else if (!row._deleted && !row.id && row.service_key) {
+            await fetch(`/api/clients/${clientId}/engagements`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+          } else if (!row._deleted && row.id && row._dirty) {
+            await fetch(`/api/clients/${clientId}/engagements/${row.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+          }
+        });
+        await Promise.all(mutations);
+      }
+
       router.push("/clientes");
       router.refresh();
     } catch (err) {
@@ -325,13 +420,92 @@ export function ClientForm(props: Props) {
           placeholder="México, Colombia, España…"
         />
 
-        <MultiSelectCombobox
-          category="services"
-          label="Servicios contratados"
-          hint="Define qué tabs y funciones IA se habilitan para este cliente."
-          value={form.services}
-          onChange={(v) => update("services", (v as string[]) ?? [])}
-        />
+        {/* Servicios contratados — engagement por fila */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Servicios contratados
+              </label>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Define qué tabs y funciones IA se habilitan para este cliente.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={addEngagement}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Agregar
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {engagements.filter((r) => !r._deleted).length === 0 && (
+              <p className="text-xs text-slate-400 py-2">Sin servicios. Usa "Agregar" para añadir uno.</p>
+            )}
+            {engagements.filter((r) => !r._deleted).map((row) => (
+              <div key={row._key} className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded">
+                {/* Servicio */}
+                <div className="flex-1 min-w-0">
+                  <SelectField
+                    value={row.service_key}
+                    onChange={(v) => updateEngagement(row._key, "service_key", v)}
+                    options={serviceOptions}
+                    placeholder="Servicio…"
+                  />
+                </div>
+                {/* Año */}
+                <div className="w-[72px] shrink-0">
+                  <input
+                    type="number"
+                    min={2010}
+                    max={2035}
+                    value={row.year}
+                    onChange={(e) => updateEngagement(row._key, "year", e.target.value)}
+                    className={inputCls + " text-center px-1.5"}
+                    placeholder="Año"
+                  />
+                </div>
+                {/* Alcance */}
+                <div className="flex-[2] min-w-0">
+                  <input
+                    type="text"
+                    value={row.alcance}
+                    onChange={(e) => updateEngagement(row._key, "alcance", e.target.value)}
+                    className={inputCls}
+                    placeholder="México — Bajío"
+                  />
+                </div>
+                {/* Status */}
+                <div className="w-[110px] shrink-0">
+                  <SelectField
+                    value={row.status}
+                    onChange={(v) => updateEngagement(row._key, "status", v as "active" | "completed")}
+                    options={[
+                      { value: "active", label: "Activo" },
+                      { value: "completed", label: "Completado" },
+                    ]}
+                  />
+                </div>
+                {/* Eliminar */}
+                <button
+                  type="button"
+                  onClick={() => removeEngagement(row._key)}
+                  className="shrink-0 p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                  title="Eliminar engagement"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Logo — al final: dato cosmético */}
         <div>

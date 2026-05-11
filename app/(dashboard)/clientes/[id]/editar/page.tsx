@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getClient } from "@/lib/clients";
+import { getClient, getClientEngagements } from "@/lib/clients";
 import { requireAdmin } from "@/lib/auth";
 import { ClientForm } from "@/components/ClientForm";
 
@@ -10,9 +10,10 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function EditarClienteFormPage({ params }: Props) {
   const { id } = await params;
-  const [client, admin] = await Promise.all([
+  const [client, admin, engagements] = await Promise.all([
     getClient(id).catch(() => null),
     requireAdmin(),
+    getClientEngagements(id).catch(() => []),
   ]);
 
   // Solo admin puede editar. Consultor → volver al detalle.
@@ -41,7 +42,7 @@ export default async function EditarClienteFormPage({ params }: Props) {
         </p>
       </div>
 
-      <ClientForm mode="edit" initial={client} />
+      <ClientForm mode="edit" initial={client} initialEngagements={engagements} />
     </div>
   );
 }

@@ -291,6 +291,35 @@ const DEV_SEED_CLIENTS: Client[] = [
 
 const CATALOG_COLUMNS = "id,name";
 
+export type ClientEngagement = {
+  id: string;
+  client_id: string;
+  service_key: string;
+  year: number | null;
+  alcance: string | null;
+  status: "active" | "completed";
+  created_at: string;
+  updated_at: string;
+};
+
+export function getClientEngagements(clientId: string): Promise<ClientEngagement[]> {
+  return withDevModeFallback<ClientEngagement[]>({
+    kind: "read",
+    fallback: [],
+    async run() {
+      const admin = createAdminClient();
+      const { data, error } = await admin
+        .from("client_engagements")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("year", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(`getClientEngagements: ${error.message}`);
+      return (data ?? []) as ClientEngagement[];
+    },
+  });
+}
+
 export type ClientMini = Pick<Client, "id" | "has_double_materiality">;
 
 export function getClientMini(id: string): Promise<ClientMini | null> {

@@ -83,6 +83,19 @@ export function NuevoClienteWizard() {
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       const newId = json.data?.id;
       if (!newId) throw new Error("Sin ID en respuesta");
+
+      // Crear primer engagement con el servicio + alcance del wizard
+      await fetch(`/api/clients/${newId}/engagements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_key: form.servicio,
+          year: new Date().getFullYear(),
+          alcance: form.alcance.trim() || null,
+          status: "active",
+        }),
+      });
+
       toast.push("success", "Cliente creado · iniciando IA");
       router.push(`/clientes/${newId}?tab=cuestionario&step=2&autoFill=1`);
     } catch (e) {

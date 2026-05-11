@@ -29,7 +29,8 @@ export type AuditEntityType =
   | "dm_resumen"
   | "dm_benchmark_company"
   | "questionnaire_snapshot"
-  | "auto_update_config";
+  | "auto_update_config"
+  | "client_engagement";
 
 export type AuditAction = "create" | "update" | "delete" | "restore" | "review";
 

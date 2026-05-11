@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeEmail } from "@/lib/auth";
@@ -6,6 +7,11 @@ import { getUser, recordLogin } from "@/lib/users";
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MINUTES = 5;
+
+const LoginCodeSchema = z.object({
+  email: z.string().min(1).max(254),
+  code:  z.string().min(1).max(20),
+});
 
 /**
  * Cuenta TODOS los intentos (éxito + fallo) de este email en la ventana.
@@ -42,23 +48,23 @@ async function recordAttempt(
 }
 
 export async function POST(req: NextRequest) {
-  let body: { email?: string; code?: string };
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { email, code } = body;
-  if (!email || !code) {
+  const parsed = LoginCodeSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json(
       { error: "Email y código requeridos" },
       { status: 400 }
     );
   }
 
-  const normalizedEmail = normalizeEmail(email);
-  const normalizedCode = code.trim();
+  const normalizedEmail = normalizeEmail(parsed.data.email);
+  const normalizedCode = parsed.data.code.trim();
   const admin = createAdminClient();
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??

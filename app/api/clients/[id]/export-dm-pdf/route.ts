@@ -126,7 +126,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     nisBrechas: nisBrechas.length > 0 ? nisBrechas : undefined,
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-pdf v4 — renderToBuffer Element type incompat con React 19
   const buffer = await renderToBuffer(React.createElement(DmReportDocument, { data: reportData }) as any);
 
   const fileName = `reporte-dm-${client.name.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.pdf`;

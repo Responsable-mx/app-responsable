@@ -71,7 +71,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   };
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-pdf v4 — Document component + renderToBuffer Element type incompat con React 19
     const element = React.createElement(ClientReport as any, {
       client,
       services,
@@ -80,7 +80,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       generatedAt: new Date().toISOString(),
       humanized,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-pdf v4 — Document component + renderToBuffer Element type incompat con React 19
     const buffer = await renderToBuffer(element as any);
     // Buffer → Uint8Array para BodyInit (Next.js 15 Edge compat)
     const bytes = new Uint8Array(buffer);

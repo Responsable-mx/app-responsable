@@ -16,6 +16,28 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-158–D-162 — Hallazgos auditoría sesión 27 (2026-05-10)
+
+### 🟡 D-158 — `@anthropic-ai/sdk` 16 minor versions atrás (0.79.0 → 0.95.1)
+- **Descripción**: gap large. Probable: features beta usadas (`cache_control`, `web_search`, Batch API) ya tienen types estables → muchos `as any` justificados (D-151) podrían eliminarse.
+- **Riesgo aplicar**: breaking changes en `messages.create`/`stream`/`tools` → regression 8 endpoints IA.
+- **Pre-requisitos arrancar**: branch dedicado · smoke test cliente piloto Nuvoil + Altamira en preview · revisar CHANGELOG SDK 0.79→0.95.
+- **Esfuerzo**: 1 sprint (4-6h con testing manual).
+
+### ~~🟡 D-159 — POST/PATCH sin Zod schema validation en 8 endpoints~~ ✅ RESUELTO (sesión 27)
+- chat-sessions POST + PATCH, client-services/[id] PATCH, extract-profile POST, materiality POST → Zod `.safeParse()` añadido. dm-resumen POST sin body (false positive). dm-validacion PATCH ya filtraba allowed manual (mitigado pero ahora también con Zod si se requiere). freeze-baseline solo query string (false positive).
+
+### ~~🟢 D-160 — `auth/send-code` y `auth/login-code` sin Zod parse~~ ✅ RESUELTO (sesión 27)
+- `SendCodeSchema` + `LoginCodeSchema` añadidos. Validación email/code antes de proceder.
+
+### 🟢 D-161 — `DocumentsTab.tsx` 82KB / 1879L (creció vs s25)
+- Subset D-153. Refactor con D-150 mismo sprint.
+
+### ~~🟢 D-162 — Routes monolitos backend: Anthropic Batch result handler duplicado en 3 routes~~ ✅ RESUELTO (sesión 27)
+- Helper `lib/ai/batch-result.ts` `extractBatchResult<T>(anthropic, batchId, schema, contextLog)` extraído. dm-benchmark, dm-iros, dm-report ahora usan helper único. Reducción ~90 LOC duplicadas. Imports `extractJsonObject` removidos donde ya no se usa.
+
+---
+
 ### Bloque D-155–D-157 — Hallazgos auditoría sesión 26 (2026-05-10 post-cleanup s25)
 
 ### ~~🟡 D-155 — 5 mutaciones DM-IA sin audit log~~ ✅ RESUELTO (sesión 26)
@@ -42,10 +64,11 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - Decisión: mockups SIGUEN ACTIVOS como playground dev (todos modificados esta semana). CLAUDE.md actualizado para reflejar realidad — sección renombrada "Mockups `/dev/*` — playground dev" + tabla de propósito por carpeta + regla de cleanup.
 - Middleware `lib/supabase/middleware.ts:60-61` bloquea `/dev/*` en producción ✓
 
-### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito 2988 líneas / 129KB
+### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito 2988 líneas / 129KB (planificado sprint dedicado)
 - **Descripción**: un componente concentra 8 stages + chat + benchmark + IROs + reporte preview. ESLint detectó setState in effect en línea 2575 (resuelto puntualmente, pero el patrón se repetirá).
 - **Fix sugerido**: dividir por sección manteniendo orchestrator delgado (`BenchmarkSection.tsx`, `IROsSection.tsx`, `ReportPreviewSection.tsx`, `Stage<N>.tsx` × 8). Pattern ya validado por `ValidacionSection.tsx`.
-- **Esfuerzo**: 1 sprint (8h, refactor + tests por sección)
+- **Por qué NO en sesión 27 cleanup**: refactor ciego sin smoke test cliente piloto = riesgo alto romper UI compleja con dependencias entre stages. Requiere branch dedicado + revisión manual cliente piloto Nuvoil/Altamira en preview antes de merge a main.
+- **Esfuerzo**: 1 sprint (8h refactor + tests por sección + 2h smoke test cliente).
 
 ### 🟡 D-151 — 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado
 - **Descripción**: reduce safety TS. No urgente, fix incremental por archivo.
@@ -74,9 +97,9 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-146 — extract-profile no registraba en logAiCall~~ ✅ RESUELTO
 - Tokens propagados desde `resp.usage` → `ProfileExtractResult` → route → `logAiCall`. Sesión 22.
 
-### 🟢 D-147 — Cache in-memory de extract-profile se pierde en cada deploy
-- **Descripción**: `const cache = new Map()` en `lib/ai/extract-profile.ts`. Aceptable para MVP (8 usuarios, TTL 30min). A escala: migrar a Redis o tabla Supabase con columna `expires_at`.
-- **Esfuerzo**: Sprint post-piloto
+### ~~🟢 D-147 — Cache in-memory de extract-profile se pierde en cada deploy~~ ✅ ACEPTADO MVP DEFINITIVO (sesión 27)
+- **Descripción**: `const cache = new Map()` en `lib/ai/extract-profile.ts`. TTL 30min, 200 entradas, 8 usuarios.
+- **Decisión sesión 27**: NO migrar a DB. Trade-off: round-trip Supabase por lookup vs persistencia entre deploys. Para 8 usuarios + cache TTL corto, perf > persistencia. Re-evaluar cuando users >50 o issue real reportado.
 
 ---
 

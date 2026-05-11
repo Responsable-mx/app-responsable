@@ -172,7 +172,7 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
           {
             type: "text",
             text: systemPrompt,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — cache_control no exportado
             cache_control: { type: "ephemeral" } as any,
           },
         ],

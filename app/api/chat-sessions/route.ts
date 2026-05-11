@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireConsultorOrAdmin } from "@/lib/auth";
 import {
   listChatSessions,
@@ -7,7 +8,15 @@ import {
 } from "@/lib/chat-sessions";
 import type { RoleId } from "@/lib/ai/models";
 
-const VALID_ROLES: RoleId[] = ["aurora", "rebeca", "elena", "valeria"];
+const VALID_ROLES = ["aurora", "rebeca", "elena", "valeria"] as const;
+
+const ChatSessionPostSchema = z.object({
+  id:       z.string().uuid().nullable().optional(),
+  clientId: z.string().uuid().nullable().optional(),
+  role:     z.enum(VALID_ROLES),
+  messages: z.array(z.unknown()),
+  title:    z.string().max(200).optional(),
+});
 
 export async function GET(req: NextRequest) {
   const user = await requireConsultorOrAdmin();
@@ -33,35 +42,30 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  let body: {
-    id?: string;
-    clientId?: string | null;
-    role?: string;
-    messages?: unknown;
-    title?: string;
-  };
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  if (!body.role || !VALID_ROLES.includes(body.role as RoleId)) {
-    return NextResponse.json({ error: "role inválido" }, { status: 400 });
-  }
-  if (!Array.isArray(body.messages)) {
-    return NextResponse.json({ error: "messages debe ser array" }, { status: 400 });
+  const parsed = ChatSessionPostSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Body inválido" },
+      { status: 400 }
+    );
   }
   // Sanitizar messages al shape esperado.
-  const messages: ChatSessionMessage[] = (body.messages as Array<Record<string, unknown>>)
+  const messages: ChatSessionMessage[] = (parsed.data.messages as Array<Record<string, unknown>>)
     .filter(
       (m) =>
-        (m.role === "user" || m.role === "assistant") && typeof m.content === "string"
+        (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string"
     )
     .map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content as string,
       ts: typeof m.ts === "number" ? (m.ts as number) : undefined,
-      roleId: VALID_ROLES.includes(m.roleId as RoleId)
+      roleId: (VALID_ROLES as readonly string[]).includes(m.roleId as string)
         ? (m.roleId as RoleId)
         : undefined,
       rating:
@@ -72,12 +76,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const saved = await upsertChatSession({
-      id: body.id ?? null,
+      id: parsed.data.id ?? null,
       userEmail: user,
-      clientId: body.clientId ?? null,
-      role: body.role as RoleId,
+      clientId: parsed.data.clientId ?? null,
+      role: parsed.data.role as RoleId,
       messages,
-      title: body.title,
+      title: parsed.data.title,
     });
     return NextResponse.json({ data: saved });
   } catch (e) {

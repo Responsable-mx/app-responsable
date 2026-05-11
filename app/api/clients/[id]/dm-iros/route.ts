@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import { getClient } from "@/lib/clients";
-import { extractJsonObject } from "@/lib/ai/extract-json";
+import { extractBatchResult } from "@/lib/ai/batch-result";
 import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -66,32 +66,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       const batch = await anthropic.beta.messages.batches.retrieve(latestBatch.batch_id);
 
       if (batch.processing_status === "ended") {
-        let parsed: z.infer<typeof IroGenerationSchema> | null = null;
-        let batchError: string | null = null;
-        let inputTokens = 0, outputTokens = 0;
-
-        for await (const result of await anthropic.beta.messages.batches.results(latestBatch.batch_id)) {
-          if (result.result.type === "succeeded") {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const msg = result.result.message as any;
-            inputTokens = msg.usage?.input_tokens ?? 0;
-            outputTokens = msg.usage?.output_tokens ?? 0;
-            const textOut = (msg.content as Array<{ type: string; text?: string }>)
-              .filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
-            const jsonText = extractJsonObject(textOut);
-            if (jsonText) {
-              const r = IroGenerationSchema.safeParse(JSON.parse(jsonText));
-              if (r.success) parsed = r.data;
-              else batchError = "Schema IA inválido";
-            } else {
-              batchError = "Sin JSON en respuesta IA";
-              console.error("[dm-iros batch] stop_reason:", msg.stop_reason, "output_tokens:", msg.usage?.output_tokens, "textOut tail:", textOut.slice(-500));
-            }
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            batchError = (result.result as any).error?.message ?? "Error en batch";
-          }
-        }
+        // D-162 helper centralizado
+        const ext = await extractBatchResult(anthropic, latestBatch.batch_id, IroGenerationSchema, "dm-iros batch");
+        const parsed = ext.parsed;
+        const batchError = ext.error;
+        const { inputTokens, outputTokens } = ext;
 
         if (parsed && !batchError) {
           // Limpiar IROs anteriores e insertar los nuevos
@@ -226,7 +205,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             system: [{
               type: "text",
               text: "Eres un consultor senior de Doble Materialidad. Responde solo con JSON válido.",
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — Batch API result union / cache_control no exportado
               cache_control: { type: "ephemeral" } as any,
             }],
             messages: [{ role: "user", content: prompt }],

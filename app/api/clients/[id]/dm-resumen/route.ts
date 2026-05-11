@@ -218,7 +218,7 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
           {
             type: "text",
             text: "Eres un consultor senior de sostenibilidad especializado en Doble Materialidad (ESRS/GRI/CSRD). Redactas resúmenes ejecutivos claros, accionables y en español de México.",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — cache_control + cache token fields no en stable usage type
             cache_control: { type: "ephemeral" } as any,
           },
         ],
@@ -231,9 +231,9 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
 
     inputTokens = response.usage?.input_tokens ?? 0;
     outputTokens = response.usage?.output_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — cache_control + cache token fields no en stable usage type
     cacheCreationTokens = (response.usage as any)?.cache_creation_input_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — cache_control + cache token fields no en stable usage type
     cacheReadTokens = (response.usage as any)?.cache_read_input_tokens ?? 0;
 
     content = response.content

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
@@ -6,6 +7,8 @@ import { extractProfileFromUrl } from "@/lib/ai/extract-profile";
 import { logAiCall } from "@/lib/ai/logging";
 
 export const maxDuration = 60;
+
+const ExtractSchema = z.object({ url: z.string().min(1).max(2048) });
 
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MIN = 5;
@@ -37,17 +40,18 @@ export async function POST(req: NextRequest) {
       { status: 429 }
     );
 
-  let body: { url?: string };
-  try { body = await req.json(); } catch {
+  let raw: unknown;
+  try { raw = await req.json(); } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-
-  if (!body.url || typeof body.url !== "string")
+  const parsed = ExtractSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json({ error: "url requerida" }, { status: 400 });
+  }
 
   const startedAt = Date.now();
   try {
-    const result = await extractProfileFromUrl(body.url);
+    const result = await extractProfileFromUrl(parsed.data.url);
     if (!result.cached) {
       const model = process.env.ANTHROPIC_MODEL_SONNET ?? "claude-sonnet-4-6";
       void logAiCall({ userEmail: user, role: "aurora", clientId: null, model, inputTokens: result.inputTokens ?? 0, outputTokens: result.outputTokens ?? 0, cacheCreationTokens: result.cacheCreationTokens ?? 0, cacheReadTokens: result.cacheReadTokens ?? 0, latencyMs: Date.now() - startedAt, error: null });

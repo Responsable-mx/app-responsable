@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import {
   listMaterialityTopics,
@@ -10,8 +11,23 @@ import { logChange } from "@/lib/audit-log";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const VALID_COLORS: TopicColor[] = ["rose", "amber", "teal", "slate"];
-const VALID_SIZES: TopicSize[] = ["sm", "md", "lg"];
+const VALID_COLORS = ["rose", "amber", "teal", "slate"] as const satisfies readonly TopicColor[];
+const VALID_SIZES = ["sm", "md", "lg"] as const satisfies readonly TopicSize[];
+
+const InitSchema = z.object({ action: z.literal("init") });
+const TopicSchema = z.object({
+  action:         z.undefined().optional(),
+  topic_key:      z.string().min(1).max(100),
+  label:          z.string().min(1).max(200),
+  x_pos:          z.number().min(0).max(100).optional(),
+  y_pos:          z.number().min(0).max(100).optional(),
+  color:          z.enum(VALID_COLORS).optional(),
+  size:           z.enum(VALID_SIZES).optional(),
+  section_key:    z.string().max(100).nullable().optional(),
+  position_index: z.number().int().optional(),
+  notes:          z.string().nullable().optional(),
+});
+const PostSchema = z.union([InitSchema, TopicSchema]);
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
@@ -34,15 +50,22 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  let body: { action?: "init" } | (Partial<MaterialityTopicInput> & { action?: never });
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+  const parsed = PostSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Body inválido" },
+      { status: 400 }
+    );
+  }
 
   // Acción especial: inicializar desde plantilla
-  if ("action" in body && body.action === "init") {
+  if ("action" in parsed.data && parsed.data.action === "init") {
     try {
       const existing = await listMaterialityTopics(id);
       if (existing.length > 0) {
@@ -68,12 +91,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   // Crear tema individual
-  const input = body as Partial<MaterialityTopicInput>;
-  if (!input.topic_key || !input.label) {
-    return NextResponse.json({ error: "topic_key y label son requeridos" }, { status: 400 });
-  }
-  const color = input.color && VALID_COLORS.includes(input.color) ? input.color : "slate";
-  const size = input.size && VALID_SIZES.includes(input.size) ? input.size : "md";
+  const input = parsed.data as Required<Pick<MaterialityTopicInput, "topic_key" | "label">> & Partial<MaterialityTopicInput>;
+  const color: TopicColor = input.color ?? "slate";
+  const size: TopicSize = input.size ?? "md";
   const x = clamp(input.x_pos ?? 50, 0, 100);
   const y = clamp(input.y_pos ?? 50, 0, 100);
 

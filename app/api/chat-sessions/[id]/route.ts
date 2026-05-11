@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireConsultorOrAdmin } from "@/lib/auth";
 import { archiveChatSession, getChatSession, renameChatSession } from "@/lib/chat-sessions";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+const RenameSchema = z.object({ title: z.string().min(1).max(200) });
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const user = await requireConsultorOrAdmin();
@@ -25,17 +28,18 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
-  let body: { title?: string };
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  if (!body.title || typeof body.title !== "string") {
+  const parsed = RenameSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json({ error: "title requerido" }, { status: 400 });
   }
   try {
-    await renameChatSession(id, user, body.title);
+    await renameChatSession(id, user, parsed.data.title);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

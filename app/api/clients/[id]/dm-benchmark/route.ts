@@ -6,6 +6,7 @@ import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import { getClient } from "@/lib/clients";
 import type { Client } from "@/lib/clients";
 import { extractJsonObject } from "@/lib/ai/extract-json";
+import { extractBatchResult } from "@/lib/ai/batch-result";
 import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { getPrompt } from "@/lib/ai/prompts";
@@ -188,44 +189,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       const batch = await anthropic.beta.messages.batches.retrieve(latestResult.batch_id);
 
       if (batch.processing_status === "ended") {
-        // Procesar resultados del batch
-        let comparison: Record<string, Record<string, string>> = {};
-        let narrative = "";
-        let batchError: string | null = null;
-        let inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
-
-        for await (const result of await anthropic.beta.messages.batches.results(latestResult.batch_id)) {
-          if (result.result.type === "succeeded") {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const msg = result.result.message as any;
-            inputTokens = msg.usage?.input_tokens ?? 0;
-            outputTokens = msg.usage?.output_tokens ?? 0;
-            cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
-            cacheReadTokens = msg.usage?.cache_read_input_tokens ?? 0;
-
-            const textOut = (msg.content as Array<{ type: string; text?: string }>)
-              .filter((b) => b.type === "text")
-              .map((b) => b.text ?? "")
-              .join("");
-
-            const jsonText = extractJsonObject(textOut);
-            if (jsonText) {
-              const parsed = CompareResponseSchema.safeParse(JSON.parse(jsonText));
-              if (parsed.success) {
-                comparison = parsed.data.comparison;
-                narrative = parsed.data.narrative;
-              } else {
-                batchError = "Schema IA inválido";
-              }
-            } else {
-              batchError = "Respuesta IA sin JSON";
-              console.error("[dm-benchmark batch] stop_reason:", msg.stop_reason, "output_tokens:", msg.usage?.output_tokens, "textOut tail:", textOut.slice(-500));
-            }
-          } else if (result.result.type === "errored") {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            batchError = (result.result as any).error?.message ?? "Error en batch";
-          }
-        }
+        // Procesar resultados del batch — D-162 helper centralizado
+        const ext = await extractBatchResult(anthropic, latestResult.batch_id, CompareResponseSchema, "dm-benchmark batch");
+        const comparison: Record<string, Record<string, string>> = ext.parsed?.comparison ?? {};
+        const narrative: string = ext.parsed?.narrative ?? "";
+        const batchError = ext.error;
+        const { inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens } = ext;
 
         if (batchError) {
           console.error("[dm-benchmark batch]", batchError);
@@ -402,7 +371,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           system: [{
             type: "text",
             text: "Eres un experto en análisis de sostenibilidad empresarial. Responde solo con JSON válido.",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — Batch API result union sin discriminated type / cache_control no exportado
             cache_control: { type: "ephemeral" } as any,
           }],
           messages: [{ role: "user", content: prompt }],
@@ -591,7 +560,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             system: [{
               type: "text",
               text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — Batch API result union sin discriminated type / cache_control no exportado
               cache_control: { type: "ephemeral" } as any,
             }],
             messages: [{ role: "user", content: prompt }],

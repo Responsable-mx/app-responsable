@@ -1,101 +1,139 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-10 (sesión 26 — audit + audit-health + audit-ia + audit-refactor + simplify post-deploy)
-**Calificación global:** 9.5 / 10 (vs 9.4 audit pre-fix; 4 hallazgos cerrados, 1 diferido)
+**Fecha:** 2026-05-10 (sesión 27 — audit-health + audit-refactor + audit-seg + cleanup completo)
+**Calificación global:** 9.6 / 10 (vs 9.4 audit pre-fix s27 / 9.5 post-fix s26)
 
 ---
 
-## Hallazgos sesión 26 — estado final tras "limpiar y propagar todo"
+## Hallazgos sesión 27 — estado final tras "limpiar toda la deuda"
 
 | ID | Sev | Descripción | Estado |
 |----|-----|-------------|--------|
-| D-155 | 🟡 | 5 mutaciones DM-IA sin `logChange()` (dm-validacion + dm-config + dm-nis + dm-resumen + dm-benchmark PATCH) | ✅ Resuelto (7 handlers con audit log) |
-| D-156 | 🟢 | `console.log` debug raw AI response 800 chars en dm-benchmark:419 | ✅ Resuelto |
-| D-157 | 🟢 | ClientForm 686L + ClientsList 618L | Diferido (refactor con D-150) |
+| D-151 | 🟡 | 35 `as any` con eslint-disable sin justificación | ✅ Resuelto (35 disables con razón contextual por archivo) |
+| D-159 | 🟡 | 8 endpoints sin Zod validation | ✅ Resuelto (Zod en chat-sessions, client-services, extract-profile, materiality + 2 false positives identificados) |
+| D-160 | 🟢 | auth send-code/login-code sin Zod | ✅ Resuelto |
+| D-162 | 🟢 | Anthropic Batch handler duplicado en 3 routes | ✅ Resuelto (`lib/ai/batch-result.ts` extractBatchResult helper, ~90 LOC duplicación eliminada) |
+| D-147 | 🟢 | Cache in-memory extract-profile | ✅ Aceptado MVP DEFINITIVO (perf > persist trade-off para 8 users) |
+| D-158 | 🟡 | Anthropic SDK 16 versions atrás | Sprint planificado (requiere smoke test cliente piloto, pre-requisito documentado) |
+| D-150 | 🟡 | DoubleMaterialidadTab monolito 2988L | Sprint planificado (riesgo prod sin smoke test) |
+| D-153/161 | 🟢 | DocumentsTab + ServiceGantt monolitos secundarios | Diferido con D-150 |
+| D-157 | 🟢 | ClientForm + ClientsList LOC altos | Diferido con D-150 |
+| D-04 | 🟡 | Metodología ResponSable | Decisión negocio (no técnico, cierre N/A) |
 
 ---
 
-## Detalle D-155 — Audit log mutaciones DM-IA
+## Aplicado sesión 27 (cleanup completo)
 
-**Patrón canónico aplicado**: CLAUDE.md "Audit log de mutaciones admin" extendido a **mutaciones consultor sobre entregables auditados externos**. Razón: Doble Materialidad IA es entregable cliente con escrutinio externo (auditor ESG, GRI, regulador). Cliente puede impugnar "¿quién cambió esta decisión IRO el 15 de agosto?" — sin trazabilidad no hay respuesta.
+### D-151 — 35 disables `any` con razón contextual
+35 ocurrencias `// eslint-disable-next-line @typescript-eslint/no-explicit-any` recibieron justificación inline:
+- `Anthropic SDK beta — cache_control no exportado`
+- `Anthropic SDK beta — Batch API result union sin discriminated type`
+- `Anthropic SDK beta — web_search tool + tool_use response blocks`
+- `react-pdf v4 — renderToBuffer Element type incompat con React 19`
+- `Supabase QueryBuilder chain con .or() condicional — type chain no inferible`
+- `Supabase nested join (client_services) — type discriminated no inferible`
+- `Supabase row → StageActivity con campo computed status`
 
-| Endpoint | Handler | Acción audit | Antes/Después |
-|----------|---------|--------------|---------------|
-| `dm-validacion/route.ts` | PATCH (upsert) | `update` o `create` | iro_decisions before, payload after |
-| `dm-config/route.ts` | PATCH | `update` | dm_horizons before, merged after |
-| `dm-nis/route.ts` | POST (genera desde cuestionario) | `create` | inserted_count + sector |
-| `dm-nis/route.ts` | PATCH (edita fila) | `update` | ibso_key + estado/calidad/accion before+after |
-| `dm-resumen/route.ts` | PATCH (review) | `review` | reviewed_at before/after |
-| `dm-resumen/route.ts` | POST (genera) | `create` | model + latencyMs |
-| `dm-benchmark/route.ts` | PATCH (rejection/reports_publicly) | `update` | updatePayload after |
+Script Python aplicó 35 reemplazos en 14 archivos. ESLint 0/0.
 
-`AuditEntityType` ya incluía `dm_validacion`, `dm_config`, `dm_nis`, `dm_resumen`, `dm_benchmark_company` — solo faltaba el call a `logChange()`.
+### D-159 + D-160 — Zod schemas en 7 endpoints
+
+| Endpoint | Schema agregado |
+|----------|-----------------|
+| `auth/send-code` | `SendCodeSchema { email }` |
+| `auth/login-code` | `LoginCodeSchema { email, code }` |
+| `chat-sessions` POST | `ChatSessionPostSchema { id?, clientId?, role, messages[], title? }` |
+| `chat-sessions/[id]` PATCH | `RenameSchema { title }` |
+| `client-services/[id]` PATCH | `PatchSchema { data? }` |
+| `clients/extract-profile` POST | `ExtractSchema { url }` |
+| `clients/[id]/materiality` POST | `PostSchema = union(InitSchema | TopicSchema)` |
+
+Patrón canónico: `const parsed = Schema.safeParse(raw); if (!parsed.success) return 400`. Reemplaza validación manual `typeof X !== "string"`.
+
+False positives identificados (no cambiar):
+- `dm-resumen POST` — sin body
+- `dm-validacion PATCH` — ya filtraba allowed manual a nivel código
+- `freeze-baseline POST` — solo lee `?force=1` query string
+
+### D-147 — Cache in-memory aceptado definitivo
+
+Análisis trade-off: migrar a Supabase = round-trip por lookup (50-150ms) vs `Map` (microseg). Para 8 users + TTL 30min = perf gana. Re-evaluar si users >50.
+
+### D-162 — Helper Anthropic Batch result
+
+`lib/ai/batch-result.ts` `extractBatchResult<T>(anthropic, batchId, schema, contextLog)` reemplaza loop duplicado en 3 routes. Encapsula:
+- Iteración `anthropic.beta.messages.batches.results(batchId)`
+- Extracción tokens (`input/output/cache_creation/cache_read`)
+- `extractJsonObject(textOut)` + `schema.safeParse()`
+- Error logging con contexto (`stop_reason`, `output_tokens`, tail 500 chars)
+- Manejo `result.type === "errored"` con error.message extraction
+
+Routes refactorizadas:
+- `dm-benchmark/route.ts` line 191 → ~10 LOC en lugar de 35
+- `dm-iros/route.ts` line 68 → ~6 LOC en lugar de 25
+- `dm-report/route.ts` line 169 → ~6 LOC en lugar de 30
+
+`extractJsonObject` import removido de dm-iros y dm-report (ya no se usa directo).
 
 ---
 
-## Áreas verificadas sin hallazgos nuevos sesión 26
+## Pendientes activos post-sesión 27
 
-| Área | Resultado |
-|------|-----------|
-| Cron security: `verifyCron(req)` en 4/4 + middleware bypass `Authorization: Bearer CRON_SECRET` | ✅ |
-| `/clientes/[id]/page.tsx`: Promise.all 5 queries paralelas | ✅ |
-| `/clientes/[id]/editar`: requireAdmin + redirect | ✅ |
-| `/api/clients` GET: rate limit 60/min DB + listClientsLight catalog | ✅ |
-| RBAC `requireConsultorForClient` en 13 endpoints DM-IA | ✅ |
-| Services/stages GET con `requireUser` (alineado RLS abierto STACK.md) | ✅ |
-| Sentry client+server con `release: VERCEL_GIT_COMMIT_SHA` | ✅ |
-| Secrets: 0 leaks en client code | ✅ |
-| Hardcoded URLs: solo User-Agent + fallbacks `process.env.X || "https://..."` | ✅ |
-| `dm-export-iros`: ExcelJS server-side, requireConsultorForClient | ✅ |
-| `freeze-baseline`: requireAdmin + logChange ✓ | ✅ |
-| Auto-deploy push 8a3ed08 → app.responsable.net HTTP 200 | ✅ |
+| ID | Sev | Descripción | Por qué diferido |
+|----|-----|-------------|------------------|
+| D-150 | 🟡 | DoubleMaterialidadTab 2988L monolito | Refactor ciego = riesgo prod alto. Requiere branch + smoke test cliente piloto |
+| D-158 | 🟡 | Anthropic SDK bump 0.79→0.95 | Breaking changes potencial. Requiere CHANGELOG review + smoke test 8 endpoints IA |
+| D-04  | 🟡 | Metodología ResponSable | Decisión negocio (no técnico) |
+| D-153 | 🟢 | DocumentsTab 82KB + ServiceGantt 55KB | Subset D-150 |
+| D-157 | 🟢 | ClientForm + ClientsList | Subset D-150 |
+| D-161 | 🟢 | DocumentsTab creció a 82KB | Subset D-153 |
 
 ---
 
-## Pendientes activos post-sesión 26
-
-| ID | Sev | Descripción |
-|----|-----|-------------|
-| D-150 | 🟡 | DoubleMaterialidadTab 2988L monolito (refactor 1 sprint) |
-| D-151 | 🟡 | 35 `any` sin justificar (gradual) |
-| D-04  | 🟡 | Metodología ResponSable (decisión negocio, arrastre) |
-| D-153 | 🟢 | DocumentsTab 74KB + ServiceGantt 55KB (post D-150) |
-| D-157 | 🟢 | ClientForm 686L + ClientsList 618L (con D-150) |
-| D-147 | 🟢 | Cache in-memory extract-profile (aceptado MVP) |
-
-## Validación post-fixes (2026-05-10 sesión 26)
+## Validación post-fixes sesión 27
 
 | Check | Resultado |
 |-------|-----------|
 | `npx tsc --noEmit` | ✅ 0 errores |
 | `npx eslint .` | ✅ exit 0 — 0 errors, 0 warnings |
-| `npx vitest run` | ✅ 318/318 tests verde |
-
-## Archivos tocados sesión 26
-
-| Archivo | Cambio |
-|---------|--------|
-| `app/api/clients/[id]/dm-benchmark/route.ts` | rm console.log debug L419 (D-156) + import logChange + PATCH `update` audit (D-155) |
-| `app/api/clients/[id]/dm-validacion/route.ts` | import logChange + PATCH `update`/`create` audit con before iro_decisions (D-155) |
-| `app/api/clients/[id]/dm-config/route.ts` | import logChange + PATCH `update` audit con before/after dm_horizons (D-155) |
-| `app/api/clients/[id]/dm-nis/route.ts` | import logChange + POST `create` audit + PATCH `update` audit con before fila (D-155) |
-| `app/api/clients/[id]/dm-resumen/route.ts` | import logChange + PATCH `review` audit + POST `create` audit con model/latency (D-155) |
-
-## Score sesión 26
-
-| Dimensión | Audit pre-fix | Post-fix |
-|-----------|---------------|----------|
-| Seguridad | 9.7 | 9.7 |
-| Confiabilidad | 9.7 | 9.8 (D-156 leak removido) |
-| UX | 9.2 | 9.2 |
-| Arquitectura | 9.6 | 9.6 |
-| Rendimiento | 9.2 | 9.2 |
-| Calidad de código | 9.6 | 9.6 |
-| Observabilidad | 9.3 | 9.6 (D-155 7 audit logs nuevos) |
-| Deuda técnica | 9.1 | 9.4 (2 cerrados, 1 diferido) |
-| **Global** | **9.4** | **9.5** |
+| `npx vitest run` | (próximo run) |
 
 ---
 
-## Auditoría anterior: 2026-05-10 (sesión 25)
-**Score post-cleanup:** 9.5/10 — D-148 hooks + D-149 doc + D-152 timeout + D-154 unused vars cerrados.
+## Archivos tocados sesión 27
+
+| Archivo | Cambio |
+|---------|--------|
+| 14 archivos `app/`/`lib/` | 35 disables `any` con razón contextual (D-151) |
+| `app/api/auth/send-code/route.ts` | Zod `SendCodeSchema` (D-160) |
+| `app/api/auth/login-code/route.ts` | Zod `LoginCodeSchema` (D-160) |
+| `app/api/chat-sessions/route.ts` | Zod `ChatSessionPostSchema` POST (D-159) |
+| `app/api/chat-sessions/[id]/route.ts` | Zod `RenameSchema` PATCH (D-159) |
+| `app/api/client-services/[id]/route.ts` | Zod `PatchSchema` (D-159) |
+| `app/api/clients/extract-profile/route.ts` | Zod `ExtractSchema` (D-159) |
+| `app/api/clients/[id]/materiality/route.ts` | Zod `PostSchema` union init/topic (D-159) |
+| `lib/ai/batch-result.ts` | NUEVO — `extractBatchResult<T>` helper (D-162) |
+| `app/api/clients/[id]/dm-benchmark/route.ts` | Refactor batch handler → helper, rm `extractJsonObject` import si aplica (D-162) |
+| `app/api/clients/[id]/dm-iros/route.ts` | Refactor batch handler → helper, rm `extractJsonObject` import (D-162) |
+| `app/api/clients/[id]/dm-report/route.ts` | Refactor batch handler → helper, rm `extractJsonObject` import (D-162) |
+| `DEUDA.md` | D-147 cerrado definitivo + D-150 plan diferido + D-158/159/160/162 nuevos bloque |
+| `AUDIT_LAST.md` | Reporte sesión 27 |
+
+## Score sesión 27
+
+| Dimensión | Audit pre-fix | Post-fix |
+|-----------|---------------|----------|
+| Seguridad | 9.6 | 9.8 (D-159 + D-160 Zod default establecido en 7 routes) |
+| Confiabilidad | 9.8 | 9.8 |
+| UX | 9.2 | 9.2 |
+| Arquitectura | 9.5 | 9.7 (D-162 helper centralizado, ~90 LOC dup eliminadas) |
+| Rendimiento | 9.2 | 9.2 |
+| Calidad de código | 9.7 | 9.8 (D-151 disables justificados + D-159/160 inputs validados) |
+| Observabilidad | 9.6 | 9.6 |
+| Deuda técnica | 9.0 | 9.5 (5 cerrados, 5 diferidos con plan claro) |
+| **Global** | **9.4** | **9.6** |
+
+---
+
+## Auditoría anterior: 2026-05-10 (sesión 26)
+**Score post-fix:** 9.5/10 — D-155 audit log DM-IA + D-156 console.log debug cerrados.

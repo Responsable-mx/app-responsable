@@ -122,17 +122,17 @@ Busca el ${reportLabel} más reciente y devuelve hasta 5 candidatos como JSON.`;
         system: [{
           type: "text",
           text: systemPrompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool type + cache_control no exportados
           cache_control: { type: "ephemeral" } as any,
         }],
         tools: [{
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool type + cache_control no exportados
           type: "web_search_20250305" as any,
           name: "web_search",
           max_uses: 3,
         }],
         messages: [{ role: "user", content: userPrompt }],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool type + cache_control no exportados
       } as any,
       { signal: timeoutSignal }
     );

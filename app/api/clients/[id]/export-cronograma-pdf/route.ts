@@ -59,7 +59,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     services: cronogramaServices,
     generatedAt: new Date().toISOString(),
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-pdf v4 — renderToBuffer Element type incompat con React 19
   const buffer = await renderToBuffer(element as any);
 
   const safeName = (client.name || "cliente").replace(/[^a-zA-Z0-9-_]+/g, "-").toLowerCase();

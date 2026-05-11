@@ -46,7 +46,7 @@ const buildProjectsOverview = unstable_cache(
 
     const actsByStage = new Map<string, StageActivity[]>();
     for (const raw of activitiesRes.data ?? []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase row → StageActivity con campo computed status agregado
       const a = { ...raw, status: computeStatus(raw) } as any as StageActivity;
       const list = actsByStage.get(a.stage_id) ?? [];
       list.push(a);

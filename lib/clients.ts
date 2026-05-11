@@ -315,7 +315,7 @@ export function listClientsLight(filter?: {
     fallback: DEV_SEED_CLIENTS.map(({ id, name }) => ({ id, name })),
     async run() {
       const admin = createAdminClient();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase QueryBuilder chain con .or() condicional — type chain no inferible
       let q: any = admin
         .from("clients")
         .select(CATALOG_COLUMNS)
@@ -348,7 +348,7 @@ export function listClientsForTable(filter?: {
     })),
     async run() {
       const admin = createAdminClient();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase QueryBuilder chain con .or() condicional — type chain no inferible
       let q: any = admin
         .from("clients")
         .select(TABLE_COLUMNS)
@@ -375,7 +375,7 @@ export function listClients(filter?: {
       // Tipado: Supabase builder cambia tipo en cada encadenamiento — usamos any
       // para evitar dance de genéricos complejos. La query sigue siendo segura
       // porque los métodos son los mismos; solo varía el orden de .ilike().
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase QueryBuilder chain con .or() condicional — type chain no inferible
       let q: any = admin
         .from("clients")
         .select(ALL_COLUMNS)

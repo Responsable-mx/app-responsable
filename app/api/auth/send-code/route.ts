@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { randomInt } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidEmail, normalizeEmail, isAuthorizedEmail } from "@/lib/auth";
 import { Resend } from "resend";
+
+const SendCodeSchema = z.object({
+  email: z.string().min(1).max(254),
+});
 
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -83,19 +88,19 @@ async function sendOtpEmail(email: string, code: string): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { email?: string };
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { email } = body;
-  if (!email || typeof email !== "string") {
+  const parsed = SendCodeSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json({ error: "Email requerido" }, { status: 400 });
   }
 
-  const normalizedEmail = normalizeEmail(email);
+  const normalizedEmail = normalizeEmail(parsed.data.email);
 
   if (!isValidEmail(normalizedEmail)) {
     return NextResponse.json({ error: "Formato de email inválido" }, { status: 400 });

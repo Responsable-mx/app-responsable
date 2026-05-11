@@ -261,14 +261,14 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
         {
           type: "text",
           text: systemPrompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
           cache_control: { type: "ephemeral" } as any,
         },
       ],
       tools: [
         {
           // Web search tool: la IA busca fuentes públicas reales (no inventa)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
           type: "web_search_20250305" as any,
           name: "web_search",
           max_uses: 2,
@@ -316,14 +316,14 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
               },
             },
             required: ["responses"],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
           } as any,
         },
       ],
       // tool_choice auto deja al modelo decidir orden (web_search primero,
       // luego submit_responses). System prompt fuerza llamada final.
       messages: [{ role: "user", content: userPrompt }],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
     } as any, { signal: timeoutSignal });
     inputTokens = msg.usage?.input_tokens ?? 0;
     outputTokens = msg.usage?.output_tokens ?? 0;
@@ -334,7 +334,7 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
       if (block.type === "text") {
         textOut += block.text;
         // Extraer citations del bloque de texto si vienen en formato Anthropic
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
         const citations = (block as any).citations as Array<{ url?: string; title?: string }> | undefined;
         if (Array.isArray(citations)) {
           for (const c of citations) {
@@ -343,9 +343,9 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
         }
       }
       // Capturar input de submit_responses — output estructurado preferido.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
       if (block.type === "tool_use" && (block as any).name === "submit_responses") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
         const input = (block as any).input as { responses?: unknown } | undefined;
         if (input && typeof input === "object" && input.responses && typeof input.responses === "object") {
           toolResponses = input.responses as Record<string, unknown>;

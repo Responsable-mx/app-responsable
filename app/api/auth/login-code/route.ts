@@ -106,37 +106,11 @@ export async function POST(req: NextRequest) {
 
   await admin.from("access_codes").update({ used: true }).eq("id", codeRow.id);
 
-  // Sincroniza rol desde authorized_users → user_metadata del JWT.
-  // Así el middleware lee user.user_metadata.role sin query extra por request.
-  const dbUser = await getUser(normalizedEmail);
-  const role = dbUser?.role ?? "consultor";
-
-  await admin.auth.admin
-    .createUser({
-      email: normalizedEmail,
-      email_confirm: true,
-      user_metadata: { role },
-    })
-    .catch(async () => {
-      // Usuario ya existe → actualizamos su metadata con el rol actual.
-      const { data: list } = await admin.auth.admin.listUsers({
-        page: 1,
-        perPage: 50,
-      });
-      const existing = list?.users.find(
-        (u) => u.email?.toLowerCase() === normalizedEmail
-      );
-      if (existing) {
-        await admin.auth.admin
-          .updateUserById(existing.id, { user_metadata: { role } })
-          .catch(() => {
-            /* best-effort */
-          });
-      }
-    });
-
   await recordLogin(normalizedEmail);
 
+  // generateLink crea el usuario si no existe y devuelve su ID.
+  // Sincronizamos el rol DESPUÉS usando ese ID para evitar el bug de paginación
+  // de listUsers (solo traía los primeros 50 usuarios de Auth).
   const { data: linkData, error: linkError } =
     await admin.auth.admin.generateLink({
       type: "magiclink",
@@ -147,6 +121,14 @@ export async function POST(req: NextRequest) {
     console.error("[login-code] generateLink error:", linkError?.message);
     return NextResponse.json({ error: "Error al crear sesión." }, { status: 500 });
   }
+
+  // Sincroniza rol desde authorized_users → user_metadata del JWT.
+  // Usa el ID devuelto por generateLink — sin paginación, sin búsqueda.
+  const dbUser = await getUser(normalizedEmail);
+  const role = dbUser?.role ?? "consultor";
+  await admin.auth.admin
+    .updateUserById(linkData.user.id, { user_metadata: { role } })
+    .catch(() => { /* best-effort */ });
 
   const supabase = await createClient();
   const { error: verifyError } = await supabase.auth.verifyOtp({

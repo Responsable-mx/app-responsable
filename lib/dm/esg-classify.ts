@@ -43,3 +43,30 @@ export const ESG_LABEL: Record<EsgCategory, string> = {
   S: "Social",
   G: "Gobernanza",
 };
+
+/**
+ * Mapea un tema_esg libre (LLM-generated) al código corto ESRS (E1, E2, S1, etc.).
+ * Used in: tabla IROs # col, popover Matriz, KPI cards Resumen, columna Validación.
+ * Pattern: usa keywords del título del tema; fallback al código de categoría.
+ */
+const ESRS_KEYWORDS: Array<{ code: string; match: RegExp }> = [
+  { code: "E1", match: /\bclim[áa]tic|\bclima\b|\bemisi|\bcarbono|\bghg\b|\bdescarboniz|\benerg[íi]a\b/i },
+  { code: "E2", match: /\bcontamin|\bvertido|\bsuelo\b|\bcontaminantes/i },
+  { code: "E3", match: /\bagua\b|\bh[íi]drico|\brecursos\s+marinos\b|\bvertimientos/i },
+  { code: "E4", match: /\bbiodivers|\becosistem|\bdeforest|\bbosque/i },
+  { code: "E5", match: /\beconom[íi]a\s+circular|\bresiduo|\breciclaj/i },
+  { code: "S1", match: /\bpersonal\s+propio|\bfuerza\s+laboral|\bcondiciones\s+laborales|\bempleados/i },
+  { code: "S2", match: /\btrabajadores\s+en\s+la\s+cadena|\bcadena\s+de\s+(?:valor|suministro)|\bproveedor/i },
+  { code: "S3", match: /\bcomunidad(?:es)?\b/i },
+  { code: "S4", match: /\bconsumidores|\busuarios\s+finales\b|\bcliente\b/i },
+  { code: "G1", match: /\bconducta\s+empresarial|\bgobernanza|\b[ée]tica|\bcorrupci[óo]n|\bcompliance\b|\bauditor[íi]a/i },
+];
+
+export function extractEsrsCode(temaEsg: string): string {
+  for (const { code, match } of ESRS_KEYWORDS) {
+    if (match.test(temaEsg)) return code;
+  }
+  // Fallback: categoría base + ?
+  const cat = classifyEsg(temaEsg);
+  return `${cat}?`;
+}

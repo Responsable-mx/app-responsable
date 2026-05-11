@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
-import { classifyEsg, ESG_BADGE } from "@/lib/dm/esg-classify";
+import { classifyEsg, ESG_BADGE, extractEsrsCode } from "@/lib/dm/esg-classify";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 import { ExpandableCell } from "@/components/doble-materialidad/ExpandableCell";
 
@@ -169,13 +169,33 @@ export function IroSection({
 
   const includedCount = iros.filter((i) => i.incluido).length;
 
-  // Agrupar por tema_esg preservando orden de aparición
-  const groups: Array<{ tema: string; items: IroInventoryItem[] }> = [];
+  // Umbral de materialidad (pattern mockup-v7) — filtra IROs visibles por
+  // consolidado = max(score_impacto, score_financiero). 0 = ver todo.
+  // Escala 1-3 ESRS: 0=todos, 1=todos los puntuados, 2=medio o más, 3=solo alto.
+  // IROs `incluido=true` siempre permanecen visibles (no perderlos al subir slider).
+  const [threshold, setThreshold] = useState<number>(0);
+
+  // Agrupar por tema_esg preservando orden de aparición + aplicar filtro umbral
+  const groupsAll: Array<{ tema: string; items: IroInventoryItem[] }> = [];
   for (const iro of iros) {
-    const existing = groups.find((g) => g.tema === iro.tema_esg);
+    const existing = groupsAll.find((g) => g.tema === iro.tema_esg);
     if (existing) existing.items.push(iro);
-    else groups.push({ tema: iro.tema_esg, items: [iro] });
+    else groupsAll.push({ tema: iro.tema_esg, items: [iro] });
   }
+  const groups = threshold === 0
+    ? groupsAll
+    : groupsAll
+        .map((g) => ({
+          tema: g.tema,
+          items: g.items.filter((i) => {
+            if (i.incluido) return true;
+            const consolidado = Math.max(i.score_impacto ?? 0, i.score_financiero ?? 0);
+            return consolidado >= threshold;
+          }),
+        }))
+        .filter((g) => g.items.length > 0);
+  const visibleCount = groups.reduce((acc, g) => acc + g.items.length, 0);
+  const filteredOut = iros.length - visibleCount;
 
   if (!hasBenchmark && status === "idle") {
     return (
@@ -237,11 +257,45 @@ export function IroSection({
   // status === "done"
   return (
     <div className="space-y-3">
+      {/* Slider umbral materialidad — filtra tabla en vivo (mockup-v7 pattern) */}
+      <div className="flex items-center gap-3 flex-wrap p-3 bg-slate-50 border border-slate-200 rounded">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+          Umbral de materialidad
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={3}
+          step={1}
+          value={threshold}
+          onChange={(e) => setThreshold(parseInt(e.target.value, 10))}
+          className="flex-1 min-w-[120px] accent-brand-primary cursor-pointer"
+          aria-label="Umbral de consolidado para mostrar IROs"
+        />
+        <span className="text-xs font-bold tabular-nums text-brand-primary min-w-[1.5rem] text-right">
+          {threshold}
+        </span>
+        <span className="text-[10px] text-slate-400">/ 3</span>
+        <span
+          className={`text-[10px] font-semibold px-2 py-0.5 rounded-sm whitespace-nowrap ${
+            threshold === 0
+              ? "bg-slate-100 text-slate-600"
+              : "bg-brand-primary-light text-brand-primary-dark"
+          }`}
+        >
+          {visibleCount} visibles
+        </span>
+        {filteredOut > 0 && (
+          <span className="text-[10px] text-slate-400 italic whitespace-nowrap">
+            {filteredOut} ocultos (consolidado &lt; {threshold})
+          </span>
+        )}
+      </div>
       {/* Header resumen */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">
-            <span className="font-bold text-slate-700">{groups.length}</span> bloques ·{" "}
+            <span className="font-bold text-slate-700">{groupsAll.length}</span> bloques ·{" "}
             <span className="font-bold text-slate-700">{includedCount}</span>/{iros.length} IROs incluidos
           </span>
           <span
@@ -295,6 +349,9 @@ export function IroSection({
                 {/* ── Cabecera de bloque temático ── */}
                 <tr key={`group-${group.tema}`} className="bg-teal-50 border-b border-teal-200">
                   <td colSpan={10} className="px-2 py-1.5 border-l-2 border-l-brand-primary">
+                    <span className="mr-1.5 text-[10px] font-mono font-bold text-teal-900 bg-teal-100 px-1.5 py-0.5 rounded-sm">
+                      {extractEsrsCode(group.tema)}
+                    </span>
                     <span className="text-[10px] font-bold uppercase tracking-widest text-teal-700">
                       {group.tema}
                     </span>

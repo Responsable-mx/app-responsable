@@ -19,11 +19,29 @@ export type BenchmarkResultRef = {
   status: "pending" | "done" | "failed";
 } | null;
 
+/**
+ * Readiness: estado de cada criterio de cierre del estudio.
+ * Pasado por el padre (DoubleMaterialidadTab) para evitar duplicar fetches.
+ * Pattern del mockup-v7: checklist transparente antes de generar.
+ */
+export type ReporteReadiness = {
+  questionnairePct: number | null;       // 0-100
+  benchmarkCompanies: number;            // # empresas validadas
+  irosTotal: number;                     // # IROs en inventario
+  irosScored: number;                    // # IROs con score completo
+  hasMatriz: boolean;                    // ≥3 IROs scored
+  nisCount: number;                      // # brechas NIS registradas
+  resumenReviewed: boolean;              // reviewed_at != null
+  validationDecided: boolean;            // todas decisiones tomadas
+  onGoToStage?: (sectionId: string) => void; // deep-link a stage faltante
+};
+
 export function ReporteSection({
   clientId,
   clientName,
   latestResult,
   latestReport,
+  readiness,
   onReportMutate,
   isReportPolling,
   onStartReportPolling,
@@ -32,6 +50,7 @@ export function ReporteSection({
   clientName: string;
   latestResult: BenchmarkResultRef;
   latestReport: LatestReport;
+  readiness: ReporteReadiness;
   onReportMutate: () => void;
   isReportPolling: boolean;
   onStartReportPolling: () => void;
@@ -40,8 +59,59 @@ export function ReporteSection({
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [confirmGenerate, setConfirmGenerate] = useState(false);
 
   const canGenerate = latestResult?.status === "done";
+
+  // Checklist de cierre — pattern mockup-v7. 7 criterios cuantificados.
+  // Cliente ve qué falta antes de gastar 2-5 min de IA + accountability del reporte.
+  const checklistItems: Array<{ ok: boolean; label: string; detail: string; sectionId?: string }> = [
+    {
+      ok: (readiness.questionnairePct ?? 0) >= 80,
+      label: "Cuestionario ≥80% completado",
+      detail: readiness.questionnairePct !== null ? `${readiness.questionnairePct}%` : "sin datos",
+      sectionId: "dm-sec-contexto",
+    },
+    {
+      ok: readiness.benchmarkCompanies >= 3,
+      label: "Benchmark ejecutado con ≥3 empresas",
+      detail: `${readiness.benchmarkCompanies} ${readiness.benchmarkCompanies === 1 ? "empresa" : "empresas"}`,
+      sectionId: "dm-sec-benchmark",
+    },
+    {
+      ok: readiness.irosScored >= 5,
+      label: "IROs calificados (≥5 con score)",
+      detail: `${readiness.irosScored}/${readiness.irosTotal} calificados`,
+      sectionId: "dm-sec-iros",
+    },
+    {
+      ok: readiness.hasMatriz,
+      label: "Matriz de materialidad generada",
+      detail: readiness.hasMatriz ? `${readiness.irosScored} IROs` : "sin matriz",
+      sectionId: "dm-sec-matriz",
+    },
+    {
+      ok: readiness.nisCount > 0,
+      label: "Brechas NIS/IBSO documentadas",
+      detail: `${readiness.nisCount} ${readiness.nisCount === 1 ? "brecha" : "brechas"}`,
+      sectionId: "dm-sec-nis",
+    },
+    {
+      ok: readiness.resumenReviewed,
+      label: "Resumen ejecutivo revisado",
+      detail: readiness.resumenReviewed ? "✓" : "pendiente",
+      sectionId: "dm-sec-resumen",
+    },
+    {
+      ok: readiness.validationDecided,
+      label: "Hallazgos validados con cliente",
+      detail: readiness.validationDecided ? "✓" : "pendiente junta",
+      sectionId: "dm-sec-validacion",
+    },
+  ];
+  const okCount = checklistItems.filter((c) => c.ok).length;
+  const totalCount = checklistItems.length;
+  const allReady = okCount === totalCount;
 
   const handleGenerate = useCallback(async () => {
     if (!latestResult) return;
@@ -103,32 +173,81 @@ export function ReporteSection({
         </div>
       )}
 
-      {/* Sin reporte todavía — mostrar botón generar */}
+      {/* Checklist de cierre — siempre visible cuando se puede generar (mockup-v7 pattern) */}
       {canGenerate && !latestReport && (
-        <div className="border-l-4 border-l-amber-400 pl-4 py-2">
-          <p className="text-xs text-slate-600 mb-3">
-            El reporte incluirá resumen ejecutivo, posicionamiento vs benchmark, riesgos identificados, fortalezas, áreas de mejora y recomendaciones priorizadas.
-          </p>
+        <>
+          <div className="border border-slate-200 rounded p-4 bg-slate-50 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checklist de cierre</p>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm tabular-nums ${
+                allReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+              }`}>
+                {okCount} / {totalCount} criterios
+              </span>
+            </div>
+            <ul className="space-y-1.5 text-xs">
+              {checklistItems.map((c) => (
+                <li key={c.label} className={`flex items-center gap-2 ${c.ok ? "text-slate-700" : "text-slate-500"}`}>
+                  {c.ok ? (
+                    <svg className="w-3 h-3 text-brand-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3 text-slate-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  )}
+                  <span className="flex-1">{c.label}</span>
+                  <span className={`text-[10px] tabular-nums ${c.ok ? "text-slate-400" : "text-amber-600"}`}>
+                    {c.detail}
+                  </span>
+                  {!c.ok && c.sectionId && readiness.onGoToStage && (
+                    <button
+                      type="button"
+                      onClick={() => readiness.onGoToStage!(c.sectionId!)}
+                      className="text-[10px] text-brand-primary underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm"
+                    >
+                      Ir →
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+          {!allReady && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded px-3 py-2.5">
+              <svg className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12" y2="17" />
+              </svg>
+              <p className="text-[11px] text-amber-700">
+                <strong>{totalCount - okCount} {totalCount - okCount === 1 ? "criterio" : "criterios"} sin completar</strong>
+                — el reporte se puede generar, pero la calidad será menor.
+              </p>
+            </div>
+          )}
           <Button
             size="md"
             variant="primary"
             loading={generating || isReportPolling}
             disabled={isReportPolling}
-            onClick={handleGenerate}
+            onClick={() => setConfirmGenerate(true)}
           >
             Generar reporte con IA
           </Button>
-        </div>
+        </>
       )}
 
-      {/* Batch en proceso — spinner activo */}
+      {/* Batch en proceso — spinner activo (sin nombrar modelo) */}
       {canGenerate && latestReport?.parse_status === "pending" && isReportPolling && (
         <div className="flex items-center gap-2 text-xs text-slate-500 py-2 border-l-4 border-l-amber-400 pl-4">
           <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          Generando reporte con Opus — puede tardar 2-5 minutos. No cierres esta página.
+          Generando reporte con IA — puede tardar 2-5 minutos. Puedes navegar otras etapas mientras esperas.
         </div>
       )}
 
@@ -211,6 +330,21 @@ export function ReporteSection({
           handleGenerate();
         }}
         onCancel={() => setConfirmRegenerate(false)}
+      />
+
+      {/* Confirm pre-generate inicial — bullets de insumos confirmados (mockup-v7) */}
+      <ConfirmModal
+        open={confirmGenerate}
+        title={`Generar reporte para ${clientName}`}
+        description={`Se analizará toda la información y se generará el PDF en 2-5 min. Cuestionario: ${readiness.questionnairePct ?? "—"}% · Benchmark: ${readiness.benchmarkCompanies} empresas · IROs: ${readiness.irosScored}/${readiness.irosTotal} calificados · NIS: ${readiness.nisCount} brechas. ${allReady ? "Todos los criterios completos." : `${totalCount - okCount} criterios pendientes — la calidad puede ser menor.`}`}
+        confirmLabel="Generar reporte"
+        cancelLabel="Cancelar"
+        tone="primary"
+        onConfirm={() => {
+          setConfirmGenerate(false);
+          handleGenerate();
+        }}
+        onCancel={() => setConfirmGenerate(false)}
       />
     </div>
   );

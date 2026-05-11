@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import useSWR from "swr";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { SkeletonList } from "@/components/ui/Skeleton";
@@ -101,6 +102,11 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
   const { push: pushToast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [marking, setMarking] = useState(false);
+  // UX patterns del mockup-v7: colapsable (lee 1er párrafo, expande resto) + edición inline
+  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
 
   const { data, isLoading, mutate } = useSWR<{ data: ResumenData }>(
     `/api/clients/${clientId}/dm-resumen`,
@@ -143,6 +149,40 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
       pushToast("error", "No se pudo copiar");
     }
   }, [resumen, pushToast]);
+
+  const handleStartEdit = useCallback(() => {
+    setDraft(resumen?.content ?? "");
+    setEditing(true);
+    setExpanded(true);
+  }, [resumen]);
+
+  const handleSaveEdit = useCallback(async () => {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      pushToast("error", "El resumen no puede estar vacío");
+      return;
+    }
+    setSavingDraft(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-resumen`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: trimmed }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        pushToast("error", json.error ?? "Error al guardar");
+        return;
+      }
+      await mutate();
+      setEditing(false);
+      pushToast("success", "Resumen actualizado");
+    } catch {
+      pushToast("error", "Error de red al guardar");
+    } finally {
+      setSavingDraft(false);
+    }
+  }, [clientId, draft, mutate, pushToast]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -210,34 +250,50 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
 
         {/* Acciones */}
         <div className="flex items-center gap-2">
-          {hasContent && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopiar}
-              aria-label="Copiar resumen al portapapeles"
-            >
-              <svg
-                className="w-4 h-4 mr-1.5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
+          {hasContent && !editing && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleStartEdit}
+                aria-label="Editar resumen"
               >
-                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-              </svg>
-              Copiar
+                <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Editar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopiar}
+                aria-label="Copiar resumen al portapapeles"
+              >
+                <svg
+                  className="w-4 h-4 mr-1.5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                  <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                </svg>
+                Copiar
+              </Button>
+            </>
+          )}
+          {!editing && (
+            <Button
+              variant={hasContent ? "secondary" : "primary"}
+              size="sm"
+              loading={generating}
+              onClick={handleGenerar}
+              disabled={generating}
+            >
+              {hasContent ? "Regenerar" : "Generar resumen"}
             </Button>
           )}
-          <Button
-            variant={hasContent ? "secondary" : "primary"}
-            size="sm"
-            loading={generating}
-            onClick={handleGenerar}
-            disabled={generating}
-          >
-            {hasContent ? "Regenerar" : "Generar resumen"}
-          </Button>
         </div>
       </div>
 
@@ -302,18 +358,57 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
                 Generado el {formatDate(resumen.created_at)}
               </p>
             )}
-            <div
-              className="prose prose-sm prose-slate max-w-none
-                prose-headings:font-semibold prose-headings:text-slate-800
-                prose-h2:text-sm prose-h2:mt-5 prose-h2:mb-2
-                prose-h3:text-xs prose-h3:mt-4 prose-h3:mb-1
-                prose-p:text-slate-700 prose-p:leading-relaxed
-                prose-table:text-xs prose-td:py-1.5 prose-th:py-1.5
-                prose-th:font-semibold prose-th:text-slate-600
-                prose-li:text-slate-700"
-            >
-              <ReactMarkdown>{resumen.content!}</ReactMarkdown>
-            </div>
+            {editing ? (
+              // Editor inline — consultor refina narrativa sin regenerar (ahorra Opus call)
+              <div className="border border-slate-200 rounded">
+                <div className="px-3 pt-2 pb-1 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Editar síntesis</span>
+                  <span className="text-[10px] text-slate-400">Markdown · separar párrafos con línea en blanco</span>
+                </div>
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={14}
+                  className="w-full text-xs text-slate-800 leading-relaxed px-4 py-3 resize-none focus:outline-none focus:ring-1 focus:ring-brand-primary/40 font-sans"
+                />
+                <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex items-center gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={savingDraft}>Cancelar</Button>
+                  <Button variant="primary" size="sm" loading={savingDraft} onClick={handleSaveEdit}>Guardar cambios</Button>
+                </div>
+              </div>
+            ) : (() => {
+              // Colapsable: muestra primer párrafo + "Leer síntesis completa ↓"
+              // Evita wall-of-text en el panel sticky. Pattern del mockup-v7.
+              const content = resumen.content!;
+              const firstBlockEnd = content.indexOf("\n\n");
+              const hasMore = firstBlockEnd > 0 && firstBlockEnd < content.length - 1;
+              const preview = !expanded && hasMore ? content.slice(0, firstBlockEnd) : content;
+              return (
+                <>
+                  <div
+                    className="prose prose-sm prose-slate max-w-none
+                      prose-headings:font-semibold prose-headings:text-slate-800
+                      prose-h2:text-sm prose-h2:mt-5 prose-h2:mb-2
+                      prose-h3:text-xs prose-h3:mt-4 prose-h3:mb-1
+                      prose-p:text-slate-700 prose-p:leading-relaxed
+                      prose-table:text-xs prose-td:py-1.5 prose-th:py-1.5
+                      prose-th:font-semibold prose-th:text-slate-600
+                      prose-li:text-slate-700"
+                  >
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{preview}</ReactMarkdown>
+                  </div>
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded((v) => !v)}
+                      className="mt-2 text-[11px] text-brand-primary font-semibold underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm"
+                    >
+                      {expanded ? "Mostrar menos ↑" : "Leer síntesis completa ↓"}
+                    </button>
+                  )}
+                </>
+              );
+            })()}
           </div>
         ) : resumen?.status === "failed" ? (
           <div className="rounded border-l-4 border-l-brand-berry bg-red-50 px-4 py-3">

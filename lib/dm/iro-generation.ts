@@ -20,6 +20,11 @@ export type IroInventoryItem = {
   confianza: "alto" | "medio" | "bajo";
   score_impacto: number | null;
   score_financiero: number | null;
+  // Coordenadas opcionales de matriz (0-10) — override manual desde popover.
+  // Si NULL, MatrizDM deriva la coordenada del score 1-3 ((score-1)/2*10).
+  pos_x: number | null;
+  pos_y: number | null;
+  pos_override: boolean;
   incluido: boolean;
   created_at: string;
   updated_at: string;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
+import { extractEsrsCode } from "@/lib/dm/esg-classify";
 
 // ── Tipos internos ────────────────────────────────────────────────────────────
 
@@ -9,12 +10,13 @@ type Quadrant = "doble_material" | "solo_impacto" | "solo_financiero" | "en_segu
 
 type TemaPoint = {
   tema_esg: string;
-  x: number;           // max score_financiero del tema
-  y: number;           // max score_impacto del tema
+  x: number;           // coord financiero 0-10 (derivado de score 1-3 o pos_x override)
+  y: number;           // coord impacto    0-10 (derivado de score 1-3 o pos_y override)
   quadrant: Quadrant;
-  score_consolidado: number;
+  score_consolidado: number;  // max(score_impacto, score_financiero) 1-3 — usado para ranking
   numero: number;      // 1-N por score_consolidado desc
   idx: number;         // índice original (para jitter)
+  hasOverride: boolean; // algún IRO del tema con pos manual
 };
 
 type Popover = {
@@ -61,20 +63,29 @@ const FILTER_OPTIONS: Array<{ value: "todos" | Quadrant; label: string }> = [
 ];
 
 // ── Helpers de coordenadas ────────────────────────────────────────────────────
+// Ejes 0-10 (pattern mockup-v7). Score 1-3 se derive como (1→0, 2→5, 3→10)
+// o se sobrescribe con pos_x/pos_y manual del consultor.
 
-function mapX(score: number): number {
-  return LEFT + ((score - 1) / 2) * PLOT_W;
+function mapX(axisValue: number): number {
+  return LEFT + (axisValue / 10) * PLOT_W;
 }
 
-function mapY(score: number): number {
-  return TOP + PLOT_H - ((score - 1) / 2) * PLOT_H;
+function mapY(axisValue: number): number {
+  return TOP + PLOT_H - (axisValue / 10) * PLOT_H;
+}
+
+/** Score 1-3 → coord eje 0-10. Permite null score → midpoint 5. */
+function scoreToAxis(score: number | null | undefined): number {
+  if (score == null) return 5;
+  return ((score - 1) / 2) * 10;
 }
 
 // ── Clasificación de cuadrante ────────────────────────────────────────────────
+// Midpoint en 5 (ejes 0-10).
 
 function classifyQuadrant(x: number, y: number): Quadrant {
-  const xMat = x >= 2;
-  const yMat = y >= 2;
+  const xMat = x >= 5;
+  const yMat = y >= 5;
   if (xMat && yMat)   return "doble_material";
   if (!xMat && yMat)  return "solo_impacto";
   if (xMat && !yMat)  return "solo_financiero";
@@ -239,19 +250,39 @@ export function MatrizDM({ iros }: Props) {
     [iros],
   );
 
-  // ── 2. Agrupar por tema_esg → max scores ───────────────────────────────────
+  // ── 2. Agrupar por tema_esg → max coords (0-10) y max scores (1-3) ─────────
+  // Usa pos_x/pos_y manual si existen; sino deriva del score 1-3.
+  type TemaAgg = {
+    maxAxisX: number;       // 0-10 (financiero)
+    maxAxisY: number;       // 0-10 (impacto)
+    maxScoreImpacto: number;    // 1-3 (para ranking score_consolidado)
+    maxScoreFinanciero: number; // 1-3
+    hasOverride: boolean;
+  };
   const temaMap = useMemo(() => {
-    const map = new Map<string, { maxImpacto: number; maxFinanciero: number }>();
+    const map = new Map<string, TemaAgg>();
     for (const iro of validIros) {
-      const current = map.get(iro.tema_esg);
-      const si = iro.score_impacto   as number;
+      const si = iro.score_impacto as number;
       const sf = iro.score_financiero as number;
+      const axisX = iro.pos_x ?? scoreToAxis(sf);
+      const axisY = iro.pos_y ?? scoreToAxis(si);
+      const isOverride = iro.pos_override === true;
+      const current = map.get(iro.tema_esg);
       if (!current) {
-        map.set(iro.tema_esg, { maxImpacto: si, maxFinanciero: sf });
+        map.set(iro.tema_esg, {
+          maxAxisX: axisX,
+          maxAxisY: axisY,
+          maxScoreImpacto: si,
+          maxScoreFinanciero: sf,
+          hasOverride: isOverride,
+        });
       } else {
         map.set(iro.tema_esg, {
-          maxImpacto:     Math.max(current.maxImpacto, si),
-          maxFinanciero:  Math.max(current.maxFinanciero, sf),
+          maxAxisX: Math.max(current.maxAxisX, axisX),
+          maxAxisY: Math.max(current.maxAxisY, axisY),
+          maxScoreImpacto: Math.max(current.maxScoreImpacto, si),
+          maxScoreFinanciero: Math.max(current.maxScoreFinanciero, sf),
+          hasOverride: current.hasOverride || isOverride,
         });
       }
     }
@@ -260,21 +291,19 @@ export function MatrizDM({ iros }: Props) {
 
   // ── 3. Construir puntos con cuadrante, score consolidado y número ───────────
   const points: TemaPoint[] = useMemo(() => {
-    const raw = Array.from(temaMap.entries()).map(([tema_esg, { maxImpacto, maxFinanciero }], idx) => ({
+    const raw = Array.from(temaMap.entries()).map(([tema_esg, agg], idx) => ({
       tema_esg,
-      x:                maxFinanciero,
-      y:                maxImpacto,
-      quadrant:         classifyQuadrant(maxFinanciero, maxImpacto),
-      score_consolidado: Math.max(maxImpacto, maxFinanciero),
-      numero:           0,   // se asigna abajo
+      x:                agg.maxAxisX,
+      y:                agg.maxAxisY,
+      quadrant:         classifyQuadrant(agg.maxAxisX, agg.maxAxisY),
+      score_consolidado: Math.max(agg.maxScoreImpacto, agg.maxScoreFinanciero),
+      numero:           0,
       idx,
+      hasOverride:      agg.hasOverride,
     }));
 
-    // Ordenar por score_consolidado desc y asignar número secuencial
     raw.sort((a, b) => b.score_consolidado - a.score_consolidado);
     raw.forEach((p, i) => { p.numero = i + 1; });
-
-    // Reordenar por idx original para mantener jitter estable
     return raw.sort((a, b) => a.idx - b.idx);
   }, [temaMap]);
 
@@ -292,14 +321,23 @@ export function MatrizDM({ iros }: Props) {
     if ((e.target as SVGElement).tagName === "svg") setPopover(null);
   }, []);
 
-  // ── Coordenadas de un punto con jitter ─────────────────────────────────────
+  // ── Coordenadas de un punto con jitter clampado al cuadrante ──────────────
+  // Si jitter empuja el punto a través del midpoint, lo reducimos a 0 en ese eje.
+  // Garantiza que el render visual coincide con el cuadrante calculado.
   function coords(p: TemaPoint) {
-    const offsetX = (p.idx % 3 - 1) * 8;
-    const offsetY = (Math.floor(p.idx / 3) % 3 - 1) * 8;
-    return {
-      cx: mapX(p.x) + offsetX,
-      cy: mapY(p.y) + offsetY,
-    };
+    const midX = mapX(5);
+    const midY = mapY(5);
+    const baseCx = mapX(p.x);
+    const baseCy = mapY(p.y);
+    let offsetX = (p.idx % 3 - 1) * 8;
+    let offsetY = (Math.floor(p.idx / 3) % 3 - 1) * 8;
+    // Eje X: si baseCx ≥ midX (financiero ≥ 5), offsetX no debe hacer cx < midX, y viceversa
+    if (baseCx >= midX && baseCx + offsetX < midX) offsetX = 0;
+    if (baseCx <  midX && baseCx + offsetX > midX) offsetX = 0;
+    // Eje Y: mapY invertido (y=10 → top, y=0 → bottom). midY divide top/bottom.
+    if (baseCy <= midY && baseCy + offsetY > midY) offsetY = 0; // arriba (impacto ≥ 5)
+    if (baseCy >  midY && baseCy + offsetY < midY) offsetY = 0; // abajo  (impacto < 5)
+    return { cx: baseCx + offsetX, cy: baseCy + offsetY };
   }
 
   // ── Scroll al punto desde el índice lateral ─────────────────────────────────
@@ -324,13 +362,13 @@ export function MatrizDM({ iros }: Props) {
   }
 
   // ── Coordenadas de líneas del eje ───────────────────────────────────────────
-  const midXPx  = mapX(1.5);
-  const midYPx  = mapY(1.5);
+  const midXPx  = mapX(5);
+  const midYPx  = mapY(5);
   const plotX0  = LEFT;
   const plotX1  = LEFT + PLOT_W;
   const plotY0  = TOP;
   const plotY1  = TOP + PLOT_H;
-  const tickPositions = [1, 2, 3] as const;
+  const tickPositions = [0, 2, 4, 6, 8, 10] as const;
 
   // ── Renderizar ────────────────────────────────────────────────────────────
   return (
@@ -413,28 +451,25 @@ export function MatrizDM({ iros }: Props) {
               stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 3"
             />
 
-            {/* Etiquetas de ticks */}
-            {tickPositions.map((v) => {
-              const label = v === 1 ? "Bajo" : v === 2 ? "Medio" : "Alto";
-              return (
-                <g key={`tick-${v}`}>
-                  {/* Eje X — abajo */}
-                  <text
-                    x={mapX(v)} y={plotY1 + 14}
-                    textAnchor="middle" fontSize={10} fill="#94a3b8"
-                  >
-                    {label}
-                  </text>
-                  {/* Eje Y — izquierda */}
-                  <text
-                    x={LEFT - 8} y={mapY(v)}
-                    textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#94a3b8"
-                  >
-                    {label}
-                  </text>
-                </g>
-              );
-            })}
+            {/* Etiquetas de ticks — escala 0-10 (mockup-v7 pattern) */}
+            {tickPositions.map((v) => (
+              <g key={`tick-${v}`}>
+                {/* Eje X — abajo */}
+                <text
+                  x={mapX(v)} y={plotY1 + 14}
+                  textAnchor="middle" fontSize={10} fill="#94a3b8"
+                >
+                  {v}
+                </text>
+                {/* Eje Y — izquierda */}
+                <text
+                  x={LEFT - 8} y={mapY(v)}
+                  textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#94a3b8"
+                >
+                  {v}
+                </text>
+              </g>
+            ))}
 
             {/* Títulos de ejes */}
             <text
@@ -547,6 +582,9 @@ export function MatrizDM({ iros }: Props) {
                       {p.numero}
                     </span>
                     <span className="flex-shrink-0"><MiniShape quadrant={p.quadrant} /></span>
+                    <span className="flex-shrink-0 text-[9px] font-mono font-bold text-slate-500 w-6">
+                      {extractEsrsCode(p.tema_esg)}
+                    </span>
                     <span className={`text-[11px] font-medium truncate ${meta.listText}`}>
                       {p.tema_esg}
                     </span>
@@ -643,9 +681,12 @@ function PopoverCard({
         </svg>
       </button>
 
-      {/* Header con forma */}
+      {/* Header con forma + código ESRS */}
       <div className="flex items-start gap-1.5 mb-2 pr-4">
         <span className="mt-0.5 flex-shrink-0"><MiniShape quadrant={tema.quadrant} /></span>
+        <span className="mt-0.5 flex-shrink-0 text-[9px] font-mono font-bold text-slate-500">
+          {extractEsrsCode(tema.tema_esg)}
+        </span>
         <p className="text-[11px] font-semibold text-slate-800 leading-snug">{tema.tema_esg}</p>
       </div>
 
@@ -654,12 +695,22 @@ function PopoverCard({
         {meta.label}
       </p>
 
-      {/* Scores */}
+      {/* Scores — Impacto/Financiero en eje 0-10; Consolidado en 1-3 (ranking ESRS) */}
       <div className="space-y-1">
-        <ScoreRow label="Impacto"     value={tema.y} />
-        <ScoreRow label="Financiero"  value={tema.x} />
-        <ScoreRow label="Consolidado" value={tema.score_consolidado} highlight />
+        <ScoreRow label="Impacto"     value={tema.y} maxScale={10} />
+        <ScoreRow label="Financiero"  value={tema.x} maxScale={10} />
+        <ScoreRow label="Consolidado" value={tema.score_consolidado} maxScale={3} highlight />
       </div>
+
+      {/* Override flag — chip cuando el consultor reposicionó manualmente */}
+      {tema.hasOverride && (
+        <p className="mt-2 inline-flex items-center gap-1 text-[9px] font-bold bg-amber-50 border border-amber-200 text-amber-700 px-1.5 py-0.5 rounded-sm">
+          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          </svg>
+          Posición ajustada manualmente
+        </p>
+      )}
 
       {/* Número del tema */}
       <p className="mt-2 text-[10px] text-slate-400">Tema #{tema.numero}</p>
@@ -667,9 +718,22 @@ function PopoverCard({
   );
 }
 
-function ScoreRow({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
-  const barW  = ((value - 1) / 2) * 100;
-  const color = value >= 2 ? "bg-brand-primary" : "bg-slate-300";
+function ScoreRow({
+  label,
+  value,
+  maxScale = 3,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  /** 3 para score 1-3 (consolidado), 10 para axis 0-10 (impacto/financiero) */
+  maxScale?: number;
+  highlight?: boolean;
+}) {
+  const half = maxScale / 2;
+  const barW = Math.max(0, Math.min(100, (value / maxScale) * 100));
+  const color = value >= half ? "bg-brand-primary" : "bg-slate-300";
+  const display = Number.isInteger(value) ? value : value.toFixed(1);
   return (
     <div className="flex items-center gap-2">
       <span className={`text-[10px] w-20 flex-shrink-0 ${highlight ? "font-semibold text-slate-700" : "text-slate-500"}`}>
@@ -678,8 +742,8 @@ function ScoreRow({ label, value, highlight }: { label: string; value: number; h
       <div className="flex-1 h-1 bg-slate-100 rounded-none overflow-hidden">
         <div className={`h-full ${color}`} style={{ width: `${barW}%` }} />
       </div>
-      <span className={`text-[10px] w-3 text-right ${highlight ? "font-bold text-slate-800" : "text-slate-500"}`}>
-        {value}
+      <span className={`text-[10px] w-6 text-right tabular-nums ${highlight ? "font-bold text-slate-800" : "text-slate-500"}`}>
+        {display}
       </span>
     </div>
   );

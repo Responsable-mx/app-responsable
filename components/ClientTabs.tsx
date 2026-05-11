@@ -10,6 +10,17 @@ import { getFieldValue, type FieldValue, type QuestionnaireBundle } from "@/lib/
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { ClientHeaderActions } from "@/components/ClientHeaderActions";
 import { sectorPillClasses } from "@/lib/sectors";
+import { CATALOG_SEEDS } from "@/lib/catalogs/seeds";
+
+// Lookup label humanizado: "energia" -> "Energía", "cambio_climatico" -> "Cambio climático".
+// Construido 1x al cargar el módulo; pill del header lo consume sin re-render cost.
+const SECTOR_LABEL_MAP: Record<string, string> = (() => {
+  const m: Record<string, string> = {};
+  for (const s of CATALOG_SEEDS) {
+    if (s.category === "sectors") m[s.value] = s.label;
+  }
+  return m;
+})();
 
 
 import { TabErrorBoundary } from "@/components/TabErrorBoundary";
@@ -452,9 +463,9 @@ export function ClientTabs({
             <Link
               href={`/clientes?sector=${encodeURIComponent(client.sector)}`}
               className={`inline-flex items-center text-[10px] font-medium rounded-sm px-2 py-0.5 transition-colors hover:opacity-80 shrink-0 ${sectorPillClasses(client.sector)}`}
-              title={metaTooltip || `Ver clientes del sector ${client.sector}`}
+              title={metaTooltip || `Ver clientes del sector ${SECTOR_LABEL_MAP[client.sector] ?? client.sector}`}
             >
-              {client.sector}
+              {SECTOR_LABEL_MAP[client.sector] ?? client.sector}
             </Link>
           )}
           {client.size && (
@@ -552,17 +563,48 @@ export function ClientTabs({
 
           {/* ── Bloque progreso agrupado (ml-auto flota derecha) ──
               Contiene: count + bar + dots + 29% + ↻ date + pencil edit
-              Cluster cohesivo con bg-slate-50 + border. */}
+              Cluster cohesivo con bg-slate-50 + border.
+              Métrica cambia según tab activo: cuestionario por defecto, DM-IA cuando esa tab visible. */}
+          {(() => {
+            const isDmTab = tab === "doble-materialidad-ia";
+            const useDm = isDmTab && dmProgress !== null;
+            const clusterCount = useDm
+              ? `${dmProgress!.done}/${dmProgress!.total}`
+              : `${questionnaireProgress?.filled ?? "–"}/${questionnaireProgress?.total ?? "–"}`;
+            const clusterPct = useDm
+              ? Math.round((dmProgress!.done / dmProgress!.total) * 100)
+              : overallPct;
+            const clusterPctTitle = useDm
+              ? `${clusterPct}% del estudio DM-IA`
+              : `${clusterPct}% global del cuestionario`;
+            return (
           <div className="ml-auto flex items-center gap-2 shrink-0 relative">
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded px-2 py-1">
-              <span className="text-[11px] text-slate-700 tabular-nums whitespace-nowrap">
-                {questionnaireProgress?.filled ?? "–"}/{questionnaireProgress?.total ?? "–"}
+              <span
+                className="text-[11px] text-slate-700 tabular-nums whitespace-nowrap"
+                title={useDm ? "Etapas DM-IA completadas / total" : "Campos del cuestionario completados / total"}
+              >
+                {clusterCount}
               </span>
               <div className="w-16 h-1 bg-slate-200 shrink-0" aria-hidden="true">
-                <div className="h-1 bg-brand-primary transition-all" style={{ width: `${overallPct}%` }} />
+                <div className="h-1 bg-brand-primary transition-all" style={{ width: `${clusterPct}%` }} />
               </div>
-              {/* Mini-dots: 1 por paso, click → jump. Glance del estado sin abrir dropdown */}
-              {questionnaireSteps.length > 0 && (
+              {/* Mini-dots: en DM-IA, 1 por etapa del estudio; en otras tabs, 1 por paso del cuestionario. */}
+              {useDm ? (
+                <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label="Avance por etapa DM-IA">
+                  {Array.from({ length: dmProgress!.total }).map((_, i) => {
+                    const isDone = i < dmProgress!.done;
+                    return (
+                      <span
+                        key={i}
+                        aria-hidden="true"
+                        className={`w-1.5 h-1.5 rounded-full ${isDone ? "bg-brand-primary" : "bg-slate-300"}`}
+                        title={`Etapa ${i + 1} de ${dmProgress!.total}${isDone ? " — completada" : ""}`}
+                      />
+                    );
+                  })}
+                </div>
+              ) : questionnaireSteps.length > 0 ? (
                 <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label="Avance por paso (mini)">
                   {questionnaireSteps.map((step, i) => {
                     const pct = sectionProg[step.key]?.pct ?? 0;
@@ -579,25 +621,26 @@ export function ClientTabs({
                     );
                   })}
                 </div>
-              )}
-              {/* % visible siempre. Si tab != cuestionario, clickeable abre dropdown desglose */}
-              {tab !== "cuestionario" ? (
+              ) : null}
+              {/* % visible siempre. Si tab != cuestionario y no es DM, clickeable abre dropdown del cuestionario.
+                  En DM-IA el % muestra estudio (no dropdown — el panel DM ya navega por su stepper). */}
+              {tab !== "cuestionario" && !useDm ? (
                 <button
                   type="button"
                   onClick={() => setShowStripDropdown((v) => !v)}
                   className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm px-1 inline-flex items-center gap-0.5"
                   aria-expanded={showStripDropdown}
                   aria-haspopup="true"
-                  title="Ver avance por paso"
+                  title="Ver avance por paso del cuestionario"
                 >
-                  {overallPct}% <span aria-hidden="true">▾</span>
+                  {clusterPct}% <span aria-hidden="true">▾</span>
                 </button>
               ) : (
                 <span
                   className="text-xs font-bold text-brand-primary-dark tabular-nums whitespace-nowrap px-1 inline-flex items-center"
-                  title={`${overallPct}% global del cuestionario`}
+                  title={clusterPctTitle}
                 >
-                  {overallPct}%
+                  {clusterPct}%
                 </span>
               )}
               {/* Fecha actualización abreviada — ↻ + dd mmm */}
@@ -695,6 +738,8 @@ export function ClientTabs({
               </div>
             )}
           </div>
+            );
+          })()}
         </div>
       </div>
 

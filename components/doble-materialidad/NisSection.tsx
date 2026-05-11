@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/SelectField";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 
 export type NisItem = {
@@ -109,35 +110,59 @@ export function NisSection({
     (i) => i.incluido && ((i.score_impacto ?? 0) + (i.score_financiero ?? 0)) >= 4
   );
 
+  // Agrupar por tema_esg — evita renderizar chips duplicados del mismo tema.
+  // Cada tema = 1 chip con badge "×N" si > 1 IRO; severidad = max(scores) del grupo.
+  type IroGroup = { tema: string; count: number; isAlta: boolean; tooltip: string };
+  const priorityGroups: IroGroup[] = (() => {
+    const map = new Map<string, IroInventoryItem[]>();
+    for (const iro of priorityIros) {
+      const arr = map.get(iro.tema_esg) ?? [];
+      arr.push(iro);
+      map.set(iro.tema_esg, arr);
+    }
+    return Array.from(map.entries()).map(([tema, items]) => {
+      const maxTotal = Math.max(
+        ...items.map((i) => (i.score_impacto ?? 0) + (i.score_financiero ?? 0)),
+      );
+      return {
+        tema,
+        count: items.length,
+        isAlta: maxTotal >= 5,
+        tooltip: items
+          .map((i) => `IRO #${i.n_iro}: ${i.descripcion} — Dim1:${i.score_impacto ?? "—"} · Dim2:${i.score_financiero ?? "—"}`)
+          .join("\n"),
+      };
+    });
+  })();
+
   return (
     <div className="space-y-3">
       {/* Banner: IROs priorizados que generan necesidad de datos ── */}
-      {priorityIros.length > 0 && (
+      {priorityGroups.length > 0 && (
         <div className="border-l-4 border-l-brand-primary pl-3 py-2 bg-brand-primary-light/20 rounded-r">
           <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary-dark mb-1.5">
-            IROs priorizados que requieren datos ({priorityIros.length})
+            Temas priorizados que requieren datos ({priorityGroups.length})
           </p>
           <div className="flex flex-wrap gap-1">
-            {priorityIros.map((iro) => {
-              const total = (iro.score_impacto ?? 0) + (iro.score_financiero ?? 0);
-              const isAlta = total >= 5;
-              return (
-                <span
-                  key={iro.id}
-                  className={`text-[10px] px-2 py-0.5 rounded-sm font-medium ${
-                    isAlta
-                      ? "bg-rose-50 text-rose-700 border border-rose-200"
-                      : "bg-amber-50 text-amber-700 border border-amber-200"
-                  }`}
-                  title={`${iro.descripcion} — Dim1: ${iro.score_impacto ?? "—"} · Dim2: ${iro.score_financiero ?? "—"}`}
-                >
-                  {isAlta ? "●" : "◆"} {iro.tema_esg}
-                </span>
-              );
-            })}
+            {priorityGroups.map((g) => (
+              <span
+                key={g.tema}
+                className={`text-[10px] px-2 py-0.5 rounded-sm font-medium ${
+                  g.isAlta
+                    ? "bg-rose-50 text-rose-700 border border-rose-200"
+                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                }`}
+                title={g.tooltip}
+              >
+                {g.isAlta ? "●" : "◆"} {g.tema}
+                {g.count > 1 && (
+                  <span className="ml-1 text-[9px] opacity-70 tabular-nums">×{g.count}</span>
+                )}
+              </span>
+            ))}
           </div>
           <p className="text-[10px] text-slate-500 mt-1.5">
-            ● Alta prioridad (Dim1+Dim2 ≥ 5) · ◆ Media (≥ 4) — verifica que tienes datos disponibles para estos temas
+            ● Alta prioridad (Dim1+Dim2 ≥ 5) · ◆ Media (≥ 4) · ×N = IROs en el tema — verifica que tienes datos disponibles para estos temas
           </p>
         </div>
       )}
@@ -196,28 +221,21 @@ export function NisSection({
                       </span>
                     </td>
                     <td className="px-2 py-2">
-                      <select
+                      <SelectField
                         disabled={isSaving}
                         value={row.estado}
-                        onChange={(e) => void patchNis(row.id, { estado: e.target.value as NisItem["estado"] })}
-                        className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-sm border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-primary/40 ${ESTADO_COLOR[row.estado]}`}
-                      >
-                        {(["no_identificado", "parcial", "disponible"] as NisItem["estado"][]).map((v) => (
-                          <option key={v} value={v}>{ESTADO_LABEL[v]}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => void patchNis(row.id, { estado: v as NisItem["estado"] })}
+                        options={(["no_identificado", "parcial", "disponible"] as NisItem["estado"][]).map((v) => ({ value: v, label: ESTADO_LABEL[v] }))}
+                        className={`text-[11px] font-semibold ${ESTADO_COLOR[row.estado]}`}
+                      />
                     </td>
                     <td className="px-2 py-2">
-                      <select
+                      <SelectField
                         disabled={isSaving}
                         value={row.calidad_dato}
-                        onChange={(e) => void patchNis(row.id, { calidad_dato: e.target.value as NisItem["calidad_dato"] })}
-                        className="text-[11px] text-slate-600 border border-slate-200 rounded px-1 py-0.5 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-primary/40"
-                      >
-                        {(["baja", "media", "alta"] as NisItem["calidad_dato"][]).map((v) => (
-                          <option key={v} value={v}>{CALIDAD_LABEL[v]}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => void patchNis(row.id, { calidad_dato: v as NisItem["calidad_dato"] })}
+                        options={(["baja", "media", "alta"] as NisItem["calidad_dato"][]).map((v) => ({ value: v, label: CALIDAD_LABEL[v] }))}
+                      />
                     </td>
                     <td className="px-2 py-2">
                       <input

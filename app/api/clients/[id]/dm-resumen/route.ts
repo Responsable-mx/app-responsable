@@ -47,17 +47,23 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 // ── PATCH: marcar como revisado ──────────────────────────────────────────────
 
-export async function PATCH(_req: NextRequest, { params }: Ctx) {
+export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const admin = createAdminClient();
 
+  // Parse body — soporta dos operaciones independientes:
+  //   { content: string }     → editar el cuerpo del resumen (override consultor)
+  //   {} (vacío) o legacy     → marcar como revisado (reviewed_at = now)
+  let body: { content?: string } = {};
+  try { body = await req.json(); } catch { body = {}; }
+
   // Obtener el último resumen done
   const { data: latest } = await admin
     .from("dm_resumenes")
-    .select("id")
+    .select("id, content, reviewed_at")
     .eq("client_id", id)
     .eq("status", "done")
     .order("created_at", { ascending: false })
@@ -68,9 +74,36 @@ export async function PATCH(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "No hay resumen generado para marcar" }, { status: 404 });
   }
 
+  // Editar contenido — validar size razonable; el consultor revisa narrativa IA.
+  if (typeof body.content === "string") {
+    const trimmed = body.content.trim();
+    if (!trimmed) {
+      return NextResponse.json({ error: "El contenido no puede estar vacío" }, { status: 400 });
+    }
+    if (trimmed.length > 50_000) {
+      return NextResponse.json({ error: "El contenido excede 50.000 caracteres" }, { status: 400 });
+    }
+    const { error } = await admin
+      .from("dm_resumenes")
+      .update({ content: trimmed })
+      .eq("id", latest.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    void logChange({
+      actorEmail: user,
+      entityType: "dm_resumen",
+      entityId: latest.id,
+      action: "update",
+      before: { content_length: latest.content?.length ?? 0 },
+      after: { client_id: id, content_length: trimmed.length },
+    });
+    return NextResponse.json({ ok: true, data: { content: trimmed } });
+  }
+
+  // Default: marcar como revisado
+  const reviewedAt = new Date().toISOString();
   const { error } = await admin
     .from("dm_resumenes")
-    .update({ reviewed_at: new Date().toISOString() })
+    .update({ reviewed_at: reviewedAt })
     .eq("id", latest.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -80,8 +113,8 @@ export async function PATCH(_req: NextRequest, { params }: Ctx) {
     entityType: "dm_resumen",
     entityId: latest.id,
     action: "review",
-    before: { reviewed_at: null },
-    after: { client_id: id, reviewed_at: new Date().toISOString() },
+    before: { reviewed_at: latest.reviewed_at },
+    after: { client_id: id, reviewed_at: reviewedAt },
   });
 
   return NextResponse.json({ ok: true });

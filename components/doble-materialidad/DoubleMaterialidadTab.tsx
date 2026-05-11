@@ -1315,7 +1315,7 @@ export function DoubleMaterialidadTab({
   });
 
   // SWR para resumen y validación — deduplicado con los SWR de los hijos
-  const { data: resumenResp } = useSWR<{ data: { status: string } | null }>(
+  const { data: resumenResp } = useSWR<{ data: { status: string; reviewed_at?: string | null } | null }>(
     resumenKey, fetcher, { revalidateOnFocus: false }
   );
   const { data: validacionResp } = useSWR<{ data: {
@@ -1552,6 +1552,22 @@ export function DoubleMaterialidadTab({
       ? Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)
       : null;
 
+  // Stepper compacto al scroll — colapsa progress header + chips para evitar
+  // doble sticky stack con el header de ClientTabs. Sentinel arriba del stepper:
+  // cuando deja de ser visible → stepper está pinned → modo compacto.
+  const stepperSentinelRef = useRef<HTMLDivElement>(null);
+  const [stepperCompact, setStepperCompact] = useState(false);
+  useEffect(() => {
+    const el = stepperSentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry) setStepperCompact(!entry.isIntersecting); },
+      { rootMargin: "-80px 0px 0px 0px", threshold: 0 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <div className="space-y-6 py-4 max-w-5xl mx-auto">
       {/* Keyframe fade-in para transición entre paneles Ruta B (montado una vez) */}
@@ -1575,6 +1591,8 @@ export function DoubleMaterialidadTab({
           </p>
         </div>
       )}
+      {/* Sentinel: IntersectionObserver lo monitorea — al salir de viewport, stepper queda pinned */}
+      <div ref={stepperSentinelRef} className="h-px -mb-px" aria-hidden="true" />
       {/* ── Stepper V3 — card con pill bar + progress + chips ── */}
       {(() => {
         const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null }> = [
@@ -1592,8 +1610,9 @@ export function DoubleMaterialidadTab({
         const validatedCompanies = companies.filter((c) => c.validated).length;
 
         return (
-          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-2 z-10">
-            {/* Cabecera progreso */}
+          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-2 z-10 transition-all">
+            {/* Cabecera progreso — solo visible cuando el stepper NO está pinned (modo expandido) */}
+            {!stepperCompact && (
             <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
@@ -1621,6 +1640,7 @@ export function DoubleMaterialidadTab({
                 teclado
               </span>
             </div>
+            )}
 
             {/* Pill bar */}
             <div className="flex items-center gap-1 px-4 py-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1630,15 +1650,15 @@ export function DoubleMaterialidadTab({
                     label={s.label}
                     status={s.status}
                     selected={s.sectionId === activeStageId}
-                    subtitle={
-                      s.status === "done"
-                        ? formatStageDate(s.doneDate)
-                        : s.status === "active"
-                        ? "En curso"
-                        : s.status === "locked"
-                        ? "Bloqueada"
-                        : "Pendiente"
-                    }
+                    subtitle={(() => {
+                      const isSel = s.sectionId === activeStageId;
+                      // Solo la etapa seleccionada dice "En curso" — evita 3 pills "En curso" simultáneas.
+                      if (isSel) return s.status === "done" ? "Revisando" : "En curso";
+                      if (s.status === "done")   return formatStageDate(s.doneDate);
+                      if (s.status === "active") return "Lista";
+                      if (s.status === "locked") return "Bloqueada";
+                      return "Pendiente";
+                    })()}
                     sectionId={s.sectionId}
                   />
                   {idx < stagesData.length - 1 && (
@@ -1653,7 +1673,8 @@ export function DoubleMaterialidadTab({
               ))}
             </div>
 
-            {/* Context chips — siempre visibles; 0-count comunica acción pendiente */}
+            {/* Context chips — ocultos en modo compact para reducir altura sticky */}
+            {!stepperCompact && (
             <div className="border-t border-slate-100 px-5 py-2">
               <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {/* Benchmark chip — siempre */}
@@ -1686,6 +1707,7 @@ export function DoubleMaterialidadTab({
                 )}
               </div>
             </div>
+            )}
           </div>
         );
       })()}
@@ -1710,6 +1732,18 @@ export function DoubleMaterialidadTab({
         <ContextoSection
           progress={questionnaireProgress}
           onGoToCuestionario={onGoToCuestionario}
+          onGoToCuestionarioStep={(stepIdx) => {
+            // ?tab=cuestionario&step=N gana sobre localStorage en ClientTabs.
+            // Padre del DM tab maneja el switch tab via onGoToCuestionario+navegación.
+            if (typeof window !== "undefined") {
+              const params = new URLSearchParams(window.location.search);
+              params.set("tab", "cuestionario");
+              params.set("step", String(stepIdx + 1));
+              window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+            }
+            onGoToCuestionario();
+          }}
+          clientId={clientId}
           sector={clientSector}
           size={clientSize}
           frameworks={clientFrameworks}
@@ -1893,6 +1927,17 @@ export function DoubleMaterialidadTab({
           clientName={clientName}
           latestResult={latestResult}
           latestReport={latestReport}
+          readiness={{
+            questionnairePct,
+            benchmarkCompanies: companies.filter((c) => c.validated).length,
+            irosTotal: iros.length,
+            irosScored: scoredIncluded.length,
+            hasMatriz: scoredIncluded.length >= 3,
+            nisCount: nisRows.length,
+            resumenReviewed: hasResumen && !!resumenResp?.data?.reviewed_at,
+            validationDecided: allIrosDecided,
+            onGoToStage: navigateTo,
+          }}
           onReportMutate={() => mutateReport()}
           isReportPolling={isReportPolling}
           onStartReportPolling={() => {

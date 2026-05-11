@@ -4,6 +4,8 @@ import { useState, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { SelectField } from "@/components/ui/SelectField";
+import { extractEsrsCode } from "@/lib/dm/esg-classify";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -164,33 +166,8 @@ export function ValidacionSection({ clientId, iros }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <section className="border border-slate-200 rounded bg-white shadow-sm">
-      {/* Encabezado */}
-      <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
-        <div>
-          <p className="uppercase tracking-widest text-[10px] font-bold text-slate-400 leading-none mb-0.5">
-            Etapa 7
-          </p>
-          <h3 className="text-sm font-semibold text-slate-800">
-            Validación con el cliente
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Registra la junta de presentación y los ajustes acordados antes de emitir el reporte.
-          </p>
-        </div>
-        {pendingCount > 0 && (
-          <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-sm font-bold whitespace-nowrap shrink-0">
-            {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
-          </span>
-        )}
-        {allDecided && (
-          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-sm font-bold whitespace-nowrap shrink-0">
-            Completo
-          </span>
-        )}
-      </div>
-
-      <div className="px-5 py-5 space-y-6">
+    <>
+      <div className="space-y-6">
 
         {/* ── Sección 1: Junta de presentación ── */}
         <div>
@@ -375,8 +352,13 @@ export function ValidacionSection({ clientId, iros }: Props) {
 
                     return (
                       <tr key={iro.id} className="hover:bg-slate-50">
-                        <td className="px-3 py-2 tabular-nums font-medium text-slate-600">
-                          {iro.n_iro}
+                        <td className="px-3 py-2 font-medium text-slate-600">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-mono font-bold text-slate-500 bg-slate-100 px-1 py-0.5 rounded-sm tabular-nums">
+                              {extractEsrsCode(iro.tema_esg)}
+                            </span>
+                            <span className="text-[10px] text-slate-400 tabular-nums">#{iro.n_iro}</span>
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-slate-700 max-w-xs">
                           <p className="line-clamp-2 leading-relaxed">
@@ -392,21 +374,13 @@ export function ValidacionSection({ clientId, iros }: Props) {
                           </p>
                         </td>
                         <td className="px-3 py-2">
-                          <select
+                          <SelectField
                             value={dec?.decision ?? ""}
-                            onChange={(e) =>
-                              handleDecision(
-                                iro.id,
-                                (e.target.value as Decision) || null
-                              )
-                            }
-                            className="w-full text-[11px] border border-slate-200 rounded px-1.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-brand-primary/40 cursor-pointer font-sans"
-                          >
-                            <option value="">-- Elegir --</option>
-                            {(Object.entries(DECISION_META) as Array<[Decision, typeof DECISION_META[Decision]]>).map(([val, meta]) => (
-                              <option key={val} value={val}>{meta.label}</option>
-                            ))}
-                          </select>
+                            onChange={(v) => handleDecision(iro.id, (v as Decision) || null)}
+                            placeholder="-- Elegir --"
+                            options={(Object.entries(DECISION_META) as Array<[Decision, typeof DECISION_META[Decision]]>).map(([val, meta]) => ({ value: val, label: meta.label }))}
+                            className="w-full text-[11px]"
+                          />
                           {dec?.decision === "ajustar" && (
                             <input
                               type="text"
@@ -475,15 +449,18 @@ export function ValidacionSection({ clientId, iros }: Props) {
               variant={allDecided ? "primary" : "secondary"}
               size="sm"
               disabled={!allDecided || saving}
+              aria-describedby={!allDecided ? "val-proceed-hint" : undefined}
               onClick={() => {
-                const el = document.getElementById("dm-sec-reporte");
-                if (!el) return;
-                const main = document.querySelector("main");
-                if (main) {
-                  const top = el.getBoundingClientRect().top + main.scrollTop - 8;
-                  main.scrollTo({ top, behavior: "smooth" });
-                } else {
-                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                // Cambia panel del wizard Ruta B vía hashchange — el padre
+                // (DoubleMaterialidadTab) escucha y monta el panel Reporte.
+                if (typeof window !== "undefined") {
+                  window.location.hash = "#dm-sec-reporte";
+                  // Scroll a top del stepper tras render del nuevo panel
+                  requestAnimationFrame(() => {
+                    const main = document.querySelector("main");
+                    if (main) main.scrollTo({ top: 0, behavior: "smooth" });
+                    else window.scrollTo({ top: 0, behavior: "smooth" });
+                  });
                 }
               }}
             >
@@ -493,13 +470,13 @@ export function ValidacionSection({ clientId, iros }: Props) {
               </svg>
             </Button>
             {!allDecided && (
-              <p className="text-[10px] text-amber-600" aria-live="polite">
+              <p id="val-proceed-hint" className="text-[10px] text-amber-600" aria-live="polite">
                 {pendingCount} IRO{pendingCount !== 1 ? "s" : ""} sin decisión
               </p>
             )}
           </div>
         </div>
       </div>
-    </section>
+    </>
   );
 }

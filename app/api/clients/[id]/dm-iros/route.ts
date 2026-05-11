@@ -29,6 +29,9 @@ const PatchBody = z.object({
   score_impacto:    z.number().int().min(1).max(3).optional(),
   score_financiero: z.number().int().min(1).max(3).optional(),
   descripcion:      z.string().min(1).max(600).optional(),
+  // Coordenadas manuales de matriz (0-10). NULL = reset al derivado por score.
+  pos_x:            z.number().min(0).max(10).nullable().optional(),
+  pos_y:            z.number().min(0).max(10).nullable().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -249,6 +252,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (fields.score_impacto !== undefined)    updatePayload.score_impacto = fields.score_impacto;
   if (fields.score_financiero !== undefined) updatePayload.score_financiero = fields.score_financiero;
   if (fields.descripcion !== undefined)      updatePayload.descripcion = fields.descripcion.trim();
+  // pos_x/pos_y: setting cualquiera de los dos marca pos_override=true.
+  // NULL en ambos resetea (deriva del score).
+  if (fields.pos_x !== undefined || fields.pos_y !== undefined) {
+    if (fields.pos_x !== undefined)          updatePayload.pos_x = fields.pos_x;
+    if (fields.pos_y !== undefined)          updatePayload.pos_y = fields.pos_y;
+    const bothNull =
+      (fields.pos_x === null || fields.pos_x === undefined) &&
+      (fields.pos_y === null || fields.pos_y === undefined);
+    updatePayload.pos_override = !bothNull;
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin

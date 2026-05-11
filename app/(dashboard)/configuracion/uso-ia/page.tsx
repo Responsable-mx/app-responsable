@@ -55,14 +55,74 @@ const usdFmt = new Intl.NumberFormat("es-MX", {
   maximumFractionDigits: 2,
 });
 
+// ── Umbrales de alerta de gasto IA ─────────────────────────
+// Configurables vía env vars en Vercel. Defaults para 8 consultores piloto.
+const COST_ALERT_THRESHOLD_USD = Number(process.env.IA_COST_ALERT_USD ?? 150);
+const OPUS_DOMINANCE_THRESHOLD_PCT = Number(process.env.IA_OPUS_DOMINANCE_PCT ?? 60);
+
+type CostAlert = {
+  tone: "warn" | "danger";
+  title: string;
+  detail: string;
+};
+
+function computeCostAlerts(s: { cost_usd_estimate_max: number; by_model: Array<{ family: string; cost_usd: number }> }): CostAlert[] {
+  const alerts: CostAlert[] = [];
+  // Alerta 1: gasto total supera umbral
+  if (s.cost_usd_estimate_max > COST_ALERT_THRESHOLD_USD) {
+    alerts.push({
+      tone: "danger",
+      title: `Gasto IA supera $${COST_ALERT_THRESHOLD_USD} USD/mes`,
+      detail: `Gasto actual: $${s.cost_usd_estimate_max.toFixed(2)} (últimos 30 días). Revisa la tabla "Gasto por modelo" para ver qué modelo domina y migrar tareas rutinarias a Haiku.`,
+    });
+  }
+  // Alerta 2: Opus domina el gasto
+  const opus = s.by_model.find((m) => m.family === "opus");
+  if (opus && s.cost_usd_estimate_max > 0) {
+    const pct = (opus.cost_usd / s.cost_usd_estimate_max) * 100;
+    if (pct >= OPUS_DOMINANCE_THRESHOLD_PCT) {
+      alerts.push({
+        tone: "warn",
+        title: `Opus consume ${Math.round(pct)}% del gasto IA`,
+        detail: `Opus es el modelo más caro ($5/$25 por 1M tokens). Solo Elena (insights estratégicos) y reportes finales lo justifican. Si otras tareas lo usan, considera migrar a Sonnet o Haiku.`,
+      });
+    }
+  }
+  return alerts;
+}
+
 export default async function UsoIaPage() {
   const [s, docs] = await Promise.all([
     getUsageSummary(30).catch(() => null),
     getDocumentsStats(),
   ]);
+  const alerts = s ? computeCostAlerts(s) : [];
 
   return (
     <div className="px-8 py-6 max-w-6xl mx-auto">
+      {alerts.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {alerts.map((a, i) => (
+            <div
+              key={i}
+              role="alert"
+              className={`border-l-4 rounded-r p-3 ${
+                a.tone === "danger"
+                  ? "border-l-rose-500 bg-rose-50 text-rose-900"
+                  : "border-l-amber-500 bg-amber-50 text-amber-900"
+              }`}
+            >
+              <p className="text-sm font-bold flex items-center gap-2">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M8 1.5l7 13H1l7-13zM8 6v4M8 12v.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                </svg>
+                {a.title}
+              </p>
+              <p className="text-xs mt-1 leading-relaxed">{a.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
       <p className="text-sm text-slate-600 mb-4 inline-flex items-center gap-1.5">
         Uso de los 4 roles IA en los últimos 30 días.
         <span

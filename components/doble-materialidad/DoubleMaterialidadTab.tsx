@@ -6,24 +6,47 @@ import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
-import { ResumenEjecutivoSection } from "@/components/doble-materialidad/ResumenEjecutivoSection";
-import { ValidacionSection } from "@/components/doble-materialidad/ValidacionSection";
-import { HorizontesConfig } from "@/components/doble-materialidad/HorizontesConfig";
-import { NisSection, type NisItem } from "@/components/doble-materialidad/NisSection";
+// ContextoSection eager — etapa por default (primer panel visible)
 import { ContextoSection } from "@/components/doble-materialidad/ContextoSection";
-import { ReporteSection } from "@/components/doble-materialidad/ReporteSection";
-import { IroSection, type IroBatchStatus } from "@/components/doble-materialidad/IroSection";
-import { BenchmarkSection } from "@/components/doble-materialidad/BenchmarkSection";
+import { HorizontesConfig } from "@/components/doble-materialidad/HorizontesConfig";
+import type { NisItem } from "@/components/doble-materialidad/NisSection";
+import type { IroBatchStatus } from "@/components/doble-materialidad/IroSection";
 import type { BenchmarkData } from "@/components/doble-materialidad/benchmark-types";
 import { StagePill } from "@/components/doble-materialidad/StagePill";
 import { CollapsibleStageSection } from "@/components/doble-materialidad/CollapsibleStageSection";
 
+// ── Lazy loading por etapa (A — Wave 2) ──────────────────────
+// Cada sección carga solo cuando el consultor llega a su pill.
+// Bundle inicial DM-IA baja ~40-60%.
+const dmFallback = <div className="h-32 bg-slate-50 animate-pulse rounded" aria-label="Cargando etapa" role="status" />;
+
 const MatrizDM = dynamic(
   () => import("@/components/doble-materialidad/MatrizDM").then((m) => ({ default: m.MatrizDM })),
-  {
-    loading: () => <div className="h-40 bg-slate-50 animate-pulse rounded" />,
-    ssr: false,
-  }
+  { loading: () => <div className="h-40 bg-slate-50 animate-pulse rounded" />, ssr: false }
+);
+const BenchmarkSection = dynamic(
+  () => import("@/components/doble-materialidad/BenchmarkSection").then((m) => ({ default: m.BenchmarkSection })),
+  { loading: () => dmFallback, ssr: false }
+);
+const IroSection = dynamic(
+  () => import("@/components/doble-materialidad/IroSection").then((m) => ({ default: m.IroSection })),
+  { loading: () => dmFallback, ssr: false }
+);
+const NisSection = dynamic(
+  () => import("@/components/doble-materialidad/NisSection").then((m) => ({ default: m.NisSection })),
+  { loading: () => dmFallback, ssr: false }
+);
+const ResumenEjecutivoSection = dynamic(
+  () => import("@/components/doble-materialidad/ResumenEjecutivoSection").then((m) => ({ default: m.ResumenEjecutivoSection })),
+  { loading: () => dmFallback, ssr: false }
+);
+const ValidacionSection = dynamic(
+  () => import("@/components/doble-materialidad/ValidacionSection").then((m) => ({ default: m.ValidacionSection })),
+  { loading: () => dmFallback, ssr: false }
+);
+const ReporteSection = dynamic(
+  () => import("@/components/doble-materialidad/ReporteSection").then((m) => ({ default: m.ReporteSection })),
+  { loading: () => dmFallback, ssr: false }
 );
 
 // catalogLabel + _CATALOG_MAP movidos a catalog-lookup.ts (D-150 sesión 27)

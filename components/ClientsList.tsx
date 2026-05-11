@@ -412,6 +412,8 @@ export function ClientsList() {
                       key={c.id}
                       className="hover:bg-slate-50/60 group cursor-pointer"
                       onClick={() => router.push(`/clientes/${c.id}`)}
+                      onMouseEnter={() => router.prefetch(`/clientes/${c.id}`)}
+                      onFocus={() => router.prefetch(`/clientes/${c.id}`)}
                     >
                       <td className="px-4 py-2.5">
                         <span className="font-semibold text-slate-900 group-hover:text-brand-primary-hover transition-colors">

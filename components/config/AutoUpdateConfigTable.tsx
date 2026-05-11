@@ -87,6 +87,28 @@ export function AutoUpdateConfigTable({ initial }: { initial: AutoUpdateConfigRo
                     {row.description && (
                       <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{row.description}</p>
                     )}
+                    {row.recommended_frequency_days != null && (
+                      <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className="text-[10px] bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20 px-1.5 py-0.5 rounded-sm font-bold tabular-nums inline-flex items-center gap-1 cursor-help"
+                          title={row.recommendation_reason ?? ""}
+                        >
+                          Recomendado: {row.recommended_frequency_days} días
+                          <span className="text-brand-primary/60">ⓘ</span>
+                        </span>
+                        {row.enabled && row.frequency_days !== row.recommended_frequency_days && (
+                          <button
+                            type="button"
+                            onClick={() => void patch(row.resource_key, { frequency_days: row.recommended_frequency_days! })}
+                            disabled={isPending}
+                            className="text-[10px] text-slate-500 hover:text-brand-primary-dark underline-offset-2 hover:underline"
+                            title="Aplicar la frecuencia recomendada"
+                          >
+                            Usar recomendado
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-center align-top">
                     <label className="inline-flex items-center cursor-pointer">

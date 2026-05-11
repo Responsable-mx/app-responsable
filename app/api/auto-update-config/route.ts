@@ -12,6 +12,8 @@ export type AutoUpdateConfigRow = {
   description: string | null;
   enabled: boolean;
   frequency_days: number;
+  recommended_frequency_days: number | null;
+  recommendation_reason: string | null;
   last_run_at: string | null;
   last_status: "ok" | "partial" | "failed" | null;
   last_error: string | null;

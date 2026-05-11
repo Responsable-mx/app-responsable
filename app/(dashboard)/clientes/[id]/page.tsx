@@ -8,10 +8,14 @@ import { listCatalog } from "@/lib/catalogs";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-export default async function EditarClientePage({ params }: Props) {
-  const { id } = await params;
+export default async function EditarClientePage({ params, searchParams }: Props) {
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const initialTab = typeof sp.tab === "string" ? sp.tab : undefined;
   // Prefetch paralelo: cliente + clients list (nav) + questionnaire + catálogos.
   // SWR arranca con datos en memoria y solo revalida en background.
   const [client, allClients, questionnaireBundle, adminEmail, serviceCatalog, countryCatalog] =
@@ -84,6 +88,7 @@ export default async function EditarClientePage({ params }: Props) {
           client={client}
           completeness={completeness}
           isAdmin={isAdmin}
+          initialTab={initialTab}
           initialQuestionnaire={questionnaireBundle}
           serviceLabels={serviceLabels}
           countryLabels={countryLabels}

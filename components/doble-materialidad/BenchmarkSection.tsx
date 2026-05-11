@@ -62,6 +62,7 @@ export function BenchmarkSection({
   const [onlyBrechas, setOnlyBrechas] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [tableFullscreen, setTableFullscreen] = useState(false);
+  const [colFilter, setColFilter] = useState<"all" | "competitor_nacional" | "competitor_internacional" | "sector" | "cadena_valor">("all");
   // ID de empresa esperando razón de rechazo (al desmarcar)
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
@@ -698,14 +699,25 @@ export function BenchmarkSection({
       {/* ── Tabla comparativa — con columna cliente highlight ── */}
       {hasComparisonData && (() => {
         const allFields = latestResult!.fields_snapshot;
+        const allCompanies = latestResult!.companies_snapshot;
         const isBrechaText = (t: string) =>
           /ausencia|brecha|carece|sin reporte|sin meta|no publica|no mide|no tiene|no cuenta/.test(t.toLowerCase());
 
+        // Counts por categoría E/S/G (filas)
         const catCounts = allFields.reduce<Record<string, number>>((acc, f) => {
           const cat = f.key.charAt(0).toUpperCase();
           acc[cat] = (acc[cat] ?? 0) + 1;
           return acc;
         }, {});
+
+        // Filtro de columnas por tipo de empresa
+        const relCounts = allCompanies.reduce<Record<string, number>>((acc, c) => {
+          acc[c.relation] = (acc[c.relation] ?? 0) + 1;
+          return acc;
+        }, {});
+        const visibleCompanies = allCompanies.filter(
+          (c) => colFilter === "all" || c.relation === colFilter
+        );
 
         const filteredFields = allFields.filter((f) => {
           const cat = f.key.charAt(0).toUpperCase();
@@ -713,7 +725,7 @@ export function BenchmarkSection({
           if (!onlyBrechas) return true;
           const texts = [
             lookupComparisonValue(latestResult!.comparison, f.key, clientName),
-            ...latestResult!.companies_snapshot.map((c) =>
+            ...visibleCompanies.map((c) =>
               lookupComparisonValue(latestResult!.comparison, f.key, c.name)
             ),
           ];
@@ -722,6 +734,22 @@ export function BenchmarkSection({
 
         const cats = ["E", "S", "G"] as const;
         const catLabel: Record<string, string> = { E: "Ambiental", S: "Social", G: "Gobernanza" };
+
+        const CAT_BADGE: Record<string, { label: string; cls: string }> = {
+          E: { label: "Amb", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+          S: { label: "Soc", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+          G: { label: "Gov", cls: "bg-violet-50 text-violet-700 border-violet-200" },
+        };
+
+        const REL_PILLS = [
+          { key: "competitor_nacional",      label: "Nacional" },
+          { key: "competitor_internacional", label: "Internacional" },
+          { key: "sector",                   label: "Sector" },
+          { key: "cadena_valor",             label: "Cadena" },
+        ] as const;
+
+        const searchHref = (companyName: string, fieldLabel: string) =>
+          `https://www.google.com/search?q=${encodeURIComponent(`${companyName} ${fieldLabel} ESG reporte sustentabilidad`)}`;
 
         const handleExport = async () => {
           setExporting(true);
@@ -742,67 +770,100 @@ export function BenchmarkSection({
           }
         };
 
-        // Barra de filtros reutilizada en modo normal y fullscreen
+        // Barra de filtros (2 filas) — reutilizada en modo normal y fullscreen
         const filterBar = (
-          <div className="flex items-center gap-2 flex-wrap">
-            {(["all", ...cats] as const).map((c) => {
-              const count = c === "all" ? allFields.length : (catCounts[c] ?? 0);
-              return (
+          <div className="flex flex-col gap-1.5">
+            {/* Fila 1: filtro dimensión (filas) + acciones */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(["all", ...cats] as const).map((c) => {
+                const count = c === "all" ? allFields.length : (catCounts[c] ?? 0);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setTableFilter(c)}
+                    className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
+                      tableFilter === c
+                        ? "bg-brand-primary text-white border-brand-primary"
+                        : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+                    }`}
+                  >
+                    {c === "all" ? "Todas" : catLabel[c]}
+                    <span className="ml-1 opacity-60">({count})</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setOnlyBrechas((v) => !v)}
+                className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
+                  onlyBrechas
+                    ? "bg-rose-50 text-rose-600 border-rose-200"
+                    : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+                }`}
+              >
+                {onlyBrechas ? `Solo brechas (${filteredFields.length})` : "Solo brechas"}
+              </button>
+              <button
+                type="button"
+                disabled={exporting}
+                onClick={handleExport}
+                className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors disabled:opacity-50"
+              >
+                {exporting ? "Exportando…" : "↓ Excel"}
+              </button>
+            </div>
+            {/* Fila 2: filtro por tipo de empresa (columnas) */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold mr-0.5">Empresa:</span>
+              <button
+                type="button"
+                onClick={() => setColFilter("all")}
+                className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
+                  colFilter === "all"
+                    ? "bg-slate-700 text-white border-slate-700"
+                    : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+                }`}
+              >
+                Todas ({allCompanies.length})
+              </button>
+              {REL_PILLS.filter((r) => (relCounts[r.key] ?? 0) > 0).map((r) => (
                 <button
-                  key={c}
+                  key={r.key}
                   type="button"
-                  onClick={() => setTableFilter(c)}
+                  onClick={() => setColFilter(r.key)}
                   className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
-                    tableFilter === c
-                      ? "bg-brand-primary text-white border-brand-primary"
+                    colFilter === r.key
+                      ? "bg-slate-700 text-white border-slate-700"
                       : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
                   }`}
                 >
-                  {c === "all" ? "Todas" : catLabel[c]}
-                  <span className="ml-1 opacity-60">({count})</span>
+                  {r.label} ({relCounts[r.key] ?? 0})
                 </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setOnlyBrechas((v) => !v)}
-              className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
-                onlyBrechas
-                  ? "bg-rose-50 text-rose-600 border-rose-200"
-                  : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
-              }`}
-            >
-              {onlyBrechas ? `Solo brechas (${filteredFields.length})` : "Solo brechas"}
-            </button>
-            <button
-              type="button"
-              disabled={exporting}
-              onClick={handleExport}
-              className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors disabled:opacity-50"
-            >
-              {exporting ? "Exportando…" : "↓ Excel"}
-            </button>
+              ))}
+            </div>
           </div>
         );
 
         // tableElement — solo la tabla, sin wrapper de scroll
-        // Usado en fullscreen (el contenedor padre maneja overflow en ambas direcciones)
+        // sticky top-0 en cada <th> con shadow bottom: header fijo al scroll vertical
+        // (shadow reemplaza border-bottom — border-collapse: collapse lo rompe con sticky)
         const tableElement = (
           <table className="min-w-full w-max text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="sticky left-0 z-10 bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+              <tr>
+                <th className="sticky left-0 top-0 z-[20] bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06),0_1px_0_0_#e2e8f0]">
                   Dimensión
                 </th>
-                <th className="text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light/30 px-3 rounded-t text-brand-primary-dark">
+                <th className="sticky top-0 z-[11] text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light/30 px-3 rounded-t text-brand-primary-dark shadow-[0_1px_0_0_#e2e8f0]">
                   {clientName}
                   <span className="ml-1 font-normal normal-case text-[10px] text-brand-primary/60">· Cliente</span>
                 </th>
-                {latestResult!.companies_snapshot.map((company) => (
+                {visibleCompanies.map((company) => (
                   <th
                     key={company.name}
                     title={company.name}
-                    className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap"
+                    className="sticky top-0 z-[11] bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[0_1px_0_0_#e2e8f0]"
                   >
                     {abbrevCompanyName(company.name)}
                     {company.relation && (
@@ -818,35 +879,69 @@ export function BenchmarkSection({
               {filteredFields.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={2 + latestResult!.companies_snapshot.length}
+                    colSpan={2 + visibleCompanies.length}
                     className="py-6 text-center text-xs text-slate-400"
                   >
                     Sin dimensiones con ese filtro.
                   </td>
                 </tr>
               ) : (
-                filteredFields.map((field) => (
-                  <tr
-                    key={field.key}
-                    className="group even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
-                  >
-                    <td className="sticky left-0 z-10 bg-white group-even:bg-slate-50/60 group-hover:bg-brand-primary-light/20 py-3 pr-6 font-medium text-slate-700 whitespace-nowrap align-top shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
-                      {field.label}
-                    </td>
-                    <td className="py-3 pr-6 max-w-[220px] align-top bg-brand-primary-light/20 px-3">
-                      <ExpandableCell
-                        text={lookupComparisonValue(latestResult!.comparison, field.key, clientName)}
-                      />
-                    </td>
-                    {latestResult!.companies_snapshot.map((company) => (
-                      <td key={company.name} className="py-3 pr-6 max-w-[220px] align-top">
-                        <ExpandableCell
-                          text={lookupComparisonValue(latestResult!.comparison, field.key, company.name)}
-                        />
+                filteredFields.map((field) => {
+                  const cat = field.key.charAt(0).toUpperCase();
+                  const badge = CAT_BADGE[cat];
+                  const clientText = lookupComparisonValue(latestResult!.comparison, field.key, clientName);
+                  return (
+                    <tr
+                      key={field.key}
+                      className="group even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
+                    >
+                      {/* Columna dimensión: badge E/S/G + label */}
+                      <td className="sticky left-0 z-10 bg-white group-even:bg-slate-50/60 group-hover:bg-brand-primary-light/20 py-3 pr-6 align-top shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                        <div className="flex flex-col gap-0.5">
+                          {badge && (
+                            <span className={`inline-flex w-fit items-center px-1 py-px rounded-sm text-[9px] font-medium border ${badge.cls}`}>
+                              {badge.label}
+                            </span>
+                          )}
+                          <span className="font-medium text-slate-700 whitespace-nowrap">{field.label}</span>
+                        </div>
                       </td>
-                    ))}
-                  </tr>
-                ))
+                      {/* Celda cliente */}
+                      <td className="py-3 pr-6 max-w-[220px] align-top bg-brand-primary-light/20 px-3">
+                        <ExpandableCell text={clientText} />
+                        {clientText && clientText !== "—" && !/^sin datos/i.test(clientText) && (
+                          <a
+                            href={searchHref(clientName, field.label)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-[9px] text-slate-400 hover:text-brand-primary mt-0.5"
+                          >
+                            ↗ fuente
+                          </a>
+                        )}
+                      </td>
+                      {/* Celdas competidores */}
+                      {visibleCompanies.map((company) => {
+                        const compText = lookupComparisonValue(latestResult!.comparison, field.key, company.name);
+                        return (
+                          <td key={company.name} className="py-3 pr-6 max-w-[220px] align-top">
+                            <ExpandableCell text={compText} />
+                            {compText && compText !== "—" && !/^sin datos/i.test(compText) && (
+                              <a
+                                href={searchHref(company.name, field.label)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-[9px] text-slate-400 hover:text-brand-primary mt-0.5"
+                              >
+                                ↗ fuente
+                              </a>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -859,7 +954,7 @@ export function BenchmarkSection({
           </div>
         );
 
-        const scrollHint = latestResult!.companies_snapshot.length > 2 && (
+        const scrollHint = visibleCompanies.length > 2 && (
           <p className="text-[10px] text-slate-400 mt-1 text-right">
             ← desliza para ver todas las empresas
           </p>
@@ -871,8 +966,8 @@ export function BenchmarkSection({
             <div className="mt-2">
               <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  {clientName} vs {latestResult!.companies_snapshot.length} empresa
-                  {latestResult!.companies_snapshot.length !== 1 ? "s" : ""} — posición por dimensión ESG
+                  {clientName} vs {allCompanies.length} empresa
+                  {allCompanies.length !== 1 ? "s" : ""} — posición por dimensión ESG
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
                   {filterBar}
@@ -895,8 +990,8 @@ export function BenchmarkSection({
               <div className="fixed inset-0 z-50 bg-white flex flex-col">
                 <div className="flex items-center justify-between gap-4 px-6 pt-4 pb-3 border-b border-slate-200 flex-shrink-0 flex-wrap">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    {clientName} vs {latestResult!.companies_snapshot.length} empresa
-                    {latestResult!.companies_snapshot.length !== 1 ? "s" : ""} — posición por dimensión ESG
+                    {clientName} vs {allCompanies.length} empresa
+                    {allCompanies.length !== 1 ? "s" : ""} — posición por dimensión ESG
                   </p>
                   <div className="flex items-center gap-2 flex-wrap">
                     {filterBar}
@@ -910,8 +1005,6 @@ export function BenchmarkSection({
                     </button>
                   </div>
                 </div>
-                {/* overflow-auto en el contenedor padre — maneja scroll X e Y sin wrapper anidado */}
-                {/* tabIndex + autoFocus permiten navegar con teclado desde apertura */}
                 <div
                   className="flex-1 overflow-auto px-6 py-4 outline-none"
                   tabIndex={0}

@@ -69,6 +69,10 @@ type Props = {
   updatedLabel?: string;
   updatedAt?: string;
   metaTooltip?: string;
+  /** Tab activo inicial — pasado desde el RSC para evitar mismatch de hidratación.
+   *  El RSC tiene acceso a searchParams reales; useSearchParams() en CSR puede
+   *  retornar null en el primer render SSR, causando React error #418. */
+  initialTab?: string;
 };
 
 const questionnaireFetcher = (url: string) =>
@@ -108,6 +112,7 @@ export function ClientTabs({
   updatedLabel = "",
   updatedAt = "",
   metaTooltip = "",
+  initialTab: initialTabProp,
 }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -132,12 +137,14 @@ export function ClientTabs({
   // Fuente de verdad única: perfil del cliente (editable desde /editar).
   const hasDmService = client.services?.includes("doble_materialidad_ia") ?? false;
   const VALID_TABS: Tab[] = ["cuestionario", "equipo", "documentos", ...(hasDmService ? ["doble-materialidad-ia" as Tab] : [])];
-  // Compat: ?tab=resumen redirige a cuestionario (tab eliminado may-2026, strip Tier 2 lo reemplaza)
+  // rawTab desde useSearchParams() — solo usado en efectos (client-only).
+  // Para el useState inicial se usa initialTabProp (pasado desde RSC vía searchParams reales)
+  // para evitar mismatch de hidratación #418 cuando useSearchParams() retorna null en SSR.
   const rawTab = searchParams?.get("tab") as Tab | "resumen" | null;
-  const initialTab: Tab = rawTab === "resumen" || !rawTab ? "cuestionario" : (rawTab as Tab);
-  const [tab, setTab] = useState<Tab>(
-    VALID_TABS.includes(initialTab) ? initialTab : "cuestionario"
-  );
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = initialTabProp === "resumen" ? undefined : (initialTabProp as Tab | undefined);
+    return t && VALID_TABS.includes(t) ? t : "cuestionario";
+  });
 
   // Strip Tier 2: estado del dropdown de avance por paso (declarado antes de los useEffects que lo consumen)
   const [showStripDropdown, setShowStripDropdown] = useState(false);

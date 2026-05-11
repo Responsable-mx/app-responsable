@@ -332,9 +332,31 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 
 ## Deploy — app-responsable (may-2026)
 
-**Push a `main` → auto-deploy automático** a `https://app.responsable.net`.  
-GitHub `Responsable-mx/app-responsable` conectado a Vercel (integración GitHub App, may-2026).  
+**Push a `main` → auto-deploy automático** a `https://app.responsable.net`.
+GitHub `Responsable-mx/app-responsable` conectado a Vercel (integración GitHub App, may-2026).
 `vercel --prod` ya no es necesario para este proyecto.
+
+### OneDrive Files-On-Demand — defensa obligatoria
+
+Repo vive bajo `C:\Users\…\OneDrive\…\app-responsable`. OneDrive puede convertir archivos a placeholders **online-only** entre Edit y commit, causando que `git status` los omita y se pierdan silenciosamente en el push. Caso real may-2026 con feature questionnaire-snapshots: 5 archivos editados invisibles a git, recuperados con `[System.IO.File]::ReadAllBytes` + rewrite.
+
+**Defensas instaladas**:
+- `scripts/pin-onedrive.mjs` — corre `attrib +P /S /D` recursivo.
+- `npm run pin:onedrive` / `npm run check:onedrive` — pin manual + check de cuántos online-only.
+- `.husky/pre-commit` — ejecuta `pin:onedrive` + `npx tsc --noEmit` antes de cualquier commit. Activado vía `git config core.hooksPath .husky` (correr 1 vez por clone).
+- `npm run predeploy` — atajo manual pre-push (pin + tsc).
+
+**Síntomas a vigilar**: `git status` no muestra archivo que Edit/Read sí ven; tamaño en disco normal pero `git hash-object` y `HEAD:ruta` matchean a pesar de cambios. Si pasa, correr `npm run pin:onedrive` y re-verificar.
+
+### Deploy flow ágil
+
+1. **Antes de commit**: hook pre-commit ejecuta automáticamente pin + tsc. Si tsc falla, fix antes de continuar.
+2. **Antes de push manual** (opcional, validar build): `npm run predeploy`.
+3. **Push**: `git push` — Vercel detecta + buildea + deploya solo HEAD.
+4. **Commits no-funcionales** (docs/chores): agregar `[skip vercel]` al mensaje. No dispara build.
+5. **Multiple commits**: acumular localmente, push único al terminar. Vercel buildea sólo HEAD (memoria global).
+6. **Migración SQL aditiva** (CREATE TABLE / ADD COLUMN / CREATE INDEX): aplicar a Supabase ANTES del push para evitar runtime errors entre los 2 pasos. Helper `node ~/.claude/scripts/apply-sql.mjs supabase/migrations/NNNN_xxx.sql --project=lyideepglavkmuuujoqz`. Destructiva pide OK textual + `--confirm-destructive`.
+7. **Verificación post-deploy**: `curl -sI https://app.responsable.net` debe devolver 200 o redirect a login.
 
 ## Cache breakpoints IA
 

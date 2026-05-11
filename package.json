@@ -13,7 +13,10 @@
     "sql:apply": "node scripts/apply-sql.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "pin:onedrive": "node scripts/pin-onedrive.mjs",
+    "check:onedrive": "node scripts/pin-onedrive.mjs --check",
+    "predeploy": "node scripts/pin-onedrive.mjs && npx tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

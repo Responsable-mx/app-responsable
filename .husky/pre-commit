@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit hook — defensa contra OneDrive Files-On-Demand + type check.
+# Activación: git config core.hooksPath .husky (una vez, ya está documentado en CLAUDE.md).
+
+set -e
+
+echo "[pre-commit] pin OneDrive…"
+node scripts/pin-onedrive.mjs
+
+echo "[pre-commit] tsc --noEmit…"
+npx tsc --noEmit
+
+echo "[pre-commit] OK"

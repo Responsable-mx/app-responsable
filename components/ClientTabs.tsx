@@ -150,7 +150,7 @@ export function ClientTabs({
   const [showStripDropdown, setShowStripDropdown] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
 
-  // Badge [N/7] en tab DM-IA — se actualiza cuando DoubleMaterialidadTab monta
+  // Badge [N/8] en tab DM-IA — se actualiza cuando DoubleMaterialidadTab monta
   const [dmProgress, setDmProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Extracción disparada desde DocumentsTab → QuestionnaireTab la consume
@@ -883,6 +883,9 @@ export function ClientTabs({
               questionnaireProgress={questionnaireProgress}
               onGoToCuestionario={() => goToTab("cuestionario")}
               onStagesProgress={(done, total) => setDmProgress({ done, total })}
+              clientSector={client.sector}
+              clientSize={client.size}
+              clientFrameworks={client.frameworks}
             />
           </TabErrorBoundary>
         </div>

@@ -746,7 +746,7 @@ export function DoubleMaterialidadTab({
         status={stage6Status}
         accent="border-l-cyan-600"
         isActive={activeStageId === "dm-sec-resumen"}
-        lockReason="Completa el inventario de IROs (Etapa 2) para generar el resumen ejecutivo con IA."
+        lockReason="Completa el inventario de IROs (Etapa 3) para generar el resumen ejecutivo con IA."
         subtitle="Narrativa generada por IA con insights, trade-offs y recomendaciones estratégicas"
       >
         <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
@@ -760,7 +760,7 @@ export function DoubleMaterialidadTab({
         status={stage7Status}
         accent="border-l-amber-500"
         isActive={activeStageId === "dm-sec-validacion"}
-        lockReason="Genera el resumen ejecutivo (Etapa 5) para iniciar la sesión de validación con el cliente."
+        lockReason="Genera el resumen ejecutivo (Etapa 6) para iniciar la sesión de validación con el cliente."
         subtitle="Decisiones del cliente sobre cada IRO incluido — aprobación, ajuste o descarte"
         headerRight={
           includedIros.length > 0 ? (

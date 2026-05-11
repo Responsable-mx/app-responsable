@@ -27,7 +27,8 @@ export type AuditEntityType =
   | "dm_validacion"
   | "dm_nis"
   | "dm_resumen"
-  | "dm_benchmark_company";
+  | "dm_benchmark_company"
+  | "questionnaire_snapshot";
 
 export type AuditAction = "create" | "update" | "delete" | "restore" | "review";
 

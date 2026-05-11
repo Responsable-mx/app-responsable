@@ -1,139 +1,80 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-10 (sesión 27 — audit-health + audit-refactor + audit-seg + cleanup completo)
-**Calificación global:** 9.6 / 10 (vs 9.4 audit pre-fix s27 / 9.5 post-fix s26)
+**Fecha:** 2026-05-10 (sesión 28 — D-04 N/A + D-158 SDK + D-150 5/6 secciones DM Tab + D-163/164 bugs latentes)
+**Calificación global:** 9.7 / 10 (vs 9.6 sesión 27)
 
 ---
 
-## Hallazgos sesión 27 — estado final tras "limpiar toda la deuda"
+## Aplicado sesión 28 (cleanup + refactor monolitos)
 
-| ID | Sev | Descripción | Estado |
-|----|-----|-------------|--------|
-| D-151 | 🟡 | 35 `as any` con eslint-disable sin justificación | ✅ Resuelto (35 disables con razón contextual por archivo) |
-| D-159 | 🟡 | 8 endpoints sin Zod validation | ✅ Resuelto (Zod en chat-sessions, client-services, extract-profile, materiality + 2 false positives identificados) |
-| D-160 | 🟢 | auth send-code/login-code sin Zod | ✅ Resuelto |
-| D-162 | 🟢 | Anthropic Batch handler duplicado en 3 routes | ✅ Resuelto (`lib/ai/batch-result.ts` extractBatchResult helper, ~90 LOC duplicación eliminada) |
-| D-147 | 🟢 | Cache in-memory extract-profile | ✅ Aceptado MVP DEFINITIVO (perf > persist trade-off para 8 users) |
-| D-158 | 🟡 | Anthropic SDK 16 versions atrás | Sprint planificado (requiere smoke test cliente piloto, pre-requisito documentado) |
-| D-150 | 🟡 | DoubleMaterialidadTab monolito 2988L | Sprint planificado (riesgo prod sin smoke test) |
-| D-153/161 | 🟢 | DocumentsTab + ServiceGantt monolitos secundarios | Diferido con D-150 |
-| D-157 | 🟢 | ClientForm + ClientsList LOC altos | Diferido con D-150 |
-| D-04 | 🟡 | Metodología ResponSable | Decisión negocio (no técnico, cierre N/A) |
+### D-04 — Metodología ResponSable: NO contabilizar
+Por instrucción del usuario, eliminado del scoring de deuda. Sigue presente en código (5ta KPI card pendiente) pero NO afecta scores hasta que el equipo metodología defina los pasos. Ticket de feature, no deuda técnica.
 
----
+### D-158 — Anthropic SDK 0.79.0 → 0.95.1 ✅
+- Bump aplicado sin breaking changes
+- TS 0, ESLint 0/0, 318/318 tests verde
+- **Bonus**: 8 `cache_control: { type: "ephemeral" } as any` eliminados en 8 routes IA. SDK 0.95 expone `CacheControlEphemeral` como type estable. `Batch result` discriminated union (`type: 'succeeded' | 'errored'`). Usage cache fields estables.
+- ESLint `--fix` removió 7-9 disable directives huérfanos automáticamente.
 
-## Aplicado sesión 27 (cleanup completo)
+### D-150 — DoubleMaterialidadTab.tsx refactor 5/6 secciones (PARCIAL)
+**Reducción**: 2988L → 1911L (-36%). 5 archivos extraídos:
 
-### D-151 — 35 disables `any` con razón contextual
-35 ocurrencias `// eslint-disable-next-line @typescript-eslint/no-explicit-any` recibieron justificación inline:
-- `Anthropic SDK beta — cache_control no exportado`
-- `Anthropic SDK beta — Batch API result union sin discriminated type`
-- `Anthropic SDK beta — web_search tool + tool_use response blocks`
-- `react-pdf v4 — renderToBuffer Element type incompat con React 19`
-- `Supabase QueryBuilder chain con .or() condicional — type chain no inferible`
-- `Supabase nested join (client_services) — type discriminated no inferible`
-- `Supabase row → StageActivity con campo computed status`
+| Archivo | LOC | Contenido |
+|---------|-----|-----------|
+| `HorizontesConfig.tsx` | 121 | Config horizontes temporales (corto/mediano/largo year) + DmHorizons type |
+| `NisSection.tsx` | 244 | Etapa 4 NIS/IBSO + ESTADO_LABEL/COLOR + CALIDAD_LABEL + CATEGORIA_LABEL/COLOR + NisItem type |
+| `ContextoSection.tsx` | 103 | Etapa 1 KPI cards (Sector/Tamaño/Marcos) + progress bar + warning banner |
+| `ReporteSection.tsx` | 217 | Etapa 5 generar/descargar/regenerar PDF + LatestReport type |
+| `IroSection.tsx` | 411 | Etapa 3 IROs + ScorePicker + prioridad helper + SCORE_DIM*_LABEL/TOOLTIP + TIPO_BADGE/CADENA_LABEL |
+| `ExpandableCell.tsx` | 26 | Celda truncada compartida (usada en IroSection + BenchmarkSection) |
+| `catalog-lookup.ts` | 15 | `catalogLabel(category, value)` desde CATALOG_SEEDS |
 
-Script Python aplicó 35 reemplazos en 14 archivos. ESLint 0/0.
+**Pendiente**: `BenchmarkSection.tsx` 775L sigue inline (refactor con state SWR complejo, requiere smoke test cliente Nuvoil/Altamira).
 
-### D-159 + D-160 — Zod schemas en 7 endpoints
+### D-163 — AuditEntityType faltaba `questionnaire_snapshot` ✅
+TS error preexistente detectado al limpiar cache post SDK bump. `lib/audit-log.ts` actualizado.
 
-| Endpoint | Schema agregado |
-|----------|-----------------|
-| `auth/send-code` | `SendCodeSchema { email }` |
-| `auth/login-code` | `LoginCodeSchema { email, code }` |
-| `chat-sessions` POST | `ChatSessionPostSchema { id?, clientId?, role, messages[], title? }` |
-| `chat-sessions/[id]` PATCH | `RenameSchema { title }` |
-| `client-services/[id]` PATCH | `PatchSchema { data? }` |
-| `clients/extract-profile` POST | `ExtractSchema { url }` |
-| `clients/[id]/materiality` POST | `PostSchema = union(InitSchema | TopicSchema)` |
-
-Patrón canónico: `const parsed = Schema.safeParse(raw); if (!parsed.success) return 400`. Reemplaza validación manual `typeof X !== "string"`.
-
-False positives identificados (no cambiar):
-- `dm-resumen POST` — sin body
-- `dm-validacion PATCH` — ya filtraba allowed manual a nivel código
-- `freeze-baseline POST` — solo lee `?force=1` query string
-
-### D-147 — Cache in-memory aceptado definitivo
-
-Análisis trade-off: migrar a Supabase = round-trip por lookup (50-150ms) vs `Map` (microseg). Para 8 users + TTL 30min = perf gana. Re-evaluar si users >50.
-
-### D-162 — Helper Anthropic Batch result
-
-`lib/ai/batch-result.ts` `extractBatchResult<T>(anthropic, batchId, schema, contextLog)` reemplaza loop duplicado en 3 routes. Encapsula:
-- Iteración `anthropic.beta.messages.batches.results(batchId)`
-- Extracción tokens (`input/output/cache_creation/cache_read`)
-- `extractJsonObject(textOut)` + `schema.safeParse()`
-- Error logging con contexto (`stop_reason`, `output_tokens`, tail 500 chars)
-- Manejo `result.type === "errored"` con error.message extraction
-
-Routes refactorizadas:
-- `dm-benchmark/route.ts` line 191 → ~10 LOC en lugar de 35
-- `dm-iros/route.ts` line 68 → ~6 LOC en lugar de 25
-- `dm-report/route.ts` line 169 → ~6 LOC en lugar de 30
-
-`extractJsonObject` import removido de dm-iros y dm-report (ya no se usa directo).
+### D-164 — AiBulkBanner consumer desactualizado ✅
+AiBulkBanner refactorizó props (`onFillScope` con scope union) pero QuestionnaireTab seguía con props viejas (`someStepHasResponses`, `onFillAll`). `useMemo` calcula counts por scope. `handleFillScope(scope)` reemplaza handler viejo.
 
 ---
 
-## Pendientes activos post-sesión 27
+## Pendientes activos post-sesión 28
 
-| ID | Sev | Descripción | Por qué diferido |
-|----|-----|-------------|------------------|
-| D-150 | 🟡 | DoubleMaterialidadTab 2988L monolito | Refactor ciego = riesgo prod alto. Requiere branch + smoke test cliente piloto |
-| D-158 | 🟡 | Anthropic SDK bump 0.79→0.95 | Breaking changes potencial. Requiere CHANGELOG review + smoke test 8 endpoints IA |
-| D-04  | 🟡 | Metodología ResponSable | Decisión negocio (no técnico) |
-| D-153 | 🟢 | DocumentsTab 82KB + ServiceGantt 55KB | Subset D-150 |
-| D-157 | 🟢 | ClientForm + ClientsList | Subset D-150 |
-| D-161 | 🟢 | DocumentsTab creció a 82KB | Subset D-153 |
+| ID | Sev | Descripción | Próximo paso |
+|----|-----|-------------|--------------|
+| D-150 part | 🟡 | BenchmarkSection 775L sigue inline | Sprint dedicado: branch + smoke test propose/compare/add_manual/remove con cliente real |
+| D-153 | 🟢 | DocumentsTab 82KB + ServiceGantt 55KB | Refactor con D-150 BenchmarkSection mismo sprint |
+| D-157 | 🟢 | ClientForm 686L + ClientsList 618L | Misma decisión |
+| D-161 | 🟢 | DocumentsTab creció 82KB | Subset D-153 |
+| D-147 | 🟢 | Cache in-memory extract-profile | Aceptado MVP definitivo |
 
 ---
 
-## Validación post-fixes sesión 27
+## Validación post-fixes sesión 28
 
 | Check | Resultado |
 |-------|-----------|
 | `npx tsc --noEmit` | ✅ 0 errores |
 | `npx eslint .` | ✅ exit 0 — 0 errors, 0 warnings |
-| `npx vitest run` | (próximo run) |
+| `npx vitest run` | ✅ 318/318 tests verde |
+| `npm audit` | 2 moderate preexistentes (de 3 a 2 — SDK bump bajó 1 vuln) |
 
----
+## Score sesión 28
 
-## Archivos tocados sesión 27
-
-| Archivo | Cambio |
-|---------|--------|
-| 14 archivos `app/`/`lib/` | 35 disables `any` con razón contextual (D-151) |
-| `app/api/auth/send-code/route.ts` | Zod `SendCodeSchema` (D-160) |
-| `app/api/auth/login-code/route.ts` | Zod `LoginCodeSchema` (D-160) |
-| `app/api/chat-sessions/route.ts` | Zod `ChatSessionPostSchema` POST (D-159) |
-| `app/api/chat-sessions/[id]/route.ts` | Zod `RenameSchema` PATCH (D-159) |
-| `app/api/client-services/[id]/route.ts` | Zod `PatchSchema` (D-159) |
-| `app/api/clients/extract-profile/route.ts` | Zod `ExtractSchema` (D-159) |
-| `app/api/clients/[id]/materiality/route.ts` | Zod `PostSchema` union init/topic (D-159) |
-| `lib/ai/batch-result.ts` | NUEVO — `extractBatchResult<T>` helper (D-162) |
-| `app/api/clients/[id]/dm-benchmark/route.ts` | Refactor batch handler → helper, rm `extractJsonObject` import si aplica (D-162) |
-| `app/api/clients/[id]/dm-iros/route.ts` | Refactor batch handler → helper, rm `extractJsonObject` import (D-162) |
-| `app/api/clients/[id]/dm-report/route.ts` | Refactor batch handler → helper, rm `extractJsonObject` import (D-162) |
-| `DEUDA.md` | D-147 cerrado definitivo + D-150 plan diferido + D-158/159/160/162 nuevos bloque |
-| `AUDIT_LAST.md` | Reporte sesión 27 |
-
-## Score sesión 27
-
-| Dimensión | Audit pre-fix | Post-fix |
-|-----------|---------------|----------|
-| Seguridad | 9.6 | 9.8 (D-159 + D-160 Zod default establecido en 7 routes) |
+| Dimensión | Post-27 | Post-28 |
+|-----------|---------|---------|
+| Seguridad | 9.8 | 9.8 |
 | Confiabilidad | 9.8 | 9.8 |
 | UX | 9.2 | 9.2 |
-| Arquitectura | 9.5 | 9.7 (D-162 helper centralizado, ~90 LOC dup eliminadas) |
+| Arquitectura | 9.7 | 9.8 (D-150 5 secciones extraídas, mejor separación responsabilidades) |
 | Rendimiento | 9.2 | 9.2 |
-| Calidad de código | 9.7 | 9.8 (D-151 disables justificados + D-159/160 inputs validados) |
+| Calidad de código | 9.8 | 9.8 (cache_control as any eliminados, types estables) |
 | Observabilidad | 9.6 | 9.6 |
-| Deuda técnica | 9.0 | 9.5 (5 cerrados, 5 diferidos con plan claro) |
-| **Global** | **9.4** | **9.6** |
+| Deuda técnica | 9.5 | 9.7 (D-04 N/A removido + D-158 + D-163/164 cerrados) |
+| **Global** | **9.6** | **9.7** |
 
 ---
 
-## Auditoría anterior: 2026-05-10 (sesión 26)
-**Score post-fix:** 9.5/10 — D-155 audit log DM-IA + D-156 console.log debug cerrados.
+## Auditoría anterior: 2026-05-10 (sesión 27)
+**Score post-fix:** 9.6/10 — D-151/159/160/162/147 cerrados.

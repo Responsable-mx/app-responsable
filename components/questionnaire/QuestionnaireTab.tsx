@@ -21,7 +21,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { WizardStepNav } from "@/components/questionnaire/WizardStepNav";
-import { AiBulkBanner } from "@/components/questionnaire/AiBulkBanner";
+import { AiBulkBanner, type AiFillScope } from "@/components/questionnaire/AiBulkBanner";
 import { SaveIndicator } from "@/components/questionnaire/SaveIndicator";
 import { FieldRow } from "@/components/questionnaire/FieldRow";
 import { SourceDrawer } from "@/components/questionnaire/SourceDrawer";
@@ -146,10 +146,12 @@ function WizardEditor({
   const [drawerField, setDrawerField] = useState<{ stepKey: string; fieldKey: string } | null>(null);
   const [aiFilling, setAiFilling] = useState<string | null>(null); // step.key
   const [aiBulkProgress, setAiBulkProgress] = useState<{ current: number; total: number; stepTitle: string } | null>(null);
-  const [confirmBulkFill, setConfirmBulkFill] = useState(false);
+  const [confirmFillScope, setConfirmFillScope] = useState<AiFillScope | null>(null);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   // Staging de AI fill por paso: guarda propuesta IA para que el consultor valide antes de aplicar.
   const [stagedFill, setStagedFill] = useState<{ stepKey: string; stepTitle: string; data: Record<string, FieldResponse> } | null>(null);
+  // Último snapshot creado en esta sesión (para botón "Restaurar pre-IA" inline).
+  const [latestSnapshot, setLatestSnapshot] = useState<{ id: string; createdAt: string } | null>(null);
   const toast = useToast();
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,6 +184,34 @@ function WizardEditor({
       result[step.key] = count;
     }
     return result;
+  }, [responses, steps]);
+
+  // Conteos para el menú scope del banner. Se basa en los pasos AI-capable.
+  const scopeFieldCounts = useMemo(() => {
+    let empty = 0;
+    let nonValidated = 0;
+    let total = 0;
+    for (const step of steps) {
+      if (!step.ai_can_fill) continue;
+      const stepObj = (responses[step.key] as Record<string, unknown> | undefined) ?? {};
+      for (const field of step.fields) {
+        total++;
+        const raw = stepObj[field.key];
+        if (!isFieldResponse(raw)) {
+          empty++;
+          nonValidated++;
+          continue;
+        }
+        const filled = isFieldFilled(raw.value);
+        if (!filled) {
+          empty++;
+          nonValidated++;
+        } else if (!raw.validated) {
+          nonValidated++;
+        }
+      }
+    }
+    return { empty, nonValidated, total };
   }, [responses, steps]);
 
   // D-38: mantener ref siempre actualizado para que save() y el flush de unmount
@@ -242,11 +272,12 @@ function WizardEditor({
 
   // Auto-trigger bulk AI fill al montar (cuando viene de /clientes/nuevo con &autoFill=1)
   // aiFillAll es function declaration (hoisted en runtime) declarada más abajo en el componente.
+  // Cliente recién creado → scope "empty" (no hay nada que sobrescribir).
   const autoFiredRef = useRef(false);
   useEffect(() => {
     if (autoFillOnMount && !autoFiredRef.current && steps.length > 0) {
       autoFiredRef.current = true;
-      void aiFillAll();
+      void aiFillAll("empty");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFillOnMount]);
@@ -410,24 +441,84 @@ function WizardEditor({
     }
   }
 
-  async function aiFill(stepKey: string) {
+  // Snapshot del estado actual antes de operación destructiva. Sin bloqueo (best-effort).
+  async function createSnapshot(trigger: "pre_bulk_ai_fill" | "pre_per_step_ai_fill" | "pre_manual_overwrite", scope: string) {
+    try {
+      const res = await fetch(`/api/clients/${clientId}/questionnaire/snapshots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          service: template.service_key,
+          trigger,
+          scope,
+        }),
+      });
+      if (!res.ok) {
+        console.warn("[questionnaire] snapshot create failed", res.status);
+        return null;
+      }
+      const json = (await res.json()) as { data: { id: string; created_at: string } };
+      setLatestSnapshot({ id: json.data.id, createdAt: json.data.created_at });
+      return json.data.id;
+    } catch (e) {
+      console.warn("[questionnaire] snapshot create error", e);
+      return null;
+    }
+  }
+
+  async function restoreSnapshot(snapshotId: string) {
+    try {
+      const res = await fetch(`/api/clients/${clientId}/questionnaire/snapshots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "restore",
+          service: template.service_key,
+          snapshotId,
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error ?? `HTTP ${res.status}`);
+      }
+      await mutate();
+      setLatestSnapshot(null);
+      toast.push("success", "Cuestionario restaurado al snapshot anterior");
+    } catch (e) {
+      toast.push("error", e instanceof Error ? e.message : "Error al restaurar snapshot");
+    }
+  }
+
+  async function aiFill(stepKey: string, scope: AiFillScope = "all") {
     setAiFilling(stepKey);
+    // Snapshot per-paso solo si hay datos previos en el paso.
+    const stepObj = (responses[stepKey] as Record<string, unknown> | undefined) ?? {};
+    const stepHasExistingData = Object.keys(stepObj).length > 0;
+    if (stepHasExistingData) {
+      await createSnapshot("pre_per_step_ai_fill", `step:${stepKey}:${scope}`);
+    }
     try {
       const res = await fetch(`/api/clients/${clientId}/wizard/${stepKey}/ai-fill`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          excludeValidated: scope !== "all",
+          excludeFilled: scope === "empty",
+        }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.error ?? `HTTP ${res.status}`);
       }
       const json = (await res.json()) as { data: Record<string, FieldResponse> };
-      const stepHasExistingData = Object.keys((responses[stepKey] as object | undefined) ?? {}).length > 0;
-      if (stepHasExistingData) {
-        // Paso ya tiene datos → mostrar staging para que el consultor valide antes de aplicar.
+      // Si scope="all" y había datos, mostrar staging diff antes de aplicar.
+      // Para "empty"/"non_validated" el backend ya preservó campos protegidos,
+      // así que aplicar directo no es destructivo.
+      if (scope === "all" && stepHasExistingData) {
         const stepTitle = steps.find((s) => s.key === stepKey)?.title ?? stepKey;
         setStagedFill({ stepKey, stepTitle, data: json.data });
       } else {
-        // Paso vacío → aplicar directo sin staging.
         const merged: QuestionnaireResponseData = { ...responses, [stepKey]: json.data };
         setResponses(merged);
         dirty.current = true;
@@ -491,9 +582,12 @@ function WizardEditor({
     }
   }
 
-  async function aiFillAll() {
+  async function aiFillAll(scope: AiFillScope = "all") {
     const aiSteps = steps.filter((s) => s.ai_can_fill);
     if (aiSteps.length === 0) return;
+    // Snapshot pre-bulk SIEMPRE (incluso scope="empty") para tener undo de 72h
+    // ante cualquier fallo o sorpresa.
+    await createSnapshot("pre_bulk_ai_fill", scope);
     let completedCount = 0;
     let success = 0;
     const failures: { step: string; error: string }[] = [];
@@ -511,6 +605,11 @@ function WizardEditor({
         const res = await fetch(`/api/clients/${clientId}/wizard/${s.key}/ai-fill`, {
           method: "POST",
           signal: controller.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            excludeValidated: scope !== "all",
+            excludeFilled: scope === "empty",
+          }),
         });
         clearTimeout(timeoutId);
         if (!res.ok) {
@@ -561,8 +660,12 @@ function WizardEditor({
 
     setAiBulkProgress(null);
     mutate();
+    const scopeLabel =
+      scope === "empty" ? "(solo vacíos)" :
+      scope === "non_validated" ? "(no validados)" :
+      "";
     if (failures.length === 0) {
-      toast.push("success", `IA llenó ${success} pasos correctamente`);
+      toast.push("success", `IA llenó ${success} paso${success === 1 ? "" : "s"} ${scopeLabel}. Snapshot pre-IA guardado — restaurable 72h.`);
     } else if (success === 0) {
       toast.push("error", `AI fill falló: ${failures[0]!.error}`);
     } else {
@@ -571,32 +674,74 @@ function WizardEditor({
   }
 
   const aiCapableCount = steps.filter((s) => s.ai_can_fill).length;
-  const someStepHasResponses = Object.values(responses).some(
-    (v) => typeof v === "object" && v !== null && Object.keys(v as object).length > 0
-  );
+
+  // Handler del menú scope del banner — pide confirmación solo para "all" (destructivo).
+  function handleScopeChoice(scope: AiFillScope) {
+    if (scope === "all" && scopeFieldCounts.total > 0) {
+      setConfirmFillScope("all");
+      return;
+    }
+    void aiFillAll(scope);
+  }
 
   return (
     <div>
       {/* (Banner "Informes del cliente" eliminado may-2026 — los informes están
           en tab Documentos y URLs editables desde /editar. Redundante en wizard.) */}
 
-      {/* Banner global AI fill */}
+      {/* Banner global AI fill — menú scope (vacíos / no validados / todo) */}
       <AiBulkBanner
         aiCapableCount={aiCapableCount}
         totalSteps={steps.length}
-        someStepHasResponses={someStepHasResponses}
+        emptyFieldCount={scopeFieldCounts.empty}
+        nonValidatedFieldCount={scopeFieldCounts.nonValidated}
+        totalFieldCount={scopeFieldCounts.total}
         progress={aiBulkProgress}
-        onFillAll={() => someStepHasResponses ? setConfirmBulkFill(true) : void aiFillAll()}
+        onFillScope={handleScopeChoice}
       />
 
+      {/* Banner de restauración: aparece tras un snapshot reciente (esta sesión) */}
+      {latestSnapshot && !aiBulkProgress && (
+        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700">
+          <div className="flex items-center gap-2 min-w-0">
+            <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 12a9 9 0 0115.5-6.3M21 4v6h-6M21 12a9 9 0 01-15.5 6.3M3 20v-6h6" />
+            </svg>
+            <span>
+              <strong>Snapshot pre-IA</strong> guardado · puedes restaurar 72h
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => void restoreSnapshot(latestSnapshot.id)}
+              className="text-xs font-semibold text-brand-primary-dark hover:underline"
+            >
+              Restaurar pre-IA
+            </button>
+            <button
+              type="button"
+              onClick={() => setLatestSnapshot(null)}
+              aria-label="Cerrar"
+              className="text-slate-400 hover:text-slate-700 text-base leading-none px-1"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
     <div className={`grid grid-cols-1 gap-5 ${drawerField ? "lg:grid-cols-[200px_1fr_280px]" : "lg:grid-cols-[200px_1fr]"}`}>
-      {/* Stepper lateral */}
+      {/* Stepper lateral con refresh per-paso */}
       <WizardStepNav
         steps={steps}
         activeStep={activeStep}
         sectionProgress={progress.sectionProgress}
         pendingValidation={pendingValidation}
         onSelect={setActiveStep}
+        onRefreshStep={(stepKey) => void aiFill(stepKey, "non_validated")}
+        refreshingStepKey={aiFilling}
+        bulkRunning={!!aiBulkProgress}
       />
 
       {/* Step content */}
@@ -836,17 +981,17 @@ function WizardEditor({
       })()}
 
       <ConfirmModal
-        open={confirmBulkFill}
-        title="¿Llenar todo con IA?"
-        description="La IA sobreescribirá las respuestas existentes en todos los pasos. Esta acción no se puede deshacer."
-        confirmLabel="Llenar todo con IA"
+        open={confirmFillScope === "all"}
+        title="¿Re-procesar todo con IA?"
+        description={`La IA tocará los ${scopeFieldCounts.total} campos de los pasos auto-llenables, incluyendo los validados. Antes guardo un snapshot — puedes restaurar el estado anterior durante 72h. Para revisar diff campo-a-campo de un paso específico usa el ⚡ del sidebar.`}
+        confirmLabel="Continuar"
         cancelLabel="Cancelar"
         tone="destructive"
         onConfirm={() => {
-          setConfirmBulkFill(false);
-          void aiFillAll();
+          setConfirmFillScope(null);
+          void aiFillAll("all");
         }}
-        onCancel={() => setConfirmBulkFill(false)}
+        onCancel={() => setConfirmFillScope(null)}
       />
 
       <ConfirmModal

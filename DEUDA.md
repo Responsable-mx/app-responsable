@@ -18,11 +18,10 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ### Bloque D-158–D-162 — Hallazgos auditoría sesión 27 (2026-05-10)
 
-### 🟡 D-158 — `@anthropic-ai/sdk` 16 minor versions atrás (0.79.0 → 0.95.1)
-- **Descripción**: gap large. Probable: features beta usadas (`cache_control`, `web_search`, Batch API) ya tienen types estables → muchos `as any` justificados (D-151) podrían eliminarse.
-- **Riesgo aplicar**: breaking changes en `messages.create`/`stream`/`tools` → regression 8 endpoints IA.
-- **Pre-requisitos arrancar**: branch dedicado · smoke test cliente piloto Nuvoil + Altamira en preview · revisar CHANGELOG SDK 0.79→0.95.
-- **Esfuerzo**: 1 sprint (4-6h con testing manual).
+### ~~🟡 D-158 — `@anthropic-ai/sdk` 16 minor versions atrás (0.79.0 → 0.95.1)~~ ✅ RESUELTO (sesión 28)
+- Bump aplicado sin breaking changes: TS 0, ESLint 0/0, 318/318 tests verde.
+- Bonus: 8 `cache_control: { type: "ephemeral" } as any` eliminados — SDK 0.95 expone `CacheControlEphemeral` como type estable. `Batch result` ahora es discriminated union (`type: 'succeeded' | 'errored'`), `usage.cache_creation_input_tokens` + `cache_read_input_tokens` son campos estables.
+- Verificación: `dist.tarball 0.95.1` instalado, `node_modules/@anthropic-ai/sdk/resources/messages/messages.d.ts` confirma types.
 
 ### ~~🟡 D-159 — POST/PATCH sin Zod schema validation en 8 endpoints~~ ✅ RESUELTO (sesión 27)
 - chat-sessions POST + PATCH, client-services/[id] PATCH, extract-profile POST, materiality POST → Zod `.safeParse()` añadido. dm-resumen POST sin body (false positive). dm-validacion PATCH ya filtraba allowed manual (mitigado pero ahora también con Zod si se requiere). freeze-baseline solo query string (false positive).
@@ -64,11 +63,18 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - Decisión: mockups SIGUEN ACTIVOS como playground dev (todos modificados esta semana). CLAUDE.md actualizado para reflejar realidad — sección renombrada "Mockups `/dev/*` — playground dev" + tabla de propósito por carpeta + regla de cleanup.
 - Middleware `lib/supabase/middleware.ts:60-61` bloquea `/dev/*` en producción ✓
 
-### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito 2988 líneas / 129KB (planificado sprint dedicado)
-- **Descripción**: un componente concentra 8 stages + chat + benchmark + IROs + reporte preview. ESLint detectó setState in effect en línea 2575 (resuelto puntualmente, pero el patrón se repetirá).
-- **Fix sugerido**: dividir por sección manteniendo orchestrator delgado (`BenchmarkSection.tsx`, `IROsSection.tsx`, `ReportPreviewSection.tsx`, `Stage<N>.tsx` × 8). Pattern ya validado por `ValidacionSection.tsx`.
-- **Por qué NO en sesión 27 cleanup**: refactor ciego sin smoke test cliente piloto = riesgo alto romper UI compleja con dependencias entre stages. Requiere branch dedicado + revisión manual cliente piloto Nuvoil/Altamira en preview antes de merge a main.
-- **Esfuerzo**: 1 sprint (8h refactor + tests por sección + 2h smoke test cliente).
+### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito (PARCIALMENTE RESUELTO sesión 28: 2988L → 1911L = -36%)
+- **Aplicado sesión 28**: 5 secciones extraídas a archivos propios:
+  - `HorizontesConfig.tsx` (121L) — config horizontes temporales
+  - `NisSection.tsx` (244L) — Etapa 4 NIS/IBSO + helpers ESTADO/CALIDAD/CATEGORIA
+  - `ContextoSection.tsx` (103L) — Etapa 1 KPI cards + progress bar
+  - `ReporteSection.tsx` (217L) — Etapa 5 generar/descargar/regenerar PDF
+  - `IroSection.tsx` (411L) — Etapa 3 IROs cliente + ScorePicker + prioridad helper + SCORE_DIM*_LABEL/TOOLTIP/TIPO_BADGE/CADENA_LABEL
+  - `ExpandableCell.tsx` (26L) — celda truncada compartida
+  - `catalog-lookup.ts` (15L) — `catalogLabel(category, value)` helper
+- **Pendiente**: `BenchmarkSection.tsx` 775L sigue inline en main. Refactor con state SWR complejo (propose/compare/add_manual/remove + polling batch + modal selección). Requiere análisis profundo de `useSWR` patterns + smoke test cliente piloto Nuvoil/Altamira para no romper UI benchmark.
+- **Pre-requisitos extraer BenchmarkSection**: branch dedicado · revisión 2 desarrolladores · smoke test propose+compare+add_manual+remove+polling con cliente real.
+- **Esfuerzo restante**: 1 sprint (4h refactor + 2h smoke test).
 
 ### 🟡 D-151 — 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado
 - **Descripción**: reduce safety TS. No urgente, fix incremental por archivo.
@@ -252,10 +258,21 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
-### ⏸ D-04 — Metodología ResponSable: pasos no definidos (NO contabilizar — bloqueo negocio)
-- **Estado**: Decisión de negocio pendiente del equipo metodología ResponSable. NO técnico — eliminado del registro de deuda activa.
+### ⏸ D-04 — Metodología ResponSable: pasos no definidos (NO CONTABILIZAR — bloqueo negocio)
+- **Estado sesión 28 (2026-05-10)**: por instrucción del usuario, NO se contabiliza en scores de deuda ni aparece en próximos audits hasta que el equipo metodología defina los pasos.
 - **Cuando se defina**: agregar 5ta KPI card en `ClientTabs` (~30min código). Re-abrir como ticket de feature, no deuda.
-- **Decisión sesión 27 (2026-05-10)**: por instrucción del usuario, dejar de contabilizar este ítem en scores de deuda. No reaparece en próximos audits hasta que negocio lo defina.
+
+---
+
+### Bloque D-163–D-164 — Bugs preexistentes detectados sesión 28 (cache stale TS)
+
+### ~~🟡 D-163 — `AuditEntityType` faltaba `questionnaire_snapshot`~~ ✅ RESUELTO (sesión 28)
+- TS error: `entityType: "questionnaire_snapshot"` not assignable. Detectado al limpiar cache TS post SDK bump.
+- Fix: agregado a union en `lib/audit-log.ts`.
+
+### ~~🟡 D-164 — `AiBulkBanner` consumer en `QuestionnaireTab` desactualizado~~ ✅ RESUELTO (sesión 28)
+- AiBulkBanner refactorizado a `onFillScope` con 3 opciones (empty/non_validated/all) + counts por scope. QuestionnaireTab seguía pasando `someStepHasResponses`/`onFillAll` (props viejas).
+- Fix: `useMemo` calcula `emptyFieldCount/nonValidatedFieldCount/totalFieldCount` recorriendo solo pasos `ai_can_fill`. `handleFillScope(scope)` mapea scope → `setConfirmBulkFill` o `aiFillAll()` directo.
 
 
 ---

@@ -56,7 +56,7 @@ const AiFieldSchema = z.object({
 });
 const AiResponseSchema = z.record(z.string(), AiFieldSchema);
 
-export async function POST(_req: NextRequest, { params }: Ctx) {
+export async function POST(req: NextRequest, { params }: Ctx) {
   const { id, stepKey } = await params;
   const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -68,6 +68,26 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   // D-13: validar formato de stepKey antes de cualquier DB call.
   if (!VALID_STEP_KEY.test(stepKey)) {
     return NextResponse.json({ error: "stepKey inválido" }, { status: 400 });
+  }
+
+  // Body opcional con scope de protección. Si no viene body (compat con caller
+  // viejo), se preserva comportamiento anterior (sobrescribe todo).
+  // - excludeValidated: si true, los campos con validated=true se preservan tal cual.
+  // - excludeFilled: si true (modo "solo vacíos"), los campos con valor no se tocan.
+  let scopeOpts: { excludeValidated: boolean; excludeFilled: boolean } = {
+    excludeValidated: false,
+    excludeFilled: false,
+  };
+  try {
+    const body = await req.json().catch(() => null);
+    if (body && typeof body === "object") {
+      scopeOpts = {
+        excludeValidated: body.excludeValidated === true,
+        excludeFilled: body.excludeFilled === true,
+      };
+    }
+  } catch {
+    // Body opcional — ignorar parse error.
   }
 
   // D-14: rate limit DB cross-instancias.
@@ -427,9 +447,35 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
   // Construir FieldResponse por campo (solo campos del paso actual; descartar extras).
   const now = new Date().toISOString();
   const result: Record<string, FieldResponse> = {};
+  // Snapshot del paso actual para protección de campos validados/llenos.
+  const existingStep =
+    (bundle.response?.responses?.[stepKey] as Record<string, unknown> | undefined) ?? {};
   for (const field of step.fields) {
+    // Scope guards: preservar campo existente si la operación pidió skip.
+    const existingRaw = existingStep[field.key];
+    if (isFieldResponse(existingRaw)) {
+      if (scopeOpts.excludeValidated && existingRaw.validated) {
+        result[field.key] = existingRaw;
+        continue;
+      }
+      if (
+        scopeOpts.excludeFilled &&
+        existingRaw.value !== null &&
+        existingRaw.value !== "" &&
+        !(Array.isArray(existingRaw.value) && existingRaw.value.length === 0)
+      ) {
+        result[field.key] = existingRaw;
+        continue;
+      }
+    }
     const ai = parsed[field.key];
     if (!ai) {
+      // IA omitió este campo. Si había un valor previo, preservarlo — no pisar
+      // trabajo del consultor con null por omisión silenciosa del modelo.
+      if (isFieldResponse(existingRaw) && existingRaw.value !== null) {
+        result[field.key] = existingRaw;
+        continue;
+      }
       result[field.key] = {
         value: null,
         source_type: "consultor_only",

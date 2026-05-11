@@ -87,6 +87,16 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
+// Normaliza URL para dedup (mismo PDF servido con/sin trailing slash o case distinto).
+function normalizeUrl(u: string): string {
+  try {
+    const parsed = new URL(u);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`.toLowerCase().replace(/\/$/, "");
+  } catch {
+    return u.toLowerCase().trim().replace(/\/$/, "");
+  }
+}
+
 export function DocumentsTab({
   clientId,
   isAdmin,
@@ -125,6 +135,12 @@ export function DocumentsTab({
   // Multi-select: IDs de servicios seleccionados para el próximo upload
   const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Confirmación dedup al subir — almacena archivos pendientes + lista de duplicados detectados
+  const [dupConfirm, setDupConfirm] = useState<{
+    files: File[];
+    dupNames: string[];
+    newFiles: File[];
+  } | null>(null);
   const toast = useToast();
 
   // ── Extracción hacia cuestionario ─────────────────────────────────────────
@@ -323,6 +339,12 @@ export function DocumentsTab({
   }, [bulkMenuOpen]);
 
   const docs = data?.data ?? [];
+  // URLs ya ingestadas — set normalizado para el DiscoverModal (evita re-ingestar la misma URL).
+  const existingUrlSet = (() => {
+    const s = new Set<string>();
+    for (const d of docs) if (d.source_url) s.add(normalizeUrl(d.source_url));
+    return s;
+  })();
   // Columnas Servicio + Estado siempre renderizadas (layout estable — el usuario no se confunde
   // con cambios de columnas según data). Si vacío → "—".
   // Detección de duplicados — un hash que aparece 2+ veces marca todas sus filas
@@ -354,11 +376,36 @@ export function DocumentsTab({
   const withContent = docs.filter((d) => d.has_content).length;
   const failedCount = docs.filter((d) => d.parse_status === "failed").length;
 
+  // Detección dedup pre-upload — match por (nombre lowercase, size_bytes).
+  // Evita duplicados accidentales al re-subir un archivo ya cargado.
+  function detectDuplicates(files: File[]): { dupNames: string[]; newFiles: File[] } {
+    const existingKey = new Set(
+      docs.map((d) => `${d.file_name.toLowerCase()}|${d.size_bytes}`)
+    );
+    const dupNames: string[] = [];
+    const newFiles: File[] = [];
+    for (const f of files) {
+      if (existingKey.has(`${f.name.toLowerCase()}|${f.size}`)) dupNames.push(f.name);
+      else newFiles.push(f);
+    }
+    return { dupNames, newFiles };
+  }
+
   async function handleUpload(files: FileList) {
+    const arr = Array.from(files);
+    const { dupNames, newFiles } = detectDuplicates(arr);
+    if (dupNames.length > 0) {
+      setDupConfirm({ files: arr, dupNames, newFiles });
+      return;
+    }
+    await doUpload(arr);
+  }
+
+  async function doUpload(files: File[]) {
     setUploading(true);
     let okCount = 0;
     const failures: string[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("kind", "general");
@@ -379,6 +426,7 @@ export function DocumentsTab({
     void mutate();
     if (okCount > 0 && failures.length === 0) toast.push("success", `${okCount} archivo(s) subidos`);
     else if (okCount > 0) toast.push("warning", `${okCount} OK · ${failures.length} fallaron`);
+    else if (files.length === 0) toast.push("info", "Sin archivos nuevos por subir");
     else toast.push("error", failures[0] ?? "Error subiendo");
   }
 
@@ -898,9 +946,70 @@ export function DocumentsTab({
       {discoverOpen && (
         <DiscoverModal
           clientId={clientId}
+          existingUrls={existingUrlSet}
           onClose={() => setDiscoverOpen(false)}
           onIngested={() => { void mutate(); }}
         />
+      )}
+
+      {/* Confirmación dedup pre-upload — lista archivos ya existentes y deja
+          elegir entre subir solo nuevos, subir todo o cancelar. Evita duplicados
+          accidentales al re-arrastrar la misma carpeta. */}
+      {dupConfirm && (
+        <Modal
+          open
+          onClose={() => setDupConfirm(null)}
+          title="Archivos ya existen"
+          size="md"
+        >
+          <div className="space-y-3 text-sm">
+            <p className="text-slate-700">
+              {dupConfirm.dupNames.length === 1
+                ? "Este archivo ya está en el cliente:"
+                : `Estos ${dupConfirm.dupNames.length} archivos ya están en el cliente:`}
+            </p>
+            <ul className="border border-amber-200 bg-amber-50 rounded p-2 max-h-[200px] overflow-y-auto text-xs text-amber-900 space-y-1">
+              {dupConfirm.dupNames.map((n) => (
+                <li key={n} className="flex items-center gap-1.5">
+                  <IconWarn className="w-3 h-3 shrink-0 text-amber-600" />
+                  <span className="truncate">{n}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-slate-600">
+              Match por nombre y tamaño exacto. Subir igual creará una segunda copia.
+            </p>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button variant="secondary" size="sm" onClick={() => setDupConfirm(null)}>
+                Cancelar
+              </Button>
+              {dupConfirm.newFiles.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const newFiles = dupConfirm.newFiles;
+                    setDupConfirm(null);
+                    void doUpload(newFiles);
+                  }}
+                >
+                  Subir solo nuevos ({dupConfirm.newFiles.length})
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  const allFiles = dupConfirm.files;
+                  setDupConfirm(null);
+                  void doUpload(allFiles);
+                }}
+              >
+                Subir todos ({dupConfirm.files.length})
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {previewing && <PreviewModal clientId={clientId} doc={previewing} onClose={() => setPreviewing(null)} />}
@@ -1245,10 +1354,13 @@ type DiscoverState =
 
 function DiscoverModal({
   clientId,
+  existingUrls,
   onClose,
   onIngested,
 }: {
   clientId: string;
+  /** URLs ya ingestadas (normalizadas) — para marcar candidatos duplicados y no pre-seleccionarlos. */
+  existingUrls: Set<string>;
   onClose: () => void;
   onIngested: () => void;
 }) {
@@ -1301,8 +1413,15 @@ function DiscoverModal({
         setState({ status: "done", candidates: [] });
       } else {
         setState({ status: "done", candidates });
-        // Pre-seleccionar todos
-        setSelected(new Set(candidates.map((_, i) => i)));
+        // Pre-seleccionar solo los que NO existan ya en el cliente (dedup pre-ingest).
+        setSelected(
+          new Set(
+            candidates
+              .map((c, i) => ({ c, i }))
+              .filter(({ c }) => !existingUrls.has(normalizeUrl(c.url)))
+              .map(({ i }) => i)
+          )
+        );
       }
     } catch (e) {
       setState({ status: "error", message: e instanceof Error ? e.message : "Error de red" });
@@ -1408,8 +1527,22 @@ function DiscoverModal({
           </div>
         )}
 
-        {state.status === "done" && candidates.length > 0 && (
+        {state.status === "done" && candidates.length > 0 && (() => {
+          const dupCount = candidates.filter((c) => existingUrls.has(normalizeUrl(c.url))).length;
+          return (
           <>
+            {dupCount > 0 && (
+              <div className="px-3 py-2 rounded border border-amber-200 bg-amber-50 text-xs text-amber-900 flex items-center gap-2" role="status" aria-live="polite">
+                <svg className="w-3.5 h-3.5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>
+                  {dupCount === 1
+                    ? "1 candidato ya está en este cliente — desmarcado por defecto."
+                    : `${dupCount} candidatos ya están en este cliente — desmarcados por defecto.`}
+                </span>
+              </div>
+            )}
             <div className="overflow-x-auto border border-slate-200 rounded bg-white shadow-sm">
               <table className="min-w-full w-max text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -1436,10 +1569,11 @@ function DiscoverModal({
                   {candidates.map((c, idx) => {
                     const result = resultMap[idx];
                     const isSelected = selected.has(idx);
+                    const isDup = existingUrls.has(normalizeUrl(c.url));
                     return (
                       <tr
                         key={idx}
-                        className={`transition-colors ${isSelected ? "bg-brand-primary-light/10" : "hover:bg-slate-50/70"}`}
+                        className={`transition-colors ${isSelected ? "bg-brand-primary-light/10" : isDup ? "bg-amber-50/40" : "hover:bg-slate-50/70"}`}
                       >
                         <td className="px-3 py-2.5">
                           <input
@@ -1465,6 +1599,12 @@ function DiscoverModal({
                             {c.title}
                           </a>
                           <span className="block text-xs text-slate-600 truncate mt-0.5">{c.url}</span>
+                          {isDup && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold uppercase tracking-widest text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                              <IconWarn className="w-2.5 h-2.5" />
+                              Ya existe
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 tabular-nums text-slate-700 text-xs">
                           {c.year ?? "—"}
@@ -1536,7 +1676,8 @@ function DiscoverModal({
               </div>
             </div>
           </>
-        )}
+          );
+        })()}
       </div>
     </Modal>
   );

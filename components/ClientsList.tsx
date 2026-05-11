@@ -2,13 +2,13 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/ui/Modal";
 import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 import { ClientCard, type ClientRow as Row } from "@/components/clients/ClientCard";
+import { ClientTableRow } from "@/components/clients/ClientTableRow";
 
 // Saved views: filtros persistidos por usuario en localStorage. Pattern Salesforce
 // "List Views" / Linear "Saved searches". Permite al consultor tener "Mis activos",
@@ -49,7 +49,6 @@ const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ data: Row[] }>);
 
 export function ClientsList() {
-  const router = useRouter();
   const { push: pushToast } = useToast();
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -414,57 +413,9 @@ export function ClientsList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((c) => {
-                  // eslint-disable-next-line react-hooks/purity -- timestamp relativo de lista, no requiere reactividad
-                  const daysAgo = Math.floor((Date.now() - new Date(c.updated_at).getTime()) / 86400000);
-                  const updatedLabel = daysAgo === 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
-                  const allTags = [
-                    ...(c.frameworks ?? []).map((f) => ({ label: f, cls: "bg-brand-primary-light text-brand-primary-dark" })),
-                    ...(c.certifications ?? []).map((f) => ({ label: f, cls: "bg-amber-50 text-amber-700" })),
-                  ].slice(0, 3);
-                  return (
-                    <tr
-                      key={c.id}
-                      className="hover:bg-slate-50/60 group cursor-pointer"
-                      onClick={() => router.push(`/clientes/${c.id}`)}
-                    >
-                      <td className="px-4 py-2.5">
-                        <span className="font-semibold text-slate-900 group-hover:text-brand-primary-hover transition-colors">
-                          {c.name}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-600 text-xs">
-                        {c.sector ?? <span className="text-slate-400">—</span>}
-                        {c.size && <span className="text-slate-400"> · {c.size}</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-600 text-xs">{c.countries?.join(", ") ?? <span className="text-slate-400">—</span>}</td>
-                      <td className="px-4 py-2.5">
-                        {allTags.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {allTags.map((t) => (
-                              <span key={t.label} className={`text-[10px] rounded-sm px-1.5 py-0.5 font-medium ${t.cls}`}>{t.label}</span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-xs tabular-nums text-slate-500">{updatedLabel}</td>
-                      <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                        <Link
-                          href={`/clientes/${c.id}?tab=chat`}
-                          title="Chat IA"
-                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary-dark bg-brand-primary-light border border-brand-primary/20 rounded px-2 py-1 hover:bg-brand-primary/20"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                          </svg>
-                          Chat
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filtered.map((c) => (
+                  <ClientTableRow key={c.id} client={c} />
+                ))}
               </tbody>
             </table>
           </div>

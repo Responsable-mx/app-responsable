@@ -98,12 +98,41 @@ async function buildComparePrompt(
   clientName: string,
   clientSector: string | null,
   clientCountry: string | null,
-  companies: Array<{ name: string; country: string | null; relation: string }>,
+  companies: Array<{ id?: string; name: string; country: string | null; relation: string }>,
   iros: DmIroConfig[],
 ): Promise<string> {
   const companiesList = companies
     .map((c) => `- ${c.name} (${c.country ?? "país desconocido"}, ${RELATION_LABELS[c.relation as keyof typeof RELATION_LABELS] ?? c.relation})`)
     .join("\n");
+
+  // Wave 7 C: si Voyage embeddings existen para algún competidor, inyectar
+  // chunks relevantes ANTES de pedirle a IA web_search. Reduce input tokens
+  // de web_search + mejora calidad (datos ya verificados del reporte oficial).
+  let competitorChunksSection = "";
+  if (process.env.VOYAGE_API_KEY) {
+    try {
+      const { searchCompetitorChunks } = await import("@/lib/documents/competitor");
+      const esrsQuery = iros.map((iro) => `${iro.esrs_standard} ${iro.label} ${iro.impact_desc} ${iro.risk_desc}`).join(" ");
+      const perCompanyChunks: string[] = [];
+      for (const c of companies) {
+        if (!c.id) continue;
+        const matches = await searchCompetitorChunks({
+          query: esrsQuery,
+          benchmarkCompanyId: c.id,
+          limit: 8,
+        });
+        if (matches && matches.length > 0) {
+          const body = matches.map((m) => m.content).join("\n---\n").slice(0, 6000);
+          perCompanyChunks.push(`### ${c.name}\n${body}`);
+        }
+      }
+      if (perCompanyChunks.length > 0) {
+        competitorChunksSection = `\n\nINFORMACIÓN PRE-ENCONTRADA (reportes oficiales — usa esto antes que web_search):\n\n${perCompanyChunks.join("\n\n")}\n`;
+      }
+    } catch (e) {
+      console.error("[dm-benchmark] competitor chunks lookup failed:", e);
+    }
+  }
 
   // Construir sección de IROs: 2 dimensiones por estándar + contexto del cuestionario
   const iroSections = await Promise.all(
@@ -125,7 +154,7 @@ async function buildComparePrompt(
 Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas.
 
 EMPRESAS A COMPARAR:
-${companiesList}
+${companiesList}${competitorChunksSection}
 
 ESTÁNDARES ESRS A ANALIZAR (2 dimensiones por estándar):
 ${iroSections.join("\n\n")}

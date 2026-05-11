@@ -6,6 +6,7 @@ export const DOCUMENT_KIND_SCHEMA = z.enum([
   "financial_report",
   "dm_report",
   "proposal",
+  "competitor_report",
 ]);
 
 export type DocumentKind = z.infer<typeof DOCUMENT_KIND_SCHEMA>;
@@ -16,4 +17,5 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
   financial_report: "Informe fin.",
   dm_report: "Reporte DM",
   proposal: "Propuesta comercial",
+  competitor_report: "Reporte competidor",
 };

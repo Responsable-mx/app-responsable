@@ -38,6 +38,8 @@ export type UploadDocOpts = {
   kind?: DocumentKind;
   sourceUrl?: string;
   serviceIds?: string[];
+  /** Wave 7 C: para kind='competitor_report', ID de empresa competidora */
+  benchmarkCompanyId?: string;
 };
 
 export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<ClientDocument> {
@@ -112,6 +114,7 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
       content_hash: contentHash,
       chunks_cache: chunksCache,
       chunks_computed_at: chunksComputedAt,
+      benchmark_company_id: opts.benchmarkCompanyId ?? null,
     })
     .select("*")
     .single();
@@ -127,7 +130,7 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
 
 export async function listDocumentsByClient(
   clientId: string,
-  opts?: { kind?: "general" | "sustainability_report" | "financial_report" }
+  opts?: { kind?: "general" | "sustainability_report" | "financial_report"; includeCompetitor?: boolean }
 ): Promise<ClientDocument[]> {
   const sb = createAdminClient();
   let query = sb
@@ -136,6 +139,11 @@ export async function listDocumentsByClient(
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
   if (opts?.kind) query = query.eq("kind", opts.kind);
+  // Wave 7 C: por default ocultar competitor_report del listado del cliente.
+  // Estos docs son para benchmark, no para mostrar como docs del cliente.
+  if (!opts?.includeCompetitor && !opts?.kind) {
+    query = query.neq("kind", "competitor_report");
+  }
   const { data, error } = await query;
   if (error) {
     console.error("[documents] list failed:", error.message);

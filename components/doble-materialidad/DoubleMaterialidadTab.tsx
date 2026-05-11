@@ -115,6 +115,7 @@ type LatestReport = {
   created_at: string;
   parse_status: "pending" | "ok" | "failed";
   markdown_content?: string;
+  batch_id?: string | null;
 } | null;
 
 type Props = {
@@ -2456,6 +2457,20 @@ export function DoubleMaterialidadTab({
       push("error", "El reporte falló. Intenta de nuevo.");
     }
   }, [latestReport?.id, latestReport?.parse_status, isReportPolling, push]);
+
+  // Auto-restart polling si al montar/cargar hay un reporte pending con batch_id.
+  // Caso: usuario disparó "Generar reporte", cambió de tab o refrescó — polling local murió,
+  // batch sigue corriendo en Anthropic. GET handler procesa pending sólo si alguien lo llama.
+  useEffect(() => {
+    if (
+      latestReport?.parse_status === "pending" &&
+      latestReport?.batch_id &&
+      !isReportPolling
+    ) {
+      pollingStartReportId.current = latestReport.id;
+      setIsReportPolling(true);
+    }
+  }, [latestReport?.parse_status, latestReport?.batch_id, latestReport?.id, isReportPolling]);
 
   const stage1Status: StageStatus =
     questionnaireProgress &&

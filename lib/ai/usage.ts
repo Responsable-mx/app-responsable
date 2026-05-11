@@ -29,6 +29,14 @@ export type FeedbackReasonBucket = {
   count: number;
 };
 
+export type FeedbackByClient = {
+  client_id: string;
+  client_name: string | null;
+  total: number;
+  /** top 3 razones del cliente con count */
+  top_reasons: Array<{ reason_code: string; count: number }>;
+};
+
 export type UsageByRole = {
   role: string;
   calls: number;
@@ -58,6 +66,8 @@ export type UsageSummary = {
   /** Wave 4 (D dashboard): top razones de rechazo IA */
   feedback_top_reasons: FeedbackReasonBucket[];
   feedback_total_down: number;
+  /** Wave 6: top 5 clientes con más rechazos + top razones por cliente */
+  feedback_by_client: FeedbackByClient[];
 };
 
 export async function getUsageSummary(
@@ -79,6 +89,7 @@ export async function getUsageSummary(
     top_clients: [],
     feedback_top_reasons: [],
     feedback_total_down: 0,
+    feedback_by_client: [],
   };
   if (isDevMode()) return empty;
 
@@ -227,7 +238,7 @@ export async function getUsageSummary(
   // Wave 4 (D dashboard): top razones de rechazo IA en ventana
   const { data: feedbackRows } = await admin
     .from("ia_feedback")
-    .select("role, reason_code")
+    .select("role, reason_code, client_id")
     .eq("rating", "down")
     .gte("created_at", since)
     .not("reason_code", "is", null)
@@ -251,6 +262,32 @@ export async function getUsageSummary(
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+  // Wave 6: agrupar feedback por cliente — top 5 clientes con más rechazos
+  const clientCountsMap = new Map<string, { total: number; reasons: Map<string, number> }>();
+  for (const r of feedbackRows ?? []) {
+    if (!r.client_id || !r.reason_code) continue;
+    const entry = clientCountsMap.get(r.client_id as string) ?? { total: 0, reasons: new Map() };
+    entry.total += 1;
+    entry.reasons.set(r.reason_code, (entry.reasons.get(r.reason_code) ?? 0) + 1);
+    clientCountsMap.set(r.client_id as string, entry);
+  }
+  const topFeedbackClientIds = Array.from(clientCountsMap.entries())
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 5);
+  const { data: fbClientNames } = topFeedbackClientIds.length
+    ? await admin.from("clients").select("id,name").in("id", topFeedbackClientIds.map(([id]) => id))
+    : { data: [] };
+  const fbNameById = new Map((fbClientNames ?? []).map((c) => [c.id as string, c.name as string]));
+  const feedbackByClient: FeedbackByClient[] = topFeedbackClientIds.map(([id, entry]) => ({
+    client_id: id,
+    client_name: fbNameById.get(id) ?? null,
+    total: entry.total,
+    top_reasons: Array.from(entry.reasons.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([reason_code, count]) => ({ reason_code, count })),
+  }));
+
   return {
     window_days: windowDays,
     total_calls: totalCalls,
@@ -267,5 +304,6 @@ export async function getUsageSummary(
     top_clients: topClients,
     feedback_top_reasons: feedbackTopReasons,
     feedback_total_down: totalDown,
+    feedback_by_client: feedbackByClient,
   };
 }

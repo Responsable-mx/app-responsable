@@ -8,6 +8,7 @@ import type { Client } from "@/lib/clients";
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { extractBatchResult } from "@/lib/ai/batch-result";
 import { logAiCall } from "@/lib/ai/logging";
+import { validateAiResponse } from "@/lib/ai/response-validator";
 import { getModelConfig } from "@/lib/ai/models";
 import { getPrompt } from "@/lib/ai/prompts";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -198,6 +199,14 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
         if (batchError) {
           console.error("[dm-benchmark batch]", batchError);
+        }
+
+        // Wave 6 — Validador E sobre narrative (texto que ve el consultor)
+        const benchmarkWarnings = narrative
+          ? validateAiResponse(narrative, { minLength: 50 }).filter((w) => w.severity !== "info")
+          : [];
+        if (benchmarkWarnings.length > 0) {
+          console.warn("[dm-benchmark] validator warnings:", benchmarkWarnings.map((w) => w.code).join(", "));
         }
 
         const model = getModelConfig("aurora").model;

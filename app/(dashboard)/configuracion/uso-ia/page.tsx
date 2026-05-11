@@ -304,6 +304,61 @@ export default async function UsoIaPage() {
             </div>
           )}
 
+          {s.feedback_by_client.length > 0 && (
+            <div className="mb-6">
+              <Panel title="Razones de rechazo IA por cliente">
+                <p className="text-[11px] text-slate-600 mb-3 leading-relaxed">
+                  Top 5 clientes con más rechazos. Útil para identificar si la IA falla más con
+                  sectores específicos o clientes problemáticos — y curar prompts dirigidos.
+                </p>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                      <th className="pb-1.5 text-left">Cliente</th>
+                      <th className="pb-1.5 text-right">Total 👎</th>
+                      <th className="pb-1.5 text-left pl-4">Top razones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {s.feedback_by_client.map((c) => {
+                      const REASON_LABELS: Record<string, string> = {
+                        factually_wrong: "Datos incorrectos",
+                        sector_off: "Sector equivocado",
+                        bad_format: "Mal formato",
+                        language: "Idioma raro",
+                        too_generic: "Muy genérico",
+                        missed_context: "Ignoró contexto",
+                        other: "Otro",
+                      };
+                      return (
+                        <tr key={c.client_id}>
+                          <td className="py-1.5 font-medium text-slate-800">
+                            {c.client_name ?? (
+                              <span className="font-mono text-slate-500 text-[10px]">{c.client_id.slice(0, 8)}…</span>
+                            )}
+                          </td>
+                          <td className="py-1.5 text-right text-slate-900 font-bold tabular-nums">{c.total}</td>
+                          <td className="py-1.5 pl-4">
+                            <div className="flex flex-wrap gap-1">
+                              {c.top_reasons.map((r, i) => (
+                                <span
+                                  key={i}
+                                  className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded-sm"
+                                >
+                                  {REASON_LABELS[r.reason_code] ?? r.reason_code} <span className="opacity-60">×{r.count}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Panel>
+            </div>
+          )}
+
           {s.feedback_total_down > 0 && (
             <div className="mb-6">
               <Panel title={`Razones de rechazo IA (${s.feedback_total_down} 👎 últimos 30 días)`}>

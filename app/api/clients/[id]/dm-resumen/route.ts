@@ -3,6 +3,7 @@ import { createAnthropicClient } from "@/lib/ai/client";
 import { requireConsultorForClient } from "@/lib/auth";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
+import { validateAiResponse } from "@/lib/ai/response-validator";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAiCall } from "@/lib/ai/logging";
@@ -310,6 +311,15 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
     );
   }
 
+  // Wave 6 — Validador E: detectar errores antes de marcar done.
+  // No bloquea persistencia (el reporte es valioso aún con warnings); solo retorna
+  // warnings al frontend para que el consultor revise antes de aprobar al cliente.
+  const validatorWarnings = validateAiResponse(content, { minLength: 100 })
+    .filter((w) => w.severity !== "info");
+  if (validatorWarnings.length > 0) {
+    console.warn("[dm-resumen] validator warnings:", validatorWarnings.map((w) => w.code).join(", "));
+  }
+
   await admin
     .from("dm_resumenes")
     .update({ status: "done", content })
@@ -324,5 +334,11 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
     after: { client_id: id, status: "done", model, latencyMs },
   });
 
-  return NextResponse.json({ data: { status: "done", content } });
+  return NextResponse.json({
+    data: {
+      status: "done",
+      content,
+      ...(validatorWarnings.length > 0 ? { ai_warnings: validatorWarnings } : {}),
+    },
+  });
 }

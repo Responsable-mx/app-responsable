@@ -85,6 +85,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
               else batchError = "Schema IA inválido";
             } else {
               batchError = "Sin JSON en respuesta IA";
+              console.error("[dm-iros batch] stop_reason:", msg.stop_reason, "output_tokens:", msg.usage?.output_tokens, "textOut tail:", textOut.slice(-500));
             }
           } else {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,7 +222,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: batchRow.id,
           params: {
             model,
-            max_tokens: 4000,
+            max_tokens: 12000, // cap subido may-2026 — 4000 truncaba 20+ IROs × 8 campos × hasta 600 chars/descripcion (stop_reason=max_tokens → "Sin JSON en respuesta IA")
             system: [{
               type: "text",
               text: "Eres un consultor senior de Doble Materialidad. Responde solo con JSON válido.",

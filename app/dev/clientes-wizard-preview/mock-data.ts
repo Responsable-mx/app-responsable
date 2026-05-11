@@ -205,6 +205,7 @@ export const MOCK_STEPS: MockStep[] = [
         sources: [
           { url: "https://altamira.com.mx/cobertura", title: "Altamira — Mapa de cobertura", date: "2024-09-01" },
         ],
+        hint: "Solo países con operación física propia (oficinas, plantas, sucursales, CEDIS, filiales). EXCLUIR alianzas comerciales, socios distribuidores y proyectos puntuales — esos van en otros campos. Lista corta y limpia. Ej. correcto: \"México, Colombia\". Ej. incorrecto: \"México (principal), Colombia; alianzas comerciales con Alemania, China, Corea...\".",
       },
       {
         key: "ops_por_pais",
@@ -215,6 +216,7 @@ export const MOCK_STEPS: MockStep[] = [
         sources: [
           { url: "https://altamira.com.mx/cobertura", title: "Altamira — Sucursales", date: "2024-09-01" },
         ],
+        hint: "Desglose por país de la operación física: número de oficinas/plantas/CEDIS/sucursales + ciudad principal. Ej. \"MX: 12 CEDIS + 1 corporativo CDMX; CO: 1 oficina Bogotá\". NO incluir alianzas comerciales ni proyectos puntuales.",
       },
       {
         key: "tipo_clientes",

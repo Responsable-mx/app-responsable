@@ -48,6 +48,8 @@ type Props = {
   initialQuestionnaire?: QuestionnaireBundle | null;
   // Header fusionado (Tier 1+2 en 1 fila). Datos antes en page.tsx.
   serviceLabels?: Map<string, string>;
+  /** Map value→label del catálogo countries — usado por el KPI Presencia. */
+  countryLabels?: Map<string, string>;
   visibleServices?: string[];
   prev?: NavRef;
   next?: NavRef;
@@ -86,6 +88,7 @@ export function ClientTabs({
   isAdmin = false,
   initialQuestionnaire,
   serviceLabels: _serviceLabels,
+  countryLabels,
   visibleServices: _visibleServices = [],
   prev = null,
   next = null,
@@ -339,12 +342,23 @@ export function ClientTabs({
   }
 
   const stripEmpleados = cleanCount(getFieldValue(genResp["empleados"]));
-  const stripPaises    = getFieldValue(genResp["paises"]);
   const stripCerts     = cleanCert(getFieldValue(sostResp["certificaciones"]));
   const stripModelo    = getFieldValue(sostResp["modelo_sostenibilidad"]);
 
+  // KPI Presencia — fuente canónica: client.countries (array catálogo, llenado
+  // por extractProfile desde sitio web). Fallback: wizard paises (texto libre)
+  // si countries está vacío. Mantiene consistencia con la página /editar.
+  const presenciaFromCountries = (client.countries ?? [])
+    .map((c) => countryLabels?.get(c) ?? c)
+    .filter(Boolean);
+  const stripPaises: FieldValue =
+    presenciaFromCountries.length > 0
+      ? (presenciaFromCountries.join(" · ") as string)
+      : getFieldValue(genResp["paises"]);
+
   // KPI Presencia visible solo si hay >1 país (1 país solo = ya implícito en sector).
   const showPresencia = (() => {
+    if (presenciaFromCountries.length > 0) return presenciaFromCountries.length > 1;
     if (stripPaises === null || stripPaises === undefined) return true; // dejar como "—" CTA
     if (Array.isArray(stripPaises)) return stripPaises.filter(Boolean).length > 1;
     if (typeof stripPaises === "string") {

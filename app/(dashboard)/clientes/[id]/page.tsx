@@ -14,15 +14,17 @@ export default async function EditarClientePage({ params }: Props) {
   const { id } = await params;
   // Prefetch paralelo: cliente + clients list (nav) + questionnaire + catálogos.
   // SWR arranca con datos en memoria y solo revalida en background.
-  const [client, allClients, questionnaireBundle, adminEmail, serviceCatalog] =
+  const [client, allClients, questionnaireBundle, adminEmail, serviceCatalog, countryCatalog] =
     await Promise.all([
       getClient(id).catch(() => null),
       listClientsLight().catch(() => []),
       getQuestionnaireBundle(id, "doble-materialidad").catch(() => null),
       requireAdmin(),
       listCatalog("services").catch(() => []),
+      listCatalog("countries").catch(() => []),
     ]);
   const serviceLabels = new Map(serviceCatalog.map((i) => [i.value, i.label]));
+  const countryLabels = new Map(countryCatalog.map((i) => [i.value, i.label]));
   const isAdmin = !!adminEmail;
   if (!client) notFound();
 
@@ -84,6 +86,7 @@ export default async function EditarClientePage({ params }: Props) {
           isAdmin={isAdmin}
           initialQuestionnaire={questionnaireBundle}
           serviceLabels={serviceLabels}
+          countryLabels={countryLabels}
           visibleServices={visibleServices}
           prev={prev ? { id: prev.id, name: prev.name } : null}
           next={next ? { id: next.id, name: next.name } : null}

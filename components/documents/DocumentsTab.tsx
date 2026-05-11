@@ -1471,7 +1471,7 @@ function DiscoverModal({
   const resultMap = Object.fromEntries(ingestResults.map((r) => [r.idx, r]));
 
   return (
-    <Modal open onClose={onClose} title="Buscar documentos con IA" size="lg">
+    <Modal open onClose={onClose} title="Buscar documentos con IA" size="xl">
       <div className="flex flex-col gap-4">
         {/* Descripción */}
         <p className="text-xs text-slate-600">

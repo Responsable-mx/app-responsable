@@ -252,11 +252,10 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
-### 🟡 D-04 — Metodología ResponSable: pasos no definidos
-- **Descripción**: El equipo aún no ha definido los pasos reales de la metodología.
-- **Impacto**: La KPI card de Metodología no existe en `ClientTabs`. Cuando se defina, agregar.
-- **Responsable**: Equipo metodología ResponSable
-- **Esfuerzo**: Decisión de negocio, luego 30min de código
+### ⏸ D-04 — Metodología ResponSable: pasos no definidos (NO contabilizar — bloqueo negocio)
+- **Estado**: Decisión de negocio pendiente del equipo metodología ResponSable. NO técnico — eliminado del registro de deuda activa.
+- **Cuando se defina**: agregar 5ta KPI card en `ClientTabs` (~30min código). Re-abrir como ticket de feature, no deuda.
+- **Decisión sesión 27 (2026-05-10)**: por instrucción del usuario, dejar de contabilizar este ítem en scores de deuda. No reaparece en próximos audits hasta que negocio lo defina.
 
 
 ---

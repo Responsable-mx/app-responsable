@@ -122,8 +122,8 @@ Busca el ${reportLabel} más reciente y devuelve hasta 5 candidatos como JSON.`;
         system: [{
           type: "text",
           text: systemPrompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool type + cache_control no exportados
-          cache_control: { type: "ephemeral" } as any,
+           
+          cache_control: { type: "ephemeral" },
         }],
         tools: [{
           // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool type + cache_control no exportados

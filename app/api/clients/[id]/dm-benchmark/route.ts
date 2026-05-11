@@ -371,8 +371,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           system: [{
             type: "text",
             text: "Eres un experto en análisis de sostenibilidad empresarial. Responde solo con JSON válido.",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — Batch API result union sin discriminated type / cache_control no exportado
-            cache_control: { type: "ephemeral" } as any,
+             
+            cache_control: { type: "ephemeral" },
           }],
           messages: [{ role: "user", content: prompt }],
         },
@@ -560,8 +560,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             system: [{
               type: "text",
               text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — Batch API result union sin discriminated type / cache_control no exportado
-              cache_control: { type: "ephemeral" } as any,
+               
+              cache_control: { type: "ephemeral" },
             }],
             messages: [{ role: "user", content: prompt }],
           },

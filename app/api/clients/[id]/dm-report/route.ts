@@ -349,8 +349,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             system: [{
               type: "text",
               text: "Eres un consultor senior de Doble Materialidad (ESRS/GRI/CSRD). Redactas reportes ejecutivos claros y accionables. Responde solo con JSON válido.",
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — Batch API result union / cache_control no exportado
-              cache_control: { type: "ephemeral" } as any,
+               
+              cache_control: { type: "ephemeral" },
             }],
             messages: [{ role: "user", content: prompt }],
           },

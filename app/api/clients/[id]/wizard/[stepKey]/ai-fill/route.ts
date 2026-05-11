@@ -261,8 +261,8 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
         {
           type: "text",
           text: systemPrompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
-          cache_control: { type: "ephemeral" } as any,
+           
+          cache_control: { type: "ephemeral" },
         },
       ],
       tools: [

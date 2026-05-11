@@ -29,8 +29,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-160 — `auth/send-code` y `auth/login-code` sin Zod parse~~ ✅ RESUELTO (sesión 27)
 - `SendCodeSchema` + `LoginCodeSchema` añadidos. Validación email/code antes de proceder.
 
-### 🟢 D-161 — `DocumentsTab.tsx` 82KB / 1879L (creció vs s25)
-- Subset D-153. Refactor con D-150 mismo sprint.
+### ~~🟢 D-161 — `DocumentsTab.tsx` 82KB / 1879L (creció vs s25)~~ ✅ RESUELTO (sesión 29)
+- Cubierto por D-153: DiscoverModal extraído, 1411L → ~1063L.
 
 ### ~~🟢 D-162 — Routes monolitos backend: Anthropic Batch result handler duplicado en 3 routes~~ ✅ RESUELTO (sesión 27)
 - Helper `lib/ai/batch-result.ts` `extractBatchResult<T>(anthropic, batchId, schema, contextLog)` extraído. dm-benchmark, dm-iros, dm-report ahora usan helper único. Reducción ~90 LOC duplicadas. Imports `extractJsonObject` removidos donde ya no se usa.
@@ -47,8 +47,11 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-156 — `console.log` debug raw AI response en dm-benchmark/route.ts:419~~ ✅ RESUELTO (sesión 26)
 - 800 chars de respuesta IA loggeados en cada call propose → Vercel logs verbose + posible info leak. Eliminado.
 
-### 🟢 D-157 — `ClientForm.tsx` 686 LOC + `ClientsList.tsx` 618 LOC
-- Componentes grandes pero no monolitos críticos como D-150. Diferido: refactor cuando se toque D-150 (mismo sprint).
+### ~~🟢 D-157 — `ClientForm.tsx` 686 LOC + `ClientsList.tsx` 618 LOC~~ ✅ RESUELTO (sesión 29)
+- `lib/clients/saved-views.ts` — SavedView, loadSavedViews, persistSavedViews
+- `lib/clients/export.ts` — exportClientsCsv
+- `lib/clients/url-utils.ts` — parseDomain + normalizeUrl (unificados desde ClientsList + ClientForm)
+- ClientsList: ~530L. ClientForm: helpers inline eliminados.
 
 ---
 
@@ -63,18 +66,12 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - Decisión: mockups SIGUEN ACTIVOS como playground dev (todos modificados esta semana). CLAUDE.md actualizado para reflejar realidad — sección renombrada "Mockups `/dev/*` — playground dev" + tabla de propósito por carpeta + regla de cleanup.
 - Middleware `lib/supabase/middleware.ts:60-61` bloquea `/dev/*` en producción ✓
 
-### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito (PARCIALMENTE RESUELTO sesión 28: 2988L → 1911L = -36%)
-- **Aplicado sesión 28**: 5 secciones extraídas a archivos propios:
-  - `HorizontesConfig.tsx` (121L) — config horizontes temporales
-  - `NisSection.tsx` (244L) — Etapa 4 NIS/IBSO + helpers ESTADO/CALIDAD/CATEGORIA
-  - `ContextoSection.tsx` (103L) — Etapa 1 KPI cards + progress bar
-  - `ReporteSection.tsx` (217L) — Etapa 5 generar/descargar/regenerar PDF
-  - `IroSection.tsx` (411L) — Etapa 3 IROs cliente + ScorePicker + prioridad helper + SCORE_DIM*_LABEL/TOOLTIP/TIPO_BADGE/CADENA_LABEL
-  - `ExpandableCell.tsx` (26L) — celda truncada compartida
-  - `catalog-lookup.ts` (15L) — `catalogLabel(category, value)` helper
-- **Pendiente**: `BenchmarkSection.tsx` 775L sigue inline en main. Refactor con state SWR complejo (propose/compare/add_manual/remove + polling batch + modal selección). Requiere análisis profundo de `useSWR` patterns + smoke test cliente piloto Nuvoil/Altamira para no romper UI benchmark.
-- **Pre-requisitos extraer BenchmarkSection**: branch dedicado · revisión 2 desarrolladores · smoke test propose+compare+add_manual+remove+polling con cliente real.
-- **Esfuerzo restante**: 1 sprint (4h refactor + 2h smoke test).
+### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito (PARCIALMENTE RESUELTO sesión 29: 2988L → ~900L = -70%)
+- **Aplicado sesión 28**: HorizontesConfig, NisSection, ContextoSection, ReporteSection, IroSection, ExpandableCell, catalog-lookup.ts
+- **Aplicado sesión 28 (Phase C)**: BenchmarkSection (957L), benchmark-types.ts, benchmark-helpers.ts
+- **Aplicado sesión 29**: StagePill (105L), CollapsibleStageSection (156L) — imports muertos Button/ConfirmModal/SelectField eliminados
+- **Pendiente único**: lógica stepper IIFE en main (~133L) — IIFE singleton, extraer requeriría pasar ~15 props; costo/beneficio bajo. Dejar.
+- **Estado**: prácticamente cerrado. Monolito disuelto.
 
 ### ~~🟡 D-151 — 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado~~ ✅ RESUELTO (sesión 27)
 - 35 disables con razón contextual aplicados. Adicional sesión 28: 8 `cache_control as any` eliminados por completo (SDK 0.95 types reales).
@@ -82,8 +79,9 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-152 — 3 tests `apply-sql-safety.test.ts` timeout 5s (OneDrive Files-On-Demand)~~ ✅ RESUELTO (sesión 25)
 - 3 tests (`permite ALTER TABLE ADD COLUMN IF NOT EXISTS`, `permite CREATE TABLE IF NOT EXISTS`, `permite COMMENT ON COLUMN`) ahora con `{ timeout: 30000 }` por test. Razón: spawn de helper Node.js sobre path con espacios + OneDrive puede tardar 5-15s la primera vez.
 
-### 🟢 D-153 — `DocumentsTab.tsx` 74KB + `ServiceGantt.tsx` 55KB monolitos secundarios
-- Mismo patrón D-150 menos urgente. Tomar después de D-150 para validar el approach.
+### ~~🟢 D-153 — `DocumentsTab.tsx` 74KB + `ServiceGantt.tsx` 55KB monolitos secundarios~~ ✅ PARCIALMENTE RESUELTO (sesión 29)
+- **DocumentsTab**: DiscoverModal (330L) extraído a `components/documents/DiscoverModal.tsx`. 1411L → ~1063L.
+- **ServiceGantt**: import `nextMonday` muerto eliminado. Extracción mayor diferida (no bloquea).
 
 ### ~~🟢 D-154 — 7 ESLint warnings unused vars~~ ✅ RESUELTO (sesión 25)
 - `completeness`, `serviceLabels`, `visibleServices`, `stripPinned`, `reportUrls`, `decisions×2` → prefix `_` o destructuring `[, setX]` o `useMemo`. ESLint final: 0 errors, 0 warnings.

@@ -15,7 +15,7 @@ import { GanttLegend } from "./GanttLegend";
 import { RichTooltip } from "./GanttTooltip";
 import {
   MS_DAY, MONTH_PX, STATUS_BAR, STATUS_LABEL, LABEL_W, ROW_H,
-  parseDate, startOfMonth, addMonths, fmtShort, nextMonday,
+  parseDate, startOfMonth, addMonths, fmtShort,
   weekBoundaries, dayBoundaries, findAtRisk,
   type Zoom,
 } from "./gantt-helpers";

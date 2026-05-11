@@ -381,7 +381,7 @@ export function ClientForm(props: Props) {
         </div>
 
         {/* Fila 2: Sector + Subsector + Tamaño */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-[1fr_1fr_148px] gap-3">
           <MultiSelectCombobox
             category="sectors"
             label="Sector"

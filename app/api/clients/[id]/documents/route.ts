@@ -11,7 +11,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const MAX_SIZE = 25 * 1024 * 1024; // 25MB
+const MAX_SIZE = 25 * 1024 * 1024;   // 25MB por archivo individual
+const MAX_ZIP_SIZE = 100 * 1024 * 1024; // 100MB para ZIPs (los archivos internos siguen limitados a 25MB c/u)
 
 const ALLOWED_MIMES = new Set([
   "application/pdf",
@@ -92,15 +93,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Falta archivo" }, { status: 400 });
   }
 
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "Archivo excede 25MB" }, { status: 413 });
-  }
-
   const isZip =
     file.type === "application/zip" ||
     file.type === "application/x-zip-compressed" ||
     (file.name.toLowerCase().endsWith(".zip") && file.type === "application/octet-stream");
 
+  if (isZip && file.size > MAX_ZIP_SIZE) {
+    return NextResponse.json({ error: "ZIP excede 100MB" }, { status: 413 });
+  }
+  if (!isZip && file.size > MAX_SIZE) {
+    return NextResponse.json({ error: "Archivo excede 25MB" }, { status: 413 });
+  }
   if (!isZip && !ALLOWED_MIMES.has(file.type)) {
     return NextResponse.json({ error: `Tipo no soportado: ${file.type || "desconocido"}` }, { status: 415 });
   }

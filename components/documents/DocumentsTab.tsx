@@ -567,7 +567,7 @@ export function DocumentsTab({
         {docs.length > 0 && (
           <>
             {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-[360px]">
+            <div className="relative flex-1 min-w-[140px] max-w-[200px]">
               <svg
                 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
                 fill="none"

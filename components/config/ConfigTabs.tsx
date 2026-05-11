@@ -23,7 +23,7 @@ const TABS = [
   { href: "/configuracion/prompts", label: "Prompts IA", Icon: IconBrain },
   { href: "/configuracion/iros", label: "IROs ESRS", Icon: IconLayers },
   { href: "/configuracion/uso-ia", label: "Uso IA", Icon: IconTarget },
-  { href: "/configuracion/auto-update", label: "Auto-update", Icon: IconSliders },
+  { href: "/configuracion/auto-update", label: "Actualizaciones", Icon: IconSliders },
   { href: "/configuracion/auditoria", label: "Auditoría", Icon: IconClipboard },
   { href: "/configuracion/preferencias", label: "Preferencias", Icon: IconSliders },
 ];

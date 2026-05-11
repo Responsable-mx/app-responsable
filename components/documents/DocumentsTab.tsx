@@ -407,11 +407,11 @@ export function DocumentsTab({
       if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
       try {
         const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
+        const j = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
           failures.push(`${file.name}: ${j.error ?? "error"}`);
         } else {
-          okCount++;
+          okCount += (j.count ?? 1);
         }
       } catch (e) {
         failures.push(`${file.name}: ${e instanceof Error ? e.message : "error"}`);
@@ -497,7 +497,7 @@ export function DocumentsTab({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <p className="text-sm font-semibold text-brand-primary-dark">Suelta para subir</p>
-            <p className="text-xs text-brand-primary-dark/70 mt-0.5">PDF, DOCX, XLSX, PPTX, TXT · Máx. 25 MB</p>
+            <p className="text-xs text-brand-primary-dark/70 mt-0.5">PDF, DOCX, XLSX, PPTX, TXT, ZIP · Máx. 25 MB</p>
           </div>
         </div>
       )}
@@ -671,7 +671,7 @@ export function DocumentsTab({
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md"
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip"
             className="hidden"
             onChange={(e) => {
               if (e.target.files?.length) void handleUpload(e.target.files);
@@ -685,7 +685,7 @@ export function DocumentsTab({
         <div className="border border-dashed border-slate-300 rounded p-8 text-center">
           <p className="text-sm text-slate-500">
             {docs.length === 0
-              ? "Sube PDF, DOCX o XLSX del cliente para que la IA tenga contexto directo del negocio."
+              ? "Sube PDF, DOCX, XLSX o ZIP del cliente para que la IA tenga contexto directo del negocio."
               : "Sin resultados para este filtro."}
           </p>
         </div>

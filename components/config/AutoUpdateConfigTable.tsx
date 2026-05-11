@@ -41,18 +41,18 @@ export function AutoUpdateConfigTable({ initial }: { initial: AutoUpdateConfigRo
 
   function nextRunEstimate(row: AutoUpdateConfigRow): string {
     if (!row.enabled) return "Desactivado";
-    if (!row.last_run_at) return "Próximo cron (00:30 CDMX)";
+    if (!row.last_run_at) return "Esta noche (00:45 CDMX)";
     const next = new Date(row.last_run_at);
     next.setDate(next.getDate() + row.frequency_days);
-    if (next.getTime() < Date.now()) return "Pendiente (próximo cron)";
+    if (next.getTime() < Date.now()) return "Pendiente (próxima noche)";
     return next.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
   }
 
   function statusBadge(row: AutoUpdateConfigRow): { label: string; cls: string } {
-    if (!row.last_run_at) return { label: "Sin correr aún", cls: "bg-slate-100 text-slate-600 border-slate-200" };
-    if (row.last_status === "ok") return { label: "OK", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+    if (!row.last_run_at) return { label: "Nunca ejecutada", cls: "bg-slate-100 text-slate-600 border-slate-200" };
+    if (row.last_status === "ok") return { label: "Exitosa", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
     if (row.last_status === "partial") return { label: "Parcial", cls: "bg-amber-50 text-amber-800 border-amber-200" };
-    if (row.last_status === "failed") return { label: "Falló", cls: "bg-rose-50 text-rose-700 border-rose-200" };
+    if (row.last_status === "failed") return { label: "Con error", cls: "bg-rose-50 text-rose-700 border-rose-200" };
     return { label: "—", cls: "bg-slate-100 text-slate-600 border-slate-200" };
   }
 
@@ -61,19 +61,19 @@ export function AutoUpdateConfigTable({ initial }: { initial: AutoUpdateConfigRo
       <table className="w-full text-xs">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
-            <th className="text-left px-4 py-2.5">Recurso</th>
-            <th className="text-center px-3 py-2.5 w-24">Activo</th>
-            <th className="text-center px-3 py-2.5 w-32">Frecuencia (días)</th>
-            <th className="text-center px-3 py-2.5 w-28">Última corrida</th>
-            <th className="text-center px-3 py-2.5 w-24">Estado</th>
-            <th className="text-center px-3 py-2.5 w-32">Próxima corrida</th>
+            <th className="text-left px-4 py-2.5">Tarea</th>
+            <th className="text-center px-3 py-2.5 w-24">Activa</th>
+            <th className="text-center px-3 py-2.5 w-32">Cada cuántos días</th>
+            <th className="text-center px-3 py-2.5 w-28">Última vez</th>
+            <th className="text-center px-3 py-2.5 w-24">Resultado</th>
+            <th className="text-center px-3 py-2.5 w-32">Próxima vez</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.length === 0 ? (
             <tr>
               <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
-                Sin configuraciones. La migración 0080 las crea automáticamente.
+                No hay tareas configuradas todavía.
               </td>
             </tr>
           ) : (

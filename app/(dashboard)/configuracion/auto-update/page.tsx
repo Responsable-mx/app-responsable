@@ -32,24 +32,24 @@ export default async function AutoUpdatePage() {
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
           Configuración
         </p>
-        <h2 className="text-lg font-bold text-slate-900">Auto-actualización de datos</h2>
+        <h2 className="text-lg font-bold text-slate-900">Actualizaciones automáticas</h2>
         <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-          Decide qué recursos se actualizan automáticamente y con qué frecuencia.
-          Cada noche a las 00:30 (hora CDMX), el sistema evalúa la configuración
-          y dispara las actualizaciones que tocan según los días configurados.
+          Decide qué información se actualiza sola y cada cuántos días.
+          Todas las noches a las 00:45 (hora CDMX), el sistema revisa esta
+          configuración y ejecuta las tareas que tocan según lo que hayas indicado.
         </p>
       </div>
 
       <AutoUpdateConfigTable initial={configs} />
 
       <div className="mt-6 border-t border-slate-200 pt-4 text-xs text-slate-600 leading-relaxed">
-        <p className="font-semibold text-slate-700 mb-1">Notas:</p>
+        <p className="font-semibold text-slate-700 mb-1">Cómo funciona:</p>
         <ul className="list-disc list-inside space-y-1">
-          <li>El cron único corre 1×/día (06:30 UTC = 00:30 CDMX). Plan Hobby de Vercel.</li>
-          <li>Frecuencia mínima: 1 día. Máxima: 365 días.</li>
-          <li>Cada cambio se audita en /configuracion/auditoria.</li>
-          <li>Los handlers individuales son idempotentes: si fallan, próximo ciclo retoma.</li>
-          <li>Costo IA estimado por ciclo varía por recurso (ver descripción).</li>
+          <li>La revisión nocturna ocurre 1 vez al día. No puedes pedir más frecuencia que diaria (limitación del plan actual).</li>
+          <li>Días configurables: entre 1 y 365. Si pones 90 días, la tarea se ejecuta cuando han pasado 90 días desde su última ejecución.</li>
+          <li>Cada cambio aquí queda registrado en <span className="font-mono">Configuración → Auditoría</span>.</li>
+          <li>Si una tarea falla en una noche, se vuelve a intentar la siguiente noche automáticamente.</li>
+          <li>Cada tarea es independiente: si una falla, las demás siguen funcionando normal.</li>
         </ul>
       </div>
     </div>

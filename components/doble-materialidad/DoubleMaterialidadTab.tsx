@@ -564,34 +564,9 @@ export function DoubleMaterialidadTab({
           { label: "Validación",  status: stage7Status, sectionId: "dm-sec-validacion" },
           { label: "Reporte",     status: stage8Status, sectionId: "dm-sec-reporte", doneDate: latestReport?.created_at },
         ];
-        const doneCount = stagesData.filter((s) => s.status === "done").length;
-        const pct = Math.round((doneCount / stagesData.length) * 100);
-
         return (
           <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all">
-            {/* Fila fusionada: [progreso] ← pills → [teclado] */}
             <div className="flex items-center gap-2 px-4 py-2">
-              {!stepperCompact && (
-                <div className="flex items-center gap-2 shrink-0 pr-2 border-r border-slate-100">
-                  <span className="hidden md:block text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
-                    Estado del estudio
-                  </span>
-                  <div className="h-[3px] w-20 bg-slate-200 flex-shrink-0 overflow-hidden">
-                    <div
-                      className="h-full bg-brand-primary transition-all duration-300"
-                      style={{ width: `${pct}%` }}
-                      role="progressbar"
-                      aria-valuenow={pct}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label={`${doneCount} de ${stagesData.length} etapas completadas`}
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-semibold tabular-nums whitespace-nowrap">
-                    {doneCount}/{stagesData.length}
-                  </span>
-                </div>
-              )}
               {/* Pills — ancho completo distribuido. overflow-x-auto como fallback en mobile */}
               <div className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {stagesData.map((s, idx) => (

@@ -194,6 +194,29 @@ FLUJO DE TRABAJO:
   // Con flag: top chunks relevantes por field labels + sinónimos RSE (~8K/doc, 50K total).
   const useRelevance = process.env.DOC_RELEVANCE_ENABLED === "true";
   const reportsContext: string[] = [];
+
+  // Sinónimos RSE fijos aseguran recall en documentos técnicos (GRI, ESRS, etc.)
+  const RSE_SYNONYMS = "ODS materialidad ESRS GRI SASB TCFD impacto riesgo oportunidad stakeholder gobernanza clima carbono huella residuos agua diversidad equidad inclusion cadena valor";
+  const relevanceQuery = useRelevance
+    ? [step.title, step.subtitle ?? "", ...step.fields.map((f) => f.label), RSE_SYNONYMS].filter(Boolean).join(" ")
+    : "";
+
+  // Wave 7: si VOYAGE_API_KEY existe y cliente tiene chunks embeddidos, hacer
+  // 1 búsqueda vector global ANTES del fallback BM25. Mejor recall semántico
+  // (sinónimos, paráfrasis, inglés). Si retorna chunks suficientes, skip BM25.
+  let vectorChunks: string[] | null = null;
+  if (useRelevance && process.env.VOYAGE_API_KEY) {
+    try {
+      const { searchSimilarChunks } = await import("@/lib/documents/embeddings");
+      const matches = await searchSimilarChunks({ query: relevanceQuery, clientId: id, limit: 20 });
+      if (matches && matches.length >= 3) {
+        vectorChunks = matches.map((m) => m.content);
+      }
+    } catch (e) {
+      console.error("[ai-fill] vector search failed, falling back to BM25:", e);
+    }
+  }
+
   try {
     const { listDocumentsByClient } = await import("@/lib/documents/queries");
     const reports = await listDocumentsByClient(id);
@@ -201,13 +224,20 @@ FLUJO DE TRABAJO:
     const TOTAL_CAP = useRelevance ? 50_000 : 150_000;
     const PER_DOC_CAP = useRelevance ? 8_000 : 30_000;
 
-    // Sinónimos RSE fijos aseguran recall en documentos técnicos (GRI, ESRS, etc.)
-    const RSE_SYNONYMS = "ODS materialidad ESRS GRI SASB TCFD impacto riesgo oportunidad stakeholder gobernanza clima carbono huella residuos agua diversidad equidad inclusion cadena valor";
+    // Wave 7: si tenemos chunks vectoriales, usarlos como contexto principal
+    if (vectorChunks && vectorChunks.length > 0) {
+      const docList = reports.filter((d) => d.parse_status === "ok").map((d) => d.file_name).join(", ");
+      const vectorBody = vectorChunks.slice(0, 25).join("\n\n---\n\n").slice(0, TOTAL_CAP);
+      reportsContext.push(
+        `\n[CHUNKS RELEVANTES — búsqueda semántica Voyage AI sobre: ${docList || "documentos del cliente"}]\n\n${vectorBody}\n`
+      );
+      totalChars = vectorBody.length;
+    }
 
-    const relevanceQuery = useRelevance
-      ? [step.title, step.subtitle ?? "", ...step.fields.map((f) => f.label), RSE_SYNONYMS].filter(Boolean).join(" ")
-      : "";
-
+    // Si vectorChunks ya cubre el contexto, skip BM25 redundante.
+    if (vectorChunks && vectorChunks.length > 0) {
+      // Resultados Voyage suficientes — no agregar BM25 sobre docs largos.
+    } else {
     for (const doc of reports) {
       if (!doc.markdown_content || doc.parse_status !== "ok") continue;
       const remaining = TOTAL_CAP - totalChars;
@@ -240,6 +270,7 @@ FLUJO DE TRABAJO:
         `\n[${label} — ${doc.file_name}]\nFuente: ${sourceUrl}\n\n${docContent}\n`
       );
     }
+    } // close else block (BM25 fallback)
   } catch (e) {
     console.error("[ai-fill] reports context failed:", e);
   }

@@ -62,23 +62,29 @@ export function ContextoSection({
   frameworks?: string[] | null;
 }) {
   const isComplete = progress && progress.filled >= progress.total && progress.total > 0;
-  const hasKpis = sector || size || (frameworks && frameworks.length > 0);
 
   // SWR dedup: ClientTabs ya carga este endpoint con la misma key → 0 fetches extra.
+  // Siempre fetch para extraer alcance_geografico y periodo_informe aunque esté completo.
   const { data: bundleResp } = useSWR<{ data: QuestionnaireBundle }>(
-    !isComplete && progress && progress.total > 0 ? `/api/clients/${clientId}/questionnaire` : null,
+    progress && progress.total > 0 ? `/api/clients/${clientId}/questionnaire` : null,
     bundleFetcher,
     { revalidateOnFocus: false }
   );
+
+  const responses = (bundleResp?.data?.response?.responses ?? {}) as Record<string, Record<string, unknown>>;
+  const alcanceGeo = (responses["informacion-base"]?.["alcance_geografico"] as string | null) ?? null;
+  const periodoInforme = (responses["estrategia-y-madurez"]?.["periodo_informe"] as string | null) ?? null;
+
   const missing = extractMissing(bundleResp?.data);
+  const hasKpis = sector || size || (frameworks && frameworks.length > 0) || alcanceGeo || periodoInforme;
   const remaining = progress ? progress.total - progress.filled : 0;
   const extraCount = Math.max(0, remaining - missing.length);
 
   return (
     <div className="py-2">
-      {/* KPI cards — Sector / Tamaño / Marcos */}
+      {/* KPI cards — Sector / Tamaño / Marcos / Alcance / Período */}
       {hasKpis && (
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Sector</p>
             <p className="text-sm font-semibold text-slate-800 truncate">
@@ -97,6 +103,18 @@ export function ContextoSection({
               {frameworks && frameworks.length > 0
                 ? frameworks.map((f) => catalogLabel("frameworks", f)).join(", ")
                 : "—"}
+            </p>
+          </div>
+          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Alcance</p>
+            <p className="text-sm font-semibold text-slate-800 truncate" title={alcanceGeo ?? undefined}>
+              {alcanceGeo || "—"}
+            </p>
+          </div>
+          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Período</p>
+            <p className="text-sm font-semibold text-slate-800 truncate">
+              {periodoInforme || "—"}
             </p>
           </div>
         </div>

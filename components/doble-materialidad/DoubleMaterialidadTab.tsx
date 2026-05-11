@@ -696,9 +696,17 @@ export function DoubleMaterialidadTab({
         subtitle="Estado del llenado — base para el benchmark y los IROs"
         headerRight={
           questionnaireProgress && questionnaireProgress.total > 0 ? (
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
-              {questionnaireProgress.filled}/{questionnaireProgress.total} campos
-            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="h-[3px] w-14 bg-slate-200 overflow-hidden rounded-sm">
+                <div
+                  className="h-full bg-teal-500 transition-all duration-300"
+                  style={{ width: `${Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-slate-500 font-semibold tabular-nums whitespace-nowrap">
+                {Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)}%
+              </span>
+            </div>
           ) : null
         }
       >

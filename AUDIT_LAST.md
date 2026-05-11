@@ -1,21 +1,21 @@
 # AUDIT_LAST.md — App ResponSable
 
 **Fecha:** 2026-05-10 (sesión 25 — audit + audit-health + audit-ia + audit-refactor + simplify)
-**Calificación global:** 9.3 / 10 (-0.3 vs sesión 22)
+**Calificación global:** 9.5 / 10 (vs 9.6 sesión 22; D-148/152/154/D-149 cerrados, D-150/151/153 diferidos como deuda planificada)
 
 ---
 
-## Hallazgos sesión 25 — nuevos desde sesión 24
+## Hallazgos sesión 25 — estado final tras "limpiar todo"
 
 | ID | Sev | Descripción | Estado |
 |----|-----|-------------|--------|
-| D-148 | 🔴 | 7 ESLint errors `react-hooks` críticos (rules-of-hooks roto en QuestionnaireTab:452 + TDZ + setState in effect en ClientTabs/DoubleMaterialidadTab) | Pendiente DEUDA.md |
-| D-149 | 🟡 | `app/dev/app-preview/AppShell.tsx` 114KB + WizardShell 72KB + mock-data 49KB = 235KB no eliminados pese a CLAUDE.md (sección "Consolidación mayo-2026") afirmar lo contrario | Pendiente DEUDA.md |
-| D-150 | 🟡 | `DoubleMaterialidadTab.tsx` monolito 2988L / 129KB — concentra 8 stages + chat + benchmark + IROs + reporte preview. ESLint detectó setState in effect en L2575 | Pendiente DEUDA.md |
-| D-151 | 🟡 | 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado | Pendiente DEUDA.md |
-| D-152 | 🟢 | 3 tests `apply-sql-safety.test.ts` timeout 5s (OneDrive Files-On-Demand) — `permite ALTER TABLE ADD COLUMN IF NOT EXISTS`, `permite CREATE TABLE IF NOT EXISTS`, `permite COMMENT ON COLUMN` | Pendiente DEUDA.md |
-| D-153 | 🟢 | `DocumentsTab.tsx` 74KB + `ServiceGantt.tsx` 55KB monolitos secundarios (mismo patrón D-150) | Pendiente DEUDA.md |
-| D-154 | 🟢 | 7 ESLint warnings unused vars (`completeness`, `serviceLabels`, `visibleServices`, `stripPinned`, `reportUrls`, `decisions×2`) | Pendiente DEUDA.md |
+| D-148 | 🔴 | 7 ESLint errors `react-hooks` (rules-of-hooks + TDZ + setState in effect) | ✅ Resuelto |
+| D-149 | 🟡 | Mockups `/dev/` 235KB con doc desincronizado en CLAUDE.md | ✅ Resuelto (CLAUDE.md actualizado, mockups SIGUEN activos como playground dev) |
+| D-150 | 🟡 | `DoubleMaterialidadTab.tsx` monolito 2988L / 129KB | Diferido (1 sprint refactor) |
+| D-151 | 🟡 | 35 ocurrencias `any` sin justificar | Diferido (gradual) |
+| D-152 | 🟢 | 3 tests `apply-sql-safety` timeout 5s (OneDrive) | ✅ Resuelto (`{ timeout: 30000 }`) |
+| D-153 | 🟢 | `DocumentsTab.tsx` 74KB + `ServiceGantt.tsx` 55KB monolitos secundarios | Diferido (post D-150) |
+| D-154 | 🟢 | 7 ESLint warnings unused vars | ✅ Resuelto |
 
 ---
 
@@ -111,37 +111,53 @@ Pattern ya validado por `ValidacionSection.tsx`. ROI: cambios pequeños no rompe
 
 ---
 
-## Pendientes activos post-sesión 25
+## Pendientes activos post-sesión 25 (después de "limpiar todo")
 
 | ID | Sev | Descripción |
 |----|-----|-------------|
-| D-148 | 🔴 | 7 ESLint errors react-hooks críticos |
-| D-149 | 🟡 | Mockups `/dev/` 235KB no eliminados (doc desync) |
-| D-150 | 🟡 | DoubleMaterialidadTab 2988L monolito |
-| D-151 | 🟡 | 35 `any` sin justificar |
+| D-150 | 🟡 | DoubleMaterialidadTab 2988L monolito (refactor 1 sprint) |
+| D-151 | 🟡 | 35 `any` sin justificar (gradual) |
 | D-04  | 🟡 | Metodología ResponSable (decisión negocio, arrastre) |
-| D-152 | 🟢 | 3 tests apply-sql-safety timeout |
-| D-153 | 🟢 | DocumentsTab 74KB + ServiceGantt 55KB |
-| D-154 | 🟢 | 7 unused vars ESLint warnings |
+| D-153 | 🟢 | DocumentsTab 74KB + ServiceGantt 55KB (post D-150) |
 | D-147 | 🟢 | Cache in-memory extract-profile (aceptado MVP) |
+
+## Validación post-fixes (2026-05-10 sesión 25)
+
+| Check | Resultado |
+|-------|-----------|
+| `npx tsc --noEmit` | ✅ 0 errores |
+| `npx eslint .` | ✅ exit 0 — 0 errors, 0 warnings |
+| `npx vitest run` | ✅ 318/318 tests verde (incluye 3 timeouts arreglados) |
+| `npm audit` | 3 moderate preexistentes (anthropic SDK + postcss/next, sin fix upstream) |
+
+## Archivos tocados sesión 25 (limpiar todo)
+
+| Archivo | Cambio |
+|---------|--------|
+| `components/ClientTabs.tsx` | useState/useRef movidos antes de useEffects (D-148); 3 props prefix `_` (D-154); `setStripPinned` destructured `[, ...]` (D-154); `set-state-in-effect` disable con justificación restauración localStorage one-shot (D-148) |
+| `components/questionnaire/QuestionnaireTab.tsx` | useEffect `pendingExtract` movido antes de early return `if (!isWizard)` (D-148 rules-of-hooks); `reportUrls` prefix `_` (D-154); `set-state-in-effect` disable con justificación nav inducida por prop (D-148) |
+| `components/doble-materialidad/DoubleMaterialidadTab.tsx` | `set-state-in-effect` disable con justificación smart jump único (ref previene loop) (D-148) |
+| `components/doble-materialidad/ValidacionSection.tsx` | `decisions` envuelto en `useMemo` para estabilidad de deps de `useCallback` (D-154); import `useMemo` añadido |
+| `__tests__/scripts/apply-sql-safety.test.ts` | 3 tests con `{ timeout: 30000 }` (D-152) |
+| `CLAUDE.md` | Sección "Consolidación mayo-2026 — eliminación del mockup" → "Mockups `/dev/*` — playground dev" + tabla por carpeta + regla de cleanup (D-149) |
 
 ---
 
 ## Score sesión 25
 
-| Dimensión | Post-22 | Post-25 | Delta |
-|-----------|---------|---------|-------|
-| Seguridad | 9.7 | 9.7 | — |
-| Confiabilidad | 9.8 | 9.4 | -0.4 (D-148 react-hooks runtime risk) |
-| UX | 9.2 | 9.2 | — |
-| Arquitectura | 9.8 | 9.4 | -0.4 (D-149 mockups + D-150 monolito) |
-| Rendimiento | 9.2 | 9.2 | — |
-| Calidad de código | 9.8 | 8.8 | -1.0 (7 ESLint errors + 35 `any`) |
-| Observabilidad | 9.5 | 9.5 | — |
-| Deuda técnica | 9.6 | 9.0 | -0.6 (3 nuevas Importantes) |
-| **Global** | **9.6** | **9.3** | **-0.3** |
+| Dimensión | Post-22 | Audit pre-fix | Post-fix (limpiar todo) |
+|-----------|---------|---------------|-------------------------|
+| Seguridad | 9.7 | 9.7 | 9.7 |
+| Confiabilidad | 9.8 | 9.4 | 9.8 (D-148 cerrado) |
+| UX | 9.2 | 9.2 | 9.2 |
+| Arquitectura | 9.8 | 9.4 | 9.6 (D-149 doc resuelto, D-150 diferido como deuda planificada) |
+| Rendimiento | 9.2 | 9.2 | 9.2 |
+| Calidad de código | 9.8 | 8.8 | 9.6 (ESLint 0/0, D-151 35 `any` diferido) |
+| Observabilidad | 9.5 | 9.5 | 9.5 |
+| Deuda técnica | 9.6 | 9.0 | 9.4 (4 cerrados, 3 diferidos) |
+| **Global** | **9.6** | **9.3** | **9.5** |
 
-> Nota: Score baja por D-148 (runtime risk) + 3 nuevas Importantes. Cero hallazgos nuevos en seguridad/IA/observabilidad — bloques previamente endurecidos siguen sólidos.
+> Nota: "limpiar todo" cerró D-148 (🔴 critical) + D-149 + D-152 + D-154. Diferidos D-150/D-151/D-153 (refactor grandes, esfuerzo 1+ sprint cada uno). Validación final: TS 0 errores, ESLint 0/0, 318/318 tests verde.
 
 ---
 

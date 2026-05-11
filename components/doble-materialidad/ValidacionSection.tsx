@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -74,7 +74,7 @@ export function ValidacionSection({ clientId, iros }: Props) {
 
   // IROs incluidos que participan en la validación
   const includedIros = iros.filter((i) => i.incluido);
-  const decisions = rec?.iro_decisions ?? {};
+  const decisions = useMemo(() => rec?.iro_decisions ?? {}, [rec?.iro_decisions]);
   const pendingCount = includedIros.filter((i) => !decisions[i.id]?.decision).length;
   const allDecided = pendingCount === 0 && includedIros.length > 0;
 

@@ -118,7 +118,7 @@ function WizardEditor({
   mutate,
   initialStepIndex = 0,
   autoFillOnMount = false,
-  reportUrls,
+  reportUrls: _reportUrls,
   pendingExtract,
   onExtractDone,
 }: {
@@ -241,6 +241,7 @@ function WizardEditor({
   }, []);
 
   // Auto-trigger bulk AI fill al montar (cuando viene de /clientes/nuevo con &autoFill=1)
+  // aiFillAll es function declaration (hoisted en runtime) declarada más abajo en el componente.
   const autoFiredRef = useRef(false);
   useEffect(() => {
     if (autoFillOnMount && !autoFiredRef.current && steps.length > 0) {
@@ -249,6 +250,20 @@ function WizardEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFillOnMount]);
+
+  // Extracción disparada desde DocumentsTab — navega al paso y ejecuta docFill automáticamente.
+  // docFill es function declaration (hoisted) declarada más abajo. useEffect colocado ANTES del
+  // early return `if (!isWizard)` para cumplir react-hooks/rules-of-hooks (orden estable).
+  useEffect(() => {
+    if (!pendingExtract) return;
+    const idx = steps.findIndex((s) => s.key === pendingExtract.stepKey);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- nav inducida por prop pendingExtract; sin loop (early return arriba)
+    if (idx >= 0) setActiveStep(idx);
+    void docFill(pendingExtract.stepKey, pendingExtract.text).finally(() => {
+      onExtractDone?.();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingExtract]);
 
   if (!isWizard) {
     return (
@@ -448,16 +463,7 @@ function WizardEditor({
     setStagedFill(null);
   }
 
-  // Extracción disparada desde DocumentsTab — navega al paso y ejecuta docFill automáticamente.
-  useEffect(() => {
-    if (!pendingExtract) return;
-    const idx = steps.findIndex((s) => s.key === pendingExtract.stepKey);
-    if (idx >= 0) setActiveStep(idx);
-    void docFill(pendingExtract.stepKey, pendingExtract.text).finally(() => {
-      onExtractDone?.();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingExtract]);
+  // (useEffect pendingExtract movido arriba antes de early return — react-hooks/rules-of-hooks)
 
   // Llena el paso activo con texto/markdown extraído (de paste o de docs subidos).
   // Reutiliza merge/save de aiFill — misma respuesta {data: Record<string, FieldResponse>}.

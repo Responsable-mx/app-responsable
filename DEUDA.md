@@ -16,6 +16,37 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-148–D-154 — Hallazgos auditoría sesión 25 (2026-05-10)
+
+### ~~🔴 D-148 — 7 ESLint errors react-hooks (rules-of-hooks + TDZ + setState in effect)~~ ✅ RESUELTO (sesión 25)
+- `QuestionnaireTab.tsx:452` useEffect después de early return → movido ANTES del early return + comentado patrón hoisted para aiFillAll/docFill (function declarations)
+- `ClientTabs.tsx:134/158/189` setShowStripDropdown accessed before declared + setState in effect → movido `useState` + `useRef` antes de useEffects + eslint-disable con justificación en sync URL→state y restauración localStorage (one-shot)
+- `DoubleMaterialidadTab.tsx:2575` navigateTo (setState) en effect → eslint-disable con justificación (smart jump único, ref didSmartJumpRef previene loop)
+
+### ~~🟡 D-149 — Mockups `/dev/` 235KB no eliminados pese a CLAUDE.md~~ ✅ RESUELTO (sesión 25)
+- Decisión: mockups SIGUEN ACTIVOS como playground dev (todos modificados esta semana). CLAUDE.md actualizado para reflejar realidad — sección renombrada "Mockups `/dev/*` — playground dev" + tabla de propósito por carpeta + regla de cleanup.
+- Middleware `lib/supabase/middleware.ts:60-61` bloquea `/dev/*` en producción ✓
+
+### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito 2988 líneas / 129KB
+- **Descripción**: un componente concentra 8 stages + chat + benchmark + IROs + reporte preview. ESLint detectó setState in effect en línea 2575 (resuelto puntualmente, pero el patrón se repetirá).
+- **Fix sugerido**: dividir por sección manteniendo orchestrator delgado (`BenchmarkSection.tsx`, `IROsSection.tsx`, `ReportPreviewSection.tsx`, `Stage<N>.tsx` × 8). Pattern ya validado por `ValidacionSection.tsx`.
+- **Esfuerzo**: 1 sprint (8h, refactor + tests por sección)
+
+### 🟡 D-151 — 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado
+- **Descripción**: reduce safety TS. No urgente, fix incremental por archivo.
+- **Esfuerzo**: gradual (5min por ocurrencia)
+
+### ~~🟢 D-152 — 3 tests `apply-sql-safety.test.ts` timeout 5s (OneDrive Files-On-Demand)~~ ✅ RESUELTO (sesión 25)
+- 3 tests (`permite ALTER TABLE ADD COLUMN IF NOT EXISTS`, `permite CREATE TABLE IF NOT EXISTS`, `permite COMMENT ON COLUMN`) ahora con `{ timeout: 30000 }` por test. Razón: spawn de helper Node.js sobre path con espacios + OneDrive puede tardar 5-15s la primera vez.
+
+### 🟢 D-153 — `DocumentsTab.tsx` 74KB + `ServiceGantt.tsx` 55KB monolitos secundarios
+- Mismo patrón D-150 menos urgente. Tomar después de D-150 para validar el approach.
+
+### ~~🟢 D-154 — 7 ESLint warnings unused vars~~ ✅ RESUELTO (sesión 25)
+- `completeness`, `serviceLabels`, `visibleServices`, `stripPinned`, `reportUrls`, `decisions×2` → prefix `_` o destructuring `[, setX]` o `useMemo`. ESLint final: 0 errors, 0 warnings.
+
+---
+
 ### Bloque D-144–D-147 — Hallazgos auditoría sesión 22 (may-2026)
 
 ### ~~🔴 D-144 — SSRF guard duplicado, sin cobertura IPv4-mapped IPv6~~ ✅ RESUELTO (sesión 22 + 23)

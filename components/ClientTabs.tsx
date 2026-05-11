@@ -82,11 +82,11 @@ const docsFetcher = (url: string) =>
 
 export function ClientTabs({
   client,
-  completeness,
+  completeness: _completeness,
   isAdmin = false,
   initialQuestionnaire,
-  serviceLabels,
-  visibleServices = [],
+  serviceLabels: _serviceLabels,
+  visibleServices: _visibleServices = [],
   prev = null,
   next = null,
   counter = "",
@@ -125,6 +125,16 @@ export function ClientTabs({
     VALID_TABS.includes(initialTab) ? initialTab : "cuestionario"
   );
 
+  // Strip Tier 2: estado del dropdown de avance por paso (declarado antes de los useEffects que lo consumen)
+  const [showStripDropdown, setShowStripDropdown] = useState(false);
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  // Badge [N/8] en tab DM-IA — se actualiza cuando DoubleMaterialidadTab monta
+  const [dmProgress, setDmProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // Extracción disparada desde DocumentsTab → QuestionnaireTab la consume
+  const [pendingDocExtract, setPendingDocExtract] = useState<{ stepKey: string; text: string } | null>(null);
+
   useEffect(() => {
     const t = searchParams?.get("tab") as Tab | null;
     if (t && VALID_TABS.includes(t)) {
@@ -155,6 +165,7 @@ export function ClientTabs({
     try {
       const saved = window.localStorage.getItem(`client-tab-${client.id}`) as Tab | null;
       if (saved && VALID_TABS.includes(saved) && saved !== tab) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- restauración inicial localStorage → state, una sola vez
         setTab(saved);
         router.replace(`?tab=${saved}`, { scroll: false });
       }
@@ -162,6 +173,16 @@ export function ClientTabs({
     // Solo al montar — restauración inicial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Cerrar dropdown al click fuera
+  useEffect(() => {
+    if (!showStripDropdown) return;
+    const onDown = (e: MouseEvent) => {
+      if (!stripRef.current?.contains(e.target as Node)) setShowStripDropdown(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showStripDropdown]);
 
   function goToTab(t: Tab) {
     setTab(t);
@@ -174,36 +195,17 @@ export function ClientTabs({
     }
   }
 
-  // Badge [N/8] en tab DM-IA — se actualiza cuando DoubleMaterialidadTab monta
-  const [dmProgress, setDmProgress] = useState<{ done: number; total: number } | null>(null);
-
-  // Extracción disparada desde DocumentsTab → QuestionnaireTab la consume
-  const [pendingDocExtract, setPendingDocExtract] = useState<{ stepKey: string; text: string } | null>(null);
-
   function handleExtractForStep(stepKey: string, text: string) {
     setPendingDocExtract({ stepKey, text });
     goToTab("cuestionario");
   }
-
-  // Strip Tier 2: estado del dropdown de avance por paso
-  const [showStripDropdown, setShowStripDropdown] = useState(false);
-  const stripRef = useRef<HTMLDivElement>(null);
-  // Cerrar dropdown al click fuera
-  useEffect(() => {
-    if (!showStripDropdown) return;
-    const onDown = (e: MouseEvent) => {
-      if (!stripRef.current?.contains(e.target as Node)) setShowStripDropdown(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [showStripDropdown]);
 
   // Sticky-pinned detection via IntersectionObserver:
   // sentinel está ANTES del strip Tier 2. Cuando el sentinel ya no está
   // visible (scrolled out), el strip está "pinned" → renderiza nombre cliente
   // dentro del strip para no perder contexto.
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const [stripPinned, setStripPinned] = useState(false);
+  const [, setStripPinned] = useState(false);
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;

@@ -196,7 +196,9 @@ describe("scripts/apply-sql.mjs — modo paranoico (máxima protección)", () =>
   // ============================================================
   // Permite operaciones puramente aditivas
   // ============================================================
-  it("permite ALTER TABLE ADD COLUMN IF NOT EXISTS", () => {
+  // Tests con timeout extendido por OneDrive Files-On-Demand: spawn de helper Node.js
+  // que abre archivos en path con espacios puede tardar 5-15s la primera vez.
+  it("permite ALTER TABLE ADD COLUMN IF NOT EXISTS", { timeout: 30000 }, () => {
     const r = runHelper("ALTER TABLE foo ADD COLUMN IF NOT EXISTS bar int DEFAULT 0;")
     // No es destructivo → no debe bloquearse en pre-check.
     // Falla luego por PAT/red (los tests no tienen credenciales reales contra Supabase),
@@ -204,7 +206,7 @@ describe("scripts/apply-sql.mjs — modo paranoico (máxima protección)", () =>
     expect(r.code).not.toBe(2)
   })
 
-  it("permite CREATE TABLE IF NOT EXISTS", () => {
+  it("permite CREATE TABLE IF NOT EXISTS", { timeout: 30000 }, () => {
     const r = runHelper("CREATE TABLE IF NOT EXISTS foo (id int PRIMARY KEY);")
     expect(r.code).not.toBe(2)
   })
@@ -219,7 +221,7 @@ describe("scripts/apply-sql.mjs — modo paranoico (máxima protección)", () =>
     expect(r.code).not.toBe(2)
   })
 
-  it("permite COMMENT ON COLUMN", () => {
+  it("permite COMMENT ON COLUMN", { timeout: 30000 }, () => {
     const r = runHelper("COMMENT ON COLUMN foo.bar IS 'descripción';")
     expect(r.code).not.toBe(2)
   })

@@ -2570,6 +2570,7 @@ export function DoubleMaterialidadTab({
     );
     if (firstPendingIdx > 0) {
       didSmartJumpRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- smart jump único al cargar status; ref didSmartJumpRef previene loop
       navigateTo(DM_SECTION_IDS[firstPendingIdx]!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

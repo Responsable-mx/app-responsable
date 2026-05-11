@@ -14,6 +14,9 @@ export type BenchmarkCompany = {
   country: string | null;
   sector: string | null;
   website: string | null;
+  sustainability_report_url?: string | null;
+  /** Wave 7 C: si tiene chunks embeddidos persistidos para reuso en benchmarks */
+  has_embedded_report?: boolean;
   justification: string | null;
   relation: CompanyRelation;
   proposed_by: "ia" | "consultor";

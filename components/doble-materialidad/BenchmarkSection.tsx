@@ -214,6 +214,46 @@ export function BenchmarkSection({
     }
   }, [clientId, push, onDataMutate]);
 
+  // Wave 7 C: ingestar reporte de competidor manualmente (cuando IA no encontró URL
+  // o consultor quiere agregar una específica). El cron embed-chunks lo procesará
+  // automáticamente en próximo ciclo (≤24h).
+  const [ingestingId, setIngestingId] = useState<string | null>(null);
+  const handleIngestReport = useCallback(async (companyId: string, suggestedUrl: string | null) => {
+    const url = window.prompt(
+      suggestedUrl
+        ? `URL del reporte de sustentabilidad del competidor (PDF/HTML):`
+        : `URL del reporte de sustentabilidad del competidor (PDF/HTML).\nSi no la tienes, pega el link a su página de sostenibilidad y la IA descargará lo público:`,
+      suggestedUrl ?? "https://"
+    );
+    if (!url || !url.trim() || !/^https?:\/\//i.test(url.trim())) return;
+    setIngestingId(companyId);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-benchmark/embed-competitor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          benchmark_company_id: companyId,
+          source_url: url.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      if (json.data?.cached) {
+        push("info", `Reporte ya estaba persistido para esta empresa (${json.data.company_name}).`);
+      } else {
+        push(
+          "success",
+          `Reporte ingerido. La IA lo procesará en las próximas horas y estará listo para benchmarks futuros.`
+        );
+      }
+      onDataMutate();
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al ingerir reporte");
+    } finally {
+      setIngestingId(null);
+    }
+  }, [clientId, push, onDataMutate]);
+
   const groupedByRelation = companies.reduce<Record<string, BenchmarkCompany[]>>((acc, c) => {
     if (!acc[c.relation]) acc[c.relation] = [];
     acc[c.relation]!.push(c);
@@ -534,6 +574,15 @@ export function BenchmarkSection({
                               {REJECTION_OPTIONS.find((r) => r.value === company.rejection_reason)?.label ?? company.rejection_reason}
                             </span>
                           )}
+                          {/* Wave 7 C: indicador reporte embeddido (chunks Voyage listos para reuso) */}
+                          {company.has_embedded_report && (
+                            <span
+                              className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-sm font-bold inline-flex items-center gap-0.5"
+                              title="Reporte oficial embeddido — la IA usa chunks vectoriales en benchmarks (más rápido, más preciso, sin web_search)"
+                            >
+                              ★ Embeddido
+                            </span>
+                          )}
                         </div>
                         {/* Sector */}
                         {company.sector && (
@@ -548,6 +597,26 @@ export function BenchmarkSection({
                       </div>
                       {/* Controles derecha */}
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Wave 7 C — botón ingerir reporte para reuso vector benchmark */}
+                        {!company.has_embedded_report && (
+                          <button
+                            type="button"
+                            onClick={() => void handleIngestReport(company.id, company.sustainability_report_url ?? null)}
+                            disabled={ingestingId === company.id}
+                            title={
+                              company.sustainability_report_url
+                                ? `Ingerir reporte oficial (URL sugerida por IA): ${company.sustainability_report_url}`
+                                : "Pegar URL del reporte de sustentabilidad del competidor para que la IA lo use en benchmarks futuros"
+                            }
+                            className={`text-[9px] px-1.5 py-0.5 rounded-sm font-medium border transition-colors ${
+                              ingestingId === company.id
+                                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-wait"
+                                : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                            }`}
+                          >
+                            {ingestingId === company.id ? "Ingiriendo…" : "↓ Reporte"}
+                          </button>
+                        )}
                         {/* B — toggle reporte ESG público */}
                         <button
                           type="button"

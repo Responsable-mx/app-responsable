@@ -566,66 +566,68 @@ export function DoubleMaterialidadTab({
 
         return (
           <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all">
-            {/* Cabecera progreso — solo visible cuando el stepper NO está pinned (modo expandido) */}
-            {!stepperCompact && (
-            <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
-                  Estado del estudio
-                </span>
-                <div className="h-[3px] w-28 bg-slate-200 flex-shrink-0 overflow-hidden">
-                  <div
-                    className="h-full bg-brand-primary transition-all duration-300"
-                    style={{ width: `${pct}%` }}
-                    role="progressbar"
-                    aria-valuenow={pct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`${doneCount} de ${stagesData.length} etapas completadas`}
-                  />
-                </div>
-                <span className="text-[10px] text-slate-500 font-semibold tabular-nums whitespace-nowrap">
-                  {doneCount}/{stagesData.length} completadas
-                </span>
-              </div>
-              {/* Hint teclado — visible solo en sm+ */}
-              <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 shrink-0 select-none">
-                <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">←</kbd>
-                <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">→</kbd>
-                teclado
-              </span>
-            </div>
-            )}
-
-            {/* Pill bar */}
-            <div className="flex items-center gap-1 px-4 py-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {stagesData.map((s, idx) => (
-                <span key={s.sectionId} className="contents">
-                  <StagePill
-                    label={s.label}
-                    status={s.status}
-                    selected={s.sectionId === activeStageId}
-                    subtitle={(() => {
-                      const isSel = s.sectionId === activeStageId;
-                      // Solo la etapa seleccionada dice "En curso" — evita 3 pills "En curso" simultáneas.
-                      if (isSel) return s.status === "done" ? "Revisando" : "En curso";
-                      if (s.status === "done")   return formatStageDate(s.doneDate);
-                      if (s.status === "active") return "Disponible";
-                      if (s.status === "locked") return "Bloqueada";
-                      return "Pendiente";
-                    })()}
-                    sectionId={s.sectionId}
-                  />
-                  {idx < stagesData.length - 1 && (
+            {/* Fila fusionada: [progreso] ← pills → [teclado] */}
+            <div className="flex items-center gap-2 px-4 py-2">
+              {!stepperCompact && (
+                <div className="flex items-center gap-2 shrink-0 pr-2 border-r border-slate-100">
+                  <span className="hidden md:block text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                    Estado del estudio
+                  </span>
+                  <div className="h-[3px] w-20 bg-slate-200 flex-shrink-0 overflow-hidden">
                     <div
-                      className={`flex-1 h-0.5 min-w-1 max-w-9 rounded-sm shrink-0 ${
-                        s.status === "done" ? "bg-brand-primary" : "bg-slate-200"
-                      }`}
-                      aria-hidden
+                      className="h-full bg-brand-primary transition-all duration-300"
+                      style={{ width: `${pct}%` }}
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${doneCount} de ${stagesData.length} etapas completadas`}
                     />
-                  )}
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-semibold tabular-nums whitespace-nowrap">
+                    {doneCount}/{stagesData.length}
+                  </span>
+                </div>
+              )}
+              {/* Pills — ancho completo distribuido. overflow-x-auto como fallback en mobile */}
+              <div className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {stagesData.map((s, idx) => (
+                  <span key={s.sectionId} className="contents">
+                    <StagePill
+                      label={s.label}
+                      status={s.status}
+                      selected={s.sectionId === activeStageId}
+                      className="flex-1"
+                      subtitle={(() => {
+                        const isSel = s.sectionId === activeStageId;
+                        // Solo la etapa seleccionada dice "En curso" — evita 3 pills "En curso" simultáneas.
+                        if (isSel) return s.status === "done" ? "En revisión" : "En curso";
+                        if (s.status === "done")   return formatStageDate(s.doneDate);
+                        if (s.status === "active") return "Disponible";
+                        if (s.status === "locked") return "Bloqueada";
+                        return "Pendiente";
+                      })()}
+                      sectionId={s.sectionId}
+                    />
+                    {idx < stagesData.length - 1 && (
+                      <div
+                        className={`w-3 h-0.5 shrink-0 rounded-sm ${
+                          s.status === "done" ? "bg-brand-primary" : "bg-slate-200"
+                        }`}
+                        aria-hidden
+                      />
+                    )}
+                  </span>
+                ))}
+              </div>
+              {/* Hint teclado — visible solo en sm+, solo expandido */}
+              {!stepperCompact && (
+                <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 shrink-0 select-none pl-2 border-l border-slate-100">
+                  <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">←</kbd>
+                  <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">→</kbd>
+                  teclado
                 </span>
-              ))}
+              )}
             </div>
 
             {/* Context chips — strip completo en expandido, mínimo en compact */}
@@ -646,7 +648,7 @@ export function DoubleMaterialidadTab({
             </div>
             )}
             {!stepperCompact && (
-            <div className="border-t border-slate-100 px-5 py-2">
+            <div className="border-t border-slate-100 px-4 py-1.5">
               <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {/* Benchmark chip — siempre */}
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">

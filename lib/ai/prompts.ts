@@ -283,8 +283,9 @@ Identifica empresas relevantes para un benchmark de Doble Materialidad aplicando
 Reglas:
 - Priorizar siempre empresas con informe de sustentabilidad publicado (GRI, TCFD, CSRD, SASB o equivalente).
 - Propón entre 6 y 10 empresas en total, con al menos 1 por categoría.
-- Para cada empresa indica: nombre, país, sector específico, URL del sitio web corporativo, tipo de relación y justificación (2-3 oraciones: por qué es relevante para el benchmark, qué publica en sostenibilidad y por qué el consultor debería incluirla).
-- Si no tienes certeza del website exacto, omítelo (null) — nunca inventes una URL.
+- Para cada empresa indica: nombre, país, sector específico, URL del sitio web corporativo, URL directa del reporte de sustentabilidad (PDF si posible), tipo de relación y justificación (2-3 oraciones: por qué es relevante para el benchmark, qué publica en sostenibilidad y por qué el consultor debería incluirla).
+- Si no tienes certeza del website o de la URL del reporte, omítelo (null) — nunca inventes una URL.
+- La URL del reporte debe apuntar al PDF/HTML público del último informe disponible (ej. "https://empresa.com/reportes/sustentabilidad-2024.pdf"). Si solo encuentras la página índice donde está el reporte, úsala. El sistema descargará y procesará automáticamente.
 
 Responde ÚNICAMENTE con JSON válido, sin texto adicional:
 {
@@ -294,6 +295,7 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional:
       "country": "México",
       "sector": "Sector específico",
       "website": "https://www.example.com/sustentabilidad",
+      "sustainability_report_url": "https://www.example.com/reportes/sustentabilidad-2024.pdf",
       "relation": "competitor_nacional",
       "justification": "Por qué es relevante: qué publica en ESG y qué aporta al benchmark"
     }

@@ -63,6 +63,9 @@ const ProposedCompanySchema = z.object({
   // Acepta URL completa, URL sin protocolo, null (cuando IA no tiene certeza), o ausente.
   // No aplicamos .url() estricto — la IA puede omitir "https://" o el campo completo.
   website: z.string().max(300).optional().nullable(),
+  // Wave 7 C: URL del reporte de sustentabilidad oficial (PDF/HTML). Si presente,
+  // auto-dispara ingest + embedding Voyage en background.
+  sustainability_report_url: z.string().max(500).optional().nullable(),
   relation: z.enum(["competitor_nacional", "competitor_internacional", "sector", "cadena_valor"]),
   justification: z.string().max(600).optional().nullable(),
 });
@@ -193,7 +196,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
   const admin = createAdminClient();
 
-  const [companiesRes, resultsRes] = await Promise.all([
+  const [companiesRes, resultsRes, embeddedDocsRes] = await Promise.all([
     admin
       .from("dm_benchmark_companies")
       .select("*")
@@ -205,9 +208,27 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       .eq("client_id", id)
       .order("created_at", { ascending: false })
       .limit(1),
+    // Wave 7 C: qué competidores tienen ya un report persistido (parseado ok)
+    admin
+      .from("client_documents")
+      .select("benchmark_company_id")
+      .eq("client_id", id)
+      .eq("kind", "competitor_report")
+      .eq("parse_status", "ok"),
   ]);
 
   const latestResult = resultsRes.data?.[0] ?? null;
+  const embeddedCompanyIds = new Set(
+    (embeddedDocsRes.data ?? [])
+      .map((d) => d.benchmark_company_id as string | null)
+      .filter((x): x is string => !!x)
+  );
+
+  // Enriquecer companies con flag has_embedded_report
+  const companiesEnriched = (companiesRes.data ?? []).map((c) => ({
+    ...c,
+    has_embedded_report: embeddedCompanyIds.has(c.id as string),
+  }));
 
   // ── Chequeo de batch pendiente ──────────────────────────────────────────
   // Si hay un resultado pendiente con batch_id, consultamos Anthropic Batch API.
@@ -274,7 +295,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
         return NextResponse.json({
           data: {
-            companies: companiesRes.data ?? [],
+            companies: companiesEnriched,
             latest_result: updatedResult,
           },
         });
@@ -288,7 +309,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
   return NextResponse.json({
     data: {
-      companies: companiesRes.data ?? [],
+      companies: companiesEnriched,
       latest_result: latestResult,
     },
   });
@@ -460,6 +481,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       country: c.country ?? null,
       sector: c.sector ?? null,
       website: c.website && c.website.length > 0 ? c.website : null,
+      sustainability_report_url:
+        c.sustainability_report_url && c.sustainability_report_url.length > 0
+          ? c.sustainability_report_url
+          : null,
       relation: c.relation,
       justification: c.justification ?? null,
       proposed_by: "ia",
@@ -473,6 +498,29 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .select();
 
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+
+    // Wave 7 C: auto-dispatch ingest de reportes en background para competidores
+    // con sustainability_report_url. Fire-and-forget — el endpoint responde inmediato,
+    // los reports caen al pipeline y el cron embed-chunks los embeddea en próximo ciclo.
+    if (inserted && process.env.VOYAGE_API_KEY) {
+      const { persistCompetitorReport } = await import("@/lib/documents/competitor");
+      for (const company of inserted) {
+        const url = (company.sustainability_report_url as string | null) ?? null;
+        if (!url) continue;
+        // No await — background, no bloquea respuesta
+        void persistCompetitorReport({
+          benchmarkCompanyId: company.id as string,
+          clientId: id,
+          uploadedBy: user,
+          sourceUrl: url,
+        }).catch((e) => {
+          console.error(
+            `[dm-benchmark auto-ingest] failed for ${company.name}:`,
+            e instanceof Error ? e.message : e
+          );
+        });
+      }
+    }
 
     return NextResponse.json({ data: { companies: inserted } });
   }

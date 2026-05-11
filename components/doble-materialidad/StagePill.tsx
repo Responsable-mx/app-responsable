@@ -9,6 +9,7 @@ export function StagePill({
   subtitle,
   sectionId,
   selected,
+  className = "",
 }: {
   label: string;
   status: StageStatus;
@@ -17,9 +18,10 @@ export function StagePill({
   sectionId?: string;
   /** ¿Es el panel actualmente visible? (Ruta B — independiente del status) */
   selected: boolean;
+  className?: string;
 }) {
   const pillBase =
-    "flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-sm border transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40";
+    `flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-sm border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 ${className}`;
 
   // selected = panel visible (ring teal + bg teal). status sólo determina estilo no-selected.
   const pillStyle = selected

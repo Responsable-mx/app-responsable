@@ -189,14 +189,24 @@ FLUJO DE TRABAJO:
 
   // Documentos del cliente como fuente primaria — incluye todos los tipos
   // (sustainability_report, financial_report, general). Cita URL real cuando exista.
-  // Tope total ~150K chars para no inflar prompt; 30K máx por doc.
+  // Wave 5c (F): chunking + relevance scoring opcional vía DOC_RELEVANCE_ENABLED.
+  // Sin flag: dump 30K chars/doc hasta 150K total (legacy).
+  // Con flag: chunks de 1.2K, top relevantes por field labels del step (~8K/doc).
+  // Reduce ~70% input tokens cuando docs son grandes.
+  const useRelevance = process.env.DOC_RELEVANCE_ENABLED === "true";
   const reportsContext: string[] = [];
   try {
     const { listDocumentsByClient } = await import("@/lib/documents/queries");
     const reports = await listDocumentsByClient(id);
     let totalChars = 0;
-    const TOTAL_CAP = 150_000;
-    const PER_DOC_CAP = 30_000;
+    const TOTAL_CAP = useRelevance ? 50_000 : 150_000;
+    const PER_DOC_CAP = useRelevance ? 8_000 : 30_000;
+
+    // Query para relevance scoring: labels + descripciones del step actual
+    const relevanceQuery = useRelevance
+      ? [step.title, step.subtitle ?? "", ...step.fields.map((f) => f.label)].filter(Boolean).join(" ")
+      : "";
+
     for (const doc of reports) {
       if (!doc.markdown_content || doc.parse_status !== "ok") continue;
       const remaining = TOTAL_CAP - totalChars;
@@ -206,10 +216,25 @@ FLUJO DE TRABAJO:
         doc.kind === "financial_report"      ? "INFORME FINANCIERO" :
                                                 "DOCUMENTO DEL CLIENTE";
       const sourceUrl = doc.source_url ?? "doc-cliente";
-      const slice = doc.markdown_content.slice(0, Math.min(PER_DOC_CAP, remaining));
-      totalChars += slice.length;
+
+      let docContent: string;
+      if (useRelevance && doc.markdown_content.length > PER_DOC_CAP) {
+        // Chunk + score + select top chunks relevantes
+        const { chunkMarkdown, selectTopChunks } = await import("@/lib/documents/relevance");
+        const chunks = chunkMarkdown(doc.markdown_content, { chunkSize: 1200, overlap: 150 });
+        const selected = selectTopChunks(chunks, relevanceQuery, {
+          maxChars: Math.min(PER_DOC_CAP, remaining),
+          minScore: 0.05,
+        });
+        docContent = selected.length > 0
+          ? selected.map((s) => s.chunk).join("\n\n---\n\n")
+          : doc.markdown_content.slice(0, Math.min(PER_DOC_CAP, remaining));
+      } else {
+        docContent = doc.markdown_content.slice(0, Math.min(PER_DOC_CAP, remaining));
+      }
+      totalChars += docContent.length;
       reportsContext.push(
-        `\n[${label} — ${doc.file_name}]\nFuente: ${sourceUrl}\n\n${slice}\n`
+        `\n[${label} — ${doc.file_name}]\nFuente: ${sourceUrl}\n\n${docContent}\n`
       );
     }
   } catch (e) {

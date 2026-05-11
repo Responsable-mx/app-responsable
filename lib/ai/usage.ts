@@ -29,6 +29,17 @@ export type FeedbackReasonBucket = {
   count: number;
 };
 
+export type UsageByRole = {
+  role: string;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cost_usd: number;
+  avg_latency_ms: number;
+  errors: number;
+};
+
 export type UsageSummary = {
   window_days: number;
   total_calls: number;
@@ -39,6 +50,8 @@ export type UsageSummary = {
   avg_latency_ms: number;
   cost_usd_estimate_max: number;
   by_model: UsageByModel[];
+  /** Wave 5a: agregado por rol (Aurora/Rebeca/Elena/Valeria) en la ventana */
+  by_role: UsageByRole[];
   by_day_role: UsageRow[];
   top_users: Array<{ user_email: string; calls: number }>;
   top_clients: Array<{ client_id: string; calls: number; client_name: string | null }>;
@@ -60,6 +73,7 @@ export async function getUsageSummary(
     avg_latency_ms: 0,
     cost_usd_estimate_max: 0,
     by_model: [],
+    by_role: [],
     by_day_role: [],
     top_users: [],
     top_clients: [],
@@ -85,7 +99,7 @@ export async function getUsageSummary(
   const { data: rows } = await admin
     .from("ai_calls")
     .select(
-      "user_email,client_id,model,input_tokens,output_tokens,cache_read_tokens,error,latency_ms"
+      "user_email,client_id,role,model,input_tokens,output_tokens,cache_read_tokens,error,latency_ms"
     )
     .gte("created_at", since)
     .limit(20000);
@@ -113,6 +127,7 @@ export async function getUsageSummary(
   let outputUsd = 0;
   let cacheUsd = 0;
   const byModelMap = new Map<UsageByModel["family"], UsageByModel>();
+  const byRoleMap = new Map<string, UsageByRole & { latency_sum: number; latency_count: number }>();
   for (const r of calls) {
     const m = (r.model as string | null ?? "").toLowerCase();
     const isHaiku = m.includes("haiku");
@@ -136,10 +151,40 @@ export async function getUsageSummary(
     acc.cache_read_tokens += r.cache_read_tokens ?? 0;
     acc.cost_usd += rIn + rOut + rCache;
     byModelMap.set(family, acc);
+    // Wave 5a: Breakdown por rol (Aurora/Rebeca/Elena/Valeria)
+    const role = (r.role as string | null) ?? "otro";
+    const rAcc = byRoleMap.get(role) ?? {
+      role, calls: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0,
+      cost_usd: 0, avg_latency_ms: 0, errors: 0, latency_sum: 0, latency_count: 0,
+    };
+    rAcc.calls += 1;
+    rAcc.input_tokens += r.input_tokens ?? 0;
+    rAcc.output_tokens += r.output_tokens ?? 0;
+    rAcc.cache_read_tokens += r.cache_read_tokens ?? 0;
+    rAcc.cost_usd += rIn + rOut + rCache;
+    if (typeof r.latency_ms === "number") {
+      rAcc.latency_sum += r.latency_ms;
+      rAcc.latency_count += 1;
+    }
+    if (r.error) rAcc.errors += 1;
+    byRoleMap.set(role, rAcc);
   }
   const costUsd = Number((inputUsd + outputUsd + cacheUsd).toFixed(3));
   const byModel: UsageByModel[] = Array.from(byModelMap.values())
     .map((m) => ({ ...m, cost_usd: Number(m.cost_usd.toFixed(3)) }))
+    .sort((a, b) => b.cost_usd - a.cost_usd);
+
+  const byRole: UsageByRole[] = Array.from(byRoleMap.values())
+    .map((r) => ({
+      role: r.role,
+      calls: r.calls,
+      input_tokens: r.input_tokens,
+      output_tokens: r.output_tokens,
+      cache_read_tokens: r.cache_read_tokens,
+      cost_usd: Number(r.cost_usd.toFixed(3)),
+      avg_latency_ms: r.latency_count > 0 ? Math.round(r.latency_sum / r.latency_count) : 0,
+      errors: r.errors,
+    }))
     .sort((a, b) => b.cost_usd - a.cost_usd);
 
   // Top 5 usuarios
@@ -216,6 +261,7 @@ export async function getUsageSummary(
     avg_latency_ms: avgLatency,
     cost_usd_estimate_max: costUsd,
     by_model: byModel,
+    by_role: byRole,
     by_day_role: (byDayRole ?? []) as UsageRow[],
     top_users: topUsers,
     top_clients: topClients,

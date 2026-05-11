@@ -231,6 +231,20 @@ export function ChatWindow({
   const currentRole = ROLES.find((r) => r.id === role)!;
   const selectedClient = clients.find((c) => c.id === clientId) ?? null;
 
+  // Wave 5b: badge "memoria IA: N rechazos" — cuenta feedback negativo
+  // vigente para este rol+cliente. Refresca cuando cambia rol o cliente.
+  const [memoryCount, setMemoryCount] = useState<number>(0);
+  useEffect(() => {
+    if (!role) return;
+    const url = new URL("/api/ia-feedback/count", window.location.origin);
+    url.searchParams.set("role", role);
+    if (clientId) url.searchParams.set("client_id", clientId);
+    fetch(url.toString())
+      .then((r) => r.json())
+      .then((j) => setMemoryCount((j?.data?.count as number) ?? 0))
+      .catch(() => setMemoryCount(0));
+  }, [role, clientId]);
+
   function handleRoleClick(next: RoleId) {
     if (next === role) return;
     if (messages.length === 0) {
@@ -597,6 +611,18 @@ export function ChatWindow({
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Wave 5b: badge memoria IA activa por feedback negativo del consultor */}
+            {memoryCount > 0 && (
+              <span
+                className="text-[10px] rounded-sm px-1.5 py-0.5 font-bold uppercase tracking-wide border bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-1 tabular-nums"
+                title={`La IA está usando ${memoryCount} rechazo${memoryCount > 1 ? "s" : ""} previo${memoryCount > 1 ? "s" : ""} del consultor sobre este rol+cliente como ejemplos a evitar. Aparece tras dar 👎 + razón.`}
+              >
+                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v5l3 2" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                </svg>
+                Memoria IA: {memoryCount}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setShowSessionsPanel(true)}

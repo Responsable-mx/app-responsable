@@ -247,6 +247,63 @@ export default async function UsoIaPage() {
             </div>
           )}
 
+          {s.by_role.length > 0 && (
+            <div className="mb-6">
+              <Panel title="Uso por rol IA (últimos 30 días)">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                      <th className="pb-1.5 text-left">Rol</th>
+                      <th className="pb-1.5 text-right">Llamadas</th>
+                      <th className="pb-1.5 text-right">T. entrada</th>
+                      <th className="pb-1.5 text-right">T. salida</th>
+                      <th className="pb-1.5 text-right">Costo</th>
+                      <th className="pb-1.5 text-right">% costo</th>
+                      <th className="pb-1.5 text-right">Latencia</th>
+                      <th className="pb-1.5 text-right">Errores</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {s.by_role.map((r) => {
+                      const pct = s.cost_usd_estimate_max > 0
+                        ? Math.round((r.cost_usd / s.cost_usd_estimate_max) * 100)
+                        : 0;
+                      const ROLE_LABELS: Record<string, { name: string; model: string }> = {
+                        aurora:  { name: "Aurora · Autor",     model: "Sonnet" },
+                        rebeca:  { name: "Rebeca · Revisor",   model: "Sonnet" },
+                        elena:   { name: "Elena · Elevador",   model: "Opus" },
+                        valeria: { name: "Valeria · Validador", model: "Haiku" },
+                      };
+                      const meta = ROLE_LABELS[r.role] ?? { name: r.role, model: "—" };
+                      return (
+                        <tr key={r.role}>
+                          <td className="py-1.5 font-semibold text-slate-800">
+                            {meta.name}
+                            <span className="ml-1.5 text-[10px] font-normal text-slate-500">({meta.model})</span>
+                          </td>
+                          <td className="py-1.5 text-right text-slate-900 tabular-nums">{numFmt.format(r.calls)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{numFmt.format(r.input_tokens)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{numFmt.format(r.output_tokens)}</td>
+                          <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{usdFmt.format(r.cost_usd)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{pct}%</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{(r.avg_latency_ms / 1000).toFixed(1)}s</td>
+                          <td className={`py-1.5 text-right tabular-nums ${r.errors > 0 ? "text-rose-700" : "text-slate-400"}`}>
+                            {r.errors}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+                  Elena (Opus) debería tener pocas llamadas pero alto costo unitario — es la voz estratégica.
+                  Valeria (Haiku) puede tener muchas llamadas con costo bajo — verifica DoD.
+                  Aurora y Rebeca dominan volumen normal (cadena Autor → Revisor).
+                </p>
+              </Panel>
+            </div>
+          )}
+
           {s.feedback_total_down > 0 && (
             <div className="mb-6">
               <Panel title={`Razones de rechazo IA (${s.feedback_total_down} 👎 últimos 30 días)`}>

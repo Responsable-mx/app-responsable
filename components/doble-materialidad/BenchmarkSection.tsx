@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
@@ -63,6 +63,8 @@ export function BenchmarkSection({
   const [exporting, setExporting] = useState(false);
   const [tableFullscreen, setTableFullscreen] = useState(false);
   const [colFilter, setColFilter] = useState<"all" | "competitor_nacional" | "competitor_internacional" | "sector" | "cadena_valor">("all");
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
   // ID de empresa esperando razón de rechazo (al desmarcar)
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
@@ -1010,15 +1012,36 @@ export function BenchmarkSection({
                   tabIndex={0}
                   // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
+                  style={{ cursor: isDragging ? "grabbing" : "grab" }}
                   onKeyDown={(e) => {
                     const el = e.currentTarget;
                     const hStep = e.shiftKey ? 400 : 150;
-                    const vStep = e.shiftKey ? 300 : 80;
                     if (e.key === "ArrowRight") { e.preventDefault(); el.scrollLeft += hStep; }
                     if (e.key === "ArrowLeft")  { e.preventDefault(); el.scrollLeft -= hStep; }
-                    if (e.key === "ArrowDown")  { e.preventDefault(); el.scrollTop  += vStep; }
-                    if (e.key === "ArrowUp")    { e.preventDefault(); el.scrollTop  -= vStep; }
                   }}
+                  onPointerDown={(e) => {
+                    const t = e.target as HTMLElement;
+                    if (t.closest("a, button, input")) return;
+                    if (e.button !== 0) return;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    const el = e.currentTarget;
+                    dragRef.current = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+                    setIsDragging(true);
+                  }}
+                  onPointerMove={(e) => {
+                    if (!dragRef.current) return;
+                    const el = e.currentTarget;
+                    el.scrollLeft = dragRef.current.sl - (e.clientX - dragRef.current.x);
+                    el.scrollTop  = dragRef.current.st - (e.clientY - dragRef.current.y);
+                  }}
+                  onPointerUp={(e) => {
+                    if (!dragRef.current) return;
+                    const moved = Math.abs(e.clientX - dragRef.current.x) > 5 || Math.abs(e.clientY - dragRef.current.y) > 5;
+                    if (moved) e.preventDefault();
+                    dragRef.current = null;
+                    setIsDragging(false);
+                  }}
+                  onPointerCancel={() => { dragRef.current = null; setIsDragging(false); }}
                 >
                   {tableElement}
                   {scrollHint}

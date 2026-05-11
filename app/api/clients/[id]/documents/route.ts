@@ -8,7 +8,7 @@ import { DOCUMENT_KIND_SCHEMA } from "@/lib/documents/types";
 import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 const MAX_SIZE = 25 * 1024 * 1024;   // 25MB por archivo individual
@@ -129,64 +129,43 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "ZIP inválido o corrupto" }, { status: 400 });
     }
 
-    const docs: object[] = [];
+    // 1. Extraer entradas válidas (sin dirs, sin macOS, con MIME soportado, dentro del límite)
+    type ZipEntry = { baseName: string; mimeType: string; fileBuffer: Buffer };
+    const validEntries: ZipEntry[] = [];
     const failures: string[] = [];
 
     for (const [entryPath, entry] of Object.entries(zip.files)) {
       if (entry.dir) continue;
       const baseName = entryPath.split("/").pop() ?? entryPath;
-      // Ignorar metadata macOS y archivos ocultos
       if (baseName.startsWith("__MACOSX") || baseName.startsWith(".")) continue;
-
       const mimeType = ZIP_EXT_TO_MIME[extname(baseName).toLowerCase()];
       if (!mimeType) continue;
-
       const fileBuffer = Buffer.from(await entry.async("arraybuffer"));
-      if (fileBuffer.length > MAX_SIZE) {
-        failures.push(`${baseName}: excede 25MB`);
-        continue;
-      }
+      if (fileBuffer.length > MAX_SIZE) { failures.push(`${baseName}: excede 25MB`); continue; }
+      validEntries.push({ baseName, mimeType, fileBuffer });
+    }
 
+    // 2. Procesar en lotes de 5 en paralelo (upload+parse es I/O-bound)
+    const docs: object[] = [];
+    const BATCH = 5;
+
+    const actorEmail = user as string;
+
+    async function processEntry({ baseName, mimeType, fileBuffer }: ZipEntry): Promise<void> {
       const contentHash = createHash("md5").update(fileBuffer).digest("hex");
       const existingDoc = await checkDocumentHash(id, contentHash);
-      if (existingDoc) {
-        failures.push(`${baseName}: ya existe`);
-        continue;
-      }
+      if (existingDoc) { failures.push(`${baseName}: ya existe`); return; }
+      const doc = await uploadAndParseDocument({ clientId: id, uploadedBy: actorEmail, fileName: baseName, mimeType, buffer: fileBuffer, kind, serviceIds });
+      void logChange({ actorEmail, entityType: "client_document", entityId: doc.id, action: "create", before: null, after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_ids: serviceIds } });
+      docs.push({ id: doc.id, file_name: doc.file_name, file_type: doc.file_type, kind: doc.kind, size_bytes: doc.size_bytes, parse_status: doc.parse_status, parse_error: doc.parse_error, has_content: !!doc.markdown_content, service_ids: doc.service_ids ?? [], created_at: doc.created_at });
+    }
 
-      try {
-        const doc = await uploadAndParseDocument({
-          clientId: id,
-          uploadedBy: user,
-          fileName: baseName,
-          mimeType,
-          buffer: fileBuffer,
-          kind,
-          serviceIds,
-        });
-        void logChange({
-          actorEmail: user,
-          entityType: "client_document",
-          entityId: doc.id,
-          action: "create",
-          before: null,
-          after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_ids: serviceIds },
-        });
-        docs.push({
-          id: doc.id,
-          file_name: doc.file_name,
-          file_type: doc.file_type,
-          kind: doc.kind,
-          size_bytes: doc.size_bytes,
-          parse_status: doc.parse_status,
-          parse_error: doc.parse_error,
-          has_content: !!doc.markdown_content,
-          service_ids: doc.service_ids ?? [],
-          created_at: doc.created_at,
-        });
-      } catch (e) {
-        failures.push(`${baseName}: ${e instanceof Error ? e.message : "error"}`);
-      }
+    for (let i = 0; i < validEntries.length; i += BATCH) {
+      const batch = validEntries.slice(i, i + BATCH);
+      const results = await Promise.allSettled(batch.map(processEntry));
+      results.forEach((r, j) => {
+        if (r.status === "rejected") failures.push(`${batch[j]?.baseName ?? "archivo"}: ${r.reason instanceof Error ? r.reason.message : "error"}`);
+      });
     }
 
     if (docs.length === 0 && failures.length > 0) {

@@ -36,8 +36,7 @@ export default async function EditarClienteFormPage({ params }: Props) {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-lg font-bold text-slate-900">{client.name}</h1>
-        <p className="text-xs text-slate-600 mt-0.5">
+        <p className="text-xs text-slate-600">
           Edita el perfil del cliente. Los cambios se reflejan de inmediato en el contexto de los roles IA.
         </p>
       </div>

@@ -324,7 +324,7 @@ export function ClientForm(props: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 pb-24">
+    <form onSubmit={handleSubmit} className="space-y-4 pb-24">
       {/* ═══ Identificación ══════════════════════════════════ */}
       <Section
         title="Identificación"
@@ -355,7 +355,8 @@ export function ClientForm(props: Props) {
           </button>
         }
       >
-        <div className="grid grid-cols-2 gap-4">
+        {/* Fila 1: Nombre + Sitio web */}
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Nombre *">
             <input
               required
@@ -365,52 +366,50 @@ export function ClientForm(props: Props) {
               placeholder="Ej: Heineken México"
             />
           </Field>
+          <Field label="Sitio web corporativo">
+            <input
+              type="text"
+              value={form.website_url}
+              onChange={(e) => update("website_url", e.target.value)}
+              className={inputCls}
+              placeholder="responsable.net"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Fuente primaria para la IA al llenar el cuestionario.
+            </p>
+          </Field>
+        </div>
+
+        {/* Fila 2: Sector + Subsector + Tamaño */}
+        <div className="grid grid-cols-3 gap-3">
+          <MultiSelectCombobox
+            category="sectors"
+            label="Sector"
+            mode="single"
+            value={form.sector}
+            onChange={(v) => update("sector", (v as string) ?? "")}
+            hasGroups
+            placeholder="Sector…"
+          />
+          <Field label="Subsector">
+            <input
+              value={form.subsector}
+              onChange={(e) => update("subsector", e.target.value)}
+              className={inputCls}
+              placeholder="Ej: Cervezas, Retail…"
+            />
+          </Field>
           <MultiSelectCombobox
             category="client_sizes"
             label="Tamaño"
             mode="single"
             value={form.size}
             onChange={(v) => update("size", (v as string) ?? "")}
-            placeholder="Elige tamaño…"
+            placeholder="Tamaño…"
           />
         </div>
 
-        {/* Sitio web — elevado: fuente primaria para IA */}
-        <Field label="Sitio web corporativo">
-          <input
-            type="text"
-            value={form.website_url}
-            onChange={(e) => update("website_url", e.target.value)}
-            className={inputCls}
-            placeholder="responsable.net"
-          />
-          <p className="text-[10px] text-slate-400 mt-1">
-            La IA usará este sitio como fuente primaria para llenar el cuestionario automáticamente.
-          </p>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <MultiSelectCombobox
-              category="sectors"
-              label="Sector"
-              mode="single"
-              value={form.sector}
-              onChange={(v) => update("sector", (v as string) ?? "")}
-              hasGroups
-              placeholder="Elige o busca un sector…"
-            />
-          </div>
-          <Field label="Subsector">
-            <input
-              value={form.subsector}
-              onChange={(e) => update("subsector", e.target.value)}
-              className={inputCls}
-              placeholder="Ej: Cervezas, Retail deportivo, etc."
-            />
-          </Field>
-        </div>
-
+        {/* Fila 3: Países */}
         <MultiSelectCombobox
           category="countries"
           label="Países donde opera"
@@ -634,7 +633,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded p-6 space-y-4">
+    <div className="bg-white border border-slate-200 rounded p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
           {title}

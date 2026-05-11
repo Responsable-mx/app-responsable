@@ -4,6 +4,7 @@ import { requireConsultorForClient } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getIbsoForSector } from "@/lib/dm/nis-catalog";
 import { getClient } from "@/lib/clients";
+import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,6 +105,14 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   if (toInsert.length > 0) {
     await admin.from("client_nis_assessment").insert(toInsert);
+    void logChange({
+      actorEmail: user,
+      entityType: "dm_nis",
+      entityId: id,
+      action: "create",
+      before: null,
+      after: { client_id: id, inserted_count: toInsert.length, sector: client.sector },
+    });
   }
 
   const { data: final } = await admin
@@ -138,6 +147,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (fields.accion !== undefined)       update.accion = fields.accion;
 
   const admin = createAdminClient();
+  const { data: before } = await admin
+    .from("client_nis_assessment")
+    .select("ibso_key, estado, calidad_dato, accion")
+    .eq("id", nisId)
+    .eq("client_id", id)
+    .maybeSingle();
+
   const { data, error } = await admin
     .from("client_nis_assessment")
     .update(update)
@@ -147,5 +163,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  void logChange({
+    actorEmail: user,
+    entityType: "dm_nis",
+    entityId: nisId,
+    action: "update",
+    before,
+    after: { client_id: id, ...update },
+  });
   return NextResponse.json({ data });
 }

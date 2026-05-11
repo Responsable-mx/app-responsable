@@ -12,6 +12,7 @@ import { getPrompt } from "@/lib/ai/prompts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RELATION_LABELS, irosToBenchmarkFields } from "@/lib/dm/fields";
 import { listActiveIros, getIroQuestionnaireContext, type DmIroConfig } from "@/lib/dm/iros";
+import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -415,8 +416,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       for (const block of msg.content) {
         if (block.type === "text") textOut += block.text;
       }
-      // DEBUG: loguear respuesta cruda para verificar que IA devuelve website/justification
-      console.log("[dm-benchmark propose] raw AI response (first 800 chars):", textOut.slice(0, 800));
       anthropicBreaker.recordSuccess();
     } catch (e) {
       anthropicBreaker.recordFailure();
@@ -686,5 +685,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  void logChange({
+    actorEmail: user,
+    entityType: "dm_benchmark_company",
+    entityId: company_id,
+    action: "update",
+    before: null,
+    after: { client_id: id, ...updatePayload },
+  });
   return NextResponse.json({ data });
 }

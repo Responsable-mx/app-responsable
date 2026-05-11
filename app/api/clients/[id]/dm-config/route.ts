@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,5 +91,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  void logChange({
+    actorEmail: user,
+    entityType: "dm_config",
+    entityId: id,
+    action: "update",
+    before: { dm_horizons: current?.dm_horizons ?? null },
+    after: { dm_horizons: merged },
+  });
   return NextResponse.json({ data: merged });
 }

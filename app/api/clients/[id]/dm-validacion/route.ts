@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireConsultorForClient } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,6 +75,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    void logChange({
+      actorEmail: user,
+      entityType: "dm_validacion",
+      entityId: existing.id,
+      action: "update",
+      before: { iro_decisions: existing.iro_decisions },
+      after: { client_id: id, ...patch },
+    });
     return NextResponse.json({ data });
   }
 
@@ -85,5 +94,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  void logChange({
+    actorEmail: user,
+    entityType: "dm_validacion",
+    entityId: data.id,
+    action: "create",
+    before: null,
+    after: { client_id: id, ...patch },
+  });
   return NextResponse.json({ data });
 }

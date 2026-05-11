@@ -22,9 +22,14 @@ export type AuditEntityType =
   | "stage_activity"
   | "stage_template"
   | "client_document"
-  | "dm_iro_config";
+  | "dm_iro_config"
+  | "dm_config"
+  | "dm_validacion"
+  | "dm_nis"
+  | "dm_resumen"
+  | "dm_benchmark_company";
 
-export type AuditAction = "create" | "update" | "delete" | "restore";
+export type AuditAction = "create" | "update" | "delete" | "restore" | "review";
 
 export type AuditEntry = {
   actorEmail: string;

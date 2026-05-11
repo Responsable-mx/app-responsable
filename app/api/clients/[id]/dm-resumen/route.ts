@@ -6,6 +6,7 @@ import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAiCall } from "@/lib/ai/logging";
+import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -73,6 +74,15 @@ export async function PATCH(_req: NextRequest, { params }: Ctx) {
     .eq("id", latest.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  void logChange({
+    actorEmail: user,
+    entityType: "dm_resumen",
+    entityId: latest.id,
+    action: "review",
+    before: { reviewed_at: null },
+    after: { client_id: id, reviewed_at: new Date().toISOString() },
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -271,6 +281,15 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
     .from("dm_resumenes")
     .update({ status: "done", content })
     .eq("id", newRow.id);
+
+  void logChange({
+    actorEmail: user,
+    entityType: "dm_resumen",
+    entityId: newRow.id,
+    action: "create",
+    before: null,
+    after: { client_id: id, status: "done", model, latencyMs },
+  });
 
   return NextResponse.json({ data: { status: "done", content } });
 }

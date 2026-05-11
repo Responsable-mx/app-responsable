@@ -6,6 +6,8 @@ import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
+// ContextoSection eager — etapa por default (primer panel visible)
+import { ContextoSection } from "@/components/doble-materialidad/ContextoSection";
 import { HorizontesConfig } from "@/components/doble-materialidad/HorizontesConfig";
 import type { NisItem } from "@/components/doble-materialidad/NisSection";
 import type { IroBatchStatus } from "@/components/doble-materialidad/IroSection";
@@ -72,8 +74,9 @@ type Props = {
   clientName: string;
   questionnaireProgress: { filled: number; total: number } | null;
   onGoToCuestionario: () => void;
-  /** Callback para badge [N/7] en el tab de ClientTabs */
+  /** Callback para badge [N/8] en el tab de ClientTabs */
   onStagesProgress?: (done: number, total: number) => void;
+  /** Campos del cliente para KPI cards en Etapa 1 */
   clientSector?: string | null;
   clientSize?: string | null;
   clientFrameworks?: string[] | null;
@@ -90,6 +93,7 @@ const fetcher = (url: string) =>
 // ── Navegación de panel activo (Ruta B — wizard) ─────────────
 // Catálogo canónico de etapas con id + label para prev/next
 export const DM_STAGES_META = [
+  { id: "dm-sec-contexto",   label: "Contexto" },
   { id: "dm-sec-benchmark",  label: "Benchmark" },
   { id: "dm-sec-iros",       label: "IROs" },
   { id: "dm-sec-matriz",     label: "Matriz" },
@@ -187,7 +191,7 @@ export function DoubleMaterialidadTab({
   // cuando ya tenemos los statuses calculados.)
   // Siempre iniciar con valor SSR-safe; leer hash en useEffect para evitar
   // mismatch de hidratación (#418) cuando la URL tiene un hash al recargar.
-  const [activeStageId, setActiveStageId] = useState<string>("dm-sec-benchmark");
+  const [activeStageId, setActiveStageId] = useState<string>("dm-sec-contexto");
   useEffect(() => {
     const hash = window.location.hash.replace(/^#/, "");
     // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR-safe: estado inicial "dm-sec-contexto" evita mismatch de hidratación (#418); hash solo disponible en cliente
@@ -346,12 +350,23 @@ export function DoubleMaterialidadTab({
     }
   }, [latestReport?.parse_status, latestReport?.batch_id, latestReport?.id, isReportPolling]);
 
+  const stage1Status: StageStatus =
+    questionnaireProgress &&
+    questionnaireProgress.filled >= questionnaireProgress.total &&
+    questionnaireProgress.total > 0
+      ? "done"
+      : "active";
+
   const hasBenchmark = latestResult?.status === "done";
   const hasIros      = irosStatus === "done" && iros.length > 0;
   const hasNis       = nisRows.length > 0;
   const hasReport    = latestReport?.parse_status === "ok";
 
-  const stage2Status: StageStatus = hasBenchmark ? "done" : "active";
+  const stage2Status: StageStatus = hasBenchmark
+    ? "done"
+    : stage1Status === "done"
+    ? "active"
+    : "pending";
 
   const stage3Status: StageStatus = hasIros
     ? "done"
@@ -421,17 +436,19 @@ export function DoubleMaterialidadTab({
     brechas_criticas: nisRows.filter((i) => i.estado === "no_identificado").length,
   };
 
-  // Badge [N/7] — notifica al padre cuántas etapas están completas
+  // Badge [N/8] — notifica al padre cuántas etapas están completas
   const stageStatuses: StageStatus[] = [
-    stage2Status, stage3Status, stage4Status,
+    stage1Status, stage2Status, stage3Status, stage4Status,
     stage5Status, stage6Status, stage7Status, stage8Status,
   ];
   const dmDoneCount = stageStatuses.filter((s) => s === "done").length;
   useEffect(() => {
-    onStagesProgress?.(dmDoneCount, 7);
+    onStagesProgress?.(dmDoneCount, 8);
   }, [dmDoneCount, onStagesProgress]);
 
   // Smart-jump al primer pendiente — solo en mount inicial y sin hash en URL.
+  // Permite que un usuario que regresa caiga directo en su trabajo pendiente
+  // en vez de releer Contexto que ya completó.
   const didSmartJumpRef = useRef(false);
   useEffect(() => {
     if (didSmartJumpRef.current) return;
@@ -440,16 +457,22 @@ export function DoubleMaterialidadTab({
       didSmartJumpRef.current = true;
       return;
     }
+    // Si Contexto ya está done y el activeStageId aún es Contexto, salta al primer
+    // active/pending no-locked. Si todo está done, queda en Reporte.
+    if (activeStageId !== "dm-sec-contexto") {
+      didSmartJumpRef.current = true;
+      return;
+    }
     const firstPendingIdx = stageStatuses.findIndex(
       (s) => s === "active" || s === "pending"
     );
-    if (firstPendingIdx >= 0) {
+    if (firstPendingIdx > 0) {
       didSmartJumpRef.current = true;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- smart jump único al cargar status; ref didSmartJumpRef previene loop
       navigateTo(DM_SECTION_IDS[firstPendingIdx]!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage2Status, stage3Status, stage4Status, stage5Status, stage6Status, stage7Status, stage8Status]);
+  }, [stage1Status, stage2Status, stage3Status, stage4Status, stage5Status, stage6Status, stage7Status, stage8Status]);
 
   // Navegación por teclado ← → entre etapas (Ruta B — cambia panel activo)
   useEffect(() => {
@@ -529,6 +552,7 @@ export function DoubleMaterialidadTab({
       {(() => {
         const validatedCompanies = companies.filter((c) => c.validated).length;
         const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null; count?: string }> = [
+          { label: "Contexto",    status: stage1Status, sectionId: "dm-sec-contexto" },
           { label: "Benchmark",   status: stage2Status, sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at,
             count: validatedCompanies > 0 ? `${validatedCompanies} emp.` : undefined },
           { label: "IROs",        status: stage3Status, sectionId: "dm-sec-iros",
@@ -617,8 +641,54 @@ export function DoubleMaterialidadTab({
 
       {/* ── Etapa 1 ── */}
       <CollapsibleStageSection
-        id="dm-sec-benchmark"
+        id="dm-sec-contexto"
         stageNum={1}
+        label="Contexto del cliente"
+        status={stage1Status}
+        accent="border-l-teal-500"
+        isActive={activeStageId === "dm-sec-contexto"}
+        subtitle="Estado del llenado — base para el benchmark y los IROs"
+        headerRight={
+          questionnaireProgress && questionnaireProgress.total > 0 ? (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="h-[3px] w-14 bg-slate-200 overflow-hidden rounded-sm">
+                <div
+                  className="h-full bg-teal-500 transition-all duration-300"
+                  style={{ width: `${Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-slate-500 font-semibold tabular-nums whitespace-nowrap">
+                {Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)}%
+              </span>
+            </div>
+          ) : null
+        }
+      >
+        <ContextoSection
+          progress={questionnaireProgress}
+          onGoToCuestionario={onGoToCuestionario}
+          onGoToCuestionarioStep={(stepIdx) => {
+            // ?tab=cuestionario&step=N gana sobre localStorage en ClientTabs.
+            // Padre del DM tab maneja el switch tab via onGoToCuestionario+navegación.
+            if (typeof window !== "undefined") {
+              const params = new URLSearchParams(window.location.search);
+              params.set("tab", "cuestionario");
+              params.set("step", String(stepIdx + 1));
+              window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+            }
+            onGoToCuestionario();
+          }}
+          clientId={clientId}
+          sector={clientSector}
+          size={clientSize}
+          frameworks={clientFrameworks}
+        />
+      </CollapsibleStageSection>
+
+      {/* ── Etapa 2 ── */}
+      <CollapsibleStageSection
+        id="dm-sec-benchmark"
+        stageNum={2}
         label="Benchmark competitivo"
         status={stage2Status}
         accent="border-l-blue-600"
@@ -651,10 +721,10 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 2 — IROs del cliente ── */}
+      {/* ── Etapa 3 — IROs del cliente ── */}
       <CollapsibleStageSection
         id="dm-sec-iros"
-        stageNum={2}
+        stageNum={3}
         label="Inventario de IROs"
         status={stage3Status}
         accent="border-l-violet-600"
@@ -683,10 +753,10 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 3 — Matriz de Doble Materialidad ── */}
+      {/* ── Etapa 4 — Matriz de Doble Materialidad ── */}
       <CollapsibleStageSection
         id="dm-sec-matriz"
-        stageNum={3}
+        stageNum={4}
         label="Matriz de Doble Materialidad"
         status={stage4Status}
         accent="border-l-brand-primary"
@@ -712,10 +782,10 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 4 — NIS / IBSO ── */}
+      {/* ── Etapa 5 — NIS / IBSO ── */}
       <CollapsibleStageSection
         id="dm-sec-nis"
-        stageNum={4}
+        stageNum={5}
         label="Brechas de información por área material"
         status={stage5Status}
         accent="border-l-amber-600"
@@ -738,10 +808,10 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 5 — Resumen ejecutivo IA ── */}
+      {/* ── Etapa 6 — Resumen ejecutivo IA ── */}
       <CollapsibleStageSection
         id="dm-sec-resumen"
-        stageNum={5}
+        stageNum={6}
         label="Resumen Ejecutivo (IA)"
         status={stage6Status}
         accent="border-l-cyan-600"
@@ -752,10 +822,10 @@ export function DoubleMaterialidadTab({
         <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 6 — Validación con el cliente ── */}
+      {/* ── Etapa 7 — Validación con el cliente ── */}
       <CollapsibleStageSection
         id="dm-sec-validacion"
-        stageNum={6}
+        stageNum={7}
         label="Validación con el cliente"
         status={stage7Status}
         accent="border-l-amber-500"
@@ -773,10 +843,10 @@ export function DoubleMaterialidadTab({
         <ValidacionSection clientId={clientId} iros={iros} />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 7 — Reporte (etapa final) ── */}
+      {/* ── Etapa 8 — Reporte (etapa final) ── */}
       <CollapsibleStageSection
         id="dm-sec-reporte"
-        stageNum={7}
+        stageNum={8}
         label="Reporte de Doble Materialidad"
         status={stage8Status}
         accent="border-l-emerald-600"

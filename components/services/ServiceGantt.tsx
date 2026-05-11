@@ -6,107 +6,19 @@
 // Baseline freeze · export PNG (html2canvas dyn-import).
 
 import { useMemo, useState, useRef, useId } from "react";
-import type { ActivityStatus, ServiceStage, StageActivity } from "@/lib/stages";
+import type { ServiceStage, StageActivity } from "@/lib/stages";
 import { QuickActionPopover, type QuickPatch } from "./QuickActionPopover";
 import { GanttToolbar } from "./GanttToolbar";
 import { GanttHeader } from "./GanttHeader";
 import { GanttEvm } from "./GanttEvm";
 import { GanttLegend } from "./GanttLegend";
 import { RichTooltip } from "./GanttTooltip";
-
-// ─── Colores ──────────────────────────────────────────────────────────────────
-
-const STATUS_BAR: Record<ActivityStatus, string> = {
-  pending: "bg-slate-300",
-  in_progress: "bg-brand-primary",
-  completed: "bg-emerald-500",
-  delayed: "bg-rose-500",
-};
-
-const STATUS_LABEL: Record<ActivityStatus, string> = {
-  pending: "Pendiente",
-  in_progress: "En curso",
-  completed: "Completada",
-  delayed: "Retrasada",
-};
-
-// ─── Helpers de fecha ─────────────────────────────────────────────────────────
-
-const MS_DAY = 86_400_000;
-
-function parseDate(s: string | null): Date | null {
-  if (!s) return null;
-  return new Date(s + "T00:00:00");
-}
-
-function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
-function addMonths(d: Date, n: number): Date {
-  return new Date(d.getFullYear(), d.getMonth() + n, 1);
-}
-
-function fmtShort(d: string | null) {
-  if (!d) return "—";
-  return new Date(d + "T00:00:00").toLocaleDateString("es-MX", {
-    day: "2-digit",
-    month: "short",
-  });
-}
-
-// Lunes más cercano >= ts
-function nextMonday(ts: number): number {
-  const d = new Date(ts);
-  const day = d.getDay(); // 0=Dom
-  const diff = day === 1 ? 0 : day === 0 ? 1 : 8 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function weekBoundaries(min: number, max: number): number[] {
-  const out: number[] = [];
-  let cur = nextMonday(min);
-  while (cur < max) {
-    out.push(cur);
-    cur += 7 * MS_DAY;
-  }
-  return out;
-}
-
-function dayBoundaries(min: number, max: number): number[] {
-  const out: number[] = [];
-  const d = new Date(min);
-  d.setHours(0, 0, 0, 0);
-  while (d.getTime() < max) {
-    out.push(d.getTime());
-    d.setDate(d.getDate() + 1);
-  }
-  return out;
-}
-
-// ─── Zoom ─────────────────────────────────────────────────────────────────────
-
-type Zoom = "fit" | "mes" | "quarter" | "semana" | "dia";
-// fit=auto · mes=200px/mes · quarter=440 (~110px/sem) · semana=1000 (~33px/día) · dia=3000 (~100px/día)
-const MONTH_PX: Record<Zoom, number | null> = { fit: null, mes: 200, quarter: 440, semana: 1000, dia: 3000 };
-
-// ─── Ruta crítica ─────────────────────────────────────────────────────────────
-
-function findAtRisk(activities: StageActivity[]): Set<string> {
-  const atRisk = new Set<string>();
-  const queue = activities.filter((a) => a.status === "delayed").map((a) => a.id);
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    if (atRisk.has(id)) continue;
-    atRisk.add(id);
-    for (const a of activities) {
-      if (a.depends_on_activity_id === id && !atRisk.has(a.id)) queue.push(a.id);
-    }
-  }
-  return atRisk;
-}
+import {
+  MS_DAY, MONTH_PX, STATUS_BAR, STATUS_LABEL, LABEL_W, ROW_H,
+  parseDate, startOfMonth, addMonths, fmtShort, nextMonday,
+  weekBoundaries, dayBoundaries, findAtRisk,
+  type Zoom,
+} from "./gantt-helpers";
 
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
@@ -114,11 +26,6 @@ type Overlay =
   | { kind: "tooltip"; activity: StageActivity; anchor: { x: number; y: number } }
   | { kind: "popover"; stageId: string; activity: StageActivity; anchor: { x: number; y: number } }
   | null;
-
-// ─── Constantes layout ────────────────────────────────────────────────────────
-
-const LABEL_W = 240;
-const ROW_H = 44;
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 

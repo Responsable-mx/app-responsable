@@ -24,7 +24,6 @@ type FormState = {
   servicio: string;
   alcance: string;
   website_url: string;
-  propuesta_url: string;
   relacion: string;
 };
 
@@ -37,7 +36,6 @@ export function NuevoClienteWizard() {
     servicio: "",
     alcance: "",
     website_url: "",
-    propuesta_url: "",
     relacion: "",
   });
   const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
@@ -80,7 +78,6 @@ export function NuevoClienteWizard() {
             nombre_empresa: form.nombre,
             servicio_contratado: form.servicio,
             alcance_geografico: form.alcance,
-            propuesta_comercial_url: form.propuesta_url || null,
             relacion_empresas: form.relacion || null,
           },
         }),
@@ -158,15 +155,6 @@ export function NuevoClienteWizard() {
           onChange={(e) => set("website_url", e.target.value)}
           placeholder="responsable.net"
           helper="Dominio que usará la IA como fuente primaria para los pasos 2-9"
-        />
-
-        <Input
-          label="Propuesta comercial"
-          type="url"
-          value={form.propuesta_url}
-          onChange={(e) => set("propuesta_url", e.target.value)}
-          placeholder="https://drive.google.com/file/..."
-          helper="URL Google Drive / OneDrive — para validar alcance"
         />
 
         <Input

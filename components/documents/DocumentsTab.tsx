@@ -23,12 +23,16 @@ const KIND_LABEL: Record<DocMeta["kind"], string> = {
   general: "General",
   sustainability_report: "Sustentabilidad",
   financial_report: "Financiero",
+  dm_report: "Reporte DM",
+  proposal: "Propuesta",
 };
 
 const KIND_COLOR: Record<DocMeta["kind"], string> = {
   general: "bg-slate-100 text-slate-700",
   sustainability_report: "bg-emerald-100 text-emerald-800",
   financial_report: "bg-amber-100 text-amber-800",
+  dm_report: "bg-teal-100 text-teal-800",
+  proposal: "bg-violet-100 text-violet-800",
 };
 
 const TYPE_BADGE: Record<DocMeta["file_type"], string> = {
@@ -356,6 +360,8 @@ export function DocumentsTab({
     general: docs.filter((d) => d.kind === "general").length,
     sustainability_report: docs.filter((d) => d.kind === "sustainability_report").length,
     financial_report: docs.filter((d) => d.kind === "financial_report").length,
+    dm_report: docs.filter((d) => d.kind === "dm_report").length,
+    proposal: docs.filter((d) => d.kind === "proposal").length,
   };
 
   // Métricas de cobertura — strip 1 condicional (sólo render cuando hay alerta).
@@ -464,9 +470,11 @@ export function DocumentsTab({
   // Filtros de categoría — solo categorías con docs. Sin pill "Todos" (redundante con
   // search bar y badge de tab). Click en pill activa toggle a "all".
   const filterOptions = [
+    ...(counts.proposal > 0 ? [{ k: "proposal" as const, label: `Propuesta (${counts.proposal})` }] : []),
     ...(counts.general > 0 ? [{ k: "general" as const, label: `General (${counts.general})` }] : []),
     ...(counts.sustainability_report > 0 ? [{ k: "sustainability_report" as const, label: `Sustentabilidad (${counts.sustainability_report})` }] : []),
     ...(counts.financial_report > 0 ? [{ k: "financial_report" as const, label: `Financiero (${counts.financial_report})` }] : []),
+    ...(counts.dm_report > 0 ? [{ k: "dm_report" as const, label: `Reporte DM (${counts.dm_report})` }] : []),
   ];
 
   return (

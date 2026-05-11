@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { detectFileType, parseToMarkdown, truncateMarkdown, type FileType } from "@/lib/documents/parsers";
+import { type DocumentKind } from "@/lib/documents/types";
 import { createHash, randomUUID } from "node:crypto";
 
 const BUCKET = "client-documents";
@@ -9,7 +10,7 @@ export type ClientDocument = {
   id: string;
   client_id: string;
   uploaded_by: string | null;
-  kind: "general" | "sustainability_report" | "financial_report";
+  kind: DocumentKind;
   file_name: string;
   file_type: FileType;
   mime_type: string;
@@ -31,7 +32,7 @@ export type UploadDocOpts = {
   fileName: string;
   mimeType: string;
   buffer: Buffer;
-  kind?: "general" | "sustainability_report" | "financial_report";
+  kind?: DocumentKind;
   sourceUrl?: string;
   serviceIds?: string[];
 };

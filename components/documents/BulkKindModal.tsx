@@ -30,9 +30,11 @@ export function BulkKindModal({
             value={kind}
             onChange={(v) => setKind(v as DocMeta["kind"])}
             options={[
+              { value: "proposal", label: "Propuesta comercial" },
               { value: "general", label: "General" },
               { value: "sustainability_report", label: "Sustentabilidad" },
               { value: "financial_report", label: "Financiero" },
+              { value: "dm_report", label: "Reporte DM" },
             ]}
           />
         </div>

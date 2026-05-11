@@ -1,107 +1,149 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-08 (sesión 22 — audit-ia + audit-seg + audit-health + audit-refactor + simplify)
-**Calificación global:** 9.6 / 10
+**Fecha:** 2026-05-10 (sesión 25 — audit + audit-health + audit-ia + audit-refactor + simplify)
+**Calificación global:** 9.3 / 10 (-0.3 vs sesión 22)
 
 ---
 
-## Hallazgos sesión 22 — nuevos desde sesión 21
+## Hallazgos sesión 25 — nuevos desde sesión 24
 
 | ID | Sev | Descripción | Estado |
 |----|-----|-------------|--------|
-| D-144 | 🔴 | SSRF guard duplicado en `extract-profile.ts` — más débil que `isPublicHttpUrl` (sin IPv4-mapped IPv6, sin prefijo 127.*, sin IPv6 ULA fc/fd) | ✅ Resuelto |
-| D-145 | 🟡 | Rate limit extract-profile usa `chat_requests` sin índice compuesto `(user_email, role, created_at)` → COUNT O(n) | Pendiente DEUDA.md |
-| D-146 | 🟢 | `extract-profile` no llamaba `logAiCall()` — tokens IA sin trazabilidad en dashboard uso-ia | ✅ Resuelto |
-| D-147 | 🟢 | Cache in-memory en `extract-profile.ts` se pierde en cada deploy — aceptable para MVP (8 usuarios) | Documentado, aceptado MVP |
+| D-148 | 🔴 | 7 ESLint errors `react-hooks` críticos (rules-of-hooks roto en QuestionnaireTab:452 + TDZ + setState in effect en ClientTabs/DoubleMaterialidadTab) | Pendiente DEUDA.md |
+| D-149 | 🟡 | `app/dev/app-preview/AppShell.tsx` 114KB + WizardShell 72KB + mock-data 49KB = 235KB no eliminados pese a CLAUDE.md (sección "Consolidación mayo-2026") afirmar lo contrario | Pendiente DEUDA.md |
+| D-150 | 🟡 | `DoubleMaterialidadTab.tsx` monolito 2988L / 129KB — concentra 8 stages + chat + benchmark + IROs + reporte preview. ESLint detectó setState in effect en L2575 | Pendiente DEUDA.md |
+| D-151 | 🟡 | 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado | Pendiente DEUDA.md |
+| D-152 | 🟢 | 3 tests `apply-sql-safety.test.ts` timeout 5s (OneDrive Files-On-Demand) — `permite ALTER TABLE ADD COLUMN IF NOT EXISTS`, `permite CREATE TABLE IF NOT EXISTS`, `permite COMMENT ON COLUMN` | Pendiente DEUDA.md |
+| D-153 | 🟢 | `DocumentsTab.tsx` 74KB + `ServiceGantt.tsx` 55KB monolitos secundarios (mismo patrón D-150) | Pendiente DEUDA.md |
+| D-154 | 🟢 | 7 ESLint warnings unused vars (`completeness`, `serviceLabels`, `visibleServices`, `stripPinned`, `reportUrls`, `decisions×2`) | Pendiente DEUDA.md |
 
 ---
 
-## Fixes aplicados sesión 22
+## Detalle D-148 — ESLint react-hooks errors
 
-### D-144 — SSRF guard unificado (🔴 → ✅)
+**Síntoma**: `npx eslint .` reporta 7 errors + 7 warnings. Errors críticos pueden producir bugs runtime intermitentes (orden hook depende de path, setState cascading).
 
-**Problema**: `lib/ai/extract-profile.ts` tenía su propia implementación SSRF que:
-- No cubría IPv4-mapped IPv6: `::ffff:192.168.1.1` bypasaba `isPrivateIPv4()` (split por `.` → NaN)
-- No cubría prefijo `127.*` (solo `127.0.0.1` exacto)
-- No cubría IPv6 ULA (`fc`/`fd` prefixes)
-- Duplicaba lógica ya existente en `lib/documents/ssrf.ts`
+| Archivo:línea | Error | Por qué importa |
+|---------------|-------|-----------------|
+| `QuestionnaireTab.tsx:452` | `useEffect` después de early return → react-hooks/rules-of-hooks | Orden de hooks inconsistente entre renders → bugs aleatorios |
+| `QuestionnaireTab.tsx:248` | `aiFillAll` accessed before declared (decl L488) | TDZ runtime cuando effect lee función no declarada |
+| `QuestionnaireTab.tsx:455-456` | `docFill` accessed before declared (decl L464) | Mismo patrón |
+| `ClientTabs.tsx:134` | `setShowStripDropdown` accessed before declared (decl L189) | Effect callback referencia setState antes de useState |
+| `ClientTabs.tsx:158` | `setState` síncrono dentro de effect body | Cascading renders, perf degradada |
+| `DoubleMaterialidadTab.tsx:2575` | `navigateTo()` (con setState) en effect body | Mismo patrón |
 
-**Fix sesión 22**:
-1. `lib/documents/ssrf.ts`: agregado check `::ffff:*` IPv4-mapped IPv6 para todos los rangos RFC1918
-2. `lib/ai/extract-profile.ts`: `validateUrl()` reemplazada → usa `isPublicHttpUrl` de ssrf.ts
-
-**Fix adicional sesión 22 (post-tests)**: El check `::ffff:*` inicial era incorrecto — Node.js WHATWG URL parser normaliza `[::ffff:192.168.1.1]` a hostname `::ffff:c0a8:101` (grupos hex). El regex dotted-decimal nunca matcheaba. Bug descubierto al escribir tests de regresión. Fix: conversión hex→decimal antes del regex (`hi/lo = parseInt(parts, 16)` → `octet = (hi >> 8) & 0xff` etc.).
-
-### D-146 — logAiCall en extract-profile (🟢 → ✅)
-
-**Problema**: `POST /api/clients/extract-profile` ejecutaba Claude (Sonnet, 300 max_tokens) sin registrar en `ai_calls`. Dashboard `uso-ia` no contabilizaba estas llamadas.
-
-**Fix**:
-- `ProfileExtractResult` añade campos opcionales `inputTokens`, `outputTokens`, `cacheCreationTokens`, `cacheReadTokens`
-- `extractFromText()` propaga `resp.usage` en el return
-- Route llama `logAiCall()` con tokens reales (no 0). Si resultado es cached, no loguea (no hubo llamada IA)
+**Fix sugerido**: mover declaraciones (`useState`, `function aiFillAll`, etc.) ANTES de cada `useEffect` que las consuma. Para `setState in effect`: si necesitas sincronizar estado externo, usar `useSyncExternalStore` o derivar valor durante render.
 
 ---
 
-## Descartados (falsos positivos del análisis)
+## Detalle D-149 — Mockups dev no eliminados
 
-| Falso positivo | Razón |
-|----------------|-------|
-| "extractOgImage acepta `data:` URIs" | INCORRECTO — ya filtra `u.protocol !== "http:" && !== "https:"` → retorna null |
-| "coerceInput omite `website_url`" | INCORRECTO — línea 430 ya lo incluye |
-| "parseDomain puede romper render" | INCORRECTO — tiene try/catch, retorna null en error |
-| "ClientAvatar usa client innecesariamente" | Sin riesgo — solo se importa desde Client Components |
+CLAUDE.md sección "Consolidación mayo-2026 — eliminación del mockup `/dev/app-preview`" afirma:
+
+> El mockup `app/dev/app-preview/AppShell.tsx` fue eliminado.
+
+Realidad (`ls app/dev/`):
+
+```
+app-preview/         (AppShell.tsx 114KB)
+chat-preview/
+client-tabs-mockup/
+clientes-wizard-preview/  (WizardShell.tsx 72KB + mock-data.ts 49KB)
+dm-nav-mockup/
+primitives-preview/
+```
+
+Middleware en `lib/supabase/middleware.ts:60-61` bloquea `/dev/*` en producción:
+```ts
+if (pathname.startsWith("/dev/") && process.env.NODE_ENV !== "production")
+```
+
+✅ Sin riesgo en prod. Pero:
+- Contamina dev build (slow HMR en archivos 100KB+)
+- Inflar `node_modules` cache + Vercel build time
+- Doc desincronizado → confusión para colaboradores
+
+**Decisión pendiente**:
+1. Eliminar mockups (si son referenciables por git history) → quita 235KB del repo
+2. Actualizar CLAUDE.md para reflejar que `/dev/app-preview` sigue activo en dev como referencia (justificar uso)
 
 ---
 
-## Áreas sin hallazgos nuevos sesión 22
+## Detalle D-150 — DoubleMaterialidadTab monolito
+
+| Métrica | Valor |
+|---------|-------|
+| Líneas | 2988 |
+| Tamaño | 129KB |
+| Secciones | 8 stages + chat + benchmark + IROs + reporte preview |
+| ESLint errors directos | 1 (setState in effect L2575) |
+| Componentes ya extraídos | `ValidacionSection.tsx`, `MatrizDM.tsx` |
+
+**Fix sugerido**: dividir por sección manteniendo orchestrator delgado:
+- `DoubleMaterialidadTab.tsx` (orchestrator + state shared)
+- `BenchmarkSection.tsx`
+- `IROsSection.tsx`
+- `ReportPreviewSection.tsx`
+- `Stage<N>.tsx` × 8
+
+Pattern ya validado por `ValidacionSection.tsx`. ROI: cambios pequeños no rompen partes alejadas + tests por sección.
+
+---
+
+## Áreas verificadas sin hallazgos nuevos sesión 25
 
 | Área | Resultado |
 |------|-----------|
-| Auth en `extract-profile` — `requireUser()` correcto (consultores pueden extraer perfiles) | ✅ |
-| Content-Type validation en `fetchPageData` — verifica text/html, rechaza binarios | ✅ |
-| Timeout 15s fetch + 55s Anthropic — apropiados para sitios corporativos | ✅ |
-| Max body bytes 5MB — cap correcto contra DoS | ✅ |
-| HTML stripping antes de enviar a IA — script/style/noscript removidos | ✅ |
-| `coerceInput` KEYS — `website_url` y `logo_url` presentes (fix de sesión 22) | ✅ |
-| `ClientAvatar` imgError state — fallback a monogram correcto | ✅ |
-| `ClientsList parseDomain` — try/catch, null safe | ✅ |
-| Model routing `extract-profile` — Sonnet vía env var `ANTHROPIC_MODEL_SONNET` | ✅ |
-| Prompt caching en `extract-profile` — `cache_control: ephemeral` en system block | ✅ |
-| DM benchmark `max_tokens: 8000` — ≤ límite Sonnet 4.6 (8192), output esperado ~3-5k tokens | ✅ |
-| Rate limit 20/5min con fail-open — comportamiento correcto | ✅ |
+| Auth `requireConsultorOrAdmin` en chat/route.ts | ✅ |
+| Rate limit chat 30/5min DB-backed + AbortSignal 45s + circuit breaker | ✅ |
+| Rate limit DB en 8 endpoints IA (ai-fill, doc-fill, dm-*, research-reports, extract-profile) | ✅ |
+| `logAiCall` con cache tokens en 9/9 routes IA | ✅ |
+| Cache breakpoints ephemeral 2× en `lib/ai/roles.ts buildSystemBlocks` | ✅ |
+| Middleware `/dev/*` bloqueado en prod | ✅ |
+| SSRF guard unificado (`isPublicHttpUrl` cubre IPv4-mapped IPv6) | ✅ |
+| `getModelConfig()` única fuente — sin hardcodes en routes (post D-110) | ✅ |
+| Sentry client+server+instrumentation+CSP `connect-src` ingest | ✅ |
+| TypeScript `--noEmit`: 0 errores | ✅ |
+| Tests: 315/318 verdes (3 timeouts D-152) | ✅ |
+| `npm audit`: 0 high, 3 moderate preexistentes (anthropic SDK + postcss/next) | ✅ |
+| STACK.md cache strategy: 12 entries documentadas (`revalidate` correcto) | ✅ |
+| Audit log `logChange()` en mutaciones admin | ✅ |
 
 ---
 
-## Pendientes activos
+## Pendientes activos post-sesión 25
 
 | ID | Sev | Descripción |
 |----|-----|-------------|
-| D-145 | 🟡 | `chat_requests` sin índice `(user_email, role, created_at)` — O(n) COUNT para rate limit |
-| D-04  | 🟡 | Metodología ResponSable — decisión de negocio, no código |
-| —     | 🟢 | `SENTRY_AUTH_TOKEN` en Vercel env vars (manual) |
-| —     | 🟢 | Secrets GitHub E2E en repo Settings |
-| —     | 🟢 | Cron para `cleanup_rate_limit_hits()` — función DB sin caller |
+| D-148 | 🔴 | 7 ESLint errors react-hooks críticos |
+| D-149 | 🟡 | Mockups `/dev/` 235KB no eliminados (doc desync) |
+| D-150 | 🟡 | DoubleMaterialidadTab 2988L monolito |
+| D-151 | 🟡 | 35 `any` sin justificar |
+| D-04  | 🟡 | Metodología ResponSable (decisión negocio, arrastre) |
+| D-152 | 🟢 | 3 tests apply-sql-safety timeout |
+| D-153 | 🟢 | DocumentsTab 74KB + ServiceGantt 55KB |
+| D-154 | 🟢 | 7 unused vars ESLint warnings |
+| D-147 | 🟢 | Cache in-memory extract-profile (aceptado MVP) |
 
 ---
 
-## Score sesión 22
+## Score sesión 25
 
-| Dimensión | Post-21 | Post-22 | Delta |
+| Dimensión | Post-22 | Post-25 | Delta |
 |-----------|---------|---------|-------|
-| Seguridad | 9.5 | 9.7 | +0.2 (D-144 SSRF IPv4-mapped cubierto, guard unificado) |
-| Confiabilidad | 9.8 | 9.8 | — |
+| Seguridad | 9.7 | 9.7 | — |
+| Confiabilidad | 9.8 | 9.4 | -0.4 (D-148 react-hooks runtime risk) |
 | UX | 9.2 | 9.2 | — |
-| Arquitectura | 9.8 | 9.8 | — |
+| Arquitectura | 9.8 | 9.4 | -0.4 (D-149 mockups + D-150 monolito) |
 | Rendimiento | 9.2 | 9.2 | — |
-| Calidad de código | 9.8 | 9.8 | — (zero TS errors mantenido) |
-| Observabilidad | 9.2 | 9.5 | +0.3 (D-146 logAiCall extract-profile con tokens reales) |
-| Deuda técnica | 9.8 | 9.6 | -0.2 (D-145 nuevo pendiente) |
-| **Global** | **9.8** | **9.6** | **-0.2** |
+| Calidad de código | 9.8 | 8.8 | -1.0 (7 ESLint errors + 35 `any`) |
+| Observabilidad | 9.5 | 9.5 | — |
+| Deuda técnica | 9.6 | 9.0 | -0.6 (3 nuevas Importantes) |
+| **Global** | **9.6** | **9.3** | **-0.3** |
 
-> Nota: score baja levemente por D-145 nuevo (rate limit sin índice). D-144 resuelto compensa en seguridad.
+> Nota: Score baja por D-148 (runtime risk) + 3 nuevas Importantes. Cero hallazgos nuevos en seguridad/IA/observabilidad — bloques previamente endurecidos siguen sólidos.
 
 ---
 
-## Auditoría anterior: 2026-05-07 (sesión 21)
-**Score:** 9.8/10
+## Auditoría anterior: 2026-05-08 (sesión 22)
+**Score:** 9.6/10 — D-144/146 resueltos, D-145/147 pendientes (D-145 cerrado en sesión 24).

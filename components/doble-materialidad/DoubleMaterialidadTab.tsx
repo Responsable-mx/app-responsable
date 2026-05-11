@@ -15,8 +15,6 @@ import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 import { classifyEsg, ESG_BADGE } from "@/lib/dm/esg-classify";
 import { ResumenEjecutivoSection } from "@/components/doble-materialidad/ResumenEjecutivoSection";
 import { ValidacionSection } from "@/components/doble-materialidad/ValidacionSection";
-import { ChecklistCierre } from "@/components/doble-materialidad/ChecklistCierre";
-import { LogDecisionesSection } from "@/components/doble-materialidad/LogDecisionesSection";
 
 const MatrizDM = dynamic(
   () => import("@/components/doble-materialidad/MatrizDM").then((m) => ({ default: m.MatrizDM })),
@@ -2959,30 +2957,6 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Checklist de cierre ── */}
-      <section aria-labelledby="stage-checklist">
-        <h2 id="stage-checklist" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-          Checklist de Cierre
-        </h2>
-        <ChecklistCierre
-          questionnaireProgress={questionnaireProgress}
-          hasCompletedBenchmark={hasBenchmark}
-          iroCount={iros.length}
-          includedIroCount={includedIros.length}
-          scoredIroCount={iros.filter((i) => i.score_impacto !== null && i.score_financiero !== null).length}
-          hasNisData={hasNis}
-          hasReport={hasReport}
-          hasResumen={hasResumen}
-        />
-      </section>
-
-      {/* ── Log de decisiones ── */}
-      <section aria-labelledby="stage-log">
-        <h2 id="stage-log" className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
-          Log de Decisiones
-        </h2>
-        <LogDecisionesSection clientId={clientId} />
-      </section>
     </div>
   );
 }

@@ -396,83 +396,83 @@ export function DocumentsTab({
     await doUpload(arr);
   }
 
-  // Archivos > 4MB van directo a Supabase vía presigned URL (Vercel limita body a 4.5MB)
-  const LARGE_FILE_THRESHOLD = 4 * 1024 * 1024;
+  const ZIP_EXT_TO_MIME: Record<string, string> = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".doc": "application/msword",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xls": "application/vnd.ms-excel",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+  };
 
-  function normalizeFileMime(file: File): string {
-    if (file.name.toLowerCase().endsWith(".zip")) return "application/zip";
-    return file.type || "application/octet-stream";
-  }
-
-  async function uploadLargeFile(file: File): Promise<number> {
-    const mimeType = normalizeFileMime(file);
-
-    // 1. Obtener URL firmada de Supabase
-    const presignRes = await fetch(`/api/clients/${clientId}/documents/presign`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: file.name, mimeType, size: file.size }),
-    });
-    if (!presignRes.ok) {
-      const j = await presignRes.json().catch(() => ({}));
-      throw new Error(j.error ?? "Error obteniendo URL de subida");
+  async function uploadSingleFile(file: File, failures: string[]): Promise<number> {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", "general");
+    if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
+    try {
+      const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { failures.push(`${file.name}: ${j.error ?? "error"}`); return 0; }
+      return (j.count as number) ?? 1;
+    } catch (e) {
+      failures.push(`${file.name}: ${e instanceof Error ? e.message : "error"}`);
+      return 0;
     }
-    const { signedUrl, storagePath } = (await presignRes.json()) as { signedUrl: string; storagePath: string };
-
-    // 2. Subir directo a Supabase (sin pasar por Vercel)
-    const uploadRes = await fetch(signedUrl, {
-      method: "PUT",
-      headers: { "Content-Type": mimeType },
-      body: file,
-    });
-    if (!uploadRes.ok) {
-      throw new Error(`Error subiendo a storage: HTTP ${uploadRes.status}`);
-    }
-
-    // 3. Registrar y procesar en el servidor
-    const registerRes = await fetch(`/api/clients/${clientId}/documents`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        storagePath,
-        filename: file.name,
-        mimeType,
-        kind: "general",
-        serviceIds: uploadServiceIds,
-      }),
-    });
-    const j = await registerRes.json().catch(() => ({}));
-    if (!registerRes.ok) throw new Error(j.error ?? "Error procesando archivo");
-    return (j.count as number) ?? 1;
   }
 
   async function doUpload(files: File[]) {
     setUploading(true);
     let okCount = 0;
     const failures: string[] = [];
+
     for (const file of files) {
-      try {
-        if (file.size > LARGE_FILE_THRESHOLD) {
-          // Archivo grande: presigned URL → Supabase → registro
-          okCount += await uploadLargeFile(file);
-        } else {
-          // Archivo pequeño: multipart directo
-          const fd = new FormData();
-          fd.append("file", file);
-          fd.append("kind", "general");
-          if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
-          const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
-          const j = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            failures.push(`${file.name}: ${j.error ?? "error"}`);
-          } else {
-            okCount += (j.count ?? 1);
+      const isZip =
+        file.name.toLowerCase().endsWith(".zip") ||
+        file.type === "application/zip" ||
+        file.type === "application/x-zip-compressed";
+
+      if (isZip) {
+        // Extraer el ZIP en el browser y subir cada archivo por separado.
+        // Evita el límite de 4.5MB de Vercel para el body de funciones serverless.
+        try {
+          const JSZip = (await import("jszip")).default;
+          const zip = await JSZip.loadAsync(file);
+
+          const extracted: File[] = [];
+          for (const [entryPath, entry] of Object.entries(zip.files)) {
+            if (entry.dir) continue;
+            const baseName = entryPath.split("/").pop() ?? entryPath;
+            if (baseName.startsWith("__MACOSX") || baseName.startsWith(".")) continue;
+            const ext = baseName.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
+            const mimeType = ZIP_EXT_TO_MIME[ext];
+            if (!mimeType) continue;
+            const buf = await entry.async("arraybuffer");
+            extracted.push(new File([buf], baseName, { type: mimeType }));
           }
+
+          if (extracted.length === 0) {
+            failures.push(`${file.name}: sin archivos soportados (PDF, DOCX, XLSX, PPTX, TXT, MD)`);
+          } else {
+            // Lotes de 5 en paralelo — mismo patrón que el server
+            const BATCH = 5;
+            for (let i = 0; i < extracted.length; i += BATCH) {
+              const batch = extracted.slice(i, i + BATCH);
+              const counts = await Promise.all(batch.map((f) => uploadSingleFile(f, failures)));
+              okCount += counts.reduce((a, b) => a + b, 0);
+            }
+          }
+        } catch (e) {
+          failures.push(`${file.name}: ${e instanceof Error ? e.message : "ZIP inválido o corrupto"}`);
         }
-      } catch (e) {
-        failures.push(`${file.name}: ${e instanceof Error ? e.message : "error"}`);
+      } else {
+        okCount += await uploadSingleFile(file, failures);
       }
     }
+
     setUploading(false);
     void mutate();
     if (okCount > 0 && failures.length === 0) toast.push("success", `${okCount} archivo(s) subidos`);

@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { catalogLabel } from "@/components/doble-materialidad/catalog-lookup";
+import { getFieldValue, isFieldFilled } from "@/lib/questionnaires/types";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
 
 export type ContextoProgress = { filled: number; total: number } | null;
@@ -59,9 +60,8 @@ function extractMissingByStep(bundle: QuestionnaireBundle | undefined): MissingS
     const missing: Array<{ key: string; label: string }> = [];
 
     for (const f of fields) {
-      const v = stepResp[f.key];
-      const empty = v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
-      if (empty) missing.push({ key: f.key, label: f.label });
+      const val = getFieldValue(stepResp[f.key]);
+      if (!isFieldFilled(val)) missing.push({ key: f.key, label: f.label });
     }
 
     if (missing.length > 0) {

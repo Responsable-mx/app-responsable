@@ -15,7 +15,7 @@ export type UsageRow = {
 };
 
 export type UsageByModel = {
-  family: "haiku" | "sonnet" | "opus" | "otro";
+  family: "haiku" | "sonnet" | "opus" | "voyage" | "otro";
   calls: number;
   input_tokens: number;
   output_tokens: number;
@@ -144,10 +144,17 @@ export async function getUsageSummary(
     const isHaiku = m.includes("haiku");
     const isOpus  = m.includes("opus");
     const isSonnet = m.includes("sonnet");
-    const family: UsageByModel["family"] = isHaiku ? "haiku" : isOpus ? "opus" : isSonnet ? "sonnet" : "otro";
-    const iIn  = isHaiku ? 0.25 : isOpus ? 5  : 3;
-    const iOut = isHaiku ? 1.25 : isOpus ? 25 : 15;
-    const iCache = isHaiku ? 0.03 : isOpus ? 0.5 : 0.3;
+    const isVoyage = m.includes("voyage");
+    const family: UsageByModel["family"] =
+      isVoyage ? "voyage" : isHaiku ? "haiku" : isOpus ? "opus" : isSonnet ? "sonnet" : "otro";
+    // Precios may-2026 por 1M tokens:
+    //   voyage-2 / voyage-3: $0.10 input, $0 output (no genera output)
+    //   voyage-3-lite: $0.02 input
+    // Voyage no tiene output ni cache_read distintos del input.
+    const voyageRate = m.includes("voyage-3-lite") ? 0.02 : 0.10;
+    const iIn  = isVoyage ? voyageRate : isHaiku ? 0.25 : isOpus ? 5  : 3;
+    const iOut = isVoyage ? 0 : isHaiku ? 1.25 : isOpus ? 25 : 15;
+    const iCache = isVoyage ? 0 : isHaiku ? 0.03 : isOpus ? 0.5 : 0.3;
     const rIn  = ((r.input_tokens  ?? 0) * iIn)    / 1_000_000;
     const rOut = ((r.output_tokens ?? 0) * iOut)   / 1_000_000;
     const rCache = ((r.cache_read_tokens ?? 0) * iCache) / 1_000_000;

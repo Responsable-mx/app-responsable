@@ -3,9 +3,13 @@ import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { RoleId } from "@/lib/ai/models";
 
+// LogRoleId extiende RoleId con "embeddings" para Voyage (Wave 7 cost tracking).
+// ai_calls.role no tiene CHECK constraint — acepta cualquier string.
+export type LogRoleId = RoleId | "embeddings";
+
 export type AiCallLog = {
   userEmail: string;
-  role: RoleId;
+  role: LogRoleId;
   clientId: string | null;
   model: string;
   inputTokens?: number;

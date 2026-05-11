@@ -127,7 +127,7 @@ export default async function UsoIaPage() {
         Uso de los 4 roles IA en los últimos 30 días.
         <span
           className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold cursor-help"
-          title="Costo real por modelo (Haiku $0.25/$1.25, Sonnet $3/$15, Opus $5/$25 por 1M tokens). Cache hits reducen ~90% el costo de input. Ver desglose por modelo abajo."
+          title="Costo real por modelo (Haiku $0.25/$1.25, Sonnet $3/$15, Opus $5/$25, Voyage $0.10/$0 por 1M tokens). Cache hits reducen ~90% el costo de input. Ver desglose por modelo abajo."
           aria-label="Más información sobre el cálculo de costo"
         >
           ⓘ
@@ -222,9 +222,11 @@ export default async function UsoIaPage() {
                       const label = m.family === "haiku" ? "Haiku (barato)"
                         : m.family === "sonnet" ? "Sonnet (medio)"
                         : m.family === "opus" ? "Opus (caro)"
+                        : m.family === "voyage" ? "Voyage (embeddings)"
                         : "Otro";
                       const tone = m.family === "haiku" ? "text-emerald-700"
                         : m.family === "opus" ? "text-rose-700"
+                        : m.family === "voyage" ? "text-indigo-700"
                         : "text-slate-700";
                       return (
                         <tr key={m.family}>
@@ -269,10 +271,11 @@ export default async function UsoIaPage() {
                         ? Math.round((r.cost_usd / s.cost_usd_estimate_max) * 100)
                         : 0;
                       const ROLE_LABELS: Record<string, { name: string; model: string }> = {
-                        aurora:  { name: "Aurora · Autor",     model: "Sonnet" },
-                        rebeca:  { name: "Rebeca · Revisor",   model: "Sonnet" },
-                        elena:   { name: "Elena · Elevador",   model: "Opus" },
-                        valeria: { name: "Valeria · Validador", model: "Haiku" },
+                        aurora:     { name: "Aurora · Autor",     model: "Sonnet" },
+                        rebeca:     { name: "Rebeca · Revisor",   model: "Sonnet" },
+                        elena:      { name: "Elena · Elevador",   model: "Opus" },
+                        valeria:    { name: "Valeria · Validador", model: "Haiku" },
+                        embeddings: { name: "Embeddings · Voyage", model: "Voyage" },
                       };
                       const meta = ROLE_LABELS[r.role] ?? { name: r.role, model: "—" };
                       return (

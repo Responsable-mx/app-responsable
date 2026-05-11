@@ -2,6 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { chunkMarkdown } from "@/lib/documents/relevance";
+import { logAiCall } from "@/lib/ai/logging";
 
 // ── Embeddings de chunks (Wave 7 — F prep) ──────────────────
 //
@@ -19,69 +20,99 @@ export type EmbeddingsConfig = {
   apiKey: string;
 };
 
+type VoyageResponse = {
+  data?: Array<{ embedding: number[] }>;
+  usage?: { total_tokens?: number };
+  model?: string;
+};
+
 /**
- * Genera embedding para texto vía Voyage API. Retorna null si key falta.
- * Documentación: https://docs.voyageai.com/reference/embeddings-api
+ * Llamada interna a Voyage API + log a ai_calls para cost tracking.
+ * userEmail/clientId opcionales (cron embed-chunks no tiene contexto user).
  */
-export async function generateEmbedding(text: string): Promise<number[] | null> {
+async function callVoyage(
+  input: string,
+  inputType: "document" | "query",
+  meta?: { userEmail?: string; clientId?: string | null }
+): Promise<number[] | null> {
   const apiKey = process.env.VOYAGE_API_KEY;
   if (!apiKey) return null;
-
   const model = process.env.VOYAGE_MODEL || "voyage-2";
+  const startedAt = Date.now();
   try {
     const res = await fetch("https://api.voyageai.com/v1/embeddings", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        input: text.slice(0, 30_000), // Voyage tope 32k tokens, ~30k chars safe
+        input: input.slice(0, inputType === "document" ? 30_000 : 4_000),
         model,
-        input_type: "document",
+        input_type: inputType,
       }),
     });
     if (!res.ok) {
-      console.error("[embeddings] voyage error:", res.status, await res.text());
+      const errText = await res.text();
+      console.error("[embeddings] voyage error:", res.status, errText);
+      void logAiCall({
+        userEmail: meta?.userEmail ?? "cron@embeddings",
+        role: "embeddings",
+        clientId: meta?.clientId ?? null,
+        model,
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: Date.now() - startedAt,
+        error: `voyage ${res.status}: ${errText.slice(0, 200)}`,
+      });
       return null;
     }
-    const json = (await res.json()) as {
-      data?: Array<{ embedding: number[] }>;
-    };
+    const json = (await res.json()) as VoyageResponse;
+    const tokens = json.usage?.total_tokens ?? 0;
+    void logAiCall({
+      userEmail: meta?.userEmail ?? "cron@embeddings",
+      role: "embeddings",
+      clientId: meta?.clientId ?? null,
+      model: json.model ?? model,
+      inputTokens: tokens,
+      outputTokens: 0,
+      latencyMs: Date.now() - startedAt,
+      error: null,
+    });
     return json.data?.[0]?.embedding ?? null;
   } catch (e) {
+    void logAiCall({
+      userEmail: meta?.userEmail ?? "cron@embeddings",
+      role: "embeddings",
+      clientId: meta?.clientId ?? null,
+      model,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - startedAt,
+      error: e instanceof Error ? e.message : "Voyage fetch failed",
+    });
     console.error("[embeddings] voyage fetch failed:", e);
     return null;
   }
 }
 
 /**
+ * Genera embedding para texto vía Voyage API. Retorna null si key falta.
+ * Documentación: https://docs.voyageai.com/reference/embeddings-api
+ */
+export async function generateEmbedding(
+  text: string,
+  meta?: { userEmail?: string; clientId?: string | null }
+): Promise<number[] | null> {
+  return callVoyage(text, "document", meta);
+}
+
+/**
  * Genera embedding para query del usuario (input_type = "query" — distinto
  * de "document" en Voyage, optimiza para search).
  */
-export async function generateQueryEmbedding(query: string): Promise<number[] | null> {
-  const apiKey = process.env.VOYAGE_API_KEY;
-  if (!apiKey) return null;
-  const model = process.env.VOYAGE_MODEL || "voyage-2";
-  try {
-    const res = await fetch("https://api.voyageai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        input: query.slice(0, 4_000),
-        model,
-        input_type: "query",
-      }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { data?: Array<{ embedding: number[] }> };
-    return json.data?.[0]?.embedding ?? null;
-  } catch {
-    return null;
-  }
+export async function generateQueryEmbedding(
+  query: string,
+  meta?: { userEmail?: string; clientId?: string | null }
+): Promise<number[] | null> {
+  return callVoyage(query, "query", meta);
 }
 
 function sha256(s: string): string {
@@ -141,7 +172,7 @@ export async function searchSimilarChunks(opts: {
   clientId: string;
   limit?: number;
 }): Promise<ChunkRow[] | null> {
-  const queryEmbedding = await generateQueryEmbedding(opts.query);
+  const queryEmbedding = await generateQueryEmbedding(opts.query, { clientId: opts.clientId });
   if (!queryEmbedding) return null; // Fallback: caller usa BM25
 
   const admin = createAdminClient();

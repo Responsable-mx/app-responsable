@@ -368,10 +368,15 @@ export function DoubleMaterialidadTab({
     ? "active"
     : "pending";
 
-  // stage4 = Matriz (visualización IROs scored) — locked si no hay IROs en inventario
-  const stage4Status: StageStatus = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length >= 3
-    ? "active"
-    : hasIros ? "pending" : "locked";
+  // stage4 = Matriz (visualización IROs scored) — auto-done cuando IROs están validados
+  const scoredIros = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length;
+  const stage4Status: StageStatus = hasIros
+    ? "done"
+    : scoredIros >= 3
+      ? "active"
+      : iros.length > 0
+        ? "pending"
+        : "locked";
 
   // stage5 = NIS / IBSO
   const stage5Status: StageStatus = hasNis

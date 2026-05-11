@@ -206,6 +206,105 @@ export async function checkDocumentHash(
   return data ?? null;
 }
 
+export type ProcessStoredDocOpts = {
+  clientId: string;
+  uploadedBy: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  kind?: DocumentKind;
+  serviceIds?: string[];
+};
+
+/**
+ * Descarga un archivo ya subido a Supabase Storage (vía presigned URL), lo parsea e inserta la fila.
+ * Lanza DuplicateDocError si el hash ya existe para este cliente.
+ * Si el insert falla, limpia el archivo del Storage.
+ */
+export class DuplicateDocError extends Error {
+  constructor(public existing: Pick<ClientDocument, "id" | "file_name" | "created_at">) {
+    super("Documento idéntico ya existe");
+  }
+}
+
+export async function processStoredDocument(opts: ProcessStoredDocOpts): Promise<ClientDocument> {
+  const sb = createAdminClient();
+
+  const { data: blob, error: dlError } = await sb.storage.from(BUCKET).download(opts.storagePath);
+  if (dlError || !blob) {
+    throw new Error(`Error descargando archivo: ${dlError?.message ?? "sin datos"}`);
+  }
+
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  const contentHash = createHash("md5").update(buffer).digest("hex");
+
+  const existing = await checkDocumentHash(opts.clientId, contentHash);
+  if (existing) {
+    // Eliminar el archivo huérfano del Storage
+    await sb.storage.from(BUCKET).remove([opts.storagePath]).catch(() => undefined);
+    throw new DuplicateDocError(existing);
+  }
+
+  const fileType = detectFileType(opts.mimeType, opts.fileName);
+  if (!fileType) throw new Error(`Tipo no soportado: ${opts.mimeType} (${opts.fileName})`);
+
+  let markdown: string | null = null;
+  let parseStatus: "ok" | "failed" = "ok";
+  let parseError: string | null = null;
+  try {
+    const md = await parseToMarkdown(buffer, fileType);
+    markdown = truncateMarkdown(md);
+    if (markdown.trim().length === 0) {
+      parseStatus = "failed";
+      parseError = "El parser no extrajo texto del archivo.";
+    }
+  } catch (e) {
+    parseStatus = "failed";
+    parseError = e instanceof Error ? e.message : String(e);
+    console.error(`[documents] parse failed for ${opts.fileName}:`, parseError);
+  }
+
+  let chunksCache: string[] | null = null;
+  let chunksComputedAt: string | null = null;
+  if (parseStatus === "ok" && markdown) {
+    try {
+      chunksCache = chunkMarkdown(markdown, { chunkSize: 1200, overlap: 150 });
+      chunksComputedAt = new Date().toISOString();
+    } catch { /* non-fatal */ }
+  }
+
+  const { data, error } = await sb
+    .from("client_documents")
+    .insert({
+      client_id: opts.clientId,
+      uploaded_by: opts.uploadedBy,
+      kind: opts.kind ?? "general",
+      file_name: opts.fileName,
+      file_type: fileType,
+      mime_type: opts.mimeType,
+      size_bytes: buffer.length,
+      storage_path: opts.storagePath,
+      markdown_content: markdown,
+      source_url: null,
+      parse_status: parseStatus,
+      parse_error: parseError,
+      service_ids: opts.serviceIds ?? [],
+      content_hash: contentHash,
+      chunks_cache: chunksCache,
+      chunks_computed_at: chunksComputedAt,
+      benchmark_company_id: null,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    await sb.storage.from(BUCKET).remove([opts.storagePath]).catch(() => undefined);
+    throw new Error(`Error guardando metadata: ${error.message}`);
+  }
+
+  return data as ClientDocument;
+}
+
 export async function getSignedUrl(storagePath: string, expiresInSec = 600): Promise<string | null> {
   const sb = createAdminClient();
   const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(storagePath, expiresInSec);

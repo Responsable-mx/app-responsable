@@ -396,22 +396,78 @@ export function DocumentsTab({
     await doUpload(arr);
   }
 
+  // Archivos > 4MB van directo a Supabase vía presigned URL (Vercel limita body a 4.5MB)
+  const LARGE_FILE_THRESHOLD = 4 * 1024 * 1024;
+
+  function normalizeFileMime(file: File): string {
+    if (file.name.toLowerCase().endsWith(".zip")) return "application/zip";
+    return file.type || "application/octet-stream";
+  }
+
+  async function uploadLargeFile(file: File): Promise<number> {
+    const mimeType = normalizeFileMime(file);
+
+    // 1. Obtener URL firmada de Supabase
+    const presignRes = await fetch(`/api/clients/${clientId}/documents/presign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, mimeType, size: file.size }),
+    });
+    if (!presignRes.ok) {
+      const j = await presignRes.json().catch(() => ({}));
+      throw new Error(j.error ?? "Error obteniendo URL de subida");
+    }
+    const { signedUrl, storagePath } = (await presignRes.json()) as { signedUrl: string; storagePath: string };
+
+    // 2. Subir directo a Supabase (sin pasar por Vercel)
+    const uploadRes = await fetch(signedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": mimeType },
+      body: file,
+    });
+    if (!uploadRes.ok) {
+      throw new Error(`Error subiendo a storage: HTTP ${uploadRes.status}`);
+    }
+
+    // 3. Registrar y procesar en el servidor
+    const registerRes = await fetch(`/api/clients/${clientId}/documents`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storagePath,
+        filename: file.name,
+        mimeType,
+        kind: "general",
+        serviceIds: uploadServiceIds,
+      }),
+    });
+    const j = await registerRes.json().catch(() => ({}));
+    if (!registerRes.ok) throw new Error(j.error ?? "Error procesando archivo");
+    return (j.count as number) ?? 1;
+  }
+
   async function doUpload(files: File[]) {
     setUploading(true);
     let okCount = 0;
     const failures: string[] = [];
     for (const file of files) {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("kind", "general");
-      if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
       try {
-        const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          failures.push(`${file.name}: ${j.error ?? "error"}`);
+        if (file.size > LARGE_FILE_THRESHOLD) {
+          // Archivo grande: presigned URL → Supabase → registro
+          okCount += await uploadLargeFile(file);
         } else {
-          okCount += (j.count ?? 1);
+          // Archivo pequeño: multipart directo
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("kind", "general");
+          if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
+          const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
+          const j = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            failures.push(`${file.name}: ${j.error ?? "error"}`);
+          } else {
+            okCount += (j.count ?? 1);
+          }
         }
       } catch (e) {
         failures.push(`${file.name}: ${e instanceof Error ? e.message : "error"}`);

@@ -3,16 +3,23 @@ import { createHash } from "node:crypto";
 import { extname } from "node:path";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
-import { listDocumentsByClient, uploadAndParseDocument, checkDocumentHash } from "@/lib/documents/queries";
-import { DOCUMENT_KIND_SCHEMA } from "@/lib/documents/types";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  listDocumentsByClient,
+  uploadAndParseDocument,
+  checkDocumentHash,
+  processStoredDocument,
+  DuplicateDocError,
+} from "@/lib/documents/queries";
+import { DOCUMENT_KIND_SCHEMA, type DocumentKind } from "@/lib/documents/types";
 import { logChange } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-const MAX_SIZE = 25 * 1024 * 1024;   // 25MB por archivo individual
-const MAX_ZIP_SIZE = 100 * 1024 * 1024; // 100MB para ZIPs (los archivos internos siguen limitados a 25MB c/u)
+const MAX_SIZE = 25 * 1024 * 1024;       // 25MB por archivo individual
+const MAX_ZIP_SIZE = 100 * 1024 * 1024;  // 100MB para ZIPs
 
 const ALLOWED_MIMES = new Set([
   "application/pdf",
@@ -40,6 +47,59 @@ const ZIP_EXT_TO_MIME: Record<string, string> = {
 
 type Ctx = { params: Promise<{ id: string }> };
 
+type ZipEntry = { baseName: string; mimeType: string; fileBuffer: Buffer };
+type ZipResult = { docs: object[]; failures: string[] };
+
+async function processZipBuffer(
+  buffer: Buffer,
+  opts: { clientId: string; actorEmail: string; kind: DocumentKind; serviceIds: string[] }
+): Promise<ZipResult> {
+  const JSZip = (await import("jszip")).default;
+  let zip: InstanceType<typeof JSZip>;
+  try {
+    zip = await JSZip.loadAsync(buffer);
+  } catch {
+    throw new Error("ZIP inválido o corrupto");
+  }
+
+  const validEntries: ZipEntry[] = [];
+  const failures: string[] = [];
+
+  for (const [entryPath, entry] of Object.entries(zip.files)) {
+    if (entry.dir) continue;
+    const baseName = entryPath.split("/").pop() ?? entryPath;
+    if (baseName.startsWith("__MACOSX") || baseName.startsWith(".")) continue;
+    const mimeType = ZIP_EXT_TO_MIME[extname(baseName).toLowerCase()];
+    if (!mimeType) continue;
+    const fileBuffer = Buffer.from(await entry.async("arraybuffer"));
+    if (fileBuffer.length > MAX_SIZE) { failures.push(`${baseName}: excede 25MB`); continue; }
+    validEntries.push({ baseName, mimeType, fileBuffer });
+  }
+
+  const docs: object[] = [];
+  const BATCH = 5;
+  const { clientId, actorEmail, kind, serviceIds } = opts;
+
+  async function processEntry({ baseName, mimeType, fileBuffer }: ZipEntry): Promise<void> {
+    const contentHash = createHash("md5").update(fileBuffer).digest("hex");
+    const existingDoc = await checkDocumentHash(clientId, contentHash);
+    if (existingDoc) { failures.push(`${baseName}: ya existe`); return; }
+    const doc = await uploadAndParseDocument({ clientId, uploadedBy: actorEmail, fileName: baseName, mimeType, buffer: fileBuffer, kind, serviceIds });
+    void logChange({ actorEmail, entityType: "client_document", entityId: doc.id, action: "create", before: null, after: { client_id: clientId, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_ids: serviceIds } });
+    docs.push({ id: doc.id, file_name: doc.file_name, file_type: doc.file_type, kind: doc.kind, size_bytes: doc.size_bytes, parse_status: doc.parse_status, parse_error: doc.parse_error, has_content: !!doc.markdown_content, service_ids: doc.service_ids ?? [], created_at: doc.created_at });
+  }
+
+  for (let i = 0; i < validEntries.length; i += BATCH) {
+    const batch = validEntries.slice(i, i + BATCH);
+    const results = await Promise.allSettled(batch.map(processEntry));
+    results.forEach((r, j) => {
+      if (r.status === "rejected") failures.push(`${batch[j]?.baseName ?? "archivo"}: ${r.reason instanceof Error ? r.reason.message : "error"}`);
+    });
+  }
+
+  return { docs, failures };
+}
+
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const [user, client] = await Promise.all([
@@ -50,7 +110,6 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
   const docs = await listDocumentsByClient(id);
-  // No exponemos markdown_content en list — solo metadata (puede ser pesado)
   const data = docs.map((d) => ({
     id: d.id,
     client_id: d.client_id,
@@ -81,6 +140,107 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
+  const contentType = req.headers.get("content-type") ?? "";
+
+  // ── Path B: archivo pre-subido vía presigned URL (body JSON con storagePath) ──
+  if (contentType.includes("application/json")) {
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Body JSON inválido" }, { status: 400 });
+    }
+
+    const { storagePath, filename, mimeType: rawMimeType, kind: rawKind, serviceIds: rawServiceIds } = body;
+    if (typeof storagePath !== "string" || !storagePath) {
+      return NextResponse.json({ error: "Falta storagePath" }, { status: 400 });
+    }
+    if (typeof filename !== "string" || !filename) {
+      return NextResponse.json({ error: "Falta filename" }, { status: 400 });
+    }
+    const mimeType = typeof rawMimeType === "string" ? rawMimeType : "application/octet-stream";
+    const kindParsed = DOCUMENT_KIND_SCHEMA.safeParse(rawKind);
+    const kind = kindParsed.success ? kindParsed.data : "general";
+    const serviceIds = Array.isArray(rawServiceIds)
+      ? rawServiceIds.filter((s): s is string => typeof s === "string")
+      : [];
+
+    const isZip =
+      mimeType === "application/zip" ||
+      mimeType === "application/x-zip-compressed" ||
+      (filename.toLowerCase().endsWith(".zip") && mimeType === "application/octet-stream");
+
+    if (isZip) {
+      // Descargar ZIP desde Supabase, extraer y procesar
+      const sb = createAdminClient();
+      const { data: blob, error: dlError } = await sb.storage.from("client-documents").download(storagePath);
+      if (dlError || !blob) {
+        return NextResponse.json({ error: `Error descargando ZIP: ${dlError?.message ?? "sin datos"}` }, { status: 500 });
+      }
+      const buffer = Buffer.from(await blob.arrayBuffer());
+
+      let result: ZipResult;
+      try {
+        result = await processZipBuffer(buffer, { clientId: id, actorEmail: user, kind, serviceIds });
+      } catch (e) {
+        // Limpiar ZIP del storage antes de retornar error
+        await sb.storage.from("client-documents").remove([storagePath]).catch(() => undefined);
+        return NextResponse.json({ error: e instanceof Error ? e.message : "Error procesando ZIP" }, { status: 400 });
+      }
+
+      // Limpiar ZIP del storage (los archivos extraídos ya se subieron individualmente)
+      await sb.storage.from("client-documents").remove([storagePath]).catch(() => undefined);
+
+      if (result.docs.length === 0 && result.failures.length > 0) {
+        return NextResponse.json({ error: `Ningún archivo procesado: ${result.failures.join("; ")}` }, { status: 422 });
+      }
+      if (result.docs.length === 0) {
+        return NextResponse.json({ error: "ZIP sin archivos soportados (PDF, DOCX, XLSX, PPTX, TXT, MD)" }, { status: 422 });
+      }
+      return NextResponse.json({ data: result.docs, count: result.docs.length, failures: result.failures });
+    }
+
+    // Archivo individual pre-subido (no ZIP)
+    let doc;
+    try {
+      doc = await processStoredDocument({ clientId: id, uploadedBy: user, storagePath, fileName: filename, mimeType, kind, serviceIds });
+    } catch (e) {
+      if (e instanceof DuplicateDocError) {
+        return NextResponse.json(
+          { error: "Documento idéntico ya existe", existing: { id: e.existing.id, file_name: e.existing.file_name, created_at: e.existing.created_at } },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Error procesando documento" }, { status: 500 });
+    }
+
+    void logChange({
+      actorEmail: user,
+      entityType: "client_document",
+      entityId: doc.id,
+      action: "create",
+      before: null,
+      after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_ids: serviceIds },
+    });
+
+    return NextResponse.json({
+      data: {
+        id: doc.id,
+        file_name: doc.file_name,
+        file_type: doc.file_type,
+        kind: doc.kind,
+        size_bytes: doc.size_bytes,
+        parse_status: doc.parse_status,
+        parse_error: doc.parse_error,
+        has_content: !!doc.markdown_content,
+        service_ids: doc.service_ids ?? [],
+        created_at: doc.created_at,
+      },
+      count: 1,
+    });
+  }
+
+  // ── Path A: upload directo multipart/form-data (archivos ≤ 4MB) ──
   let formData: FormData;
   try {
     formData = await req.formData();
@@ -111,7 +271,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const kindParsed = DOCUMENT_KIND_SCHEMA.safeParse(formData.get("kind"));
   const kind = kindParsed.success ? kindParsed.data : "general";
 
-  // service_ids: array de UUIDs separados por coma (FormData no soporta arrays nativos)
   const rawServiceIds = formData.get("service_ids");
   const serviceIds = typeof rawServiceIds === "string" && rawServiceIds.trim()
     ? rawServiceIds.split(",").map((s) => s.trim()).filter(Boolean)
@@ -119,66 +278,24 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // ZIP: extraer y procesar cada archivo interno por separado
   if (isZip) {
-    const JSZip = (await import("jszip")).default;
-    let zip: InstanceType<typeof JSZip>;
+    let result: ZipResult;
     try {
-      zip = await JSZip.loadAsync(buffer);
-    } catch {
-      return NextResponse.json({ error: "ZIP inválido o corrupto" }, { status: 400 });
+      result = await processZipBuffer(buffer, { clientId: id, actorEmail: user, kind, serviceIds });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Error procesando ZIP" }, { status: 400 });
     }
 
-    // 1. Extraer entradas válidas (sin dirs, sin macOS, con MIME soportado, dentro del límite)
-    type ZipEntry = { baseName: string; mimeType: string; fileBuffer: Buffer };
-    const validEntries: ZipEntry[] = [];
-    const failures: string[] = [];
-
-    for (const [entryPath, entry] of Object.entries(zip.files)) {
-      if (entry.dir) continue;
-      const baseName = entryPath.split("/").pop() ?? entryPath;
-      if (baseName.startsWith("__MACOSX") || baseName.startsWith(".")) continue;
-      const mimeType = ZIP_EXT_TO_MIME[extname(baseName).toLowerCase()];
-      if (!mimeType) continue;
-      const fileBuffer = Buffer.from(await entry.async("arraybuffer"));
-      if (fileBuffer.length > MAX_SIZE) { failures.push(`${baseName}: excede 25MB`); continue; }
-      validEntries.push({ baseName, mimeType, fileBuffer });
+    if (result.docs.length === 0 && result.failures.length > 0) {
+      return NextResponse.json({ error: `Ningún archivo procesado: ${result.failures.join("; ")}` }, { status: 422 });
     }
-
-    // 2. Procesar en lotes de 5 en paralelo (upload+parse es I/O-bound)
-    const docs: object[] = [];
-    const BATCH = 5;
-
-    const actorEmail = user as string;
-
-    async function processEntry({ baseName, mimeType, fileBuffer }: ZipEntry): Promise<void> {
-      const contentHash = createHash("md5").update(fileBuffer).digest("hex");
-      const existingDoc = await checkDocumentHash(id, contentHash);
-      if (existingDoc) { failures.push(`${baseName}: ya existe`); return; }
-      const doc = await uploadAndParseDocument({ clientId: id, uploadedBy: actorEmail, fileName: baseName, mimeType, buffer: fileBuffer, kind, serviceIds });
-      void logChange({ actorEmail, entityType: "client_document", entityId: doc.id, action: "create", before: null, after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_ids: serviceIds } });
-      docs.push({ id: doc.id, file_name: doc.file_name, file_type: doc.file_type, kind: doc.kind, size_bytes: doc.size_bytes, parse_status: doc.parse_status, parse_error: doc.parse_error, has_content: !!doc.markdown_content, service_ids: doc.service_ids ?? [], created_at: doc.created_at });
-    }
-
-    for (let i = 0; i < validEntries.length; i += BATCH) {
-      const batch = validEntries.slice(i, i + BATCH);
-      const results = await Promise.allSettled(batch.map(processEntry));
-      results.forEach((r, j) => {
-        if (r.status === "rejected") failures.push(`${batch[j]?.baseName ?? "archivo"}: ${r.reason instanceof Error ? r.reason.message : "error"}`);
-      });
-    }
-
-    if (docs.length === 0 && failures.length > 0) {
-      return NextResponse.json({ error: `Ningún archivo procesado: ${failures.join("; ")}` }, { status: 422 });
-    }
-    if (docs.length === 0) {
+    if (result.docs.length === 0) {
       return NextResponse.json({ error: "ZIP sin archivos soportados (PDF, DOCX, XLSX, PPTX, TXT, MD)" }, { status: 422 });
     }
-
-    return NextResponse.json({ data: docs, count: docs.length, failures });
+    return NextResponse.json({ data: result.docs, count: result.docs.length, failures: result.failures });
   }
 
-  // Dedup: mismo contenido para el mismo cliente → 409 con referencia al doc existente.
+  // Archivo individual — dedup + upload
   const contentHash = createHash("md5").update(buffer).digest("hex");
   const existing = await checkDocumentHash(id, contentHash);
   if (existing) {

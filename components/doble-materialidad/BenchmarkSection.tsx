@@ -785,71 +785,77 @@ export function BenchmarkSection({
           </div>
         );
 
-        // Grid de tabla reutilizado en modo normal y fullscreen
-        const tableGrid = (
-          <div className="relative overflow-x-auto">
-            <table className="min-w-full w-max text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="sticky left-0 z-10 bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
-                    Dimensión
+        // tableElement — solo la tabla, sin wrapper de scroll
+        // Usado en fullscreen (el contenedor padre maneja overflow en ambas direcciones)
+        const tableElement = (
+          <table className="min-w-full w-max text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="sticky left-0 z-10 bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                  Dimensión
+                </th>
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light/30 px-3 rounded-t text-brand-primary-dark">
+                  {clientName}
+                  <span className="ml-1 font-normal normal-case text-[10px] text-brand-primary/60">· Cliente</span>
+                </th>
+                {latestResult!.companies_snapshot.map((company) => (
+                  <th
+                    key={company.name}
+                    title={company.name}
+                    className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap"
+                  >
+                    {abbrevCompanyName(company.name)}
+                    {company.relation && (
+                      <span className="ml-1 font-normal normal-case text-[10px] text-slate-400">
+                        · {RELATION_LABELS[company.relation as CompanyRelation] ?? company.relation}
+                      </span>
+                    )}
                   </th>
-                  <th className="text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light/30 px-3 rounded-t text-brand-primary-dark">
-                    {clientName}
-                    <span className="ml-1 font-normal normal-case text-[10px] text-brand-primary/60">· Cliente</span>
-                  </th>
-                  {latestResult!.companies_snapshot.map((company) => (
-                    <th
-                      key={company.name}
-                      title={company.name}
-                      className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap"
-                    >
-                      {abbrevCompanyName(company.name)}
-                      {company.relation && (
-                        <span className="ml-1 font-normal normal-case text-[10px] text-slate-400">
-                          · {RELATION_LABELS[company.relation as CompanyRelation] ?? company.relation}
-                        </span>
-                      )}
-                    </th>
-                  ))}
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredFields.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={2 + latestResult!.companies_snapshot.length}
+                    className="py-6 text-center text-xs text-slate-400"
+                  >
+                    Sin dimensiones con ese filtro.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredFields.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={2 + latestResult!.companies_snapshot.length}
-                      className="py-6 text-center text-xs text-slate-400"
-                    >
-                      Sin dimensiones con ese filtro.
+              ) : (
+                filteredFields.map((field) => (
+                  <tr
+                    key={field.key}
+                    className="group even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
+                  >
+                    <td className="sticky left-0 z-10 bg-white group-even:bg-slate-50/60 group-hover:bg-brand-primary-light/20 py-3 pr-6 font-medium text-slate-700 whitespace-nowrap align-top shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                      {field.label}
                     </td>
-                  </tr>
-                ) : (
-                  filteredFields.map((field) => (
-                    <tr
-                      key={field.key}
-                      className="group even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
-                    >
-                      <td className="sticky left-0 z-10 bg-white group-even:bg-slate-50/60 group-hover:bg-brand-primary-light/20 py-3 pr-6 font-medium text-slate-700 whitespace-nowrap align-top shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
-                        {field.label}
-                      </td>
-                      <td className="py-3 pr-6 max-w-[220px] align-top bg-brand-primary-light/20 px-3">
+                    <td className="py-3 pr-6 max-w-[220px] align-top bg-brand-primary-light/20 px-3">
+                      <ExpandableCell
+                        text={lookupComparisonValue(latestResult!.comparison, field.key, clientName)}
+                      />
+                    </td>
+                    {latestResult!.companies_snapshot.map((company) => (
+                      <td key={company.name} className="py-3 pr-6 max-w-[220px] align-top">
                         <ExpandableCell
-                          text={lookupComparisonValue(latestResult!.comparison, field.key, clientName)}
+                          text={lookupComparisonValue(latestResult!.comparison, field.key, company.name)}
                         />
                       </td>
-                      {latestResult!.companies_snapshot.map((company) => (
-                        <td key={company.name} className="py-3 pr-6 max-w-[220px] align-top">
-                          <ExpandableCell
-                            text={lookupComparisonValue(latestResult!.comparison, field.key, company.name)}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        );
+
+        // tableGrid — wrapper con scroll horizontal para modo normal
+        const tableGrid = (
+          <div className="relative overflow-x-auto">
+            {tableElement}
           </div>
         );
 
@@ -904,8 +910,24 @@ export function BenchmarkSection({
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-auto px-6 py-4">
-                  {tableGrid}
+                {/* overflow-auto en el contenedor padre — maneja scroll X e Y sin wrapper anidado */}
+                {/* tabIndex + autoFocus permiten navegar con teclado desde apertura */}
+                <div
+                  className="flex-1 overflow-auto px-6 py-4 outline-none"
+                  tabIndex={0}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus
+                  onKeyDown={(e) => {
+                    const el = e.currentTarget;
+                    const hStep = e.shiftKey ? 400 : 150;
+                    const vStep = e.shiftKey ? 300 : 80;
+                    if (e.key === "ArrowRight") { e.preventDefault(); el.scrollLeft += hStep; }
+                    if (e.key === "ArrowLeft")  { e.preventDefault(); el.scrollLeft -= hStep; }
+                    if (e.key === "ArrowDown")  { e.preventDefault(); el.scrollTop  += vStep; }
+                    if (e.key === "ArrowUp")    { e.preventDefault(); el.scrollTop  -= vStep; }
+                  }}
+                >
+                  {tableElement}
                   {scrollHint}
                 </div>
               </div>

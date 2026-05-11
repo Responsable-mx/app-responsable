@@ -599,7 +599,7 @@ export function DoubleMaterialidadTab({
                       // Solo la etapa seleccionada dice "En curso" — evita 3 pills "En curso" simultáneas.
                       if (isSel) return s.status === "done" ? "Revisando" : "En curso";
                       if (s.status === "done")   return formatStageDate(s.doneDate);
-                      if (s.status === "active") return "Lista";
+                      if (s.status === "active") return "Disponible";
                       if (s.status === "locked") return "Bloqueada";
                       return "Pendiente";
                     })()}
@@ -853,7 +853,7 @@ export function DoubleMaterialidadTab({
         stageNum={7}
         label="Validación con el cliente"
         status={stage7Status}
-        accent="border-l-rose-600"
+        accent="border-l-amber-500"
         isActive={activeStageId === "dm-sec-validacion"}
         lockReason="Genera el resumen ejecutivo (Etapa 6) para iniciar la sesión de validación con el cliente."
         subtitle="Decisiones del cliente sobre cada IRO incluido — aprobación, ajuste o descarte"

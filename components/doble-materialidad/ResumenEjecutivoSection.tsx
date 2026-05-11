@@ -304,6 +304,12 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
             <div
               key={card.key}
               className={`p-3 bg-slate-50 border border-slate-200 rounded border-l-4 ${card.borderClass}`}
+              title={
+                quadrantCounts[card.key] === 0 &&
+                (card.key === "solo_impacto" || card.key === "solo_financiero")
+                  ? "0 = todos los IROs del estudio tienen ambas dimensiones de materialidad"
+                  : undefined
+              }
             >
               <p className={`text-[10px] font-bold uppercase tracking-widest ${card.textClass} mb-1.5`}>
                 {card.label}

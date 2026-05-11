@@ -384,6 +384,26 @@ export function MatrizDM({ iros, onGoToIros }: Props) {
         })}
       </div>
 
+      {/* Chip narrativo — síntesis automática de cuadrantes */}
+      {(() => {
+        const dmCount = points.filter((p) => p.quadrant === "doble_material").length;
+        const topDm = [...points]
+          .filter((p) => p.quadrant === "doble_material")
+          .sort((a, b) => b.score_consolidado - a.score_consolidado)[0] ?? null;
+        if (dmCount === 0) return null;
+        return (
+          <div className="flex items-center gap-2 flex-wrap mt-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-1 rounded-sm">
+              <svg className="w-2.5 h-2.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+              {dmCount} tema{dmCount !== 1 ? "s" : ""} doble material
+              {topDm && ` · riesgo principal: ${topDm.tema_esg}`}
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Contenido: SVG + índice lateral */}
       <div className="flex gap-4 items-start">
 

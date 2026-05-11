@@ -806,14 +806,6 @@ export function BenchmarkSection({
               >
                 {onlyBrechas ? `Solo brechas (${filteredFields.length})` : "Solo brechas"}
               </button>
-              <button
-                type="button"
-                disabled={exporting}
-                onClick={handleExport}
-                className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors disabled:opacity-50"
-              >
-                {exporting ? "Exportando…" : "↓ Excel"}
-              </button>
             </div>
             {/* Fila 2: filtro por tipo de empresa (columnas) */}
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -857,7 +849,7 @@ export function BenchmarkSection({
                 <th className="sticky left-0 top-0 z-[20] bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06),0_1px_0_0_#e2e8f0]">
                   Dimensión
                 </th>
-                <th className="sticky top-0 z-[11] text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light/30 px-3 rounded-t text-brand-primary-dark shadow-[0_1px_0_0_#e2e8f0]">
+                <th className="sticky top-0 z-[11] text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light px-3 rounded-t text-brand-primary-dark shadow-[0_1px_0_0_#e2e8f0]">
                   {clientName}
                   <span className="ml-1 font-normal normal-case text-[10px] text-brand-primary/60">· Cliente</span>
                 </th>
@@ -973,14 +965,24 @@ export function BenchmarkSection({
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
                   {filterBar}
-                  <button
-                    type="button"
-                    onClick={() => setTableFullscreen(true)}
-                    title="Pantalla completa"
-                    className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors"
-                  >
-                    ⛶
-                  </button>
+                  <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+                    <button
+                      type="button"
+                      disabled={exporting}
+                      onClick={handleExport}
+                      className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors disabled:opacity-50"
+                    >
+                      {exporting ? "Exportando…" : "↓ Excel"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTableFullscreen(true)}
+                      title="Pantalla completa"
+                      className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors"
+                    >
+                      ⛶
+                    </button>
+                  </div>
                 </div>
               </div>
               {tableGrid}
@@ -997,14 +999,24 @@ export function BenchmarkSection({
                   </p>
                   <div className="flex items-center gap-2 flex-wrap">
                     {filterBar}
-                    <button
-                      type="button"
-                      onClick={() => setTableFullscreen(false)}
-                      title="Cerrar (Esc)"
-                      className="ml-2 px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors"
-                    >
-                      ✕ Cerrar
-                    </button>
+                    <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+                      <button
+                        type="button"
+                        disabled={exporting}
+                        onClick={handleExport}
+                        className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors disabled:opacity-50"
+                      >
+                        {exporting ? "Exportando…" : "↓ Excel"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTableFullscreen(false)}
+                        title="Cerrar (Esc)"
+                        className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors"
+                      >
+                        ✕ Cerrar
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div

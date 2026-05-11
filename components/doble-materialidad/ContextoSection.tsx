@@ -93,8 +93,21 @@ export function ContextoSection({
   );
 
   const responses = (bundleResp?.data?.response?.responses ?? {}) as Record<string, Record<string, unknown>>;
-  const alcanceGeo = (responses["informacion-base"]?.["alcance_geografico"] as string | null) ?? null;
-  const periodoInforme = (responses["estrategia-y-madurez"]?.["periodo_informe"] as string | null) ?? null;
+
+  // Los campos guardados por AI-fill son objetos { value, sources, validated, updated_at, source_type }.
+  // Extraer .value si es un objeto; si ya es string, usarlo directo.
+  function extractStr(v: unknown): string | null {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "string") return v;
+    if (typeof v === "object" && "value" in (v as object)) {
+      const inner = (v as { value: unknown }).value;
+      return typeof inner === "string" ? inner : null;
+    }
+    return null;
+  }
+
+  const alcanceGeo = extractStr(responses["informacion-base"]?.["alcance_geografico"]);
+  const periodoInforme = extractStr(responses["estrategia-y-madurez"]?.["periodo_informe"]);
 
   const missingByStep = extractMissingByStep(bundleResp?.data);
   const hasKpis = sector || size || (frameworks && frameworks.length > 0) || alcanceGeo || periodoInforme;

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
-import { listDocumentsByClient, uploadAndParseDocument } from "@/lib/documents/queries";
+import { listDocumentsByClient, uploadAndParseDocument, checkDocumentHash } from "@/lib/documents/queries";
 import { DOCUMENT_KIND_SCHEMA } from "@/lib/documents/types";
 import { logChange } from "@/lib/audit-log";
 
@@ -95,6 +96,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     : [];
 
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  // Dedup: mismo contenido para el mismo cliente → 409 con referencia al doc existente.
+  const contentHash = createHash("md5").update(buffer).digest("hex");
+  const existing = await checkDocumentHash(id, contentHash);
+  if (existing) {
+    return NextResponse.json(
+      { error: "Documento idéntico ya existe", existing: { id: existing.id, file_name: existing.file_name, created_at: existing.created_at } },
+      { status: 409 }
+    );
+  }
 
   let doc;
   try {

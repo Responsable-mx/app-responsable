@@ -189,10 +189,9 @@ FLUJO DE TRABAJO:
 
   // Documentos del cliente como fuente primaria — incluye todos los tipos
   // (sustainability_report, financial_report, general). Cita URL real cuando exista.
-  // Wave 5c (F): chunking + relevance scoring opcional vía DOC_RELEVANCE_ENABLED.
+  // DOC_RELEVANCE_ENABLED: BM25 sobre chunks_cache pre-calculados (~70% menos tokens).
   // Sin flag: dump 30K chars/doc hasta 150K total (legacy).
-  // Con flag: chunks de 1.2K, top relevantes por field labels del step (~8K/doc).
-  // Reduce ~70% input tokens cuando docs son grandes.
+  // Con flag: top chunks relevantes por field labels + sinónimos RSE (~8K/doc, 50K total).
   const useRelevance = process.env.DOC_RELEVANCE_ENABLED === "true";
   const reportsContext: string[] = [];
   try {
@@ -202,9 +201,11 @@ FLUJO DE TRABAJO:
     const TOTAL_CAP = useRelevance ? 50_000 : 150_000;
     const PER_DOC_CAP = useRelevance ? 8_000 : 30_000;
 
-    // Query para relevance scoring: labels + descripciones del step actual
+    // Sinónimos RSE fijos aseguran recall en documentos técnicos (GRI, ESRS, etc.)
+    const RSE_SYNONYMS = "ODS materialidad ESRS GRI SASB TCFD impacto riesgo oportunidad stakeholder gobernanza clima carbono huella residuos agua diversidad equidad inclusion cadena valor";
+
     const relevanceQuery = useRelevance
-      ? [step.title, step.subtitle ?? "", ...step.fields.map((f) => f.label)].filter(Boolean).join(" ")
+      ? [step.title, step.subtitle ?? "", ...step.fields.map((f) => f.label), RSE_SYNONYMS].filter(Boolean).join(" ")
       : "";
 
     for (const doc of reports) {
@@ -219,9 +220,11 @@ FLUJO DE TRABAJO:
 
       let docContent: string;
       if (useRelevance && doc.markdown_content.length > PER_DOC_CAP) {
-        // Chunk + score + select top chunks relevantes
         const { chunkMarkdown, selectTopChunks } = await import("@/lib/documents/relevance");
-        const chunks = chunkMarkdown(doc.markdown_content, { chunkSize: 1200, overlap: 150 });
+        // Usar chunks pre-calculados si existen; recomputar solo como fallback
+        const chunks = Array.isArray(doc.chunks_cache) && doc.chunks_cache.length > 0
+          ? doc.chunks_cache
+          : chunkMarkdown(doc.markdown_content, { chunkSize: 1200, overlap: 150 });
         const selected = selectTopChunks(chunks, relevanceQuery, {
           maxChars: Math.min(PER_DOC_CAP, remaining),
           minScore: 0.05,

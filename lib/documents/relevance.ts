@@ -105,6 +105,27 @@ export function scoreChunk(chunk: string, queryTokens: Set<string>): number {
 
 export type ScoredChunk = { chunk: string; score: number; index: number };
 
+// Términos de sección ejecutiva — chunks con estas palabras reciben boost 1.15x.
+// Aplica a documentos RSE donde resumen/conclusiones concentran los datos clave.
+const POSITION_BONUS_TERMS = new Set([
+  "resumen", "ejecutivo", "conclusion", "conclusiones", "objetivo", "objetivos",
+  "alcance", "materialidad", "impacto", "riesgo", "oportunidad", "recomendacion",
+  "recomendaciones", "hallazgo", "hallazgos", "resultado", "resultados",
+  "estrategia", "vision", "mision", "introduccion", "presentacion",
+]);
+
+function positionMultiplier(chunk: string, index: number): number {
+  let mult = index < 3 ? 1.2 : 1.0; // primeras secciones concentran contexto general
+  const normalized = chunk
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  for (const term of POSITION_BONUS_TERMS) {
+    if (normalized.includes(term)) { mult *= 1.15; break; }
+  }
+  return mult;
+}
+
 /**
  * Top N chunks por relevancia al query, respetando un budget de chars total.
  * Devuelve preservando el orden original del documento (para continuidad).
@@ -128,7 +149,11 @@ export function selectTopChunks(
     }, []);
   }
 
-  const scored = chunks.map((c, i) => ({ chunk: c, score: scoreChunk(c, queryTokens), index: i }));
+  const scored = chunks.map((c, i) => ({
+    chunk: c,
+    score: scoreChunk(c, queryTokens) * positionMultiplier(c, i),
+    index: i,
+  }));
   // Mantener solo chunks con score real, ordenados desc
   const filtered = scored
     .filter((s) => s.score >= minScore)

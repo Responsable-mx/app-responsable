@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { detectFileType, parseToMarkdown, truncateMarkdown, type FileType } from "@/lib/documents/parsers";
+import { chunkMarkdown } from "@/lib/documents/relevance";
 import { type DocumentKind } from "@/lib/documents/types";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -22,6 +23,8 @@ export type ClientDocument = {
   parse_error: string | null;
   service_ids: string[];
   content_hash: string | null;
+  chunks_cache: string[] | null;
+  chunks_computed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -77,6 +80,18 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
     console.error(`[documents] parse failed for ${opts.fileName}:`, parseError);
   }
 
+  // Pre-compute chunks para BM25 en ai-fill (evita re-chunking por request).
+  let chunksCache: string[] | null = null;
+  let chunksComputedAt: string | null = null;
+  if (parseStatus === "ok" && markdown) {
+    try {
+      chunksCache = chunkMarkdown(markdown, { chunkSize: 1200, overlap: 150 });
+      chunksComputedAt = new Date().toISOString();
+    } catch {
+      // non-fatal — ai-fill hará fallback a re-chunking
+    }
+  }
+
   // 3. Insertar fila
   const { data, error } = await sb
     .from("client_documents")
@@ -95,6 +110,8 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
       parse_error: parseError,
       service_ids: opts.serviceIds ?? [],
       content_hash: contentHash,
+      chunks_cache: chunksCache,
+      chunks_computed_at: chunksComputedAt,
     })
     .select("*")
     .single();
@@ -165,6 +182,20 @@ export async function deleteDocument(id: string): Promise<{ ok: boolean; error?:
   const { error } = await sb.from("client_documents").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+export async function checkDocumentHash(
+  clientId: string,
+  hash: string
+): Promise<Pick<ClientDocument, "id" | "file_name" | "created_at"> | null> {
+  const sb = createAdminClient();
+  const { data } = await sb
+    .from("client_documents")
+    .select("id, file_name, created_at")
+    .eq("client_id", clientId)
+    .eq("content_hash", hash)
+    .maybeSingle();
+  return data ?? null;
 }
 
 export async function getSignedUrl(storagePath: string, expiresInSec = 600): Promise<string | null> {

@@ -17,11 +17,20 @@ export type ChatStreamUsage = {
   cache_read_input_tokens?: number | null;
 };
 
+export type ChatStreamWarning = {
+  code: string;
+  severity: "info" | "warn" | "error";
+  message: string;
+  evidence?: string;
+};
+
 export type ChatStreamDone = {
   type: "done";
   usage: ChatStreamUsage;
   stop_reason: string | null;
   cache_read_tokens: number;
+  /** Validador E (Wave 3): warnings detectados en la respuesta IA */
+  warnings?: ChatStreamWarning[];
 };
 
 export type ChatStreamError = {

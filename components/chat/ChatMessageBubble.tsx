@@ -110,6 +110,29 @@ export function ChatMessageBubble({
               <span className="inline-block w-2 h-4 bg-slate-400 animate-pulse" />
             )}
           </div>
+          {/* Validador E (Wave 3): warnings de calidad detectados en la respuesta */}
+          {m.warnings && m.warnings.length > 0 && (
+            <div className="mt-2 space-y-1" role="alert">
+              {m.warnings.map((w, wIdx) => (
+                <div
+                  key={wIdx}
+                  className={`flex items-start gap-1.5 text-[11px] leading-snug px-2 py-1 rounded-sm ${
+                    w.severity === "error"
+                      ? "bg-rose-50 text-rose-700 border-l-2 border-l-rose-400"
+                      : "bg-amber-50 text-amber-800 border-l-2 border-l-amber-400"
+                  }`}
+                >
+                  <svg className="w-3 h-3 mt-0.5 shrink-0" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                    <path d="M6 1l5 9H1l5-9zM6 4v3M6 8.5v.5" stroke="currentColor" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+                  </svg>
+                  <span>
+                    <span className="font-semibold">Revisa: </span>
+                    {w.message}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           {showActions && (
             <div className="flex items-center mt-2 -mx-1">
               <button

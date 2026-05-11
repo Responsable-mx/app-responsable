@@ -13,6 +13,7 @@ import {
 } from "@/lib/questionnaires/types";
 import { getModelConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
+import { validateAiResponse, type ValidationWarning } from "@/lib/ai/response-validator";
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
@@ -501,12 +502,18 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
         type: "web" as const,
       }));
     }
+    // Validador E: detecta códigos catálogo expuestos, jerga inglesa, disclaimers
+    const valueStr = typeof ai.value === "string" ? ai.value : "";
+    const warnings: ValidationWarning[] = valueStr
+      ? validateAiResponse(valueStr, { minLength: 0 }).filter((w) => w.severity !== "info")
+      : [];
     result[field.key] = {
       value: typeof ai.value === "string" || typeof ai.value === "number" ? ai.value : null,
       source_type: sourceType,
       sources,
       validated: false,
       updated_at: now,
+      ...(warnings.length > 0 ? { ai_warnings: warnings } : {}),
     };
   }
 

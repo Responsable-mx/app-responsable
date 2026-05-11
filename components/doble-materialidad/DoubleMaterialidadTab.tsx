@@ -513,7 +513,7 @@ export function DoubleMaterialidadTab({
       : null;
 
   return (
-    <div className="space-y-6 py-4 max-w-5xl mx-auto">
+    <div className="space-y-6 py-4">
       {/* Keyframe fade-in para transición entre paneles Ruta B (montado una vez) */}
       <style>{`@keyframes dmFadeIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}`}</style>
       {/* Banner: cuestionario < 50% → calidad de análisis reducida */}

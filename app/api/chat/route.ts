@@ -6,6 +6,7 @@ import { getQuestionnaireBundle } from "@/lib/questionnaires/queries";
 import { getModelConfig } from "@/lib/ai/models";
 import { buildSystemBlocks } from "@/lib/ai/roles";
 import { logAiCall } from "@/lib/ai/logging";
+import { validateAiResponse } from "@/lib/ai/response-validator";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 import { ChatRequestSchema } from "@/lib/validation";
@@ -180,22 +181,29 @@ export async function POST(req: NextRequest) {
           { signal: AbortSignal.timeout(STREAM_TIMEOUT_MS) }
         );
 
+        // Acumular respuesta para validador E (post-stream).
+        let fullResponseText = "";
         for await (const event of response) {
           if (
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
+            fullResponseText += event.delta.text;
             send({ type: "delta", text: event.delta.text });
           }
         }
 
         const finalMessage = await response.finalMessage();
+        // Validador E: detecta códigos catálogo, jerga inglesa, URLs malformadas
+        const validatorWarnings = validateAiResponse(fullResponseText)
+          .filter((w) => w.severity !== "info");
         send({
           type: "done",
           usage: finalMessage.usage,
           stop_reason: finalMessage.stop_reason,
           // ayuda al cliente a confirmar que hay cache hit en turnos subsecuentes
           cache_read_tokens: finalMessage.usage.cache_read_input_tokens ?? 0,
+          ...(validatorWarnings.length > 0 ? { warnings: validatorWarnings } : {}),
         });
         logUsage(finalMessage.usage, finalMessage.stop_reason);
         anthropicBreaker.recordSuccess();

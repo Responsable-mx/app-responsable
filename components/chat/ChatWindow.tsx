@@ -9,6 +9,7 @@ import { ChatMessageBubble } from "@/components/chat/ChatMessageBubble";
 import { ChatEmptyState } from "@/components/chat/ChatEmptyState";
 import {
   type ChatMessage,
+  type ChatMessageWarning,
   type ClientOption,
   type RoleId,
   ROLES,
@@ -333,6 +334,15 @@ export function ChatWindow({
                 cacheReadTokens: prev.cacheReadTokens + cacheReadTokens,
                 costUsd: prev.costUsd + turnCost,
               }));
+              // Validador E: adjuntar warnings al último mensaje assistant.
+              const warnings = (raw as { warnings?: ChatMessageWarning[] }).warnings;
+              if (warnings && warnings.length > 0) {
+                setMessages((m) => {
+                  const last = m[m.length - 1];
+                  if (!last || last.role !== "assistant") return m;
+                  return [...m.slice(0, -1), { ...last, warnings }];
+                });
+              }
             } else if (raw.type === "error") {
               setError(raw.error);
             }

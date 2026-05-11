@@ -19,6 +19,13 @@ export type ClientOption = {
 
 export type RoleId = "aurora" | "rebeca" | "elena" | "valeria";
 
+export type ChatMessageWarning = {
+  code: string;
+  severity: "info" | "warn" | "error";
+  message: string;
+  evidence?: string;
+};
+
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -28,6 +35,8 @@ export type ChatMessage = {
   // puede cambiar de rol entre turnos — sin esto los mensajes viejos se renderizarían
   // con el avatar del rol actual (atribución incorrecta).
   roleId?: RoleId;
+  // Validador E (Wave 3): warnings de calidad detectados en la respuesta.
+  warnings?: ChatMessageWarning[];
 };
 
 // Orden lógico cadena calidad: Autor → Revisor → Elevador → Validador.

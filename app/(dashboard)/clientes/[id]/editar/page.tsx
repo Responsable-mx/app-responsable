@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getClient, getClientEngagements } from "@/lib/clients";
 import { requireAdmin } from "@/lib/auth";
 import { ClientForm } from "@/components/ClientForm";
+import { ClientFormBoundary } from "@/components/ClientFormBoundary";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,9 @@ export default async function EditarClienteFormPage({ params }: Props) {
         </p>
       </div>
 
-      <ClientForm mode="edit" initial={client} initialEngagements={engagements} />
+      <ClientFormBoundary>
+        <ClientForm mode="edit" initial={client} initialEngagements={engagements} />
+      </ClientFormBoundary>
     </div>
   );
 }

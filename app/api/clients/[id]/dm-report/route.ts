@@ -195,6 +195,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
               }
             } else {
               batchError = "Respuesta IA sin JSON";
+              console.error("[dm-report batch] stop_reason:", msg.stop_reason, "output_tokens:", msg.usage?.output_tokens, "textOut tail:", textOut.slice(-500));
             }
           } else if (result.result.type === "errored") {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -374,7 +375,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: docRow.id,
           params: {
             model,
-            max_tokens: 6000,
+            max_tokens: 16000, // cap subido may-2026 — 6000 truncaba secciones extendidas (priority_topics + benchmark_gaps + proximos_pasos + roadmap_90d) (stop_reason=max_tokens → parse_status=failed)
             system: [{
               type: "text",
               text: "Eres un consultor senior de Doble Materialidad (ESRS/GRI/CSRD). Redactas reportes ejecutivos claros y accionables. Responde solo con JSON válido.",

@@ -128,11 +128,13 @@ ESTÁNDARES ESRS A ANALIZAR (2 dimensiones por estándar):
 ${iroSections.join("\n\n")}
 
 INSTRUCCIONES:
-- Por cada dimensión (impacto + riesgo/oportunidad): 1-2 oraciones concisas por empresa (incluye a ${clientName}).
+- Por cada dimensión (impacto + riesgo/oportunidad): UNA sola oración por empresa, máximo 35 palabras (incluye a ${clientName}).
+- Sé telegráfico: dato concreto + relevancia ESG. Evita adjetivos vacíos y conectores narrativos.
 - Si en "Datos del cuestionario" hay información del cliente, úsala como evidencia concreta en el análisis de ${clientName}.
-- Si no hay datos públicos verificables para una empresa en una dimensión, escribe "Sin datos públicos disponibles."
+- Si no hay datos públicos verificables para una empresa en una dimensión, escribe exactamente "Sin datos públicos disponibles."
 - CRÍTICO: usa EXACTAMENTE los nombres de empresa tal como aparecen en EMPRESAS A COMPARAR como claves del JSON.
-- Cierra con párrafo narrativo de 60-80 palabras: posición de ${clientName}, fortalezas clave, brechas principales y prioridad recomendada.
+- CRÍTICO: cierra TODAS las llaves del JSON. Mejor menos contenido bien cerrado que más contenido truncado.
+- Cierra con párrafo narrativo de 50-70 palabras: posición de ${clientName}, fortalezas, brechas, prioridad.
 
 JSON únicamente — usa estas claves exactas: ${fieldKeys}
 {
@@ -216,6 +218,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
               }
             } else {
               batchError = "Respuesta IA sin JSON";
+              console.error("[dm-benchmark batch] stop_reason:", msg.stop_reason, "output_tokens:", msg.usage?.output_tokens, "textOut tail:", textOut.slice(-500));
             }
           } else if (result.result.type === "errored") {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -585,7 +588,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: resultRow.id,
           params: {
             model,
-            max_tokens: 8000, // 10 IROs × 2 dims × N empresas × 1-2 oraciones; máximo claude-sonnet-4-6
+            max_tokens: 16000, // 10 IROs × 2 dims × N empresas (cap subido may-2026: 8K truncaba JSON con 5+ empresas — stop_reason=max_tokens → "Respuesta IA sin JSON")
             system: [{
               type: "text",
               text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",

@@ -203,7 +203,7 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
     const response = await anthropic.messages.create(
       {
         model,
-        max_tokens: 2000,
+        max_tokens: 4000, // cap subido may-2026 — 2000 puede truncar resumen con tabla top-5 + 5 secciones markdown
         system: [
           {
             type: "text",
@@ -230,6 +230,10 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
       .filter((b) => b.type === "text")
       .map((b) => (b as { type: "text"; text: string }).text)
       .join("");
+
+    if (response.stop_reason === "max_tokens") {
+      console.error("[dm-resumen] stop_reason=max_tokens — output truncado, output_tokens:", outputTokens);
+    }
 
   } catch (e) {
     anthropicBreaker.recordFailure();

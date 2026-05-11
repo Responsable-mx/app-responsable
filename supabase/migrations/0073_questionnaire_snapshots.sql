@@ -24,9 +24,10 @@ create table if not exists public.questionnaire_snapshots (
 create index if not exists questionnaire_snapshots_client_id_idx
   on public.questionnaire_snapshots(client_id, created_at desc);
 
+-- Index plano sobre expires_at (sin WHERE: Postgres exige predicados IMMUTABLE,
+-- y `now()` no califica). Tabla es pequeña; el cron de cleanup hace scan barato.
 create index if not exists questionnaire_snapshots_expires_idx
-  on public.questionnaire_snapshots(expires_at)
-  where expires_at > now();
+  on public.questionnaire_snapshots(expires_at);
 
 comment on table public.questionnaire_snapshots is
   'Snapshot del cuestionario antes de operaciones destructivas (bulk AI fill, sobrescritura manual). Restaurable 72h.';

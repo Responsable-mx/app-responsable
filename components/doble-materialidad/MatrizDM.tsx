@@ -95,86 +95,69 @@ function classifyQuadrant(x: number, y: number): Quadrant {
 
 // ── Shapes SVG ────────────────────────────────────────────────────────────────
 
-function ShapeCircle({ cx, cy, fill, stroke, num, dimmed, onClick, onMouseEnter, onMouseLeave }: {
+type ShapeProps = {
   cx: number; cy: number; fill: string; stroke: string; num: number;
-  dimmed: boolean; onClick: () => void;
-  onMouseEnter: () => void; onMouseLeave: () => void;
-}) {
+  dimmed: boolean; label: string;
+  onClick: () => void; onMouseEnter: () => void; onMouseLeave: () => void;
+};
+
+function dotGroupProps(p: ShapeProps) {
+  return {
+    role: "button" as const,
+    tabIndex: p.dimmed ? -1 : 0,
+    "aria-label": p.label,
+    onClick: p.onClick,
+    onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); p.onClick(); } },
+    onMouseEnter: p.onMouseEnter,
+    onMouseLeave: p.onMouseLeave,
+    style: { cursor: "pointer", opacity: p.dimmed ? 0.12 : 1 },
+  };
+}
+
+function ShapeCircle(p: ShapeProps) {
   return (
-    <g
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      style={{ cursor: "pointer", opacity: dimmed ? 0.12 : 1 }}
-    >
-      <circle cx={cx} cy={cy} r={7} fill={fill} stroke={stroke} strokeWidth={1.5} />
-      <text x={cx} y={cy} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
-        {num}
+    <g {...dotGroupProps(p)}>
+      <circle cx={p.cx} cy={p.cy} r={7} fill={p.fill} stroke={p.stroke} strokeWidth={1.5} />
+      <text x={p.cx} y={p.cy} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
+        {p.num}
       </text>
     </g>
   );
 }
 
-function ShapeDiamond({ cx, cy, fill, stroke, num, dimmed, onClick, onMouseEnter, onMouseLeave }: {
-  cx: number; cy: number; fill: string; stroke: string; num: number;
-  dimmed: boolean; onClick: () => void;
-  onMouseEnter: () => void; onMouseLeave: () => void;
-}) {
+function ShapeDiamond(p: ShapeProps) {
   const s = 8;
-  const pts = `${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`;
+  const pts = `${p.cx},${p.cy - s} ${p.cx + s},${p.cy} ${p.cx},${p.cy + s} ${p.cx - s},${p.cy}`;
   return (
-    <g
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      style={{ cursor: "pointer", opacity: dimmed ? 0.12 : 1 }}
-    >
-      <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.5} />
-      <text x={cx} y={cy} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
-        {num}
+    <g {...dotGroupProps(p)}>
+      <polygon points={pts} fill={p.fill} stroke={p.stroke} strokeWidth={1.5} />
+      <text x={p.cx} y={p.cy} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
+        {p.num}
       </text>
     </g>
   );
 }
 
-function ShapeSquare({ cx, cy, fill, stroke, num, dimmed, onClick, onMouseEnter, onMouseLeave }: {
-  cx: number; cy: number; fill: string; stroke: string; num: number;
-  dimmed: boolean; onClick: () => void;
-  onMouseEnter: () => void; onMouseLeave: () => void;
-}) {
+function ShapeSquare(p: ShapeProps) {
   const s = 6.5;
   return (
-    <g
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      style={{ cursor: "pointer", opacity: dimmed ? 0.12 : 1 }}
-    >
-      <rect x={cx - s} y={cy - s} width={13} height={13} fill={fill} stroke={stroke} strokeWidth={1.5} />
-      <text x={cx} y={cy} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
-        {num}
+    <g {...dotGroupProps(p)}>
+      <rect x={p.cx - s} y={p.cy - s} width={13} height={13} fill={p.fill} stroke={p.stroke} strokeWidth={1.5} />
+      <text x={p.cx} y={p.cy} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
+        {p.num}
       </text>
     </g>
   );
 }
 
-function ShapeTriangle({ cx, cy, fill, stroke, num, dimmed, onClick, onMouseEnter, onMouseLeave }: {
-  cx: number; cy: number; fill: string; stroke: string; num: number;
-  dimmed: boolean; onClick: () => void;
-  onMouseEnter: () => void; onMouseLeave: () => void;
-}) {
+function ShapeTriangle(p: ShapeProps) {
   const s = 8;
-  const pts = `${cx},${cy - s} ${cx + s},${cy + s} ${cx - s},${cy + s}`;
+  const pts = `${p.cx},${p.cy - s} ${p.cx + s},${p.cy + s} ${p.cx - s},${p.cy + s}`;
   return (
-    <g
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      style={{ cursor: "pointer", opacity: dimmed ? 0.12 : 1 }}
-    >
-      <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.5} />
-      <text x={cx} y={cy + 2} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
-        {num}
+    <g {...dotGroupProps(p)}>
+      <polygon points={pts} fill={p.fill} stroke={p.stroke} strokeWidth={1.5} />
+      <text x={p.cx} y={p.cy + 2} fontSize={7} textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="700">
+        {p.num}
       </text>
     </g>
   );
@@ -182,14 +165,14 @@ function ShapeTriangle({ cx, cy, fill, stroke, num, dimmed, onClick, onMouseEnte
 
 function DotShape(props: {
   quadrant: Quadrant;
-  cx: number; cy: number; num: number; dimmed: boolean;
+  cx: number; cy: number; num: number; dimmed: boolean; label: string;
   onClick: () => void; onMouseEnter: () => void; onMouseLeave: () => void;
 }) {
   const meta = QUADRANT_META[props.quadrant];
-  const sharedProps = {
+  const sharedProps: ShapeProps = {
     cx: props.cx, cy: props.cy,
     fill: meta.fill, stroke: meta.stroke,
-    num: props.num, dimmed: props.dimmed,
+    num: props.num, dimmed: props.dimmed, label: props.label,
     onClick: props.onClick,
     onMouseEnter: props.onMouseEnter,
     onMouseLeave: props.onMouseLeave,
@@ -515,6 +498,7 @@ export function MatrizDM({ iros, onGoToIros }: Props) {
                     cx={cx} cy={cy}
                     num={p.numero}
                     dimmed={dimmed}
+                    label={`${QUADRANT_META[p.quadrant].label}: ${p.tema_esg}`}
                     onClick={() => {
                       setPopover((prev) =>
                         prev?.tema.tema_esg === p.tema_esg
@@ -651,6 +635,32 @@ function PopoverCard({
 
     setPos({ top, left });
   }, [popover, svgRef]);
+
+  // Focus al primer botón al montar
+  useEffect(() => {
+    const first = ref.current?.querySelector<HTMLElement>("button, [tabindex='0']");
+    first?.focus();
+  }, []);
+
+  // Trap de Tab dentro del popover
+  useEffect(() => {
+    function onTab(e: KeyboardEvent) {
+      if (e.key !== "Tab" || !ref.current) return;
+      const focusable = Array.from(
+        ref.current.querySelectorAll<HTMLElement>("button, [tabindex='0']")
+      ).filter((el) => !el.hasAttribute("disabled"));
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    document.addEventListener("keydown", onTab);
+    return () => document.removeEventListener("keydown", onTab);
+  }, []);
 
   // Cerrar click outside
   useEffect(() => {

@@ -167,7 +167,7 @@ function StagePill({
   selected: boolean;
 }) {
   const pillBase =
-    "flex flex-col items-center gap-0.5 px-3 py-2 rounded-sm border transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40";
+    "flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-sm border transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40";
 
   // selected = panel visible (ring teal + bg teal). status sólo determina estilo no-selected.
   const pillStyle = selected
@@ -195,7 +195,7 @@ function StagePill({
     ? "text-slate-500"
     : status === "active"
     ? "text-brand-primary"
-    : "text-slate-400";
+    : "text-slate-500";
 
   const inner = (
     <>

@@ -846,10 +846,10 @@ export function BenchmarkSection({
           <table className="min-w-full w-max text-xs border-collapse">
             <thead>
               <tr>
-                <th className="sticky left-0 top-0 z-[20] bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06),0_1px_0_0_#e2e8f0]">
+                <th className="sticky left-0 top-0 z-[20] bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pt-2 pb-3 pr-4 w-[200px] whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06),0_2px_0_0_#cbd5e1]">
                   Dimensión
                 </th>
-                <th className="sticky top-0 z-[11] text-left text-[10px] font-bold uppercase tracking-widest pb-2 pr-6 whitespace-nowrap bg-brand-primary-light px-3 rounded-t text-brand-primary-dark shadow-[0_1px_0_0_#e2e8f0]">
+                <th className="sticky top-0 z-[11] text-left text-[10px] font-bold uppercase tracking-widest pt-2 pb-3 pr-6 whitespace-nowrap bg-brand-primary-light px-3 rounded-t text-brand-primary-dark shadow-[0_2px_0_0_#94a3b8]">
                   {clientName}
                   <span className="ml-1 font-normal normal-case text-[10px] text-brand-primary/60">· Cliente</span>
                 </th>
@@ -857,7 +857,7 @@ export function BenchmarkSection({
                   <th
                     key={company.name}
                     title={company.name}
-                    className="sticky top-0 z-[11] bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 pr-6 whitespace-nowrap shadow-[0_1px_0_0_#e2e8f0]"
+                    className="sticky top-0 z-[11] bg-white text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 pt-2 pb-3 pr-6 whitespace-nowrap shadow-[0_2px_0_0_#cbd5e1]"
                   >
                     {abbrevCompanyName(company.name)}
                     {company.relation && (
@@ -890,14 +890,14 @@ export function BenchmarkSection({
                       className="group even:bg-slate-50/60 hover:bg-brand-primary-light/20 transition-colors"
                     >
                       {/* Columna dimensión: badge E/S/G + label */}
-                      <td className="sticky left-0 z-10 bg-white group-even:bg-slate-50/60 group-hover:bg-brand-primary-light/20 py-3 pr-6 align-top shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                      <td className="sticky left-0 z-10 w-[200px] bg-white group-even:bg-slate-50/60 group-hover:bg-brand-primary-light/20 py-3 pr-4 align-top shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                         <div className="flex flex-col gap-0.5">
                           {badge && (
                             <span className={`inline-flex w-fit items-center px-1 py-px rounded-sm text-[9px] font-medium border ${badge.cls}`}>
                               {badge.label}
                             </span>
                           )}
-                          <span className="font-medium text-slate-700 whitespace-nowrap">{field.label}</span>
+                          <span className="font-medium text-slate-700 text-xs leading-snug">{field.label}</span>
                         </div>
                       </td>
                       {/* Celda cliente */}
@@ -1022,7 +1022,6 @@ export function BenchmarkSection({
                 <div
                   className="flex-1 overflow-auto px-6 py-4 outline-none"
                   tabIndex={0}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
                   style={{ cursor: isDragging ? "grabbing" : "grab" }}
                   onKeyDown={(e) => {

@@ -330,6 +330,35 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 
 **Patrón canónico:** `components/ClientTabs.tsx`. Page.tsx queda thin: solo data fetching + `<ClientTabs>` con props extendidos (sectorLabels, visibleServices, prev/next, counter, updatedLabel, updatedAt, metaTooltip).
 
+## Retrieval semántico de documentos (Wave 5c → 7)
+
+Pipeline en 2 niveles, swap transparente cuando llegue Voyage API key.
+
+### Hoy — BM25 sobre markdown_content (activo en prod via DOC_RELEVANCE_ENABLED=true)
+
+- `lib/documents/relevance.ts`: chunkMarkdown (1.2K + 150 overlap) + scoreChunk BM25-simplified + selectTopChunks (greedy top score, preserva orden doc) + position bonus (1.2x primeros chunks + 1.15x si contiene términos "resumen/conclusion/objetivo/...")
+- Activación: env `DOC_RELEVANCE_ENABLED=true` en Vercel production
+- Beneficio: ~70% menos input tokens en docs >30K chars
+- Limitación: no entiende sinónimos ("emisiones" ≠ "huella climática")
+
+### Mañana — Embeddings vectoriales con Voyage AI (Wave 7 infra lista)
+
+- **Migración 0076** (pendiente OK textual del usuario para `--confirm-destructive`):
+  - `CREATE EXTENSION vector`
+  - `document_chunks` tabla con `embedding vector(1024)` (Voyage voyage-2 dims)
+  - Índice IVFFlat cosine + índices por document_id, client_id
+  - RLS: SELECT authenticated, INSERT/UPDATE solo service_role
+- **`lib/documents/embeddings.ts`** ya en repo:
+  - `generateEmbedding(text)` y `generateQueryEmbedding(query)` (input_type "document" vs "query")
+  - `persistDocumentChunks({documentId, clientId, markdownContent})` upsert idempotente con content_hash dedupe
+  - `searchSimilarChunks({query, clientId, limit})` cosine similarity en JS (suficiente <500 chunks/cliente); retorna null si VOYAGE_API_KEY falta → caller usa BM25
+- **Activación cuando llegue API key:**
+  1. Vercel env: `VOYAGE_API_KEY=<key>` + opcional `VOYAGE_MODEL=voyage-2`
+  2. Aplicar migración 0076 (`--confirm-destructive`)
+  3. Crear cron `/api/cron/embed-chunks` (6h) que itere documents sin embeddings
+  4. Modificar `ai-fill/route.ts` para llamar `searchSimilarChunks` antes que BM25
+- **Beneficio esperado**: +25% precisión retrieval en queries con sinónimos / idiomas distintos / paráfrasis
+
 ## Deploy — app-responsable (may-2026)
 
 **Push a `main` → auto-deploy automático** a `https://app.responsable.net`.

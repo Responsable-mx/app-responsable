@@ -90,7 +90,7 @@ export function WizardStepNav({
                   }}
                   disabled={refreshing || bulkRunning}
                   aria-label={`Refrescar paso ${s.title} con IA`}
-                  title={refreshing ? "Refrescando…" : "Refrescar este paso con IA"}
+                  title={refreshing ? "Refrescando…" : "Refrescar este paso con IA · actualiza campos vacíos y no validados, preserva los validados ✓"}
                   className={`shrink-0 w-6 h-6 -mr-1 rounded flex items-center justify-center transition-colors ${
                     refreshing
                       ? "text-brand-primary-dark"

@@ -829,22 +829,6 @@ function WizardEditor({
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <SaveIndicator state={saveState} errorMsg={errorMsg} />
-            <div className="flex items-center gap-2">
-              {step.ai_can_fill && (() => {
-                const stepHasData = stepProgress.filled > 0;
-                return (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    loading={aiFilling === step.key}
-                    onClick={() => aiFill(step.key)}
-                    disabled={!!aiBulkProgress}
-                  >
-                    {stepHasData ? "Refrescar este paso con IA" : "Llenar este paso con IA"}
-                  </Button>
-                );
-              })()}
-            </div>
           </div>
         </div>
 

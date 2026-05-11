@@ -458,14 +458,14 @@ export function ClientForm(props: Props) {
                   />
                 </div>
                 {/* Año */}
-                <div className="w-[72px] shrink-0">
+                <div className="w-[92px] shrink-0">
                   <input
                     type="number"
                     min={2010}
                     max={2035}
                     value={row.year}
                     onChange={(e) => updateEngagement(row._key, "year", e.target.value)}
-                    className={inputCls + " text-center px-1.5"}
+                    className={inputCls + " text-center"}
                     placeholder="Año"
                   />
                 </div>

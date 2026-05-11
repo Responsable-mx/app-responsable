@@ -10,39 +10,9 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/ui/Modal";
 import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
-
-// Saved views: filtros persistidos por usuario en localStorage. Pattern Salesforce
-// "List Views" / Linear "Saved searches". Permite al consultor tener "Mis activos",
-// "Cierres este mes", etc. URL stateful via search params para compartir.
-const SAVED_VIEWS_KEY = "rs.clientes.savedViews.v1";
-
-type SavedView = {
-  id: string;
-  name: string;
-  query: string;
-  sectorFilter: string;
-  view: ViewMode;
-};
-
-function loadSavedViews(): SavedView[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(SAVED_VIEWS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistSavedViews(views: SavedView[]) {
-  try {
-    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(views));
-  } catch {
-    // Quota excedida o storage bloqueado — silent fail OK.
-  }
-}
+import { type SavedView, loadSavedViews, persistSavedViews } from "@/lib/clients/saved-views";
+import { exportClientsCsv } from "@/lib/clients/export";
+import { parseDomain } from "@/lib/clients/url-utils";
 
 type Row = Pick<
   Client,
@@ -487,60 +457,6 @@ export function ClientsList() {
       )}
     </div>
   );
-}
-
-// Export filtered clients to CSV. Escape fields que contengan coma/comilla/newline
-// con doble comilla (RFC 4180). UTF-8 BOM para Excel detect encoding correcto.
-function exportClientsCsv(rows: Row[]) {
-  const headers = [
-    "Nombre",
-    "Sector",
-    "Tamaño",
-    "Países",
-    "Frameworks",
-    "Certificaciones",
-    "Actualizado",
-  ];
-  const escape = (v: string) => {
-    if (v.includes(",") || v.includes('"') || v.includes("\n")) {
-      return `"${v.replace(/"/g, '""')}"`;
-    }
-    return v;
-  };
-  const lines = [headers.join(",")];
-  for (const c of rows) {
-    lines.push(
-      [
-        escape(c.name),
-        escape(c.sector ?? ""),
-        escape(c.size ?? ""),
-        escape((c.countries ?? []).join("; ")),
-        escape((c.frameworks ?? []).join("; ")),
-        escape((c.certifications ?? []).join("; ")),
-        new Date(c.updated_at).toISOString().slice(0, 10),
-      ].join(",")
-    );
-  }
-  // BOM + CRLF para máx compatibilidad Excel.
-  const csv = "﻿" + lines.join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const stamp = new Date().toISOString().slice(0, 10);
-  a.href = url;
-  a.download = `clientes-${stamp}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function parseDomain(url: string | null | undefined): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
-    return u.hostname.replace(/^www\./, "");
-  } catch { return null; }
 }
 
 function ClientCard({ client }: { client: Row }) {

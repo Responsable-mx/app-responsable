@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 import { extractProfileFromUrl } from "@/lib/ai/extract-profile";
 import { logAiCall } from "@/lib/ai/logging";
+import { getTaskConfig } from "@/lib/ai/models";
 
 export const maxDuration = 60;
 
@@ -53,13 +54,13 @@ export async function POST(req: NextRequest) {
   try {
     const result = await extractProfileFromUrl(parsed.data.url);
     if (!result.cached) {
-      const model = process.env.ANTHROPIC_MODEL_SONNET ?? "claude-sonnet-4-6";
+      const model = getTaskConfig("extract").model;
       void logAiCall({ userEmail: user, role: "aurora", clientId: null, model, inputTokens: result.inputTokens ?? 0, outputTokens: result.outputTokens ?? 0, cacheCreationTokens: result.cacheCreationTokens ?? 0, cacheReadTokens: result.cacheReadTokens ?? 0, latencyMs: Date.now() - startedAt, error: null });
     }
     return NextResponse.json({ data: result });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error desconocido";
-    void logAiCall({ userEmail: user, role: "aurora", clientId: null, model: process.env.ANTHROPIC_MODEL_SONNET ?? "claude-sonnet-4-6", inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, latencyMs: Date.now() - startedAt, error: msg });
+    void logAiCall({ userEmail: user, role: "aurora", clientId: null, model: getTaskConfig("extract").model, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, latencyMs: Date.now() - startedAt, error: msg });
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

@@ -4,8 +4,10 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import { listCatalog } from "@/lib/catalogs";
 import { isPublicHttpUrl } from "@/lib/documents/ssrf";
+import { getTaskConfig } from "@/lib/ai/models";
 
-const MODEL = process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6";
+// Extracción de perfil desde URL/HTML → tarea estructurada → Haiku (12× más barato que Sonnet)
+const MODEL = getTaskConfig("extract").model;
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_BODY_BYTES = 5 * 1024 * 1024;

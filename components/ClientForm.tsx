@@ -9,6 +9,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ClientAvatar } from "@/components/ClientAvatar";
 import { MultiSelectCombobox } from "@/components/MultiSelectCombobox";
 import { type NarrativeBlockKey } from "@/lib/clients/narrative-schemas";
+import { normalizeUrl } from "@/lib/clients/url-utils";
 
 type Props =
   | { mode: "create"; initial?: undefined }
@@ -425,12 +426,6 @@ export function ClientForm(props: Props) {
       )}
     </form>
   );
-}
-
-function normalizeUrl(url: string): string {
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return url;
-  return `https://${url}`;
 }
 
 const inputCls =

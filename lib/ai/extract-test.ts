@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { listCatalog } from "@/lib/catalogs";
+import { getTaskConfig } from "@/lib/ai/models";
 
 // ═══════════════════════════════════════════════════════════════
 // POC de extracción IA. Por ahora solo campo 'sector'.
@@ -10,7 +11,8 @@ import { listCatalog } from "@/lib/catalogs";
 // Cache in-memory 30 min por hash SHA-256 del input normalizado.
 // ═══════════════════════════════════════════════════════════════
 
-const MODEL = process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6";
+// Extracción estructurada (campo único) → Haiku (12× más barato)
+const MODEL = getTaskConfig("extract").model;
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB

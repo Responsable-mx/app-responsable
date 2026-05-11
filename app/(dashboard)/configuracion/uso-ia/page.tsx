@@ -67,7 +67,7 @@ export default async function UsoIaPage() {
         Uso de los 4 roles IA en los últimos 30 días.
         <span
           className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold cursor-help"
-          title="Costo estimado es techo (asume Sonnet para todo). Valeria corre Haiku 5× más barato. Cache hits reducen ~90% el costo de input."
+          title="Costo real por modelo (Haiku $0.25/$1.25, Sonnet $3/$15, Opus $5/$25 por 1M tokens). Cache hits reducen ~90% el costo de input. Ver desglose por modelo abajo."
           aria-label="Más información sobre el cálculo de costo"
         >
           ⓘ
@@ -139,6 +139,53 @@ export default async function UsoIaPage() {
               </div>
             );
           })()}
+
+          {s.by_model.length > 0 && (
+            <div className="mb-6">
+              <Panel title="Gasto por modelo (últimos 30 días)">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                      <th className="pb-1.5 text-left">Modelo</th>
+                      <th className="pb-1.5 text-right">Llamadas</th>
+                      <th className="pb-1.5 text-right">T. entrada</th>
+                      <th className="pb-1.5 text-right">T. salida</th>
+                      <th className="pb-1.5 text-right">Costo USD</th>
+                      <th className="pb-1.5 text-right">% costo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {s.by_model.map((m) => {
+                      const pct = s.cost_usd_estimate_max > 0
+                        ? Math.round((m.cost_usd / s.cost_usd_estimate_max) * 100)
+                        : 0;
+                      const label = m.family === "haiku" ? "Haiku (barato)"
+                        : m.family === "sonnet" ? "Sonnet (medio)"
+                        : m.family === "opus" ? "Opus (caro)"
+                        : "Otro";
+                      const tone = m.family === "haiku" ? "text-emerald-700"
+                        : m.family === "opus" ? "text-rose-700"
+                        : "text-slate-700";
+                      return (
+                        <tr key={m.family}>
+                          <td className={`py-1.5 font-semibold ${tone}`}>{label}</td>
+                          <td className="py-1.5 text-right text-slate-900 tabular-nums">{numFmt.format(m.calls)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{numFmt.format(m.input_tokens)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{numFmt.format(m.output_tokens)}</td>
+                          <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{usdFmt.format(m.cost_usd)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{pct}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p className="text-[10px] text-slate-500 mt-2">
+                  Haiku = ~12× más barato que Sonnet. Si Sonnet/Opus dominan llamadas
+                  rutinarias (extracción, validación), revisa si pueden migrar a Haiku.
+                </p>
+              </Panel>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Panel title="Top consultores">

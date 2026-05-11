@@ -14,6 +14,15 @@ export type UsageRow = {
   errors: number;
 };
 
+export type UsageByModel = {
+  family: "haiku" | "sonnet" | "opus" | "otro";
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cost_usd: number;
+};
+
 export type UsageSummary = {
   window_days: number;
   total_calls: number;
@@ -23,6 +32,7 @@ export type UsageSummary = {
   total_errors: number;
   avg_latency_ms: number;
   cost_usd_estimate_max: number;
+  by_model: UsageByModel[];
   by_day_role: UsageRow[];
   top_users: Array<{ user_email: string; calls: number }>;
   top_clients: Array<{ client_id: string; calls: number; client_name: string | null }>;
@@ -40,6 +50,7 @@ export async function getUsageSummary(
     total_errors: 0,
     avg_latency_ms: 0,
     cost_usd_estimate_max: 0,
+    by_model: [],
     by_day_role: [],
     top_users: [],
     top_clients: [],
@@ -90,18 +101,35 @@ export async function getUsageSummary(
   let inputUsd = 0;
   let outputUsd = 0;
   let cacheUsd = 0;
+  const byModelMap = new Map<UsageByModel["family"], UsageByModel>();
   for (const r of calls) {
     const m = (r.model as string | null ?? "").toLowerCase();
     const isHaiku = m.includes("haiku");
     const isOpus  = m.includes("opus");
+    const isSonnet = m.includes("sonnet");
+    const family: UsageByModel["family"] = isHaiku ? "haiku" : isOpus ? "opus" : isSonnet ? "sonnet" : "otro";
     const iIn  = isHaiku ? 0.25 : isOpus ? 5  : 3;
     const iOut = isHaiku ? 1.25 : isOpus ? 25 : 15;
     const iCache = isHaiku ? 0.03 : isOpus ? 0.5 : 0.3;
-    inputUsd  += ((r.input_tokens  ?? 0) * iIn)    / 1_000_000;
-    outputUsd += ((r.output_tokens ?? 0) * iOut)   / 1_000_000;
-    cacheUsd  += ((r.cache_read_tokens ?? 0) * iCache) / 1_000_000;
+    const rIn  = ((r.input_tokens  ?? 0) * iIn)    / 1_000_000;
+    const rOut = ((r.output_tokens ?? 0) * iOut)   / 1_000_000;
+    const rCache = ((r.cache_read_tokens ?? 0) * iCache) / 1_000_000;
+    inputUsd  += rIn;
+    outputUsd += rOut;
+    cacheUsd  += rCache;
+    // Breakdown por modelo
+    const acc = byModelMap.get(family) ?? { family, calls: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cost_usd: 0 };
+    acc.calls += 1;
+    acc.input_tokens += r.input_tokens ?? 0;
+    acc.output_tokens += r.output_tokens ?? 0;
+    acc.cache_read_tokens += r.cache_read_tokens ?? 0;
+    acc.cost_usd += rIn + rOut + rCache;
+    byModelMap.set(family, acc);
   }
   const costUsd = Number((inputUsd + outputUsd + cacheUsd).toFixed(3));
+  const byModel: UsageByModel[] = Array.from(byModelMap.values())
+    .map((m) => ({ ...m, cost_usd: Number(m.cost_usd.toFixed(3)) }))
+    .sort((a, b) => b.cost_usd - a.cost_usd);
 
   // Top 5 usuarios
   const userCounts = new Map<string, number>();
@@ -149,6 +177,7 @@ export async function getUsageSummary(
     total_errors: totalErrors,
     avg_latency_ms: avgLatency,
     cost_usd_estimate_max: costUsd,
+    by_model: byModel,
     by_day_role: (byDayRole ?? []) as UsageRow[],
     top_users: topUsers,
     top_clients: topClients,

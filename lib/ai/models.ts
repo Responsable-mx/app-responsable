@@ -61,3 +61,59 @@ export const ROLE_LABELS: Record<RoleId, string> = {
   elena: "Elena · Elevador",
   valeria: "Valeria · Validador",
 };
+
+// ── Modelos por TIPO DE TAREA (no por rol) ─────────────────
+// Permite que tareas estructuradas (extracción JSON, validación) usen
+// Haiku (12× más barato que Sonnet) sin tocar el sistema de roles del chat.
+// ───────────────────────────────────────────────────────────
+
+export type TaskKind =
+  | "extract"   // Estructurar campos desde texto/web → Haiku
+  | "validate"  // Verificar JSON contra schema/checklist → Haiku
+  | "compose"   // Borrador narrativo, listas, propuestas → Sonnet
+  | "analyze"   // Razonamiento sectorial, comparaciones → Sonnet
+  | "elevate"   // Insights, trade-offs estratégicos → Opus
+  | "report";   // Reporte final crítico cliente → Opus
+
+export const TASK_CONFIG: Record<TaskKind, ModelConfig> = {
+  extract: {
+    model: process.env.ANTHROPIC_MODEL_HAIKU || "claude-haiku-4-5-20251001",
+    maxTokens: 1500,
+    useCache: false,
+    description: "Extracción estructurada (campos JSON desde texto/web)",
+  },
+  validate: {
+    model: process.env.ANTHROPIC_MODEL_HAIKU || "claude-haiku-4-5-20251001",
+    maxTokens: 1000,
+    useCache: false,
+    description: "Validación de JSON / checklist DoD",
+  },
+  compose: {
+    model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6",
+    maxTokens: 2000,
+    useCache: true,
+    description: "Borrador narrativo, listas, propuestas IA",
+  },
+  analyze: {
+    model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6",
+    maxTokens: 2500,
+    useCache: true,
+    description: "Razonamiento sectorial, comparaciones, benchmarks",
+  },
+  elevate: {
+    model: process.env.ANTHROPIC_MODEL_OPUS || "claude-opus-4-7",
+    maxTokens: 2500,
+    useCache: true,
+    description: "Insights, trade-offs estratégicos (Elena)",
+  },
+  report: {
+    model: process.env.ANTHROPIC_MODEL_OPUS || "claude-opus-4-7",
+    maxTokens: 4000,
+    useCache: true,
+    description: "Reporte final cliente — Opus por criticidad",
+  },
+};
+
+export function getTaskConfig(task: TaskKind): ModelConfig {
+  return TASK_CONFIG[task];
+}

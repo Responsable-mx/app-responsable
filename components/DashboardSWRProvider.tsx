@@ -11,8 +11,12 @@ export function DashboardSWRProvider({ children }: { children: React.ReactNode }
     <SWRConfig
       value={{
         revalidateOnFocus: false,
+        revalidateIfStale: true,
         keepPreviousData: true,
-        dedupingInterval: 5_000,
+        // Datos dinámicos del cliente (chat, wizard) se cachean 30s entre vistas.
+        // Catálogos lentos (sectores, frameworks, plantillas) overridean con 1hr/5min localmente.
+        dedupingInterval: 30_000,
+        focusThrottleInterval: 60_000,
         errorRetryCount: 3,
         onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
           // No reintentar en 404 ni 401 — son errores definitivos, no transitorios

@@ -404,7 +404,7 @@ export function DoubleMaterialidadTab({
   const includedIros  = iros.filter((i) => i.incluido);
   const allIrosDecided =
     includedIros.length > 0 &&
-    includedIros.every((i) => validacionRec?.iro_decisions[i.id]?.decision);
+    includedIros.every((i) => validacionRec?.iro_decisions?.[i.id]?.decision);
   // stage7 = Validación — locked si no hay resumen ejecutivo generado
   const stage7Status: StageStatus = allIrosDecided
     ? "done"
@@ -550,11 +550,15 @@ export function DoubleMaterialidadTab({
       <div ref={stepperSentinelRef} className="h-px -mb-px" aria-hidden="true" />
       {/* ── Stepper V3 — card con pill bar + progress + chips ── */}
       {(() => {
-        const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null }> = [
+        const validatedCompanies = companies.filter((c) => c.validated).length;
+        const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null; count?: string }> = [
           { label: "Contexto",    status: stage1Status, sectionId: "dm-sec-contexto" },
-          { label: "Benchmark",   status: stage2Status, sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at },
-          { label: "IROs",        status: stage3Status, sectionId: "dm-sec-iros" },
-          { label: "Matriz",      status: stage4Status, sectionId: "dm-sec-matriz" },
+          { label: "Benchmark",   status: stage2Status, sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at,
+            count: validatedCompanies > 0 ? `${validatedCompanies} emp.` : undefined },
+          { label: "IROs",        status: stage3Status, sectionId: "dm-sec-iros",
+            count: iros.length > 0 ? `${iros.length} IROs` : undefined },
+          { label: "Matriz",      status: stage4Status, sectionId: "dm-sec-matriz",
+            count: quadrantCounts.doble_material > 0 ? `${quadrantCounts.doble_material} DM` : undefined },
           { label: "NIS/IBSO",    status: stage5Status, sectionId: "dm-sec-nis" },
           { label: "Resumen IA",  status: stage6Status, sectionId: "dm-sec-resumen" },
           { label: "Validación",  status: stage7Status, sectionId: "dm-sec-validacion" },
@@ -562,7 +566,6 @@ export function DoubleMaterialidadTab({
         ];
         const doneCount = stagesData.filter((s) => s.status === "done").length;
         const pct = Math.round((doneCount / stagesData.length) * 100);
-        const validatedCompanies = companies.filter((c) => c.validated).length;
 
         return (
           <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all">
@@ -600,12 +603,14 @@ export function DoubleMaterialidadTab({
                       className="flex-1"
                       subtitle={(() => {
                         const isSel = s.sectionId === activeStageId;
-                        // Solo la etapa seleccionada dice "En curso" — evita 3 pills "En curso" simultáneas.
+                        // Etapa seleccionada: estado simple sin count para no saturar.
                         if (isSel) return s.status === "done" ? "En revisión" : "En curso";
-                        if (s.status === "done")   return formatStageDate(s.doneDate);
-                        if (s.status === "active") return "Disponible";
-                        if (s.status === "locked") return "Bloqueada";
-                        return "Pendiente";
+                        let base: string;
+                        if (s.status === "done")        base = formatStageDate(s.doneDate);
+                        else if (s.status === "active") base = "Disponible";
+                        else if (s.status === "locked") base = "Bloqueada";
+                        else                            base = "Pendiente";
+                        return s.count ? `${base} · ${s.count}` : base;
                       })()}
                       sectionId={s.sectionId}
                     />
@@ -630,57 +635,6 @@ export function DoubleMaterialidadTab({
               )}
             </div>
 
-            {/* Context chips — strip completo en expandido, mínimo en compact */}
-            {stepperCompact && (iros.length > 0 || validatedCompanies > 0) && (
-            <div className="border-t border-slate-100 px-5 py-1.5 flex items-center gap-3 text-[10px] text-slate-500">
-              {validatedCompanies > 0 && (
-                <span className="whitespace-nowrap tabular-nums font-medium">{validatedCompanies} empresas</span>
-              )}
-              {iros.length > 0 && (
-                <span className="whitespace-nowrap tabular-nums font-medium">{scoredIncluded.length}/{iros.length} IROs</span>
-              )}
-              {quadrantCounts.doble_material > 0 && (
-                <span className="whitespace-nowrap font-semibold text-rose-600">{quadrantCounts.doble_material} doble mat.</span>
-              )}
-              {quadrantCounts.solo_impacto > 0 && (
-                <span className="whitespace-nowrap font-medium text-amber-600">{quadrantCounts.solo_impacto} impacto</span>
-              )}
-            </div>
-            )}
-            {!stepperCompact && (
-            <div className="border-t border-slate-100 px-4 py-1.5">
-              <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {/* Benchmark chip — siempre */}
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                  {validatedCompanies > 0 ? (
-                    <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-                  ) : (
-                    <svg className="w-2 h-2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  )}
-                  {validatedCompanies} empresa{validatedCompanies !== 1 ? "s" : ""} benchmark
-                </span>
-                {/* IROs chip — siempre */}
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                  {iros.length > 0 ? (
-                    <svg className="w-2 h-2 text-brand-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-                  ) : (
-                    <svg className="w-2 h-2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  )}
-                  {iros.length} IROs{iros.length > 0 ? ` · ${scoredIncluded.length} calificados` : ""}
-                </span>
-                {quadrantCounts.doble_material > 0 && (
-                  <span className="inline-flex text-[10px] font-semibold bg-rose-50 border border-rose-200 text-rose-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                    {quadrantCounts.doble_material} doble material
-                  </span>
-                )}
-                {quadrantCounts.solo_impacto > 0 && (
-                  <span className="inline-flex text-[10px] font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-sm whitespace-nowrap shrink-0">
-                    {quadrantCounts.solo_impacto} mat. por impacto
-                  </span>
-                )}
-              </div>
-            </div>
-            )}
           </div>
         );
       })()}
@@ -881,7 +835,7 @@ export function DoubleMaterialidadTab({
         headerRight={
           includedIros.length > 0 ? (
             <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
-              {includedIros.filter((i) => validacionRec?.iro_decisions[i.id]?.decision).length}/{includedIros.length} decididos
+              {includedIros.filter((i) => validacionRec?.iro_decisions?.[i.id]?.decision).length}/{includedIros.length} decididos
             </span>
           ) : null
         }

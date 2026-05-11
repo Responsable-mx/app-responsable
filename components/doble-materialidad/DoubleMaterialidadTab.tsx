@@ -200,9 +200,15 @@ export function DoubleMaterialidadTab({
   const navigateTo = useCallback((sectionId: string) => {
     if (!DM_SECTION_IDS.includes(sectionId)) return;
     setActiveStageId(sectionId);
-    // Sync URL hash sin scroll — permite back/forward + deep-link
+    // Sync URL hash sin scroll — permite back/forward + deep-link.
+    // IMPORTANTE: siempre forzar tab=doble-materialidad-ia en la URL para evitar
+    // race condition con router.replace async en ClientTabs: si window.location.search
+    // aún refleja ?tab=cuestionario (valor stale), el replaceState dispararía un
+    // cambio de searchParams que el useEffect de ClientTabs interpreta como "ir a cuestionario".
     if (typeof window !== "undefined") {
-      const newUrl = `${window.location.pathname}${window.location.search}#${sectionId}`;
+      const params = new URLSearchParams(window.location.search);
+      params.set("tab", "doble-materialidad-ia");
+      const newUrl = `${window.location.pathname}?${params.toString()}#${sectionId}`;
       window.history.replaceState(null, "", newUrl);
     }
   }, []);

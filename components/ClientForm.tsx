@@ -333,18 +333,6 @@ export function ClientForm(props: Props) {
           onChange={(v) => update("services", (v as string[]) ?? [])}
         />
 
-        <Field label="Relación con otras empresas del sistema">
-          <input
-            value={form.related_companies}
-            onChange={(e) => update("related_companies", e.target.value)}
-            className={inputCls}
-            placeholder="Ej: Filial de Grupo X · Empresa independiente"
-          />
-          <p className="text-[10px] text-slate-400 mt-1">
-            Madre / hija / hermana con otros clientes en ResponSable — si aplica.
-          </p>
-        </Field>
-
         {/* Logo — al final: dato cosmético */}
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">
@@ -395,6 +383,20 @@ export function ClientForm(props: Props) {
         </div>
       </Section>
 
+      {/* ═══ Relaciones organizacionales ═════════════════════ */}
+      <Section title="Relaciones organizacionales">
+        <Field label="Relación con otras empresas del sistema">
+          <input
+            value={form.related_companies}
+            onChange={(e) => update("related_companies", e.target.value)}
+            className={inputCls}
+            placeholder="Ej: Filial de Grupo X · Empresa independiente"
+          />
+          <p className="text-[10px] text-slate-400 mt-1">
+            Madre / hija / hermana con otros clientes en ResponSable — si aplica.
+          </p>
+        </Field>
+      </Section>
 
       {/* ═══ Footer sticky ══════════════════════════════════ */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t border-slate-200">

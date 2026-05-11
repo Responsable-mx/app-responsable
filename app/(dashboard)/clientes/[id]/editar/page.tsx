@@ -20,7 +20,7 @@ export default async function EditarClienteFormPage({ params }: Props) {
   if (!client) notFound();
 
   return (
-    <div className="px-6 py-4 max-w-3xl mx-auto">
+    <div className="px-6 py-4 max-w-5xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-6 text-xs text-slate-500">
         <Link href="/clientes" className="hover:text-brand-primary-dark transition-colors font-medium">

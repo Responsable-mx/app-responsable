@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 /**
@@ -27,7 +26,6 @@ export function ClientHeaderActions({
   clientName?: string;
   isAdmin: boolean;
 }) {
-  const router = useRouter();
   const btnRef = useRef<HTMLButtonElement>(null);
 
   // Keyboard shortcut global: E → editar (admin)
@@ -42,12 +40,12 @@ export function ClientHeaderActions({
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       if (e.key === "e" || e.key === "E") {
         e.preventDefault();
-        router.push(`/clientes/${clientId}/editar`);
+        window.location.assign(`/clientes/${clientId}/editar`);
       }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [isAdmin, clientId, router]);
+  }, [isAdmin, clientId]);
 
   if (!isAdmin) return null;
 
@@ -55,7 +53,7 @@ export function ClientHeaderActions({
     <button
       ref={btnRef}
       type="button"
-      onClick={() => router.push(`/clientes/${clientId}/editar`)}
+      onClick={() => window.location.assign(`/clientes/${clientId}/editar`)}
       className="inline-flex items-center justify-center w-9 h-9 text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 shrink-0"
       aria-label="Editar cliente"
       title="Editar cliente · atajo E"

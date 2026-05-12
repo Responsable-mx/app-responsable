@@ -412,16 +412,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               { signal: AbortSignal.timeout(28_000) }
             );
 
-            // Extract URL: prefer citation URLs with ESG/report keywords, fallback to text
+            // Extract URL from citations (trusted — Anthropic already fetched the page)
+            // or from text (needs HTTP validation — could be hallucinated).
             let foundUrl: string | null = null;
+            let fromCitation = false;
             for (const block of msg.content ?? []) {
               if (block.type === "text" && typeof block.text === "string") {
                 const citations = block.citations as Array<{ url?: string }> | undefined;
-                if (Array.isArray(citations)) {
+                if (Array.isArray(citations) && citations.length > 0) {
                   const esgCitation = citations.find((c) =>
                     c.url && /sustain|esg|report|informe|sostenib|annual|memoria|tcfd|gri|csrd/i.test(c.url)
                   );
-                  foundUrl = esgCitation?.url ?? citations[0]?.url ?? null;
+                  const picked = esgCitation?.url ?? citations[0]?.url ?? null;
+                  if (picked) { foundUrl = picked; fromCitation = true; }
                 }
                 if (!foundUrl) {
                   const match = block.text.match(/https?:\/\/[^\s"'<>\n]+/);
@@ -431,6 +434,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             }
 
             if (!foundUrl) return { id: empresa.id, url: null };
+            // Citation URLs are verified by Anthropic's search — only check SSRF guard.
+            // Text-extracted URLs may be hallucinated — run full HTTP validation.
+            if (fromCitation) {
+              return { id: empresa.id, url: isPublicHttpUrl(foundUrl).ok ? foundUrl : null };
+            }
             const valid = await validateUrl(foundUrl);
             return { id: empresa.id, url: valid ? foundUrl : null };
           } catch {

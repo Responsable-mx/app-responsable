@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { HelpMenu } from "@/components/HelpMenu";
@@ -161,7 +160,7 @@ export function Sidebar({
             pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           return (
-            <Link
+            <a
               key={item.href}
               href={item.href}
               data-tour={item.tour}
@@ -181,7 +180,7 @@ export function Sidebar({
               {!collapsed && active && (
                 <span className="ml-auto w-1 h-5 rounded-full bg-brand-primary/70" />
               )}
-            </Link>
+            </a>
           );
         })}
       </nav>

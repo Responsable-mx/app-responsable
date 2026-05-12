@@ -253,9 +253,9 @@ function TopicsGroupedTable({ topics }: { topics: TopicGrouped[] }) {
               key={i}
               className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"} hover:bg-brand-primary/5`}
             >
-              <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap max-w-[200px]">{t.tema_consolidado}</td>
-              <td className="px-3 py-2 text-slate-700 max-w-[480px]">{t.descripcion_consolidada}</td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-2 font-medium text-slate-800 w-[220px] min-w-[180px] align-top break-words">{t.tema_consolidado}</td>
+              <td className="px-3 py-2 text-slate-700 max-w-[480px] align-top">{t.descripcion_consolidada}</td>
+              <td className="px-3 py-2 align-top">
                 <div className="flex flex-wrap gap-1">
                   {t.referentes.map((r) => (
                     <span key={r} className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-brand-primary/10 text-[10px] font-semibold text-brand-primary">

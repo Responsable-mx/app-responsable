@@ -806,9 +806,6 @@ export function DocumentsTab({
                     )}
                     <td className="px-3 py-2.5 min-w-[320px] max-w-[480px]">
                       <div className="flex items-center gap-2">
-                        <span className="shrink-0 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
-                          {TYPE_BADGE[d.file_type]}
-                        </span>
                         <span className="text-sm font-semibold text-slate-900 truncate">{d.file_name}</span>
                         {d.content_hash && dupHashes.has(d.content_hash) && (
                           <span

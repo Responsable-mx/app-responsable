@@ -11,8 +11,10 @@ export type IroBatchStatus = "idle" | "pending" | "done" | "failed";
 
 const SCORE_LABELS: Record<number, { label: string; color: string }> = {
   1: { label: "1", color: "bg-emerald-100 text-emerald-700 border-emerald-300" },
-  2: { label: "2", color: "bg-amber-100 text-amber-700 border-amber-300" },
-  3: { label: "3", color: "bg-rose-100 text-rose-700 border-rose-300" },
+  2: { label: "2", color: "bg-teal-100 text-teal-700 border-teal-300" },
+  3: { label: "3", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  4: { label: "4", color: "bg-orange-100 text-orange-700 border-orange-300" },
+  5: { label: "5", color: "bg-rose-100 text-rose-700 border-rose-300" },
 };
 
 const SCORE_DIM1_LABEL: Record<string, string> = {
@@ -30,10 +32,10 @@ const SCORE_DIM2_LABEL: Record<string, string> = {
 };
 
 const SCORE_DIM1_TOOLTIP: Record<string, string> = {
-  impacto_negativo: "Severidad: Escala (extensión del daño) × Alcance (nº afectados) × Remediabilidad (dificultad de reparar). 1=bajo · 2=medio · 3=alto",
-  impacto_positivo: "Escala × Alcance (sin Remediabilidad para impactos positivos). 1=bajo · 2=medio · 3=alto",
-  riesgo:           "Probabilidad de que el riesgo se materialice. 1=baja · 2=media · 3=alta",
-  oportunidad:      "Probabilidad de capturar la oportunidad. 1=baja · 2=media · 3=alta",
+  impacto_negativo: "Severidad: Escala (extensión del daño) × Alcance (nº afectados) × Remediabilidad (dificultad de reparar). 1=muy bajo · 3=medio · 5=muy alto",
+  impacto_positivo: "Escala × Alcance (sin Remediabilidad para impactos positivos). 1=muy bajo · 3=medio · 5=muy alto",
+  riesgo:           "Probabilidad de que el riesgo se materialice. 1=muy baja · 3=media · 5=muy alta",
+  oportunidad:      "Probabilidad de capturar la oportunidad. 1=muy baja · 3=media · 5=muy alta",
 };
 
 const TIPO_SHORT: Record<string, string> = {
@@ -80,7 +82,7 @@ function ScorePicker({
         </span>
       )}
       <div className="flex gap-0.5">
-        {[1, 2, 3].map((n) => {
+        {[1, 2, 3, 4, 5].map((n) => {
           const active = value === n;
           const { label, color } = SCORE_LABELS[n]!;
           return (
@@ -106,8 +108,8 @@ function ScorePicker({
 function prioridad(impacto: number | null, financiero: number | null): { label: string; color: string } {
   if (!impacto || !financiero) return { label: "—", color: "text-slate-400" };
   const sum = impacto + financiero;
-  if (sum >= 5) return { label: "Alta",  color: "text-rose-600 font-semibold" };
-  if (sum >= 3) return { label: "Media", color: "text-amber-600 font-semibold" };
+  if (sum >= 8) return { label: "Alta",  color: "text-rose-600 font-semibold" };
+  if (sum >= 5) return { label: "Media", color: "text-amber-600 font-semibold" };
   return { label: "Baja", color: "text-emerald-600 font-semibold" };
 }
 
@@ -170,7 +172,7 @@ export function IroSection({
   const includedCount = iros.filter((i) => i.incluido).length;
 
   // Umbral de materialidad — filtra IROs visibles por consolidado = max(score_impacto, score_financiero).
-  // Escala 1-3 ESRS: 1=BAJO=todos, 2=MEDIO=medio o más, 3=ALTO=solo alto.
+  // Escala 1-5: 1=todos, 2=≥2, ..., 5=solo 5.
   // IROs `incluido=true` siempre permanecen visibles (no perderlos al subir slider).
   const [threshold, setThreshold] = useState<number>(1);
 
@@ -264,7 +266,7 @@ export function IroSection({
         <input
           type="range"
           min={1}
-          max={3}
+          max={5}
           step={1}
           value={threshold}
           onChange={(e) => setThreshold(parseInt(e.target.value, 10))}
@@ -274,7 +276,7 @@ export function IroSection({
         <span className="text-xs font-bold tabular-nums text-brand-primary min-w-[1.5rem] text-right">
           {threshold}
         </span>
-        <span className="text-[10px] text-slate-400">/ 3</span>
+        <span className="text-[10px] text-slate-400">/ 5</span>
         <span
           className={`text-[10px] font-semibold px-2 py-0.5 rounded-sm whitespace-nowrap ${
             threshold <= 1
@@ -301,7 +303,7 @@ export function IroSection({
             className="text-[10px] uppercase tracking-widest text-slate-400 font-bold cursor-default"
             title="Dim 1: Severidad (impactos negativos) · Escala/Alcance (impactos positivos) · Probabilidad (riesgos/oportunidades) — Dim 2: Materialidad financiera para la empresa en todos los tipos"
           >
-            Dim 1 (Severidad/Prob.) × Dim 2 (Materialidad) · 1=bajo · 2=medio · 3=alto ⓘ
+            Dim 1 (Severidad/Prob.) × Dim 2 (Materialidad) · 1=muy bajo · 5=muy alto ⓘ
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -371,7 +373,7 @@ export function IroSection({
                           .map(i => Math.max(i.score_impacto ?? 0, i.score_financiero ?? 0))
                       );
                       if (!isFinite(consolidado) || consolidado === 0) return null;
-                      const color = consolidado === 3 ? "text-rose-600" : consolidado === 2 ? "text-amber-600" : "text-emerald-600";
+                      const color = consolidado >= 4 ? "text-rose-600" : consolidado >= 3 ? "text-amber-600" : "text-emerald-600";
                       return (
                         <span className={`ml-3 text-[9px] tabular-nums ${color}`} title="Score consolidado del tema (max de impacto y financiero)">
                           Score max: {consolidado}

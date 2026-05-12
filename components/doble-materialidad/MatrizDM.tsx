@@ -10,10 +10,10 @@ type Quadrant = "doble_material" | "solo_impacto" | "solo_financiero" | "en_segu
 
 type TemaPoint = {
   tema_esg: string;
-  x: number;           // coord financiero 0-10 (derivado de score 1-3 o pos_x override)
-  y: number;           // coord impacto    0-10 (derivado de score 1-3 o pos_y override)
+  x: number;           // coord financiero 0-10 (derivado de score 1-5 o pos_x override)
+  y: number;           // coord impacto    0-10 (derivado de score 1-5 o pos_y override)
   quadrant: Quadrant;
-  score_consolidado: number;  // max(score_impacto, score_financiero) 1-3 — usado para ranking
+  score_consolidado: number;  // max(score_impacto, score_financiero) 1-5 — usado para ranking
   numero: number;      // 1-N por score_consolidado desc
   idx: number;         // índice original (para jitter)
   hasOverride: boolean; // algún IRO del tema con pos manual
@@ -64,7 +64,7 @@ const FILTER_OPTIONS: Array<{ value: "todos" | Quadrant; label: string }> = [
 ];
 
 // ── Helpers de coordenadas ────────────────────────────────────────────────────
-// Ejes 0-10 (pattern mockup-v7). Score 1-3 se derive como (1→0, 2→5, 3→10)
+// Ejes 0-10 (pattern mockup-v7). Score 1-5 se deriva como (1→0, 2→2.5, 3→5, 4→7.5, 5→10)
 // o se sobrescribe con pos_x/pos_y manual del consultor.
 
 function mapX(axisValue: number): number {
@@ -75,10 +75,10 @@ function mapY(axisValue: number): number {
   return TOP + PLOT_H - (axisValue / 10) * PLOT_H;
 }
 
-/** Score 1-3 → coord eje 0-10. Permite null score → midpoint 5. */
+/** Score 1-5 → coord eje 0-10. Permite null score → midpoint 5. */
 function scoreToAxis(score: number | null | undefined): number {
   if (score == null) return 5;
-  return ((score - 1) / 2) * 10;
+  return ((score - 1) / 4) * 10;
 }
 
 // ── Clasificación de cuadrante ────────────────────────────────────────────────

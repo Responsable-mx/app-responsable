@@ -189,7 +189,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     ? iros
         .map((iro) => {
           const scoreConsolidado = Math.max(iro.score_impacto ?? 0, iro.score_financiero ?? 0);
-          return `- [${iro.n_iro}] ${iro.tema_esg} — tipo: ${iro.tipo} — score_impacto: ${iro.score_impacto ?? 0}/3 — score_financiero: ${iro.score_financiero ?? 0}/3 — score_consolidado: ${scoreConsolidado}/3 — horizonte: ${iro.horizonte ?? "no especificado"}\n  ${iro.descripcion ?? ""}`;
+          return `- [${iro.n_iro}] ${iro.tema_esg} — tipo: ${iro.tipo} — score_impacto: ${iro.score_impacto ?? 0}/5 — score_financiero: ${iro.score_financiero ?? 0}/5 — score_consolidado: ${scoreConsolidado}/5 — horizonte: ${iro.horizonte ?? "no especificado"}\n  ${iro.descripcion ?? ""}`;
         })
         .join("\n")
     : "No hay IROs materiales registrados para este cliente.";

@@ -21,7 +21,7 @@ export type IroInventoryItem = {
   score_impacto: number | null;
   score_financiero: number | null;
   // Coordenadas opcionales de matriz (0-10) — override manual desde popover.
-  // Si NULL, MatrizDM deriva la coordenada del score 1-3 ((score-1)/2*10).
+  // Si NULL, MatrizDM deriva la coordenada del score 1-5 ((score-1)/4*10).
   pos_x: number | null;
   pos_y: number | null;
   pos_override: boolean;
@@ -42,8 +42,8 @@ const IroItemSchema = z.object({
   horizonte:        z.enum(["corto","mediano","largo"]),
   evidencia:        z.string().max(200).optional(),
   confianza:        z.enum(["alto","medio","bajo"]),
-  score_impacto:    z.number().int().min(1).max(3),
-  score_financiero: z.number().int().min(1).max(3),
+  score_impacto:    z.number().int().min(1).max(5),
+  score_financiero: z.number().int().min(1).max(5),
 });
 
 export const IroGenerationSchema = z.object({

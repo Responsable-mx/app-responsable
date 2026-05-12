@@ -26,8 +26,8 @@ const IRO_RATE_LIMIT = { windowMs: 5 * 60_000, maxCalls: 5 };
 const PatchBody = z.object({
   id:               z.string().uuid(),
   incluido:         z.boolean().optional(),
-  score_impacto:    z.number().int().min(1).max(3).optional(),
-  score_financiero: z.number().int().min(1).max(3).optional(),
+  score_impacto:    z.number().int().min(1).max(5).optional(),
+  score_financiero: z.number().int().min(1).max(5).optional(),
   descripcion:      z.string().min(1).max(600).optional(),
   // Coordenadas manuales de matriz (0-10). NULL = reset al derivado por score.
   pos_x:            z.number().min(0).max(10).nullable().optional(),

@@ -114,7 +114,7 @@ async function buildReportPrompt(
   const iroInventory = clientIros.length
     ? `\nINVENTARIO DE IROs DEL CLIENTE (${clientIros.length} IROs revisados por el consultor):\n${clientIros
         .map((iro) =>
-          `IRO-${iro.n_iro} [${iro.tipo}] ${iro.tema_esg}: ${iro.descripcion} (cadena: ${iro.cadena}, horizonte: ${iro.horizonte}, impacto: ${iro.score_impacto ?? "?"}/3, financiero: ${iro.score_financiero ?? "?"}/3, confianza: ${iro.confianza})`
+          `IRO-${iro.n_iro} [${iro.tipo}] ${iro.tema_esg}: ${iro.descripcion} (cadena: ${iro.cadena}, horizonte: ${iro.horizonte}, impacto: ${iro.score_impacto ?? "?"}/5, financiero: ${iro.score_financiero ?? "?"}/5, confianza: ${iro.confianza})`
         )
         .join("\n")}`
     : "";

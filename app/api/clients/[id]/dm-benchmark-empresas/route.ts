@@ -398,57 +398,72 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const results = await Promise.allSettled(
         batch.map(async (empresa) => {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta: web_search tool
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta: web_search + submit_url tools
             const msg = await (anthropic.messages.create as (opts: unknown, extra?: unknown) => Promise<any>)(
               {
                 model,
-                max_tokens: 600,
-                tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
+                max_tokens: 1000,
+                tools: [
+                  { type: "web_search_20250305", name: "web_search", max_uses: 2 },
+                  {
+                    name: "submit_url",
+                    description: "Submit the URL of the official sustainability or ESG report page found.",
+                    input_schema: {
+                      type: "object",
+                      properties: {
+                        url: {
+                          type: "string",
+                          description: "Full URL to the report page or PDF. Empty string if not found.",
+                        },
+                      },
+                      required: ["url"],
+                    },
+                  },
+                ],
                 messages: [{
                   role: "user",
-                  content: `Usa web_search para encontrar la URL del informe de sostenibilidad, reporte ESG o memoria de sostenibilidad más reciente de "${empresa.nombre}" (${empresa.pais}${empresa.subsector ? `, ${empresa.subsector}` : ""}).\n\nBusca términos como "${empresa.nombre} sustainability report 2024" o "${empresa.nombre} informe sostenibilidad".\n\nResponde con ÚNICAMENTE la URL (puede ser página HTML del informe o PDF directo — ambos válidos). Sin texto adicional. Si no encuentras nada: null`,
+                  content: `Use web_search to find the official sustainability report or ESG report page for "${empresa.nombre}" from ${empresa.pais}${empresa.subsector ? ` (${empresa.subsector})` : ""}. Then call submit_url with the URL. Accept HTML landing pages or direct PDFs. If not found after searching, call submit_url with url: "".`,
                 }],
               },
-              { signal: AbortSignal.timeout(28_000) }
+              { signal: AbortSignal.timeout(55_000) }
             );
 
-            // Detect if web_search was actually used (tool_use block in response)
+            // Extract URL from submit_url tool call (structured output — preferred)
+            let foundUrl: string | null = null;
             const usedWebSearch = (msg.content ?? []).some(
               (b: { type: string; name?: string }) => b.type === "tool_use" && b.name === "web_search"
             );
-
-            // Extract URL: citations preferred, fallback to text
-            let foundUrl: string | null = null;
-            let fromCitation = false;
             for (const block of msg.content ?? []) {
-              if (block.type === "text" && typeof block.text === "string") {
-                const citations = block.citations as Array<{ url?: string }> | undefined;
-                if (Array.isArray(citations) && citations.length > 0) {
-                  const esgCitation = citations.find((c) =>
-                    c.url && /sustain|esg|report|informe|sostenib|annual|memoria|tcfd|gri|csrd/i.test(c.url)
-                  );
-                  const picked = esgCitation?.url ?? citations[0]?.url ?? null;
-                  if (picked) { foundUrl = picked; fromCitation = true; }
-                }
-                if (!foundUrl) {
-                  const match = block.text.match(/https?:\/\/[^\s"'<>\n.,)]+/);
-                  if (match && !/^null$/i.test(match[0])) foundUrl = match[0];
+              if (block.type === "tool_use" && block.name === "submit_url") {
+                const url = (block.input as { url?: string })?.url?.trim();
+                if (url && url.length > 10 && url.startsWith("http")) foundUrl = url;
+              }
+            }
+            // Fallback: citation URLs from text blocks
+            if (!foundUrl) {
+              for (const block of msg.content ?? []) {
+                if (block.type === "text") {
+                  const citations = (block.citations as Array<{ url?: string }> | undefined) ?? [];
+                  const picked = citations.find(c => c.url)?.url ?? null;
+                  if (picked) { foundUrl = picked; break; }
+                  const match = (block.text as string | undefined)?.match(/https?:\/\/[^\s"'<>\n.,)]+/);
+                  if (match) { foundUrl = match[0]; break; }
                 }
               }
             }
 
-            console.log(`[search_urls] ${empresa.nombre}: usedWebSearch=${usedWebSearch} fromCitation=${fromCitation} url=${foundUrl}`);
+            console.log(`[search_urls] ${empresa.nombre}: usedWebSearch=${usedWebSearch} url=${foundUrl}`);
 
             if (!foundUrl) return { id: empresa.id, url: null };
-            // If web_search was used OR URL came from citation → URL is from real search results,
-            // only SSRF guard needed. Corporate CDNs (Pemex/BP/Iberdrola) block bot validators.
-            if (usedWebSearch || fromCitation) {
+            // URL came from web_search results (structured or citation) — only SSRF guard.
+            // Corporate CDNs block our validator but URLs are real.
+            if (usedWebSearch) {
               return { id: empresa.id, url: isPublicHttpUrl(foundUrl).ok ? foundUrl : null };
             }
-            // Model used training data (no web_search) → validate to avoid hallucinations
             const valid = await validateUrl(foundUrl);
             return { id: empresa.id, url: valid ? foundUrl : null };
-          } catch {
+          } catch (err) {
+            console.error(`[search_urls] ${empresa.nombre}: ERROR ${err instanceof Error ? err.message : String(err)}`);
             return { id: empresa.id, url: null };
           }
         })

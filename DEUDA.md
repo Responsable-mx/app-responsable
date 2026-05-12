@@ -16,6 +16,32 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-169–D-173 — Hallazgos auditoría completa sesión 32 (2026-05-12)
+
+### 🔴 D-169 — Next.js 16.2.4 con 13 CVEs activos (middleware bypass + SSRF + XSS + DoS)
+- Versión instalada: 16.2.4. 13 advisories activos incluyendo: middleware bypass × 4 (GHSA-492v, GHSA-267c, GHSA-36qx, GHSA-26hh), SSRF via WebSocket upgrades, CSP nonce XSS, cache poisoning × 2, DoS × 3.
+- **La auth usa middleware** (`lib/supabase/middleware.ts`) → middleware bypass CVEs son directamente explotables si bypasearan la autenticación.
+- Fix: `npm audit fix` bumps a 16.2.6 (3 packages: next + @next/swc-win32-x64-msvc + @next/env, sin breaking changes). Esfuerzo: 5min + push.
+
+### 🟡 D-170 — `dm-referentes` y `dm-benchmark-empresas` sin rate limiting
+- `app/api/clients/[id]/dm-referentes/route.ts`: actions `generate_topics` (16K max_tokens, Sonnet, ~$0.24/call) y `generate_frameworks` (4K, ~$0.06/call) — sin `checkRateLimit`.
+- `app/api/clients/[id]/dm-benchmark-empresas/route.ts`: action `generate` (4K, ~$0.06/call) — sin `checkRateLimit`.
+- Patrón correcto en `dm-benchmark` (D-111), `dm-report` (D-122), `research-reports` (D-123).
+- Fix: añadir `await checkRateLimit(user.email, "dm_referentes_generate", 3, 300_000)` al inicio de los 3 handlers. Esfuerzo ~30min.
+
+### 🟡 D-171 — Regresión ESLint: 3 errors (sesión 31 = 0 errors)
+- `components/doble-materialidad/BenchmarkSection.tsx:84` — `setSelected(new Set(...))` dentro de `useEffect` body. Regla `react-hooks/set-state-in-effect`. Fix: `useState(() => new Set(companies.map(c => c.id)))` lazy initializer.
+- `components/doble-materialidad/ReferentesSection.tsx:307` — 2× `"` sin escapar. Regla `react/no-unescaped-entities`. Fix: `&quot;`.
+
+### 🟢 D-172 — `DoubleMaterialidadTab.tsx:544` — `stepperCompact` unused (ESLint warning)
+- Regresión: sesión 28/31 = 0 warnings. Fix: eliminar asignación o `_stepperCompact`.
+
+### 🟢 D-173 — Módulo DM-IA: 4 archivos, 3648L total
+- BenchmarkSection 1205L · DoubleMaterialidadTab 950L · BenchmarkEmpresasSection 729L · ReferentesSection 764L.
+- Candidato para refactor conjunto en mismo sprint que D-150 BenchmarkSection (pendiente smoke test Nuvoil/Altamira).
+
+---
+
 ### Bloque D-165–D-168 — Hallazgos auditoría IA sesión 31 (2026-05-12)
 
 ### ~~🟡 D-165 — `dm-iros/route.ts` logAiCall con cacheCreationTokens/cacheReadTokens hardcodeados a 0~~ ✅ RESUELTO (sesión 31)

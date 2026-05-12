@@ -1,7 +1,69 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-12 (sesión 31 — Auditoría IA: modelos, velocidad, costo, anti-alucinación)
-**Calificación global:** 9.7 / 10 (igual que sesión 28 — 2 bugs corregidos, 2 deudas menores documentadas)
+**Fecha:** 2026-05-12 (sesión 32 — auditoría completa post-sesiones 29–31)
+**Calificación global:** 9.5 / 10 (vs 9.7 sesión 31 — D-169 Next.js CVEs + D-171 ESLint regresión)
+
+---
+
+## Hallazgos nuevos — sesión 32 (2026-05-12)
+
+### 🔴 D-169 — Next.js 16.2.4 con 13 CVEs activos
+- Versión instalada: 16.2.4. Versión con fix: 16.2.6 vía `npm audit fix` (3 packages, sin breaking changes).
+- CVEs relevantes: middleware bypass × 4 (GHSA-492v, GHSA-267c, GHSA-36qx, GHSA-26hh), SSRF via WebSocket upgrades, CSP nonce XSS, cache poisoning × 2, DoS × 3.
+- **La auth de la app usa middleware** → los 4 CVEs de middleware bypass son directamente relevantes.
+- Fix: `npm audit fix` y push.
+
+### 🟡 D-170 — dm-referentes y dm-benchmark-empresas sin rate limiting
+- `generate_topics` (16K max_tokens, Sonnet, ~$0.24/call), `generate_frameworks` (4K), `dm-benchmark-empresas/generate` (4K) — cero `checkRateLimit`.
+- Patrón correcto en dm-benchmark (D-111), dm-report (D-122), research-reports (D-123).
+- Fix: añadir `await checkRateLimit(user.email, "dm_referentes_generate", 3, 300_000)` en los 3 handlers. ~30min.
+
+### 🟡 D-171 — 3 ESLint errors (regresión — sesión 31 = 0 errors)
+- `components/doble-materialidad/BenchmarkSection.tsx:84` — `setSelected` dentro de `useEffect` body (`react-hooks/set-state-in-effect`). Fix: `useState(() => new Set(...))` lazy initializer.
+- `components/doble-materialidad/ReferentesSection.tsx:307` — 2× `"` sin escapar (`react/no-unescaped-entities`). Fix: `&quot;`.
+
+### 🟢 D-172 — DoubleMaterialidadTab.tsx:544 — `stepperCompact` unused (ESLint warning)
+- Regresión menor (sesión 28/31 = 0 warnings). Fix: prefix `_` o eliminar la asignación.
+
+### 🟢 D-173 — Módulo DM-IA: 4 archivos, 3648L total
+- BenchmarkSection 1205L · DoubleMaterialidadTab 950L · BenchmarkEmpresasSection 729L · ReferentesSection 764L.
+- Candidato para refactor conjunto en mismo sprint que D-150 BenchmarkSection (pendiente smoke test).
+
+---
+
+## Resuelto en sesión 31b (encontrado en revisión deuda activa)
+
+D-167 ✅ AbortSignal subido a 170_000ms (margen mejorado de 30s → 10s; Batch diferido)
+D-168 ✅ `FRAMEWORKS_SYSTEM`, `TOPICS_SYSTEM`, `GENERATE_SYSTEM` con `cache_control: ephemeral` extraídos
+
+---
+
+## Pendientes activos post-sesión 32
+
+| ID | Sev | Descripción | Acción |
+|----|-----|-------------|--------|
+| D-169 | 🔴 | Next.js 16.2.4 → 16.2.6 (13 CVEs + middleware bypass) | `npm audit fix` + push |
+| D-170 | 🟡 | dm-referentes + dm-benchmark-empresas sin rate limit | `checkRateLimit` en 3 actions |
+| D-171 | 🟡 | 3 ESLint errors (BenchmarkSection:84, ReferentesSection:307×2) | Fix lazy init + `&quot;` |
+| D-172 | 🟢 | `stepperCompact` unused (ESLint warning) | `_` prefix |
+| D-173 | 🟢 | DM-IA módulo 3648L | Refactor con D-150 BenchmarkSection |
+| D-147 | 🟢 | Cache in-memory extract-profile | Aceptado MVP definitivo |
+
+---
+
+## Score sesión 32
+
+| Dimensión | Post-31 | Post-32 |
+|-----------|---------|---------|
+| Seguridad | 9.8 | 9.4 (D-169 Next.js middleware bypass CVEs) |
+| Confiabilidad | 9.8 | 9.8 |
+| UX | 9.2 | 9.2 |
+| Arquitectura | 9.8 | 9.7 (D-173 DM módulo pesado) |
+| Rendimiento | 9.2 | 9.2 |
+| Calidad de código | 9.9 | 9.5 (D-171 regresión 3 ESLint errors) |
+| Observabilidad | 9.7 | 9.7 |
+| Deuda técnica | 9.7 | 9.5 (4 items nuevos) |
+| **Global** | **9.7** | **9.5** |
 
 ---
 

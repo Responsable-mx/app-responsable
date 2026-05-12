@@ -26,15 +26,14 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - D-158 (sesión 28) actualizó SDK a 0.95 y eliminó 8 `as any` en otras routes, pero `dm-resumen` quedó sin actualizar. `cache_creation_input_tokens` + `cache_read_input_tokens` son tipos estables en SDK 0.95.
 - Fix: 2 comentarios eslint-disable + 2 casts `as any` eliminados. Acceso directo a `response.usage?.cache_creation_input_tokens`.
 
-### 🟡 D-167 — `dm-referentes/generate_topics` síncrono con timeout 150s en Vercel (maxDuration=180s)
-- 16K max_tokens + Sonnet síncrono deja solo 30s de margen ante Vercel cold start. En clientes con cuestionario completo (~80 campos) el payload es pesado y el riesgo de timeout es real.
-- **Recomendación**: migrar a Batch API (igual que dm-iros, dm-report, dm-benchmark). Esfuerzo medio (~4h).
-- **Workaround temporal**: maxDuration en route config subir a 180 + añadir AbortSignal de 170s.
+### ~~🟡 D-167 — `dm-referentes/generate_topics` síncrono con timeout 150s en Vercel (maxDuration=180s)~~ ✅ RESUELTO (sesión 31b)
+- AbortSignal subido a 170_000ms (antes 150s, solo 30s margen). `maxDuration=180` ya estaba en route config.
+- Migración completa a Batch API diferida — margen ahora es 10s, riesgo cold start reducido.
 
-### 🟢 D-168 — `dm-referentes/generate_frameworks` y `dm-benchmark-empresas/generate` sin system block → 100% cache miss
-- Ambas actions mandan solo el `user` block sin `system`. Cache hit rate = 0%.
-- Savings estimados si se añade system block estático: ~$2-5/mes (volumen piloto bajo, prioridad baja).
-- **Acción**: separar instrucciones estáticas a `system` con `cache_control: { type: "ephemeral" }`.
+### ~~🟢 D-168 — `dm-referentes/generate_frameworks` y `dm-benchmark-empresas/generate` sin system block → 100% cache miss~~ ✅ RESUELTO (sesión 31b)
+- `FRAMEWORKS_SYSTEM`, `TOPICS_SYSTEM`, `GENERATE_SYSTEM` extraídos como constantes estáticas con `cache_control: { type: "ephemeral" }`.
+- Funciones renombradas: `buildFrameworksUserContent`, `buildTopicsUserContent`, `buildGenerateUserContent` — solo retornan el bloque dinámico del cliente.
+- Cache hit en segundas ejecuciones sobre el mismo cliente (frameworks/topics se generan 1-2 veces por cliente, pero múltiples consultores pueden regenerar).
 
 ---
 

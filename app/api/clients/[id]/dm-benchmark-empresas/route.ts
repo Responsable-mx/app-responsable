@@ -70,35 +70,18 @@ type Ctx = { params: Promise<{ id: string }> };
 
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
-function buildPrompt(
-  clientName: string,
-  sector: string,
-  industry: string | null,
-  countries: string,
-  size: string | null,
-): string {
-  const year      = new Date().getFullYear();
-  const prevYear  = year - 1;
-  const isLarge   = size ? /grande|corporativo|conglomerado|grupo/i.test(size) : false;
-  const isMedium  = !isLarge;
-
-  return `Eres un experto en sostenibilidad empresarial y benchmarking ESG.
-
-CONTEXTO DEL CLIENTE:
-- Empresa: ${clientName}
-- Sector: ${sector}
-- Industria: ${industry ?? "no especificada"}
-- Países de operación: ${countries}
-- Tamaño: ${size ?? "no especificado"}
+// Bloque estático — cacheable con cache_control ephemeral
+const GENERATE_SYSTEM = `Eres un experto en sostenibilidad empresarial y benchmarking ESG.
 
 TAREA: Proponer empresas de referencia para un benchmarking de sostenibilidad ESG.
+Proponer exactamente 3 empresas por cada criterio aplicable.
 
-CRITERIOS (proponer exactamente 3 empresas por cada uno aplicable):
-- competidores_directos: Competidores directos con informe de sostenibilidad publicado en ${countries}.
-- sp_yearbook: Empresas del sector en el S&P Sustainability Yearbook ${year} (o ${prevYear} si aún no se publicó el de ${year}).
+CRITERIOS:
+- competidores_directos: Competidores directos del sector con informe de sostenibilidad publicado.
+- sp_yearbook: Empresas del sector en el S&P Sustainability Yearbook (año más reciente disponible).
 - internacionales: Empresas internacionales del sector con informe de sostenibilidad regional o global.
-- conglomerados: ${isLarge ? `Grupos empresariales que compartan ≥2 sectores con ${clientName}.` : `NO aplica — ${clientName} no es un conglomerado. Incluir en criterios_omitidos.`}
-- b2b: Clientes o proveedores del sector con informe de sostenibilidad.${isMedium ? " Incluir si conoces relaciones B2B relevantes del sector; si no aplica, incluir en criterios_omitidos." : ""}
+- conglomerados: Grupos empresariales con ≥2 sectores en común (solo si el cliente es conglomerado/grupo grande).
+- b2b: Clientes o proveedores del sector con informe de sostenibilidad publicado.
 
 REGLAS:
 1. Solo empresas reales y verificables con informes públicos.
@@ -110,21 +93,32 @@ REGLAS:
 7. Incluir en criterios_omitidos los criterios que no aplican al cliente.
 8. SOLO JSON válido, sin markdown ni texto adicional.
 
-{
-  "companies": [
-    {
-      "id": "c1_ejemplo",
-      "nombre": "Empresa S.A.",
-      "pais": "México",
-      "reporte_url": "https://...",
-      "metodologia": ["GRI","SASB"],
-      "criterio": "competidores_directos",
-      "subsector": "Subsector específico",
-      "justificacion": "..."
-    }
-  ],
-  "criterios_omitidos": ["conglomerados"]
-}`;
+{"companies":[{"id":"c1_ejemplo","nombre":"Empresa S.A.","pais":"México","reporte_url":null,"metodologia":["GRI","SASB"],"criterio":"competidores_directos","subsector":"...","justificacion":"..."}],"criterios_omitidos":["conglomerados"]}`;
+
+function buildGenerateUserContent(
+  clientName: string,
+  sector: string,
+  industry: string | null,
+  countries: string,
+  size: string | null,
+): string {
+  const year      = new Date().getFullYear();
+  const prevYear  = year - 1;
+  const isLarge   = size ? /grande|corporativo|conglomerado|grupo/i.test(size) : false;
+  const isMedium  = !isLarge;
+
+  return `CONTEXTO DEL CLIENTE:
+- Empresa: ${clientName}
+- Sector: ${sector}
+- Industria: ${industry ?? "no especificada"}
+- Países de operación: ${countries}
+- Tamaño: ${size ?? "no especificado"}
+
+INSTRUCCIONES POR CRITERIO:
+- competidores_directos: Priorizar empresas que operen en ${countries}.
+- sp_yearbook: Usar edición ${year} (o ${prevYear} si la de ${year} aún no se publicó).
+- conglomerados: ${isLarge ? `Aplica — buscar grupos con ≥2 sectores comunes con ${clientName}.` : `No aplica — incluir en criterios_omitidos.`}
+- b2b: ${isMedium ? "Incluir si hay relaciones B2B relevantes conocidas; si no, incluir en criterios_omitidos." : "Incluir proveedores/clientes clave del sector."}`;
 }
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -264,7 +258,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const industry  = (client as Record<string, unknown>).industry as string | null ?? null;
     const countries = (client.countries as string[] | null)?.join(", ") ?? "México";
     const size      = (client as Record<string, unknown>).size as string | null ?? null;
-    const prompt    = buildPrompt(client.name, sector, industry, countries, size);
+    const userContent = buildGenerateUserContent(client.name, sector, industry, countries, size);
 
     const { model } = getModelConfig("aurora");
     const anthropic  = createAnthropicClient();
@@ -275,7 +269,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const msg = await anthropic.messages.create({
         model,
         max_tokens: 4000,
-        messages: [{ role: "user", content: prompt }],
+        system: [{ type: "text", text: GENERATE_SYSTEM, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: userContent }],
       }, { signal: AbortSignal.timeout(90_000) });
 
       inputTokens         = msg.usage?.input_tokens ?? 0;

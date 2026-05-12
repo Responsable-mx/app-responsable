@@ -75,15 +75,10 @@ function sanitizeFrameworkUrls(frameworks: ReferenteFramework[]): ReferenteFrame
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
-function buildFrameworksPrompt(sector: string, industry: string | null, countries: string): string {
-  return `Eres un experto en estándares de sostenibilidad y reporting ESG.
+// Bloque estático — cacheable con cache_control ephemeral
+const FRAMEWORKS_SYSTEM = `Eres un experto en estándares de sostenibilidad y reporting ESG.
 
-CONTEXTO DEL CLIENTE:
-- Sector: ${sector}
-- Industria: ${industry ?? "no especificada"}
-- Países de operación: ${countries}
-
-TAREA: Proponer los marcos de referencia de sostenibilidad aplicables a este cliente para un Estudio de Doble Materialidad.
+TAREA: Proponer los marcos de referencia de sostenibilidad aplicables a un cliente para un Estudio de Doble Materialidad.
 
 REGLAS:
 1. Siempre incluir: SASB (con estándar sectorial si aplica), GRI Standards, ESRS (estándares europeos).
@@ -92,35 +87,9 @@ REGLAS:
 4. Máximo 8 referentes — solo los realmente aplicables. No inventar estándares.
 5. Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.
 
-{
-  "frameworks": [
-    {
-      "id": "SASB",
-      "name": "SASB Standards",
-      "description": "...",
-      "url": "https://sasb.ifrs.org",
-      "sector_note": "..."
-    }
-  ]
-}`;
-}
+{"frameworks":[{"id":"SASB","name":"SASB Standards","description":"...","url":"https://sasb.ifrs.org","sector_note":"..."}]}`;
 
-function buildTopicsPrompt(
-  sector: string,
-  clientName: string,
-  frameworks: ReferenteFramework[],
-): string {
-  const frameworksList = frameworks
-    .map((f) => `- ${f.id}: ${f.name}${f.sector_note ? ` (${f.sector_note})` : ""}`)
-    .join("\n");
-
-  return `Eres un experto en materialidad ESG y reporting de sostenibilidad.
-
-CLIENTE: ${clientName}
-SECTOR: ${sector}
-
-MARCOS DE REFERENCIA VALIDADOS:
-${frameworksList}
+const TOPICS_SYSTEM = `Eres un experto en materialidad ESG y reporting de sostenibilidad.
 
 TAREA 1 — TABLA DE TEMAS (raw, fiel a fuentes):
 Genera una tabla extrayendo fielmente los temas de sostenibilidad que cada referente menciona para este sector.
@@ -135,16 +104,29 @@ TAREA 3 — AUTOEVALUACIÓN:
 Evalúa del 1 al 10 qué tan completo está el mapeo. Justifica en 2-3 oraciones.
 
 Responde ÚNICAMENTE con JSON válido:
-{
-  "coverage_score": 8.5,
-  "coverage_note": "El mapeo cubre los temas materiales principales del sector...",
-  "topics_raw": [
-    { "tema": "Cambio climático", "subtema": "Emisiones GEI Alcance 1 y 2", "descripcion": "...", "referente": "GRI" }
-  ],
-  "topics_grouped": [
-    { "tema_consolidado": "Cambio climático y emisiones", "descripcion_consolidada": "...", "referentes": ["GRI", "ESRS", "SASB"] }
-  ]
-}`;
+{"coverage_score":8.5,"coverage_note":"...","topics_raw":[{"tema":"Cambio climático","subtema":"Emisiones GEI Alcance 1 y 2","descripcion":"...","referente":"GRI"}],"topics_grouped":[{"tema_consolidado":"Cambio climático y emisiones","descripcion_consolidada":"...","referentes":["GRI","ESRS","SASB"]}]}`;
+
+function buildFrameworksUserContent(sector: string, industry: string | null, countries: string): string {
+  return `CONTEXTO DEL CLIENTE:
+- Sector: ${sector}
+- Industria: ${industry ?? "no especificada"}
+- Países de operación: ${countries}`;
+}
+
+function buildTopicsUserContent(
+  sector: string,
+  clientName: string,
+  frameworks: ReferenteFramework[],
+): string {
+  const frameworksList = frameworks
+    .map((f) => `- ${f.id}: ${f.name}${f.sector_note ? ` (${f.sector_note})` : ""}`)
+    .join("\n");
+
+  return `CLIENTE: ${clientName}
+SECTOR: ${sector}
+
+MARCOS DE REFERENCIA VALIDADOS:
+${frameworksList}`;
 }
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -235,7 +217,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const sector    = client.sector ?? "no especificado";
     const industry  = (client as Record<string, unknown>).industry as string | null ?? null;
     const countries = (client.countries as string[] | null)?.join(", ") ?? "México";
-    const prompt    = buildFrameworksPrompt(sector, industry, countries);
+    const userContent = buildFrameworksUserContent(sector, industry, countries);
 
     const anthropic  = createAnthropicClient();
     let textOut = "", inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
@@ -245,7 +227,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const msg = await anthropic.messages.create({
         model,
         max_tokens: 4000,
-        messages: [{ role: "user", content: prompt }],
+        system: [{ type: "text", text: FRAMEWORKS_SYSTEM, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: userContent }],
       }, { signal: AbortSignal.timeout(120_000) });
 
       inputTokens         = msg.usage?.input_tokens ?? 0;
@@ -312,7 +295,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       updated_at: new Date().toISOString(),
     }, { onConflict: "client_id" });
 
-    const prompt    = buildTopicsPrompt(client.sector ?? "no especificado", client.name, active);
+    const userContent = buildTopicsUserContent(client.sector ?? "no especificado", client.name, active);
     const anthropic = createAnthropicClient();
     let textOut = "", inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
     const startedAt = Date.now();
@@ -321,8 +304,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const msg = await anthropic.messages.create({
         model,
         max_tokens: 16000,
-        messages: [{ role: "user", content: prompt }],
-      }, { signal: AbortSignal.timeout(150_000) });
+        system: [{ type: "text", text: TOPICS_SYSTEM, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: userContent }],
+      }, { signal: AbortSignal.timeout(170_000) });
 
       inputTokens         = msg.usage?.input_tokens ?? 0;
       outputTokens        = msg.usage?.output_tokens ?? 0;

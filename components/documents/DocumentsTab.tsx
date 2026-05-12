@@ -152,7 +152,7 @@ export function DocumentsTab({
   const bulkMenuRef = useRef<HTMLDivElement>(null);
   // Drag & drop upload
   const [isDragging, setIsDragging] = useState(false);
-  const [dupConfirm, setDupConfirm] = useState<{ dupNames: string[]; newFiles: File[]; files: File[] } | null>(null);
+  // uploadServiceIds: filtro activo de tabla + default serviceIds en staging
   const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const dragDepth = useRef(0);
 
@@ -373,7 +373,7 @@ export function DocumentsTab({
 
   function handleUpload(files: FileList) {
     const arr = Array.from(files);
-    setStaging(arr.map((f) => ({ file: f, kind: "general", serviceIds: [] })));
+    setStaging(arr.map((f) => ({ file: f, kind: "general", serviceIds: uploadServiceIds })));
   }
 
   const ZIP_EXT_TO_MIME: Record<string, string> = {

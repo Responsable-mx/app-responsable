@@ -402,11 +402,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             const msg = await (anthropic.messages.create as (opts: unknown, extra?: unknown) => Promise<any>)(
               {
                 model,
-                max_tokens: 300,
-                tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
+                max_tokens: 600,
+                tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
                 messages: [{
                   role: "user",
-                  content: `Usa web_search para encontrar la URL del informe de sostenibilidad, reporte ESG o memoria de sostenibilidad más reciente de "${empresa.nombre}" (${empresa.pais}${empresa.subsector ? `, ${empresa.subsector}` : ""}).\n\nDevuelve ÚNICAMENTE la URL directa al PDF o página oficial del informe. Sin texto adicional. Si no encuentras URL confiable: null`,
+                  content: `Usa web_search para encontrar la URL del informe de sostenibilidad, reporte ESG o memoria de sostenibilidad más reciente de "${empresa.nombre}" (${empresa.pais}${empresa.subsector ? `, ${empresa.subsector}` : ""}).\n\nBusca términos como "${empresa.nombre} sustainability report 2024" o "${empresa.nombre} informe sostenibilidad".\n\nResponde con ÚNICAMENTE la URL (puede ser página HTML del informe o PDF directo — ambos válidos). Sin texto adicional. Si no encuentras nada: null`,
                 }],
               },
               { signal: AbortSignal.timeout(28_000) }

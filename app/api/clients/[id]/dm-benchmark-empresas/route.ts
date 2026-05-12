@@ -8,6 +8,7 @@ import { extractJsonObject } from "@/lib/ai/extract-json";
 import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicHttpUrl } from "@/lib/documents/ssrf";
 import type {
   BenchmarkEmpresasData,
   BenchmarkEmpresa,
@@ -61,6 +62,31 @@ const GenerateResponseSchema = z.object({
 });
 
 type Ctx = { params: Promise<{ id: string }> };
+
+// ── URL validation ─────────────────────────────────────────────────────────────
+
+async function validateUrl(url: string): Promise<boolean> {
+  if (!isPublicHttpUrl(url).ok) return false;
+  try {
+    const r = await fetch(url, {
+      method: "HEAD",
+      headers: { "User-Agent": "ResponSable-BenchmarkValidator/1.0" },
+      signal: AbortSignal.timeout(6_000),
+      redirect: "follow",
+    });
+    if (r.status < 400) return true;
+    // Some servers reject HEAD — retry with GET + Range
+    const r2 = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "ResponSable-BenchmarkValidator/1.0", Range: "bytes=0-0" },
+      signal: AbortSignal.timeout(8_000),
+      redirect: "follow",
+    });
+    return r2.status < 400 || r2.status === 206;
+  } catch {
+    return false;
+  }
+}
 
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
@@ -302,7 +328,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
     }
 
-    const { companies, criterios_omitidos } = validated.data;
+    const { companies: rawCompanies, criterios_omitidos } = validated.data;
+
+    // Validate URLs in parallel — nullify any that don't resolve (broken/hallucinated)
+    const companies = await Promise.all(
+      rawCompanies.map(async (c) => {
+        if (!c.reporte_url) return c;
+        const ok = await validateUrl(c.reporte_url);
+        return ok ? c : { ...c, reporte_url: null };
+      })
+    );
+
     const enabledIds = companies.map((c) => c.id);
 
     await admin.from("dm_benchmark_empresas").upsert({

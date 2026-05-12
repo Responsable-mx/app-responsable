@@ -475,8 +475,15 @@ export function DocumentsTab({
 
     setUploading(false);
     void mutate();
+    if (failures.length > 0) console.warn("[documents] upload failures:", failures);
     if (okCount > 0 && failures.length === 0) toast.push("success", `${okCount} archivo(s) subidos`);
-    else if (okCount > 0) toast.push("warning", `${okCount} OK · ${failures.length} fallaron`);
+    else if (okCount > 0) {
+      toast.push("warning", `${okCount} OK · ${failures.length} fallaron`);
+      const detail = failures.length <= 3
+        ? failures.join(" · ")
+        : `${failures.slice(0, 3).join(" · ")} (+${failures.length - 3} más)`;
+      toast.push("error", detail, 8000);
+    }
     else if (files.length === 0) toast.push("info", "Sin archivos nuevos por subir");
     else toast.push("error", failures[0] ?? "Error subiendo");
   }

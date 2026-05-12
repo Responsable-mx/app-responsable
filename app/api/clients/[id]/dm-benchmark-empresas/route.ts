@@ -45,6 +45,16 @@ const AddCompanyBody = z.object({
   subsector:z.string().max(200).optional().nullable(),
 });
 
+const UpdateCompanyBody = z.object({
+  action:      z.literal("update_company"),
+  id:          z.string().min(1).max(80),
+  nombre:      z.string().min(1).max(200).optional(),
+  pais:        z.string().min(1).max(100).optional(),
+  reporte_url: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
+  metodologia: z.array(z.string().min(1).max(30)).min(1).max(8).optional(),
+  subsector:   z.string().max(200).optional().nullable(),
+});
+
 const GenerateResponseSchema = z.object({
   companies:          z.array(EmpresaSchema).min(1).max(20),
   criterios_omitidos: z.array(z.enum(["competidores_directos","sp_yearbook","internacionales","conglomerados","b2b"])).max(5),
@@ -186,6 +196,47 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "Error de base de datos" }, { status: 500 });
     }
     return NextResponse.json({ data: { company: newCompany } });
+  }
+
+  // ── Action: update_company (edit existing) ────────────────────────────────
+  if (body.action === "update_company") {
+    const parsed = UpdateCompanyBody.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    const { id: companyId, nombre, pais, reporte_url, metodologia, subsector } = parsed.data;
+
+    const { data: rec } = await admin
+      .from("dm_benchmark_empresas")
+      .select("proposed_companies")
+      .eq("client_id", id)
+      .maybeSingle();
+
+    const proposed = (rec?.proposed_companies ?? []) as BenchmarkEmpresa[];
+    const updated  = proposed.map((c) =>
+      c.id === companyId
+        ? {
+            ...c,
+            ...(nombre      !== undefined && { nombre }),
+            ...(pais        !== undefined && { pais }),
+            ...(reporte_url !== undefined && { reporte_url: reporte_url === "" ? null : reporte_url }),
+            ...(metodologia !== undefined && { metodologia }),
+            ...(subsector   !== undefined && { subsector }),
+          }
+        : c
+    );
+
+    const { error } = await admin.from("dm_benchmark_empresas").upsert({
+      client_id: id,
+      proposed_companies: updated,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "client_id" });
+
+    if (error) {
+      console.error("[dm-benchmark-empresas update_company]", error);
+      return NextResponse.json({ error: "Error de base de datos" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
   }
 
   // ── Action: generate ───────────────────────────────────────────────────────

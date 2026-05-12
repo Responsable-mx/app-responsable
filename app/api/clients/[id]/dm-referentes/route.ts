@@ -214,6 +214,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
     const jsonText   = extractJsonObject(textOut);
     if (!jsonText) {
+      console.error("[dm-referentes generate_frameworks] textOut sin JSON:", JSON.stringify(textOut.slice(0, 800)));
       await admin.from("dm_referentes").upsert({ client_id: id, frameworks_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
       return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });
     }

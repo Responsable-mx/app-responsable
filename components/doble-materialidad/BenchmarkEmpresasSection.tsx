@@ -51,14 +51,30 @@ function EmpresaCard({
   empresa,
   selected,
   onToggle,
+  onUpdate,
 }: {
   empresa: BenchmarkEmpresa;
   selected: boolean;
   onToggle: () => void;
+  onUpdate: (id: string, reporte_url: string | null) => Promise<void>;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded]     = useState(false);
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [urlDraft, setUrlDraft]     = useState(empresa.reporte_url ?? "");
+  const [saving, setSaving]         = useState(false);
+
   const hasJustification = !!empresa.justificacion;
   const longJust = hasJustification && empresa.justificacion!.length > 180;
+
+  const handleSaveUrl = async () => {
+    setSaving(true);
+    try {
+      await onUpdate(empresa.id, urlDraft.trim() || null);
+      setEditingUrl(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div
@@ -75,12 +91,12 @@ function EmpresaCard({
           className="mt-1 h-3.5 w-3.5 rounded-sm accent-teal-600 cursor-pointer shrink-0"
         />
         <div className="flex-1 min-w-0">
-          {/* Row 1: nombre + país + link + metodología */}
+          {/* Row 1: nombre + país + link + metodología + edit */}
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <span className="font-semibold text-slate-800 text-sm">{empresa.nombre}</span>
               <span className="text-xs text-slate-400 font-medium">{empresa.pais}</span>
-              {empresa.reporte_url && (
+              {empresa.reporte_url && !editingUrl && (
                 <a
                   href={empresa.reporte_url}
                   target="_blank"
@@ -95,20 +111,69 @@ function EmpresaCard({
               )}
               <MethodBadge methods={empresa.metodologia} />
             </div>
-            {empresa.reporte_url && (
-              <a
-                href={empresa.reporte_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] text-teal-600 hover:text-teal-800 font-medium shrink-0"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Informe
-              </a>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {empresa.reporte_url && !editingUrl && (
+                <a
+                  href={empresa.reporte_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[11px] text-teal-600 hover:text-teal-800 font-medium"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Informe
+                </a>
+              )}
+              {/* Edit URL button */}
+              {!editingUrl && (
+                <button
+                  type="button"
+                  onClick={() => { setUrlDraft(empresa.reporte_url ?? ""); setEditingUrl(true); }}
+                  title="Editar URL del informe"
+                  className="p-0.5 text-slate-300 hover:text-slate-500 transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Inline URL editor */}
+          {editingUrl && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="url"
+                value={urlDraft}
+                onChange={(e) => setUrlDraft(e.target.value)}
+                placeholder="https://... (dejar vacío para quitar)"
+                className="flex-1 min-w-0 px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleSaveUrl();
+                  if (e.key === "Escape") setEditingUrl(false);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void handleSaveUrl()}
+                disabled={saving}
+                className="px-2 py-1 bg-teal-600 text-white text-[10px] font-bold rounded hover:bg-teal-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+              >
+                {saving ? "…" : "Guardar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingUrl(false)}
+                className="px-2 py-1 border border-slate-200 text-slate-400 text-[10px] rounded hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
           {/* Row 2: subsector */}
           {empresa.subsector && (
             <div className="text-[11px] text-slate-400 mt-0.5">{empresa.subsector}</div>
@@ -379,6 +444,20 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
     push("success", `"${data.nombre}" agregada y seleccionada.`);
   };
 
+  const handleUpdateUrl = async (companyId: string, reporte_url: string | null) => {
+    const r = await fetch(key, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update_company", id: companyId, reporte_url }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: "Error desconocido" }));
+      throw new Error((err as { error?: string }).error ?? "Error al actualizar");
+    }
+    await mutate();
+    onDataMutate?.();
+  };
+
   const selectAll = () => setLocalEnabled(proposed.map((c) => c.id));
   const clearAll  = () => setLocalEnabled([]);
 
@@ -530,6 +609,7 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
                   empresa={empresa}
                   selected={localEnabled.includes(empresa.id)}
                   onToggle={() => handleToggle(empresa.id)}
+                  onUpdate={handleUpdateUrl}
                 />
               ))}
             </div>

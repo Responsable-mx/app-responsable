@@ -651,14 +651,6 @@ export function DoubleMaterialidadTab({
               );
             })}
           </div>
-          {/* Hint teclado — visible solo en sm+, solo expandido */}
-          {!stepperCompact && (
-            <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 shrink-0 select-none pl-2 border-l border-slate-100">
-              <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">←</kbd>
-              <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">→</kbd>
-              teclado
-            </span>
-          )}
         </div>
       </div>
 

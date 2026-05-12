@@ -125,8 +125,22 @@ function EmpresaCard({
                   Informe
                 </a>
               )}
-              {/* Edit URL button */}
-              {!editingUrl && (
+              {/* No URL — actionable nudge */}
+              {!empresa.reporte_url && !editingUrl && (
+                <button
+                  type="button"
+                  onClick={() => { setUrlDraft(""); setEditingUrl(true); }}
+                  title="La IA no pudo verificar un informe público. Haz clic para agregar la URL manualmente."
+                  className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-amber-600 font-medium italic transition-colors"
+                >
+                  <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  Sin URL verificada
+                </button>
+              )}
+              {/* Edit URL button (when URL exists) */}
+              {empresa.reporte_url && !editingUrl && (
                 <button
                   type="button"
                   onClick={() => { setUrlDraft(empresa.reporte_url ?? ""); setEditingUrl(true); }}

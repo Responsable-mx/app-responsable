@@ -276,6 +276,7 @@ export function DoubleMaterialidadTab({
   const iros        = irosResp?.data?.iros ?? [];
   const nisRows     = nisResp?.data ?? [];
   const latestReport = reportResp?.data ?? null;
+  const validatedCompanies = companies.filter((c) => c.validated).length;
 
   // Detectar cuando el batch del benchmark termina
   useEffect(() => {
@@ -509,6 +510,21 @@ export function DoubleMaterialidadTab({
     return () => obs.disconnect();
   }, []);
 
+  // Datos del stepper — extraído del IIFE (D-150 sesión 30)
+  const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null; count?: string }> = [
+    { label: "Contexto",    status: stage1Status, sectionId: "dm-sec-contexto" },
+    { label: "Benchmark",   status: stage2Status, sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at,
+      count: validatedCompanies > 0 ? `${validatedCompanies} emp.` : undefined },
+    { label: "IROs",        status: stage3Status, sectionId: "dm-sec-iros",
+      count: iros.length > 0 ? `${iros.length} IROs` : undefined },
+    { label: "Matriz",      status: stage4Status, sectionId: "dm-sec-matriz",
+      count: quadrantCounts.doble_material > 0 ? `${quadrantCounts.doble_material} DM` : undefined },
+    { label: "NIS/IBSO",    status: stage5Status, sectionId: "dm-sec-nis" },
+    { label: "Resumen IA",  status: stage6Status, sectionId: "dm-sec-resumen" },
+    { label: "Validación",  status: stage7Status, sectionId: "dm-sec-validacion" },
+    { label: "Reporte",     status: stage8Status, sectionId: "dm-sec-reporte", doneDate: latestReport?.created_at },
+  ];
+
   if (loadingBenchmark) {
     return (
       <div className="py-6">
@@ -549,70 +565,51 @@ export function DoubleMaterialidadTab({
       {/* Sentinel: IntersectionObserver lo monitorea — al salir de viewport, stepper queda pinned */}
       <div ref={stepperSentinelRef} className="h-px -mb-px" aria-hidden="true" />
       {/* ── Stepper V3 — card con pill bar + progress + chips ── */}
-      {(() => {
-        const validatedCompanies = companies.filter((c) => c.validated).length;
-        const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null; count?: string }> = [
-          { label: "Contexto",    status: stage1Status, sectionId: "dm-sec-contexto" },
-          { label: "Benchmark",   status: stage2Status, sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at,
-            count: validatedCompanies > 0 ? `${validatedCompanies} emp.` : undefined },
-          { label: "IROs",        status: stage3Status, sectionId: "dm-sec-iros",
-            count: iros.length > 0 ? `${iros.length} IROs` : undefined },
-          { label: "Matriz",      status: stage4Status, sectionId: "dm-sec-matriz",
-            count: quadrantCounts.doble_material > 0 ? `${quadrantCounts.doble_material} DM` : undefined },
-          { label: "NIS/IBSO",    status: stage5Status, sectionId: "dm-sec-nis" },
-          { label: "Resumen IA",  status: stage6Status, sectionId: "dm-sec-resumen" },
-          { label: "Validación",  status: stage7Status, sectionId: "dm-sec-validacion" },
-          { label: "Reporte",     status: stage8Status, sectionId: "dm-sec-reporte", doneDate: latestReport?.created_at },
-        ];
-        return (
-          <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all">
-            <div className="flex items-center gap-2 px-4 py-2">
-              {/* Pills — ancho completo distribuido. overflow-x-auto como fallback en mobile */}
-              <div className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {stagesData.map((s, idx) => (
-                  <span key={s.sectionId} className="contents">
-                    <StagePill
-                      label={s.label}
-                      status={s.status}
-                      selected={s.sectionId === activeStageId}
-                      className="flex-1"
-                      subtitle={(() => {
-                        const isSel = s.sectionId === activeStageId;
-                        // Etapa seleccionada: estado simple sin count para no saturar.
-                        if (isSel) return s.status === "done" ? "En revisión" : "En curso";
-                        let base: string;
-                        if (s.status === "done")        base = formatStageDate(s.doneDate);
-                        else if (s.status === "active") base = "Disponible";
-                        else if (s.status === "locked") base = "Bloqueada";
-                        else                            base = "Pendiente";
-                        return s.count ? `${base} · ${s.count}` : base;
-                      })()}
-                      sectionId={s.sectionId}
+      <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all">
+        <div className="flex items-center gap-2 px-4 py-2">
+          {/* Pills — ancho completo distribuido. overflow-x-auto como fallback en mobile */}
+          <div className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {stagesData.map((s, idx) => {
+              const isSel = s.sectionId === activeStageId;
+              let base: string;
+              if (isSel)                  base = s.status === "done" ? "En revisión" : "En curso";
+              else if (s.status === "done")   base = formatStageDate(s.doneDate);
+              else if (s.status === "active") base = "Disponible";
+              else if (s.status === "locked") base = "Bloqueada";
+              else                            base = "Pendiente";
+              const subtitle = s.count && !isSel ? `${base} · ${s.count}` : base;
+              return (
+                <span key={s.sectionId} className="contents">
+                  <StagePill
+                    label={s.label}
+                    status={s.status}
+                    selected={isSel}
+                    className="flex-1"
+                    subtitle={subtitle}
+                    sectionId={s.sectionId}
+                  />
+                  {idx < stagesData.length - 1 && (
+                    <div
+                      className={`w-3 h-0.5 shrink-0 rounded-sm ${
+                        s.status === "done" ? "bg-brand-primary" : "bg-slate-200"
+                      }`}
+                      aria-hidden
                     />
-                    {idx < stagesData.length - 1 && (
-                      <div
-                        className={`w-3 h-0.5 shrink-0 rounded-sm ${
-                          s.status === "done" ? "bg-brand-primary" : "bg-slate-200"
-                        }`}
-                        aria-hidden
-                      />
-                    )}
-                  </span>
-                ))}
-              </div>
-              {/* Hint teclado — visible solo en sm+, solo expandido */}
-              {!stepperCompact && (
-                <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 shrink-0 select-none pl-2 border-l border-slate-100">
-                  <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">←</kbd>
-                  <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">→</kbd>
-                  teclado
+                  )}
                 </span>
-              )}
-            </div>
-
+              );
+            })}
           </div>
-        );
-      })()}
+          {/* Hint teclado — visible solo en sm+, solo expandido */}
+          {!stepperCompact && (
+            <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 shrink-0 select-none pl-2 border-l border-slate-100">
+              <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">←</kbd>
+              <kbd className="inline-flex items-center px-1 py-0.5 border border-slate-200 rounded-sm text-[9px] text-slate-500 font-mono leading-none">→</kbd>
+              teclado
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* ── Etapa 1 ── */}
       <CollapsibleStageSection
@@ -672,7 +669,7 @@ export function DoubleMaterialidadTab({
         headerRight={
           companies.length > 0 ? (
             <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
-              {companies.filter((c) => c.validated).length} de {companies.length} validadas
+              {validatedCompanies} de {companies.length} validadas
             </span>
           ) : null
         }
@@ -842,7 +839,7 @@ export function DoubleMaterialidadTab({
           latestReport={latestReport}
           readiness={{
             questionnairePct,
-            benchmarkCompanies: companies.filter((c) => c.validated).length,
+            benchmarkCompanies: validatedCompanies,
             irosTotal: iros.length,
             irosScored: scoredIncluded.length,
             hasMatriz: scoredIncluded.length >= 3,

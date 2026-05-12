@@ -66,12 +66,11 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - Decisión: mockups SIGUEN ACTIVOS como playground dev (todos modificados esta semana). CLAUDE.md actualizado para reflejar realidad — sección renombrada "Mockups `/dev/*` — playground dev" + tabla de propósito por carpeta + regla de cleanup.
 - Middleware `lib/supabase/middleware.ts:60-61` bloquea `/dev/*` en producción ✓
 
-### 🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito (PARCIALMENTE RESUELTO sesión 29: 2988L → ~900L = -70%)
+### ~~🟡 D-150 — `DoubleMaterialidadTab.tsx` monolito~~ ✅ RESUELTO (sesión 30)
 - **Aplicado sesión 28**: HorizontesConfig, NisSection, ContextoSection, ReporteSection, IroSection, ExpandableCell, catalog-lookup.ts
 - **Aplicado sesión 28 (Phase C)**: BenchmarkSection (957L), benchmark-types.ts, benchmark-helpers.ts
 - **Aplicado sesión 29**: StagePill (105L), CollapsibleStageSection (156L) — imports muertos Button/ConfirmModal/SelectField eliminados
-- **Pendiente único**: lógica stepper IIFE en main (~133L) — IIFE singleton, extraer requeriría pasar ~15 props; costo/beneficio bajo. Dejar.
-- **Estado**: prácticamente cerrado. Monolito disuelto.
+- **Aplicado sesión 30**: IIFE stepper eliminado — `stagesData` + `validatedCompanies` extraídos como variables; 3 ocurrencias `companies.filter(…).length` deduplicadas a 1. 2988L → ~867L = -71%.
 
 ### ~~🟡 D-151 — 35 ocurrencias `as any` / `: any` sin `eslint-disable` justificado~~ ✅ RESUELTO (sesión 27)
 - 35 disables con razón contextual aplicados. Adicional sesión 28: 8 `cache_control as any` eliminados por completo (SDK 0.95 types reales).

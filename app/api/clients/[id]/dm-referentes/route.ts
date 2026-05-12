@@ -382,57 +382,113 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ data: { updated: 0, total: 0 } });
     }
 
-    const frameworkList = missing.map((f) => `- ${f.id}: ${f.name}`).join("\n");
-    const urlPrompt = `Proporciona la URL oficial de cada uno de estos marcos de sostenibilidad ESG. Solo incluye URLs que conozcas con certeza — omite las que no puedas verificar.
-
-Marcos sin URL:
-${frameworkList}
-
-Responde ÚNICAMENTE con JSON válido:
-{"urls": {"<id>": "<url_oficial>", ...}}`;
-
-    const anthropic = createAnthropicClient();
-    const { model: haikuModel } = getModelConfig("valeria");
-    let textOut = "";
-    try {
-      const msg = await anthropic.messages.create({
-        model: haikuModel,
-        max_tokens: 500,
-        messages: [{ role: "user", content: urlPrompt }],
-      }, { signal: AbortSignal.timeout(30_000) });
-      for (const block of msg.content) {
-        if (block.type === "text") textOut += block.text;
-      }
-      anthropicBreaker.recordSuccess();
-    } catch {
-      anthropicBreaker.recordFailure();
-      return NextResponse.json({ error: "Error al buscar URLs con IA" }, { status: 500 });
-    }
-
-    let urlMap: Record<string, string> = {};
-    try {
-      const jsonText = extractJsonObject(textOut);
-      if (jsonText) {
-        const parsed = JSON.parse(jsonText) as { urls?: Record<string, string> };
-        urlMap = parsed.urls ?? {};
-      }
-    } catch { /* ignorar parse errors */ }
+    // URLs canónicas hardcoded — más confiables que LLM para frameworks estables
+    const CANONICAL_URLS: Record<string, string> = {
+      GRI:      "https://www.globalreporting.org/standards/",
+      SASB:     "https://sasb.ifrs.org/standards/",
+      ESRS:     "https://www.efrag.org/en/projects/esrs-set-1",
+      TCFD:     "https://www.fsb-tcfd.org/recommendations/",
+      CDP:      "https://www.cdp.net/en/guidance",
+      IPIECA:   "https://www.ipieca.org/resources/good-practice/ipieca-iog-api-sustainability-reporting-guidance/",
+      PRI:      "https://www.unpri.org/reporting-and-assessment/about-pri-reporting/1138.article",
+      GRESB:    "https://www.gresb.com/nl-en/",
+      GCCA:     "https://gccassociation.org/sustainability-innovation/gcca-sustainability-guidelines/",
+      ISO26000: "https://www.iso.org/iso-26000-social-responsibility.html",
+      GHG:      "https://ghgprotocol.org/corporate-standard",
+      SBTI:     "https://sciencebasedtargets.org/resources/",
+      CSRD:     "https://finance.ec.europa.eu/capital-markets-union-and-financial-markets/company-reporting-and-auditing/company-reporting/corporate-sustainability-reporting_en",
+      TNFD:     "https://tnfd.global/reporting/",
+      SDG:      "https://sdgs.un.org/goals",
+      SDGS:     "https://sdgs.un.org/goals",
+    };
 
     let updated = 0;
-    const updatedProposed = proposed.map((f) => {
-      if (f.url) return f;
-      const candidate = urlMap[f.id];
-      if (!candidate) return f;
-      if (!isPublicHttpUrl(candidate).ok) return f;
-      updated++;
-      return { ...f, url: candidate };
-    });
+    const updatedProposed = [...proposed];
+    const stillMissing: ReferenteFramework[] = [];
 
-    await admin.from("dm_referentes").upsert({
-      client_id: id,
-      proposed_frameworks: updatedProposed,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "client_id" });
+    // Paso 1: llenar desde mapa hardcoded
+    for (const f of missing) {
+      const key = f.id.toUpperCase().replace(/[\s-]/g, "");
+      const canonical = CANONICAL_URLS[key] ?? CANONICAL_URLS[f.id];
+      if (canonical) {
+        const idx = updatedProposed.findIndex((p) => p.id === f.id);
+        if (idx !== -1) { updatedProposed[idx] = { ...updatedProposed[idx]!, url: canonical } as ReferenteFramework; updated++; }
+      } else {
+        stillMissing.push(f);
+      }
+    }
+
+    // Paso 2: web_search para frameworks no conocidos
+    if (stillMissing.length > 0) {
+      const anthropic = createAnthropicClient();
+      const { model: searchModel } = getModelConfig("aurora");
+
+      const CONCURRENCY = 3;
+      for (let i = 0; i < stillMissing.length; i += CONCURRENCY) {
+        const batch = stillMissing.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(async (f) => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta: web_search
+              const msg = await (anthropic.messages.create as (opts: unknown, extra?: unknown) => Promise<any>)(
+                {
+                  model: searchModel,
+                  max_tokens: 800,
+                  tools: [
+                    { type: "web_search_20250305", name: "web_search", max_uses: 2 },
+                    {
+                      name: "submit_url",
+                      description: "Submit the official URL for the ESG framework.",
+                      input_schema: {
+                        type: "object",
+                        properties: { url: { type: "string", description: "Official URL or empty string if not found." } },
+                        required: ["url"],
+                      },
+                    },
+                  ],
+                  messages: [{
+                    role: "user",
+                    content: `MANDATORY: Call web_search before submit_url. Find the official standards/guidance page for the ESG framework "${f.name}" (id: ${f.id}). Search for "${f.name} official standards" or "${f.name} reporting framework site". Call submit_url with the main official URL. If not found, call submit_url with url: "".`,
+                  }],
+                },
+                { signal: AbortSignal.timeout(40_000) }
+              );
+
+              let foundUrl: string | null = null;
+              for (const block of msg.content ?? []) {
+                if (block.type === "tool_use" && block.name === "submit_url") {
+                  const url = (block.input as { url?: string })?.url?.trim();
+                  if (url && url.length > 10 && url.startsWith("http")) foundUrl = url;
+                }
+              }
+              console.log(`[dm-referentes search_urls] ${f.id}: url=${foundUrl}`);
+              return { id: f.id, url: foundUrl };
+            } catch (err) {
+              console.error(`[dm-referentes search_urls] ${f.id}: ERROR ${err instanceof Error ? err.message : String(err)}`);
+              return { id: f.id, url: null };
+            }
+          })
+        );
+
+        for (const result of results) {
+          if (result.status === "fulfilled" && result.value.url) {
+            const candidate = result.value.url;
+            if (isPublicHttpUrl(candidate).ok) {
+              const idx = updatedProposed.findIndex((p) => p.id === result.value.id);
+              if (idx !== -1) { updatedProposed[idx] = { ...updatedProposed[idx]!, url: candidate } as ReferenteFramework; updated++; }
+            }
+          }
+        }
+      }
+    }
+
+    if (updated > 0) {
+      await admin.from("dm_referentes").upsert({
+        client_id: id,
+        proposed_frameworks: updatedProposed,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "client_id" });
+    }
 
     return NextResponse.json({ data: { updated, total: missing.length } });
   }

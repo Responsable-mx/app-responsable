@@ -68,31 +68,6 @@ const SearchUrlsBody = z.object({
 
 type Ctx = { params: Promise<{ id: string }> };
 
-// ── URL validation ─────────────────────────────────────────────────────────────
-
-async function validateUrl(url: string): Promise<boolean> {
-  if (!isPublicHttpUrl(url).ok) return false;
-  try {
-    const r = await fetch(url, {
-      method: "HEAD",
-      headers: { "User-Agent": "ResponSable-BenchmarkValidator/1.0" },
-      signal: AbortSignal.timeout(6_000),
-      redirect: "follow",
-    });
-    if (r.status < 400) return true;
-    // Some servers reject HEAD — retry with GET + Range
-    const r2 = await fetch(url, {
-      method: "GET",
-      headers: { "User-Agent": "ResponSable-BenchmarkValidator/1.0", Range: "bytes=0-0" },
-      signal: AbortSignal.timeout(8_000),
-      redirect: "follow",
-    });
-    return r2.status < 400 || r2.status === 206;
-  } catch {
-    return false;
-  }
-}
-
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
 function buildPrompt(
@@ -335,14 +310,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
     const { companies: rawCompanies, criterios_omitidos } = validated.data;
 
-    // Validate URLs in parallel — nullify any that don't resolve (broken/hallucinated)
-    const companies = await Promise.all(
-      rawCompanies.map(async (c) => {
-        if (!c.reporte_url) return c;
-        const ok = await validateUrl(c.reporte_url);
-        return ok ? c : { ...c, reporte_url: null };
-      })
-    );
+    // Solo SSRF guard — no validateUrl (CDNs corporativos bloquean HEAD/GET de bots)
+    const companies = rawCompanies.map((c) => {
+      if (!c.reporte_url) return c;
+      return isPublicHttpUrl(c.reporte_url).ok ? c : { ...c, reporte_url: null };
+    });
 
     const enabledIds = companies.map((c) => c.id);
 
@@ -424,7 +396,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
                 ],
                 messages: [{
                   role: "user",
-                  content: `Search for the official sustainability or ESG report page for "${empresa.nombre}" (${empresa.pais}${empresa.subsector ? `, ${empresa.subsector}` : ""}). Try queries like: "${empresa.nombre} sustainability report 2024", "${empresa.nombre} ESG report", "${empresa.nombre} informe sostenibilidad". Accept HTML landing pages or direct PDF links. Call submit_url with the best URL found, or url: "" if nothing found after 3 searches.`,
+                  content: `MANDATORY: You MUST call web_search at least once before calling submit_url. Do NOT rely solely on training knowledge — perform a live search to get the current report URL.
+
+Find the official sustainability or ESG report page for "${empresa.nombre}" (${empresa.pais}${empresa.subsector ? `, ${empresa.subsector}` : ""}).
+
+Try these search queries in order:
+1. "${empresa.nombre} sustainability report 2024"
+2. "${empresa.nombre} ESG report annual 2024"
+3. "${empresa.nombre} informe de sostenibilidad 2024"
+
+Accept HTML landing pages or direct PDF links. After searching, call submit_url with the best URL found. If nothing found after 3 searches, call submit_url with url: "".`,
                 }],
               },
               { signal: AbortSignal.timeout(60_000) }

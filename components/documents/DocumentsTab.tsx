@@ -1038,6 +1038,22 @@ export function DocumentsTab({
             onClose={() => setStaging(null)}
             title={`Subir ${staging.length} archivo${staging.length !== 1 ? "s" : ""}`}
             size="lg"
+            footer={
+              <div className="flex justify-end gap-2 w-full">
+                <Button variant="secondary" size="sm" onClick={() => setStaging(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={uploading}
+                  disabled={staging.length === 0}
+                  onClick={() => void doUpload(staging)}
+                >
+                  Subir {staging.length} archivo{staging.length !== 1 ? "s" : ""} →
+                </Button>
+              </div>
+            }
           >
             <div className="space-y-4">
               {/* Banner duplicados */}
@@ -1077,6 +1093,14 @@ export function DocumentsTab({
                   )}
                 </div>
               )}
+
+              {/* Header columnas */}
+              <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                <span className="flex-1 pl-10">Archivo</span>
+                <span className="w-36 shrink-0">Categoría</span>
+                {serviceOptions.length > 0 && <span className="w-[120px] shrink-0">Servicio</span>}
+                <span className="w-6 shrink-0" />
+              </div>
 
               {/* Filas por archivo */}
               <div className="space-y-1 max-h-[400px] overflow-y-auto -mx-1 px-1">
@@ -1143,20 +1167,6 @@ export function DocumentsTab({
                 })}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <Button variant="secondary" size="sm" onClick={() => setStaging(null)}>
-                  Cancelar
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  loading={uploading}
-                  disabled={staging.length === 0}
-                  onClick={() => void doUpload(staging)}
-                >
-                  Subir {staging.length} archivo{staging.length !== 1 ? "s" : ""} →
-                </Button>
-              </div>
             </div>
           </Modal>
         );

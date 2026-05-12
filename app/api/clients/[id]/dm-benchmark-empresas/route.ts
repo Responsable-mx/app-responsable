@@ -397,14 +397,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const batch = toSearch.slice(i, i + CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map(async (empresa) => {
+          const t0 = Date.now();
+          console.log(`[search_urls] starting: ${empresa.nombre}`);
           try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta: web_search + submit_url tools
             const msg = await (anthropic.messages.create as (opts: unknown, extra?: unknown) => Promise<any>)(
               {
                 model,
-                max_tokens: 1000,
+                max_tokens: 1200,
                 tools: [
-                  { type: "web_search_20250305", name: "web_search", max_uses: 2 },
+                  { type: "web_search_20250305", name: "web_search", max_uses: 3 },
                   {
                     name: "submit_url",
                     description: "Submit the URL of the official sustainability or ESG report page found.",
@@ -422,11 +424,18 @@ export async function POST(req: NextRequest, { params }: Ctx) {
                 ],
                 messages: [{
                   role: "user",
-                  content: `Use web_search to find the official sustainability report or ESG report page for "${empresa.nombre}" from ${empresa.pais}${empresa.subsector ? ` (${empresa.subsector})` : ""}. Then call submit_url with the URL. Accept HTML landing pages or direct PDFs. If not found after searching, call submit_url with url: "".`,
+                  content: `Search for the official sustainability or ESG report page for "${empresa.nombre}" (${empresa.pais}${empresa.subsector ? `, ${empresa.subsector}` : ""}). Try queries like: "${empresa.nombre} sustainability report 2024", "${empresa.nombre} ESG report", "${empresa.nombre} informe sostenibilidad". Accept HTML landing pages or direct PDF links. Call submit_url with the best URL found, or url: "" if nothing found after 3 searches.`,
                 }],
               },
-              { signal: AbortSignal.timeout(55_000) }
+              { signal: AbortSignal.timeout(60_000) }
             );
+
+            const stopReason = msg.stop_reason as string;
+            const blockSummary = (msg.content ?? []).map(
+              (b: { type: string; name?: string }) =>
+                b.type === "tool_use" ? `tool_use:${b.name}` : b.type
+            ).join(",");
+            console.log(`[search_urls] ${empresa.nombre}: stop=${stopReason} blocks=[${blockSummary}] elapsed=${Date.now() - t0}ms`);
 
             // Extract URL from submit_url tool call (structured output — preferred)
             let foundUrl: string | null = null;
@@ -452,7 +461,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               }
             }
 
-            console.log(`[search_urls] ${empresa.nombre}: usedWebSearch=${usedWebSearch} url=${foundUrl}`);
+            console.log(`[search_urls] ${empresa.nombre}: usedWebSearch=${usedWebSearch} url=${foundUrl} elapsed=${Date.now() - t0}ms`);
 
             if (!foundUrl) return { id: empresa.id, url: null };
             // URL came from web_search results (structured or citation) — only SSRF guard.
@@ -463,7 +472,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             const valid = await validateUrl(foundUrl);
             return { id: empresa.id, url: valid ? foundUrl : null };
           } catch (err) {
-            console.error(`[search_urls] ${empresa.nombre}: ERROR ${err instanceof Error ? err.message : String(err)}`);
+            console.error(`[search_urls] ${empresa.nombre}: ERROR elapsed=${Date.now() - t0}ms ${err instanceof Error ? err.message : String(err)}`);
             return { id: empresa.id, url: null };
           }
         })

@@ -390,8 +390,14 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
   }, [localEnabled, enabledDB]);
 
   const [showManualForm, setShowManualForm] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [searchingUrls, setSearchingUrls] = useState(false);
+
+  const noUrlCount = useMemo(
+    () => proposed.filter((c) => !c.reporte_url).length,
+    [proposed]
+  );
 
   // Group by criterion
   const byCriterio = useMemo(() => {
@@ -449,6 +455,34 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
       push("error", e instanceof Error ? e.message : "Error al generar.");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleSearchUrls = async () => {
+    setSearchingUrls(true);
+    try {
+      const r = await fetch(key, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "search_urls" }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: "Error desconocido" }));
+        throw new Error((err as { error?: string }).error ?? "Error al buscar URLs");
+      }
+      const result = await r.json() as { data: { updated: number; total: number } };
+      await mutate();
+      onDataMutate?.();
+      const { updated, total } = result.data;
+      if (updated === 0) {
+        push("info", `Búsqueda completada — no se encontraron URLs verificables para las ${total} empresas. Agrégalas manualmente.`);
+      } else {
+        push("success", `${updated} de ${total} URL${updated !== 1 ? "s" : ""} encontrada${updated !== 1 ? "s" : ""} y verificada${updated !== 1 ? "s" : ""}.`);
+      }
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al buscar URLs.");
+    } finally {
+      setSearchingUrls(false);
     }
   };
 
@@ -561,6 +595,27 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
           </svg>
           {generating ? "Regenerando…" : "Regenerar lista IA"}
         </button>
+        {noUrlCount > 0 && (
+          <button
+            type="button"
+            onClick={() => void handleSearchUrls()}
+            disabled={searchingUrls || generating}
+            title={`${noUrlCount} empresa${noUrlCount !== 1 ? "s" : ""} sin URL — buscar con IA`}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {searchingUrls ? (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            )}
+            {searchingUrls ? `Buscando URLs…` : `Buscar URLs (${noUrlCount})`}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setShowManualForm((x) => !x)}

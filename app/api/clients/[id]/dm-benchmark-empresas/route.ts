@@ -16,7 +16,7 @@ import type {
 } from "@/lib/dm/benchmark-empresas-types";
 
 export const runtime    = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 300;
 export const dynamic    = "force-dynamic";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -59,6 +59,11 @@ const UpdateCompanyBody = z.object({
 const GenerateResponseSchema = z.object({
   companies:          z.array(EmpresaSchema).min(1).max(20),
   criterios_omitidos: z.array(z.enum(["competidores_directos","sp_yearbook","internacionales","conglomerados","b2b"])).max(5),
+});
+
+const SearchUrlsBody = z.object({
+  action:      z.literal("search_urls"),
+  company_ids: z.array(z.string().max(80)).max(20).optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -351,6 +356,109 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }, { onConflict: "client_id" });
 
     return NextResponse.json({ data: { companies, enabled_companies: enabledIds, criterios_omitidos } });
+  }
+
+  // ── Action: search_urls (web_search para empresas sin URL) ───────────────────
+  if (body.action === "search_urls") {
+    if (anthropicBreaker.isOpen) {
+      return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
+    }
+
+    const parsed = SearchUrlsBody.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const { data: rec } = await admin
+      .from("dm_benchmark_empresas")
+      .select("proposed_companies")
+      .eq("client_id", id)
+      .maybeSingle();
+
+    if (!rec) return NextResponse.json({ error: "No hay empresas generadas" }, { status: 404 });
+
+    const proposed   = (rec.proposed_companies ?? []) as BenchmarkEmpresa[];
+    const targetIds  = parsed.data.company_ids;
+    const toSearch   = proposed.filter((c) =>
+      !c.reporte_url && (targetIds ? targetIds.includes(c.id) : true)
+    );
+
+    if (toSearch.length === 0) {
+      return NextResponse.json({ data: { updated: 0, total: 0 } });
+    }
+
+    const anthropic = createAnthropicClient();
+    const { model } = getModelConfig("aurora");
+    const updatedMap = new Map<string, string>();
+
+    // Concurrency: 3 simultaneous searches
+    const CONCURRENCY = 3;
+    for (let i = 0; i < toSearch.length; i += CONCURRENCY) {
+      const batch = toSearch.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async (empresa) => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta: web_search tool
+            const msg = await (anthropic.messages.create as (opts: unknown, extra?: unknown) => Promise<any>)(
+              {
+                model,
+                max_tokens: 300,
+                tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
+                messages: [{
+                  role: "user",
+                  content: `Usa web_search para encontrar la URL del informe de sostenibilidad, reporte ESG o memoria de sostenibilidad más reciente de "${empresa.nombre}" (${empresa.pais}${empresa.subsector ? `, ${empresa.subsector}` : ""}).\n\nDevuelve ÚNICAMENTE la URL directa al PDF o página oficial del informe. Sin texto adicional. Si no encuentras URL confiable: null`,
+                }],
+              },
+              { signal: AbortSignal.timeout(28_000) }
+            );
+
+            // Extract URL: prefer citation URLs with ESG/report keywords, fallback to text
+            let foundUrl: string | null = null;
+            for (const block of msg.content ?? []) {
+              if (block.type === "text" && typeof block.text === "string") {
+                const citations = block.citations as Array<{ url?: string }> | undefined;
+                if (Array.isArray(citations)) {
+                  const esgCitation = citations.find((c) =>
+                    c.url && /sustain|esg|report|informe|sostenib|annual|memoria|tcfd|gri|csrd/i.test(c.url)
+                  );
+                  foundUrl = esgCitation?.url ?? citations[0]?.url ?? null;
+                }
+                if (!foundUrl) {
+                  const match = block.text.match(/https?:\/\/[^\s"'<>\n]+/);
+                  if (match && !/null/i.test(match[0])) foundUrl = match[0];
+                }
+              }
+            }
+
+            if (!foundUrl) return { id: empresa.id, url: null };
+            const valid = await validateUrl(foundUrl);
+            return { id: empresa.id, url: valid ? foundUrl : null };
+          } catch {
+            return { id: empresa.id, url: null };
+          }
+        })
+      );
+
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value.url) {
+          updatedMap.set(result.value.id, result.value.url);
+        }
+      }
+    }
+
+    const updatedCount = updatedMap.size;
+    if (updatedCount > 0) {
+      const updatedProposed = proposed.map((c) =>
+        updatedMap.has(c.id) ? { ...c, reporte_url: updatedMap.get(c.id)! } : c
+      );
+      await admin.from("dm_benchmark_empresas").upsert({
+        client_id: id,
+        proposed_companies: updatedProposed,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "client_id" });
+    }
+
+    return NextResponse.json({ data: { updated: updatedCount, total: toSearch.length } });
   }
 
   return NextResponse.json({ error: "action no reconocido" }, { status: 400 });

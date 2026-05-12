@@ -733,13 +733,7 @@ export function DoubleMaterialidadTab({
         accent="border-l-cyan-600"
         isActive={activeStageId === "dm-sec-benchmark-empresas"}
         subtitle="Identifica empresas con informes de sostenibilidad públicos · valida las que entran al benchmark"
-        headerRight={
-          (benchmarkEmpresasRec?.enabled_companies ?? []).length > 0 ? (
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
-              {(benchmarkEmpresasRec?.enabled_companies ?? []).length} empresa{(benchmarkEmpresasRec?.enabled_companies ?? []).length !== 1 ? "s" : ""} seleccionada{(benchmarkEmpresasRec?.enabled_companies ?? []).length !== 1 ? "s" : ""}
-            </span>
-          ) : null
-        }
+        headerRight={null}
       >
         <BenchmarkEmpresasSection
           clientId={clientId}

@@ -140,10 +140,10 @@ TAREA 1 — TABLA DE TEMAS (raw, fiel a fuentes):
 Genera una tabla extrayendo fielmente los temas de sostenibilidad que cada referente menciona para este sector.
 - NO agrupar, NO emitir juicio propio.
 - Solo información proveniente de los referentes listados.
-- Máximo 150 filas.
+- Máximo 80 filas. Sé conciso en las descripciones (máx 2 oraciones por fila).
 
 TAREA 2 — TABLA AGRUPADA:
-Agrupa los temas de la tabla raw en temas comunes. Consolida descripciones sin omitir aspectos de riesgo, oportunidad o impacto. No inventar nada.
+Agrupa los temas de la tabla raw en temas comunes. Consolida descripciones sin omitir aspectos de riesgo, oportunidad o impacto. No inventar nada. Máximo 30 grupos.
 
 TAREA 3 — AUTOEVALUACIÓN:
 Evalúa del 1 al 10 qué tan completo está el mapeo. Justifica en 2-3 oraciones.
@@ -299,7 +299,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     try {
       const msg = await anthropic.messages.create({
         model,
-        max_tokens: 8000,
+        max_tokens: 16000,
         messages: [{ role: "user", content: prompt }],
       }, { signal: AbortSignal.timeout(150_000) });
 

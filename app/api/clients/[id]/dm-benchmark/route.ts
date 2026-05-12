@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { RELATION_LABELS, irosToBenchmarkFields } from "@/lib/dm/fields";
 import { listActiveIros, getIroQuestionnaireContext, type DmIroConfig } from "@/lib/dm/iros";
 import { logChange } from "@/lib/audit-log";
+import type { BenchmarkEmpresa } from "@/lib/dm/benchmark-empresas-types";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -54,7 +55,13 @@ const RemoveBody = z.object({
   company_id: z.string().uuid(),
 });
 
-const RequestBody = z.discriminatedUnion("action", [ProposeBody, CompareBody, AddManualBody, RemoveBody]);
+const ImportFromReferentesBody = z.object({
+  action: z.literal("import_from_referentes"),
+});
+
+const RequestBody = z.discriminatedUnion("action", [
+  ProposeBody, CompareBody, AddManualBody, RemoveBody, ImportFromReferentesBody,
+]);
 
 const ProposedCompanySchema = z.object({
   name: z.string().min(1).max(200),
@@ -572,6 +579,75 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ data: { removed: true } });
   }
 
+  // ── IMPORT_FROM_REFERENTES: importa empresas validadas en Etapa 3 ─────────
+  // Lee dm_benchmark_empresas.enabled_companies, mapea a dm_benchmark_companies.
+  // Deduplica por nombre (case-insensitive). Marca validated=true — ya revisadas.
+  if (parsed.data.action === "import_from_referentes") {
+    const { data: empresasRec } = await admin
+      .from("dm_benchmark_empresas")
+      .select("proposed_companies, enabled_companies")
+      .eq("client_id", id)
+      .single();
+
+    if (!empresasRec) {
+      return NextResponse.json({ error: "Etapa 3 no encontrada — genera primero las empresas de referencia" }, { status: 404 });
+    }
+
+    const enabledIds = (empresasRec.enabled_companies as string[] | null) ?? [];
+    const allProposed = (empresasRec.proposed_companies as BenchmarkEmpresa[] | null) ?? [];
+    const toImport = allProposed.filter((e) => enabledIds.includes(e.id));
+
+    if (toImport.length === 0) {
+      return NextResponse.json({ error: "Sin empresas habilitadas en Etapa 3" }, { status: 400 });
+    }
+
+    const criterioToRelation: Record<string, string> = {
+      competidores_directos: "competitor_nacional",
+      sp_yearbook:           "sector",
+      internacionales:       "competitor_internacional",
+      conglomerados:         "sector",
+      b2b:                   "cadena_valor",
+    };
+
+    const { data: existing } = await admin
+      .from("dm_benchmark_companies")
+      .select("name")
+      .eq("client_id", id);
+    const existingNames = new Set((existing ?? []).map((e) => (e.name as string).toLowerCase()));
+
+    const rows = toImport
+      .filter((e) => !existingNames.has(e.nombre.toLowerCase()))
+      .map((e) => ({
+        client_id: id,
+        name: e.nombre,
+        country: e.pais ?? null,
+        sector: e.subsector ?? null,
+        website: null as string | null,
+        sustainability_report_url: e.reporte_url ?? null,
+        relation: criterioToRelation[e.criterio] ?? "sector",
+        justification: e.justificacion ?? null,
+        proposed_by: "consultor",
+        validated: true,
+        created_by: user,
+      }));
+
+    if (rows.length > 0) {
+      const { error: insertErr } = await admin.from("dm_benchmark_companies").insert(rows);
+      if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    }
+
+    void logChange({
+      actorEmail: user,
+      entityType: "dm_benchmark_company",
+      entityId: id,
+      action: "create",
+      before: null,
+      after: { imported_count: rows.length, skipped: toImport.length - rows.length, source: "dm_benchmark_empresas" },
+    });
+
+    return NextResponse.json({ data: { imported: rows.length, skipped: toImport.length - rows.length } });
+  }
+
   // ── COMPARE: Batch API asíncrono — Sonnet, sin límite de 60s ────────────
   // Flujo:
   //   1. Crea fila pending en dm_benchmark_results
@@ -580,6 +656,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   //   4. Retorna {status:"pending"} al frontend inmediatamente
   //   5. Frontend hace polling del GET cada 5s
   //   6. GET detecta batch ended → procesa resultados → actualiza fila → retorna done
+  if (parsed.data.action !== "compare") {
+    return NextResponse.json({ error: "action no reconocido" }, { status: 400 });
+  }
   const { company_ids } = parsed.data;
 
   const { data: companies, error: fetchErr } = await admin

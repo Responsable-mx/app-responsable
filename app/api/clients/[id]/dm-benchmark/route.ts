@@ -103,6 +103,9 @@ async function buildProposePrompt(
     .replace(/\{\{feedback_context\}\}/g, feedbackContext);
 }
 
+// Retorna 2 bloques separados para permitir cache del bloque estático de IROs:
+//   irosCacheBlock → va en system[1] con cache_control ephemeral (cambia solo cuando admin edita IROs)
+//   dynamicPrompt  → va en messages[user] (cliente + empresas + ctx cuestionario + chunks — cambia por run)
 async function buildComparePrompt(
   clientId: string,
   clientName: string,
@@ -110,14 +113,32 @@ async function buildComparePrompt(
   clientCountry: string | null,
   companies: Array<{ id?: string; name: string; country: string | null; relation: string }>,
   iros: DmIroConfig[],
-): Promise<string> {
+): Promise<{ irosCacheBlock: string; dynamicPrompt: string }> {
   const companiesList = companies
     .map((c) => `- ${c.name} (${c.country ?? "país desconocido"}, ${RELATION_LABELS[c.relation as keyof typeof RELATION_LABELS] ?? c.relation})`)
     .join("\n");
 
-  // Wave 7 C: si Voyage embeddings existen para algún competidor, inyectar
-  // chunks relevantes ANTES de pedirle a IA web_search. Reduce input tokens
-  // de web_search + mejora calidad (datos ya verificados del reporte oficial).
+  // Bloque estático de IROs — sin datos de cliente (va cacheado en system)
+  const irosCacheBlock = `ESTÁNDARES ESRS A ANALIZAR (2 dimensiones por estándar):
+
+${iros.map((iro) =>
+  `[${iro.esrs_standard} — ${iro.label}]
+  Impacto (empresa → sociedad): ${iro.impact_desc}
+  Riesgo/Oportunidad (entorno → empresa): ${iro.risk_desc} | ${iro.opportunity_desc}`
+).join("\n\n")}`;
+
+  // Contexto del cuestionario por IRO — solo donde hay datos (dinámico, por cliente)
+  const ctxLines = (await Promise.all(
+    iros.map(async (iro) => {
+      const ctx = await getIroQuestionnaireContext(clientId, iro);
+      return ctx ? `  [${iro.esrs_standard}] ${ctx}` : null;
+    })
+  )).filter(Boolean);
+  const clientCtxSection = ctxLines.length > 0
+    ? `\nDATOS DEL CUESTIONARIO DE ${clientName} (evidencia verificada — priorizar sobre conocimiento general):\n${ctxLines.join("\n")}\n`
+    : "";
+
+  // Wave 7 C: chunks Voyage de reportes oficiales de competidores
   let competitorChunksSection = "";
   if (process.env.VOYAGE_API_KEY) {
     try {
@@ -137,38 +158,23 @@ async function buildComparePrompt(
         }
       }
       if (perCompanyChunks.length > 0) {
-        competitorChunksSection = `\n\nINFORMACIÓN PRE-ENCONTRADA (reportes oficiales — usa esto antes que web_search):\n\n${perCompanyChunks.join("\n\n")}\n`;
+        competitorChunksSection = `\nINFORMACIÓN PRE-ENCONTRADA (reportes oficiales — usa esto antes que web_search):\n\n${perCompanyChunks.join("\n\n")}\n`;
       }
     } catch (e) {
       console.error("[dm-benchmark] competitor chunks lookup failed:", e);
     }
   }
 
-  // Construir sección de IROs: 2 dimensiones por estándar + contexto del cuestionario
-  const iroSections = await Promise.all(
-    iros.map(async (iro) => {
-      const ctx = await getIroQuestionnaireContext(clientId, iro);
-      const ctxLine = ctx ? `\n  ▸ Datos del cuestionario de ${clientName}:\n${ctx}` : "";
-      return `[${iro.esrs_standard} — ${iro.label}]
-  Impacto (${clientName} → Sociedad): ${iro.impact_desc}
-  Riesgo/Oportunidad (Entorno → ${clientName}): Riesgo: ${iro.risk_desc} | Oportunidad: ${iro.opportunity_desc}${ctxLine}`;
-    })
-  );
-
   const fieldKeys = iros.flatMap((iro) => [
     `"${iro.esrs_standard}_impact"`,
     `"${iro.esrs_standard}_risk_opp"`,
   ]).join(", ");
 
-  return `Eres un analista ESG senior especializado en Doble Materialidad (ESRS/GRI/CSRD).
-Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas.
+  const dynamicPrompt = `Compara a ${clientName} (sector: ${clientSector ?? "no especificado"}, país: ${clientCountry ?? "México"}) contra las siguientes empresas.
 
 EMPRESAS A COMPARAR:
-${companiesList}${competitorChunksSection}
-
-ESTÁNDARES ESRS A ANALIZAR (2 dimensiones por estándar):
-${iroSections.join("\n\n")}
-
+${companiesList}
+${clientCtxSection}${competitorChunksSection}
 INSTRUCCIONES:
 - Por cada dimensión (impacto + riesgo/oportunidad): UNA sola oración por empresa, máximo 35 palabras (incluye a ${clientName}).
 - Sé telegráfico: dato concreto + relevancia ESG. Evita adjetivos vacíos y conectores narrativos.
@@ -176,7 +182,7 @@ INSTRUCCIONES:
 - Si no hay datos públicos verificables para una empresa en una dimensión, escribe exactamente "Sin datos públicos disponibles."
 - CRÍTICO: usa EXACTAMENTE los nombres de empresa tal como aparecen en EMPRESAS A COMPARAR como claves del JSON.
 - CRÍTICO: cierra TODAS las llaves del JSON. Mejor menos contenido bien cerrado que más contenido truncado.
-- Cierra con párrafo narrativo de 50-70 palabras: posición de ${clientName}, fortalezas, brechas, prioridad.
+- Cierra con párrafo narrativo de 80-120 palabras: posición de ${clientName}, fortalezas, brechas, prioridad.
 
 JSON únicamente — usa estas claves exactas: ${fieldKeys}
 {
@@ -192,6 +198,8 @@ JSON únicamente — usa estas claves exactas: ${fieldKeys}
   },
   "narrative": "síntesis ejecutiva 80-120 palabras"
 }`;
+
+  return { irosCacheBlock, dynamicPrompt };
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -686,7 +694,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Cargar IROs activos y construir prompt + fields_snapshot
   const iros = await listActiveIros();
   const fieldsSnapshot = irosToBenchmarkFields(iros);
-  const prompt = await buildComparePrompt(
+  const { irosCacheBlock, dynamicPrompt } = await buildComparePrompt(
     id,
     client.name,
     client.sector ?? null,
@@ -721,14 +729,22 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: resultRow.id,
           params: {
             model,
-            max_tokens: 16000, // 10 IROs × 2 dims × N empresas (cap subido may-2026: 8K truncaba JSON con 5+ empresas — stop_reason=max_tokens → "Respuesta IA sin JSON")
-            system: [{
-              type: "text",
-              text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
-               
-              cache_control: { type: "ephemeral" },
-            }],
-            messages: [{ role: "user", content: prompt }],
+            max_tokens: 12000, // 8 empresas × 20 dims × ~40 tokens + overhead = ~9K max real. 12K seguro.
+            system: [
+              {
+                type: "text",
+                text: "Eres un analista senior de sostenibilidad especializado en Doble Materialidad. Responde solo con JSON válido.",
+                cache_control: { type: "ephemeral" },
+              },
+              {
+                // IRO definitions son estáticas (cambian 2-3×/año cuando admin edita dm_iro_config).
+                // Cache hit ahorra ~600 tokens de input en cada re-run del mismo consultor.
+                type: "text",
+                text: irosCacheBlock,
+                cache_control: { type: "ephemeral" },
+              },
+            ],
+            messages: [{ role: "user", content: dynamicPrompt }],
           },
         }],
       },

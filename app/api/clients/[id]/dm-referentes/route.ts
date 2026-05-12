@@ -42,19 +42,19 @@ const FrameworksResponseSchema = z.object({
 const TopicRawSchema = z.object({
   tema:        z.string().min(1).max(200),
   subtema:     z.string().optional().nullable(),
-  descripcion: z.string().min(1).max(800),
+  descripcion: z.string().min(1).max(3000),
   referente:   z.string().min(1).max(50),
 });
 
 const TopicGroupedSchema = z.object({
   tema_consolidado:        z.string().min(1).max(200),
-  descripcion_consolidada: z.string().min(1).max(1000),
+  descripcion_consolidada: z.string().min(1).max(3000),
   referentes:              z.array(z.string()).min(1),
 });
 
 const TopicsResponseSchema = z.object({
-  coverage_score: z.number().min(1).max(10),
-  coverage_note:  z.string().min(1).max(500),
+  coverage_score: z.number().min(0).max(10),
+  coverage_note:  z.string().min(1).max(1000),
   topics_raw:     z.array(TopicRawSchema).min(1).max(200),
   topics_grouped: z.array(TopicGroupedSchema).min(1).max(50),
 });
@@ -349,6 +349,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }
     const validated = TopicsResponseSchema.safeParse(JSON.parse(jsonText));
     if (!validated.success) {
+      console.error("[dm-referentes generate_topics] schema inválido:", JSON.stringify(validated.error.flatten()));
       await admin.from("dm_referentes").upsert({ client_id: id, topics_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
       return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
     }

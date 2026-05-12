@@ -446,20 +446,19 @@ export function DocumentsTab({
     }
   }
 
-  async function doUpload(files: File[]) {
+  async function doUpload(entries: { file: File; kind: DocMeta["kind"]; serviceIds: string[] }[]) {
+    setStaging(null);
     setUploading(true);
     let okCount = 0;
     const failures: string[] = [];
 
-    for (const file of files) {
+    for (const { file, kind, serviceIds } of entries) {
       const isZip =
         file.name.toLowerCase().endsWith(".zip") ||
         file.type === "application/zip" ||
         file.type === "application/x-zip-compressed";
 
       if (isZip) {
-        // Extraer el ZIP en el browser y subir cada archivo por separado.
-        // Evita el límite de 4.5MB de Vercel para el body de funciones serverless.
         try {
           const JSZip = (await import("jszip")).default;
           const zip = await JSZip.loadAsync(file);
@@ -479,12 +478,10 @@ export function DocumentsTab({
           if (extracted.length === 0) {
             failures.push(`${file.name}: sin archivos soportados (PDF, DOCX, XLSX, PPTX, TXT, MD)`);
           } else {
-            // Lotes de 5 en paralelo — mismo patrón que el server
             const BATCH = 5;
             for (let i = 0; i < extracted.length; i += BATCH) {
               const batch = extracted.slice(i, i + BATCH);
-              const uploadKind = filter !== "all" ? filter : "general";
-              const counts = await Promise.all(batch.map((f) => uploadSingleFile(f, uploadKind, uploadServiceIds, failures)));
+              const counts = await Promise.all(batch.map((f) => uploadSingleFile(f, kind, serviceIds, failures)));
               okCount += counts.reduce((a, b) => a + b, 0);
             }
           }
@@ -492,7 +489,7 @@ export function DocumentsTab({
           failures.push(`${file.name}: ${e instanceof Error ? e.message : "ZIP inválido o corrupto"}`);
         }
       } else {
-        okCount += await uploadSingleFile(file, filter !== "all" ? filter : "general", uploadServiceIds, failures);
+        okCount += await uploadSingleFile(file, kind, serviceIds, failures);
       }
     }
 
@@ -507,7 +504,7 @@ export function DocumentsTab({
         : `${failures.slice(0, 3).join(" · ")} (+${failures.length - 3} más)`;
       toast.push("error", detail, 8000);
     }
-    else if (files.length === 0) toast.push("info", "Sin archivos nuevos por subir");
+    else if (entries.length === 0) toast.push("info", "Sin archivos nuevos por subir");
     else toast.push("error", failures[0] ?? "Error subiendo");
   }
 
@@ -781,8 +778,7 @@ export function DocumentsTab({
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 {canExtract && <th className="px-3 py-2 w-8" />}
-                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Tipo</th>
-                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Nombre</th>
+                <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2 min-w-[320px]">Archivo</th>
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Categoría</th>
                 {/* Columnas Servicio + Estado siempre renderizadas (layout estable). Si vacío → "—" */}
                 <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2">Servicio</th>
@@ -808,13 +804,11 @@ export function DocumentsTab({
                         />
                       </td>
                     )}
-                    <td className="px-3 py-2.5">
-                      <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-700 rounded-sm px-1.5 py-0.5">
-                        {TYPE_BADGE[d.file_type]}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 max-w-[280px]">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-3 py-2.5 min-w-[320px] max-w-[480px]">
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
+                          {TYPE_BADGE[d.file_type]}
+                        </span>
                         <span className="text-sm font-semibold text-slate-900 truncate">{d.file_name}</span>
                         {d.content_hash && dupHashes.has(d.content_hash) && (
                           <span
@@ -908,7 +902,7 @@ export function DocumentsTab({
                   {d.parse_status === "failed" && d.parse_error && (
                     <tr className="bg-rose-50/50">
                       <td
-                        colSpan={8 + (canExtract ? 1 : 0)}
+                        colSpan={7 + (canExtract ? 1 : 0)}
                         className="px-3 py-2 text-xs text-rose-700"
                       >
                         <span className="font-semibold">Error de conversión:</span> {d.parse_error}
@@ -1035,60 +1029,87 @@ export function DocumentsTab({
         />
       )}
 
-      {/* Confirmación dedup pre-upload — lista archivos ya existentes y deja
-          elegir entre subir solo nuevos, subir todo o cancelar. Evita duplicados
-          accidentales al re-arrastrar la misma carpeta. */}
-      {dupConfirm && (
+      {/* Modal de staging — selección de categoría + servicio por archivo antes de subir */}
+      {staging && (
         <Modal
           open
-          onClose={() => setDupConfirm(null)}
-          title="Archivos ya existen"
-          size="md"
+          onClose={() => setStaging(null)}
+          title={`Subir ${staging.length} archivo${staging.length !== 1 ? "s" : ""}`}
+          size="lg"
         >
-          <div className="space-y-3 text-sm">
-            <p className="text-slate-700">
-              {dupConfirm.dupNames.length === 1
-                ? "Este archivo ya está en el cliente:"
-                : `Estos ${dupConfirm.dupNames.length} archivos ya están en el cliente:`}
-            </p>
-            <ul className="border border-amber-200 bg-amber-50 rounded p-2 max-h-[200px] overflow-y-auto text-xs text-amber-900 space-y-1">
-              {dupConfirm.dupNames.map((n) => (
-                <li key={n} className="flex items-center gap-1.5">
-                  <IconWarn className="w-3 h-3 shrink-0 text-amber-600" />
-                  <span className="truncate">{n}</span>
-                </li>
+          <div className="space-y-4">
+            {/* Aplicar a todos */}
+            {staging.length > 1 && (
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                <span className="text-xs text-slate-500 font-medium shrink-0">Aplicar a todos:</span>
+                <SelectField
+                  value=""
+                  onChange={(v) => setStaging((s) => s?.map((e) => ({ ...e, kind: v as DocMeta["kind"] })) ?? null)}
+                  options={KIND_OPTIONS}
+                  placeholder="Categoría…"
+                />
+                {serviceOptions.length > 0 && (
+                  <ServiceMultiSelect
+                    options={serviceOptions}
+                    selected={[]}
+                    onChange={(ids) => setStaging((s) => s?.map((e) => ({ ...e, serviceIds: ids })) ?? null)}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Filas por archivo */}
+            <div className="space-y-1 max-h-[400px] overflow-y-auto -mx-1 px-1">
+              {staging.map((entry, i) => (
+                <div key={i} className="flex items-center gap-2 py-2 border-b border-slate-100 last:border-0">
+                  <span className="shrink-0 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
+                    {entry.file.name.split(".").pop()?.toUpperCase() ?? "FILE"}
+                  </span>
+                  <span
+                    className="text-sm text-slate-900 flex-1 truncate min-w-0 font-medium"
+                    title={entry.file.name}
+                  >
+                    {entry.file.name}
+                  </span>
+                  <div className="shrink-0 w-36">
+                    <SelectField
+                      value={entry.kind}
+                      onChange={(v) =>
+                        setStaging((s) =>
+                          s?.map((e, j) => (j === i ? { ...e, kind: v as DocMeta["kind"] } : e)) ?? null
+                        )
+                      }
+                      options={KIND_OPTIONS}
+                    />
+                  </div>
+                  {serviceOptions.length > 0 && (
+                    <div className="shrink-0">
+                      <ServiceMultiSelect
+                        options={serviceOptions}
+                        selected={entry.serviceIds}
+                        onChange={(ids) =>
+                          setStaging((s) =>
+                            s?.map((e, j) => (j === i ? { ...e, serviceIds: ids } : e)) ?? null
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
               ))}
-            </ul>
-            <p className="text-xs text-slate-600">
-              Match por nombre y tamaño exacto. Subir igual creará una segunda copia.
-            </p>
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button variant="secondary" size="sm" onClick={() => setDupConfirm(null)}>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button variant="secondary" size="sm" onClick={() => setStaging(null)}>
                 Cancelar
               </Button>
-              {dupConfirm.newFiles.length > 0 && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const newFiles = dupConfirm.newFiles;
-                    setDupConfirm(null);
-                    void doUpload(newFiles);
-                  }}
-                >
-                  Subir solo nuevos ({dupConfirm.newFiles.length})
-                </Button>
-              )}
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => {
-                  const allFiles = dupConfirm.files;
-                  setDupConfirm(null);
-                  void doUpload(allFiles);
-                }}
+                loading={uploading}
+                onClick={() => void doUpload(staging)}
               >
-                Subir todos ({dupConfirm.files.length})
+                Subir {staging.length} archivo{staging.length !== 1 ? "s" : ""} →
               </Button>
             </div>
           </div>

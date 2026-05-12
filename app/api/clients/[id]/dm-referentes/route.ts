@@ -8,6 +8,7 @@ import { extractJsonObject } from "@/lib/ai/extract-json";
 import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicHttpUrl } from "@/lib/documents/ssrf";
 import type { ReferentesData, ReferenteFramework, TopicRaw, TopicGrouped } from "@/lib/dm/referentes-types";
 
 export const runtime    = "nodejs";
@@ -53,6 +54,38 @@ const TopicsResponseSchema = z.object({
 });
 
 type Ctx = { params: Promise<{ id: string }> };
+
+// ── URL validation ────────────────────────────────────────────────────────────
+
+async function validateUrl(url: string): Promise<boolean> {
+  const guard = isPublicHttpUrl(url);
+  if (!guard.ok) return false;
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: AbortSignal.timeout(5_000),
+      headers: { "User-Agent": "ResponSable-ReferentesCheck/1.0" },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function sanitizeFrameworkUrls(frameworks: ReferenteFramework[]): Promise<ReferenteFramework[]> {
+  return Promise.all(
+    frameworks.map(async (f) => {
+      if (!f.url) return f;
+      const valid = await validateUrl(f.url);
+      if (!valid) {
+        console.warn(`[dm-referentes] URL inválida/404 para ${f.id}: ${f.url}`);
+        return { ...f, url: null };
+      }
+      return f;
+    }),
+  );
+}
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
@@ -224,7 +257,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
     }
 
-    const frameworks = validated.data.frameworks as ReferenteFramework[];
+    const frameworks = await sanitizeFrameworkUrls(validated.data.frameworks as ReferenteFramework[]);
     await admin.from("dm_referentes").upsert({
       client_id: id,
       proposed_frameworks: frameworks,

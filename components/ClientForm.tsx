@@ -88,7 +88,7 @@ function initialBlocks(
 }
 
 const catalogFetcher = (url: string) =>
-  fetch(url).then((r) => r.json()).then((j) => (j.data ?? []) as { value: string; label: string }[]);
+  fetch(url).then((r) => r.json() as Promise<{ data: { value: string; label: string }[] }>);
 
 function engagementToRow(e: ClientEngagement): EngagementRow {
   return {
@@ -114,11 +114,12 @@ export function ClientForm(props: Props) {
     () => (props.initialEngagements ?? []).map(engagementToRow)
   );
 
-  const { data: serviceOptions = [] } = useSWR<{ value: string; label: string }[]>(
+  const { data: catalogResp } = useSWR(
     "/api/catalogs?category=services",
     catalogFetcher,
     { revalidateOnFocus: false, dedupingInterval: 3_600_000 }
   );
+  const serviceOptions = catalogResp?.data ?? [];
 
   const [form, setForm] = useState<FormState>({
     name: props.initial?.name ?? "",

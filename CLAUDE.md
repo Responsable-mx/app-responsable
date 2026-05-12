@@ -367,6 +367,39 @@ Pipeline en 2 niveles, swap transparente. BM25 activo en prod; Voyage configurad
 
 **Buena práctica — key en sesión de chat:** Si el usuario pega una API key en el chat de Claude Code, guardar inmediatamente en `.env.local` (o `.env.global`). Las keys en historial JSONL de sesiones quedan expuestas en texto claro en `~/.claude/projects/*/**.jsonl`.
 
+## Patrón canónico — Texto expandible "Ver más / Ver menos" (may-2026)
+
+**Nunca usar conteo de caracteres** para decidir si mostrar el botón. El texto puede ser largo y aun así caber en 2 líneas (depende del ancho del contenedor y el font-size).
+
+**Patrón correcto — medir el DOM:**
+
+```tsx
+const [expanded, setExpanded] = useState(false);
+const [isClamped, setIsClamped] = useState(false);
+const textRef = useRef<HTMLParagraphElement>(null);
+
+useLayoutEffect(() => {
+  if (!expanded && textRef.current) {
+    setIsClamped(textRef.current.scrollHeight > textRef.current.clientHeight);
+  }
+}, [text, expanded]);   // re-mide al cambiar el texto o al colapsar
+
+// En JSX:
+<p ref={textRef} className={!expanded ? "line-clamp-2" : ""}>
+  {text}
+</p>
+{(isClamped || expanded) && (
+  <button onClick={() => setExpanded(x => !x)}>
+    {expanded ? "Ver menos" : "Ver más"}
+  </button>
+)}
+```
+
+- `useLayoutEffect` (no `useEffect`) — mide antes del paint, evita flash
+- La condición `isClamped || expanded` garantiza que "Ver menos" siga visible tras expandir
+- Al colapsar (`expanded → false`), el effect re-mide y actualiza `isClamped`
+- Aplica a cualquier texto largo en cards: justificaciones, descripciones, notas
+
 ## Patrón canónico — URLs generadas por IA (may-2026)
 
 Toda etapa DM-IA que devuelva URLs en su respuesta JSON debe aplicar este patrón. Activo en: dm-referentes, dm-benchmark-empresas.

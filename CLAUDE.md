@@ -367,6 +367,73 @@ Pipeline en 2 niveles, swap transparente. BM25 activo en prod; Voyage configurad
 
 **Buena práctica — key en sesión de chat:** Si el usuario pega una API key en el chat de Claude Code, guardar inmediatamente en `.env.local` (o `.env.global`). Las keys en historial JSONL de sesiones quedan expuestas en texto claro en `~/.claude/projects/*/**.jsonl`.
 
+## Patrón canónico — URLs generadas por IA (may-2026)
+
+Toda etapa DM-IA que devuelva URLs en su respuesta JSON debe aplicar este patrón. Activo en: dm-referentes, dm-benchmark-empresas.
+
+### Server-side: validar antes de persistir
+
+```typescript
+import { isPublicHttpUrl } from "@/lib/documents/ssrf";
+
+async function validateUrl(url: string): Promise<boolean> {
+  if (!isPublicHttpUrl(url).ok) return false;
+  try {
+    const r = await fetch(url, {
+      method: "HEAD",
+      headers: { "User-Agent": "ResponSable-Validator/1.0" },
+      signal: AbortSignal.timeout(6_000),
+      redirect: "follow",
+    });
+    if (r.status < 400) return true;
+    // Algunos servidores rechazan HEAD — fallback GET parcial
+    const r2 = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "ResponSable-Validator/1.0", Range: "bytes=0-0" },
+      signal: AbortSignal.timeout(8_000),
+      redirect: "follow",
+    });
+    return r2.status < 400 || r2.status === 206;
+  } catch {
+    return false;
+  }
+}
+
+// Después de validar el schema IA:
+const items = await Promise.all(
+  rawItems.map(async (item) => {
+    if (!item.url) return item;
+    return (await validateUrl(item.url)) ? item : { ...item, url: null };
+  })
+);
+```
+
+- Siempre usar SSRF guard (`isPublicHttpUrl`) antes de cualquier `fetch` a URL externa
+- Correr en `Promise.all` — paralelo, ~6-8s máximo dentro del budget de 90-180s
+- URLs que fallan → `null` antes de persistir en DB
+
+### Client-side: indicar ausencia de URL
+
+Cuando `url === null`, mostrar nudge "Sin URL verificada" en lugar de silencio:
+
+```tsx
+{item.url ? (
+  <a href={item.url} target="_blank" rel="noopener noreferrer">Ver →</a>
+) : (
+  <span title="La IA no pudo verificar la URL. Agrega manualmente si la conoces."
+        className="inline-flex items-center gap-1 text-[10px] text-slate-400 italic">
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+    </svg>
+    Sin URL verificada
+  </span>
+)}
+```
+
+- Si el consultor puede corregir la URL manualmente (ej. company cards): hacer el nudge clickeable → abre editor inline
+- Si es solo referencia (ej. framework cards): span no-interactivo es suficiente
+
 ## Deploy — app-responsable (may-2026)
 
 **Push a `main` → auto-deploy automático** a `https://app.responsable.net`.

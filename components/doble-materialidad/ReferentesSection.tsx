@@ -116,7 +116,7 @@ function FrameworkCard({
             )}
           </div>
         </div>
-        {framework.url && (
+        {framework.url ? (
           <a
             href={framework.url}
             target="_blank"
@@ -126,6 +126,16 @@ function FrameworkCard({
           >
             Ver →
           </a>
+        ) : (
+          <span
+            title="La IA no pudo verificar la URL oficial de este referente."
+            className="inline-flex items-center gap-1 text-[10px] text-slate-400 italic shrink-0"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            Sin URL verificada
+          </span>
         )}
       </div>
       <p className="text-xs text-slate-600 mt-2 leading-snug">{framework.description}</p>

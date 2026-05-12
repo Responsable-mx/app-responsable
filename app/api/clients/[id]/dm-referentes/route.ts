@@ -55,36 +55,16 @@ const TopicsResponseSchema = z.object({
 
 type Ctx = { params: Promise<{ id: string }> };
 
-// ── URL validation ────────────────────────────────────────────────────────────
 
-async function validateUrl(url: string): Promise<boolean> {
-  const guard = isPublicHttpUrl(url);
-  if (!guard.ok) return false;
-  try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: AbortSignal.timeout(5_000),
-      headers: { "User-Agent": "ResponSable-ReferentesCheck/1.0" },
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function sanitizeFrameworkUrls(frameworks: ReferenteFramework[]): Promise<ReferenteFramework[]> {
-  return Promise.all(
-    frameworks.map(async (f) => {
-      if (!f.url) return f;
-      const valid = await validateUrl(f.url);
-      if (!valid) {
-        console.warn(`[dm-referentes] URL inválida/404 para ${f.id}: ${f.url}`);
-        return { ...f, url: null };
-      }
-      return f;
-    }),
-  );
+function sanitizeFrameworkUrls(frameworks: ReferenteFramework[]): ReferenteFramework[] {
+  return frameworks.map((f) => {
+    if (!f.url) return f;
+    if (!isPublicHttpUrl(f.url).ok) {
+      console.warn(`[dm-referentes] URL rechazada por SSRF guard para ${f.id}: ${f.url}`);
+      return { ...f, url: null };
+    }
+    return f;
+  });
 }
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
@@ -257,7 +237,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
     }
 
-    const frameworks = await sanitizeFrameworkUrls(validated.data.frameworks as ReferenteFramework[]);
+    const frameworks = sanitizeFrameworkUrls(validated.data.frameworks as ReferenteFramework[]);
     await admin.from("dm_referentes").upsert({
       client_id: id,
       proposed_frameworks: frameworks,
@@ -344,6 +324,76 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }, { onConflict: "client_id" });
 
     return NextResponse.json({ data: { coverage_score, coverage_note, topics_raw, topics_grouped } });
+  }
+
+  // ── Action: search_urls ────────────────────────────────────────────────────────
+  if (body.action === "search_urls") {
+    const { data: rec } = await admin
+      .from("dm_referentes")
+      .select("proposed_frameworks")
+      .eq("client_id", id)
+      .maybeSingle();
+
+    const proposed = (rec?.proposed_frameworks ?? []) as ReferenteFramework[];
+    const missing  = proposed.filter((f) => !f.url);
+
+    if (missing.length === 0) {
+      return NextResponse.json({ data: { updated: 0, total: 0 } });
+    }
+
+    const frameworkList = missing.map((f) => `- ${f.id}: ${f.name}`).join("\n");
+    const urlPrompt = `Proporciona la URL oficial de cada uno de estos marcos de sostenibilidad ESG. Solo incluye URLs que conozcas con certeza — omite las que no puedas verificar.
+
+Marcos sin URL:
+${frameworkList}
+
+Responde ÚNICAMENTE con JSON válido:
+{"urls": {"<id>": "<url_oficial>", ...}}`;
+
+    const anthropic = createAnthropicClient();
+    const { model: haikuModel } = getModelConfig("valeria");
+    let textOut = "";
+    try {
+      const msg = await anthropic.messages.create({
+        model: haikuModel,
+        max_tokens: 500,
+        messages: [{ role: "user", content: urlPrompt }],
+      }, { signal: AbortSignal.timeout(30_000) });
+      for (const block of msg.content) {
+        if (block.type === "text") textOut += block.text;
+      }
+      anthropicBreaker.recordSuccess();
+    } catch {
+      anthropicBreaker.recordFailure();
+      return NextResponse.json({ error: "Error al buscar URLs con IA" }, { status: 500 });
+    }
+
+    let urlMap: Record<string, string> = {};
+    try {
+      const jsonText = extractJsonObject(textOut);
+      if (jsonText) {
+        const parsed = JSON.parse(jsonText) as { urls?: Record<string, string> };
+        urlMap = parsed.urls ?? {};
+      }
+    } catch { /* ignorar parse errors */ }
+
+    let updated = 0;
+    const updatedProposed = proposed.map((f) => {
+      if (f.url) return f;
+      const candidate = urlMap[f.id];
+      if (!candidate) return f;
+      if (!isPublicHttpUrl(candidate).ok) return f;
+      updated++;
+      return { ...f, url: candidate };
+    });
+
+    await admin.from("dm_referentes").upsert({
+      client_id: id,
+      proposed_frameworks: updatedProposed,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "client_id" });
+
+    return NextResponse.json({ data: { updated, total: missing.length } });
   }
 
   return NextResponse.json({ error: "action no reconocido" }, { status: 400 });

@@ -400,50 +400,35 @@ useLayoutEffect(() => {
 - Al colapsar (`expanded → false`), el effect re-mide y actualiza `isClamped`
 - Aplica a cualquier texto largo en cards: justificaciones, descripciones, notas
 
-## Patrón canónico — URLs generadas por IA (may-2026)
+## Patrón canónico — URLs generadas por IA (may-2026, actualizado)
 
 Toda etapa DM-IA que devuelva URLs en su respuesta JSON debe aplicar este patrón. Activo en: dm-referentes, dm-benchmark-empresas.
 
-### Server-side: validar antes de persistir
+### ⚠️ NO usar validateUrl() para URLs de IA
+
+`validateUrl()` (HEAD/GET con user-agent de bot) es bloqueado por los CDNs corporativos de empresas grandes (BP, Iberdrola, Pemex, SASB, GRI, etc.) aunque la URL sea correcta. Caso confirmado may-2026: las 3 empresas más grandes del benchmark tenían URL correcta pero `validateUrl` las descartaba.
+
+**Regla:** para URLs aportadas por la IA (JSON de generate, web_search, o conocimiento de entrenamiento) → solo aplicar `isPublicHttpUrl()` (SSRF guard). No hacer fetch de validación.
+
+### Server-side: solo SSRF guard
 
 ```typescript
 import { isPublicHttpUrl } from "@/lib/documents/ssrf";
 
-async function validateUrl(url: string): Promise<boolean> {
-  if (!isPublicHttpUrl(url).ok) return false;
-  try {
-    const r = await fetch(url, {
-      method: "HEAD",
-      headers: { "User-Agent": "ResponSable-Validator/1.0" },
-      signal: AbortSignal.timeout(6_000),
-      redirect: "follow",
-    });
-    if (r.status < 400) return true;
-    // Algunos servidores rechazan HEAD — fallback GET parcial
-    const r2 = await fetch(url, {
-      method: "GET",
-      headers: { "User-Agent": "ResponSable-Validator/1.0", Range: "bytes=0-0" },
-      signal: AbortSignal.timeout(8_000),
-      redirect: "follow",
-    });
-    return r2.status < 400 || r2.status === 206;
-  } catch {
-    return false;
-  }
-}
-
 // Después de validar el schema IA:
-const items = await Promise.all(
-  rawItems.map(async (item) => {
-    if (!item.url) return item;
-    return (await validateUrl(item.url)) ? item : { ...item, url: null };
-  })
-);
+const items = rawItems.map((item) => {
+  if (!item.url) return item;
+  return isPublicHttpUrl(item.url).ok ? item : { ...item, url: null };
+});
 ```
 
-- Siempre usar SSRF guard (`isPublicHttpUrl`) antes de cualquier `fetch` a URL externa
-- Correr en `Promise.all` — paralelo, ~6-8s máximo dentro del budget de 90-180s
-- URLs que fallan → `null` antes de persistir en DB
+- `isPublicHttpUrl` bloquea: localhost, RFC1918, link-local, IPv6 ULA, IPv4-mapped (`::ffff:*`)
+- No hacer `fetch()` de validación — CDNs bloquean bots aunque la URL sea real
+- URLs de IA son confiables para empresas conocidas; URLs hallucinated son raras y detectables en UI
+
+### validateUrl() — cuándo SÍ usarla
+
+Solo para URLs ingresadas por el usuario (no generadas por IA) donde se sospecha typo o URL incorrecta, y el dominio objetivo es probablemente un sitio pequeño sin CDN corporativo. Ejemplo: `ingest-report` donde el consultor pega una URL de informe.
 
 ### Client-side: indicar ausencia de URL
 

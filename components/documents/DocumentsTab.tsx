@@ -1030,91 +1030,140 @@ export function DocumentsTab({
       )}
 
       {/* Modal de staging — selección de categoría + servicio por archivo antes de subir */}
-      {staging && (
-        <Modal
-          open
-          onClose={() => setStaging(null)}
-          title={`Subir ${staging.length} archivo${staging.length !== 1 ? "s" : ""}`}
-          size="lg"
-        >
-          <div className="space-y-4">
-            {/* Aplicar a todos */}
-            {staging.length > 1 && (
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-                <span className="text-xs text-slate-500 font-medium shrink-0">Aplicar a todos:</span>
-                <SelectField
-                  value=""
-                  onChange={(v) => setStaging((s) => s?.map((e) => ({ ...e, kind: v as DocMeta["kind"] })) ?? null)}
-                  options={KIND_OPTIONS}
-                  placeholder="Categoría…"
-                />
-                {serviceOptions.length > 0 && (
-                  <ServiceMultiSelect
-                    options={serviceOptions}
-                    selected={[]}
-                    onChange={(ids) => setStaging((s) => s?.map((e) => ({ ...e, serviceIds: ids })) ?? null)}
-                  />
-                )}
-              </div>
-            )}
-
-            {/* Filas por archivo */}
-            <div className="space-y-1 max-h-[400px] overflow-y-auto -mx-1 px-1">
-              {staging.map((entry, i) => (
-                <div key={i} className="flex items-center gap-2 py-2 border-b border-slate-100 last:border-0">
-                  <span className="shrink-0 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
-                    {entry.file.name.split(".").pop()?.toUpperCase() ?? "FILE"}
+      {staging && (() => {
+        const existingKeys = new Set(docs.map((d) => `${d.file_name.toLowerCase()}|${d.size_bytes}`));
+        const isDup = (f: File) => existingKeys.has(`${f.name.toLowerCase()}|${f.size}`);
+        const dupCount = staging.filter((e) => isDup(e.file)).length;
+        const newCount = staging.length - dupCount;
+        return (
+          <Modal
+            open
+            onClose={() => setStaging(null)}
+            title={`Subir ${staging.length} archivo${staging.length !== 1 ? "s" : ""}`}
+            size="lg"
+          >
+            <div className="space-y-4">
+              {/* Banner duplicados */}
+              {dupCount > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                  <IconWarn className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                  <span className="flex-1">
+                    {dupCount} archivo{dupCount !== 1 ? "s" : ""} ya exist{dupCount !== 1 ? "en" : "e"} en este cliente.
+                    {newCount > 0 ? ` Solo se subirán ${newCount} nuevos si quitas los duplicados.` : " Todos son duplicados."}
                   </span>
-                  <span
-                    className="text-sm text-slate-900 flex-1 truncate min-w-0 font-medium"
-                    title={entry.file.name}
+                  <button
+                    type="button"
+                    className="shrink-0 text-amber-800 font-semibold underline hover:no-underline"
+                    onClick={() => setStaging((s) => s?.filter((e) => !isDup(e.file)) ?? null)}
                   >
-                    {entry.file.name}
-                  </span>
-                  <div className="shrink-0 w-36">
-                    <SelectField
-                      value={entry.kind}
-                      onChange={(v) =>
-                        setStaging((s) =>
-                          s?.map((e, j) => (j === i ? { ...e, kind: v as DocMeta["kind"] } : e)) ?? null
-                        )
-                      }
-                      options={KIND_OPTIONS}
-                    />
-                  </div>
+                    Quitar duplicados
+                  </button>
+                </div>
+              )}
+
+              {/* Aplicar a todos */}
+              {staging.length > 1 && (
+                <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                  <span className="text-xs text-slate-500 font-medium shrink-0">Aplicar a todos:</span>
+                  <SelectField
+                    value=""
+                    onChange={(v) => setStaging((s) => s?.map((e) => ({ ...e, kind: v as DocMeta["kind"] })) ?? null)}
+                    options={KIND_OPTIONS}
+                    placeholder="Categoría…"
+                  />
                   {serviceOptions.length > 0 && (
-                    <div className="shrink-0">
-                      <ServiceMultiSelect
-                        options={serviceOptions}
-                        selected={entry.serviceIds}
-                        onChange={(ids) =>
-                          setStaging((s) =>
-                            s?.map((e, j) => (j === i ? { ...e, serviceIds: ids } : e)) ?? null
-                          )
-                        }
-                      />
-                    </div>
+                    <ServiceMultiSelect
+                      options={serviceOptions}
+                      selected={[]}
+                      onChange={(ids) => setStaging((s) => s?.map((e) => ({ ...e, serviceIds: ids })) ?? null)}
+                    />
                   )}
                 </div>
-              ))}
-            </div>
+              )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button variant="secondary" size="sm" onClick={() => setStaging(null)}>
-                Cancelar
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                loading={uploading}
-                onClick={() => void doUpload(staging)}
-              >
-                Subir {staging.length} archivo{staging.length !== 1 ? "s" : ""} →
-              </Button>
+              {/* Filas por archivo */}
+              <div className="space-y-1 max-h-[400px] overflow-y-auto -mx-1 px-1">
+                {staging.map((entry, i) => {
+                  const dup = isDup(entry.file);
+                  return (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-2 py-2 border-b border-slate-100 last:border-0 ${dup ? "opacity-60" : ""}`}
+                    >
+                      <span className="shrink-0 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-sm px-1.5 py-0.5">
+                        {entry.file.name.split(".").pop()?.toUpperCase() ?? "FILE"}
+                      </span>
+                      <span
+                        className="text-sm text-slate-900 flex-1 truncate min-w-0 font-medium"
+                        title={entry.file.name}
+                      >
+                        {entry.file.name}
+                      </span>
+                      {dup && (
+                        <span className="shrink-0 text-[10px] font-bold uppercase rounded-sm px-1.5 py-0.5 bg-amber-100 text-amber-800 whitespace-nowrap">
+                          Ya existe
+                        </span>
+                      )}
+                      {!dup && (
+                        <>
+                          <div className="shrink-0 w-36">
+                            <SelectField
+                              value={entry.kind}
+                              onChange={(v) =>
+                                setStaging((s) =>
+                                  s?.map((e, j) => (j === i ? { ...e, kind: v as DocMeta["kind"] } : e)) ?? null
+                                )
+                              }
+                              options={KIND_OPTIONS}
+                            />
+                          </div>
+                          {serviceOptions.length > 0 && (
+                            <div className="shrink-0">
+                              <ServiceMultiSelect
+                                options={serviceOptions}
+                                selected={entry.serviceIds}
+                                onChange={(ids) =>
+                                  setStaging((s) =>
+                                    s?.map((e, j) => (j === i ? { ...e, serviceIds: ids } : e)) ?? null
+                                  )
+                                }
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setStaging((s) => s?.filter((_, j) => j !== i) ?? null)}
+                        className="shrink-0 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                        title="Quitar de la lista"
+                        aria-label={`Quitar ${entry.file.name}`}
+                      >
+                        <IconX className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button variant="secondary" size="sm" onClick={() => setStaging(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={uploading}
+                  disabled={staging.length === 0}
+                  onClick={() => void doUpload(staging)}
+                >
+                  Subir {staging.length} archivo{staging.length !== 1 ? "s" : ""} →
+                </Button>
+              </div>
             </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {previewing && <PreviewModal clientId={clientId} doc={previewing} onClose={() => setPreviewing(null)} />}
 

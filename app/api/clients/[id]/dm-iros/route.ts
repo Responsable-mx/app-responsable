@@ -73,7 +73,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         const ext = await extractBatchResult(anthropic, latestBatch.batch_id, IroGenerationSchema, "dm-iros batch");
         const parsed = ext.parsed;
         const batchError = ext.error;
-        const { inputTokens, outputTokens } = ext;
+        const { inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens } = ext;
 
         if (parsed && !batchError) {
           // Limpiar IROs anteriores e insertar los nuevos
@@ -99,7 +99,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           void logAiCall({
             userEmail: latestBatch.created_by, role: "aurora", clientId: id,
             model: getModelConfig("aurora").model,
-            inputTokens, outputTokens, cacheCreationTokens: 0, cacheReadTokens: 0,
+            inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens,
             latencyMs: 0, error: null,
           });
           return NextResponse.json({

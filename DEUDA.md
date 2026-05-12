@@ -16,6 +16,28 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-165–D-168 — Hallazgos auditoría IA sesión 31 (2026-05-12)
+
+### ~~🟡 D-165 — `dm-iros/route.ts` logAiCall con cacheCreationTokens/cacheReadTokens hardcodeados a 0~~ ✅ RESUELTO (sesión 31)
+- `extractBatchResult` ya retornaba los valores reales pero la destructuring solo extraía `inputTokens, outputTokens`. `cacheCreationTokens: 0, cacheReadTokens: 0` hardcodeados en `logAiCall`. Dashboard de costos subrepresentaba ~15-20% de tokens de cache en flujo IROs.
+- Fix: destructuring ampliado `{ inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens } = ext`.
+
+### ~~🟢 D-166 — `dm-resumen/route.ts` usa `(response.usage as any)` para campos de cache~~ ✅ RESUELTO (sesión 31)
+- D-158 (sesión 28) actualizó SDK a 0.95 y eliminó 8 `as any` en otras routes, pero `dm-resumen` quedó sin actualizar. `cache_creation_input_tokens` + `cache_read_input_tokens` son tipos estables en SDK 0.95.
+- Fix: 2 comentarios eslint-disable + 2 casts `as any` eliminados. Acceso directo a `response.usage?.cache_creation_input_tokens`.
+
+### 🟡 D-167 — `dm-referentes/generate_topics` síncrono con timeout 150s en Vercel (maxDuration=180s)
+- 16K max_tokens + Sonnet síncrono deja solo 30s de margen ante Vercel cold start. En clientes con cuestionario completo (~80 campos) el payload es pesado y el riesgo de timeout es real.
+- **Recomendación**: migrar a Batch API (igual que dm-iros, dm-report, dm-benchmark). Esfuerzo medio (~4h).
+- **Workaround temporal**: maxDuration en route config subir a 180 + añadir AbortSignal de 170s.
+
+### 🟢 D-168 — `dm-referentes/generate_frameworks` y `dm-benchmark-empresas/generate` sin system block → 100% cache miss
+- Ambas actions mandan solo el `user` block sin `system`. Cache hit rate = 0%.
+- Savings estimados si se añade system block estático: ~$2-5/mes (volumen piloto bajo, prioridad baja).
+- **Acción**: separar instrucciones estáticas a `system` con `cache_control: { type: "ephemeral" }`.
+
+---
+
 ### Bloque D-158–D-162 — Hallazgos auditoría sesión 27 (2026-05-10)
 
 ### ~~🟡 D-158 — `@anthropic-ai/sdk` 16 minor versions atrás (0.79.0 → 0.95.1)~~ ✅ RESUELTO (sesión 28)

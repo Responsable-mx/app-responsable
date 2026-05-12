@@ -265,10 +265,8 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
 
     inputTokens = response.usage?.input_tokens ?? 0;
     outputTokens = response.usage?.output_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — cache_control + cache token fields no en stable usage type
-    cacheCreationTokens = (response.usage as any)?.cache_creation_input_tokens ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — cache_control + cache token fields no en stable usage type
-    cacheReadTokens = (response.usage as any)?.cache_read_input_tokens ?? 0;
+    cacheCreationTokens = response.usage?.cache_creation_input_tokens ?? 0;
+    cacheReadTokens = response.usage?.cache_read_input_tokens ?? 0;
 
     content = response.content
       .filter((b) => b.type === "text")

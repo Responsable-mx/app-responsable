@@ -192,7 +192,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         model,
         max_tokens: 2000,
         messages: [{ role: "user", content: prompt }],
-      }, { signal: AbortSignal.timeout(60_000) });
+      }, { signal: AbortSignal.timeout(120_000) });
 
       inputTokens         = msg.usage?.input_tokens ?? 0;
       outputTokens        = msg.usage?.output_tokens ?? 0;

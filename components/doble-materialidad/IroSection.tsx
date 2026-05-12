@@ -169,11 +169,10 @@ export function IroSection({
 
   const includedCount = iros.filter((i) => i.incluido).length;
 
-  // Umbral de materialidad (pattern mockup-v7) — filtra IROs visibles por
-  // consolidado = max(score_impacto, score_financiero). 0 = ver todo.
-  // Escala 1-3 ESRS: 0=todos, 1=todos los puntuados, 2=medio o más, 3=solo alto.
+  // Umbral de materialidad — filtra IROs visibles por consolidado = max(score_impacto, score_financiero).
+  // Escala 1-3 ESRS: 1=BAJO=todos, 2=MEDIO=medio o más, 3=ALTO=solo alto.
   // IROs `incluido=true` siempre permanecen visibles (no perderlos al subir slider).
-  const [threshold, setThreshold] = useState<number>(0);
+  const [threshold, setThreshold] = useState<number>(1);
 
   // Agrupar por tema_esg preservando orden de aparición + aplicar filtro umbral
   const groupsAll: Array<{ tema: string; items: IroInventoryItem[] }> = [];
@@ -182,7 +181,7 @@ export function IroSection({
     if (existing) existing.items.push(iro);
     else groupsAll.push({ tema: iro.tema_esg, items: [iro] });
   }
-  const groups = threshold === 0
+  const groups = threshold <= 1
     ? groupsAll
     : groupsAll
         .map((g) => ({
@@ -264,7 +263,7 @@ export function IroSection({
         </span>
         <input
           type="range"
-          min={0}
+          min={1}
           max={3}
           step={1}
           value={threshold}
@@ -278,7 +277,7 @@ export function IroSection({
         <span className="text-[10px] text-slate-400">/ 3</span>
         <span
           className={`text-[10px] font-semibold px-2 py-0.5 rounded-sm whitespace-nowrap ${
-            threshold === 0
+            threshold <= 1
               ? "bg-slate-100 text-slate-600"
               : "bg-brand-primary-light text-brand-primary-dark"
           }`}

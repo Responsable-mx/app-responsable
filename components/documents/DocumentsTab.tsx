@@ -27,6 +27,10 @@ const KIND_LABEL: Record<DocMeta["kind"], string> = {
   proposal: "Propuesta",
 };
 
+const KIND_OPTIONS = (Object.entries(KIND_LABEL) as [DocMeta["kind"], string][]).map(
+  ([value, label]) => ({ value, label })
+);
+
 const KIND_COLOR: Record<DocMeta["kind"], string> = {
   general: "bg-slate-100 text-slate-700",
   sustainability_report: "bg-emerald-100 text-emerald-800",
@@ -125,15 +129,9 @@ export function DocumentsTab({
   const [previewing, setPreviewing] = useState<DocMeta | null>(null);
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const [editingServices, setEditingServices] = useState<DocMeta | null>(null);
-  // Multi-select: IDs de servicios seleccionados para el próximo upload
-  const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Confirmación dedup al subir — almacena archivos pendientes + lista de duplicados detectados
-  const [dupConfirm, setDupConfirm] = useState<{
-    files: File[];
-    dupNames: string[];
-    newFiles: File[];
-  } | null>(null);
+  type StagingEntry = { file: File; kind: DocMeta["kind"]; serviceIds: string[] };
+  const [staging, setStaging] = useState<StagingEntry[] | null>(null);
   const toast = useToast();
 
   // ── Extracción hacia cuestionario ─────────────────────────────────────────
@@ -154,6 +152,8 @@ export function DocumentsTab({
   const bulkMenuRef = useRef<HTMLDivElement>(null);
   // Drag & drop upload
   const [isDragging, setIsDragging] = useState(false);
+  const [dupConfirm, setDupConfirm] = useState<{ dupNames: string[]; newFiles: File[]; files: File[] } | null>(null);
+  const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const dragDepth = useRef(0);
 
   async function fetchDocContent(docId: string): Promise<string | null> {
@@ -371,29 +371,9 @@ export function DocumentsTab({
   const withContent = docs.filter((d) => d.has_content).length;
   const failedCount = docs.filter((d) => d.parse_status === "failed").length;
 
-  // Detección dedup pre-upload — match por (nombre lowercase, size_bytes).
-  // Evita duplicados accidentales al re-subir un archivo ya cargado.
-  function detectDuplicates(files: File[]): { dupNames: string[]; newFiles: File[] } {
-    const existingKey = new Set(
-      docs.map((d) => `${d.file_name.toLowerCase()}|${d.size_bytes}`)
-    );
-    const dupNames: string[] = [];
-    const newFiles: File[] = [];
-    for (const f of files) {
-      if (existingKey.has(`${f.name.toLowerCase()}|${f.size}`)) dupNames.push(f.name);
-      else newFiles.push(f);
-    }
-    return { dupNames, newFiles };
-  }
-
-  async function handleUpload(files: FileList) {
+  function handleUpload(files: FileList) {
     const arr = Array.from(files);
-    const { dupNames, newFiles } = detectDuplicates(arr);
-    if (dupNames.length > 0) {
-      setDupConfirm({ files: arr, dupNames, newFiles });
-      return;
-    }
-    await doUpload(arr);
+    setStaging(arr.map((f) => ({ file: f, kind: "general", serviceIds: [] })));
   }
 
   const ZIP_EXT_TO_MIME: Record<string, string> = {
@@ -408,13 +388,16 @@ export function DocumentsTab({
     ".md": "text/markdown",
   };
 
-  // Vercel body limit ~4.5MB — archivos mayores van vía presigned URL de Supabase
-  const DIRECT_MAX = 4 * 1024 * 1024;
+  const DIRECT_MAX = 4 * 1024 * 1024; // Vercel body limit ~4.5MB
 
-  async function uploadSingleFile(file: File, failures: string[]): Promise<number> {
+  async function uploadSingleFile(
+    file: File,
+    kind: DocMeta["kind"],
+    serviceIds: string[],
+    failures: string[]
+  ): Promise<number> {
     try {
       if (file.size > DIRECT_MAX) {
-        // Paso 1: obtener URL firmada de Supabase
         const presignRes = await fetch(`/api/clients/${clientId}/documents/presign`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -430,8 +413,6 @@ export function DocumentsTab({
           failures.push(`${file.name}: respuesta de presign incompleta`);
           return 0;
         }
-
-        // Paso 2: subir directo a Supabase (sin pasar por Vercel)
         const uploadRes = await fetch(signedUrl, {
           method: "PUT",
           headers: { "Content-Type": file.type },
@@ -441,29 +422,20 @@ export function DocumentsTab({
           failures.push(`${file.name}: error subiendo a storage (HTTP ${uploadRes.status})`);
           return 0;
         }
-
-        // Paso 3: registrar en DB vía API
         const regRes = await fetch(`/api/clients/${clientId}/documents`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storagePath,
-            filename: file.name,
-            mimeType: file.type,
-            kind: "general",
-            serviceIds: uploadServiceIds,
-          }),
+          body: JSON.stringify({ storagePath, filename: file.name, mimeType: file.type, kind, serviceIds }),
         });
         const regJ = await regRes.json().catch(() => ({})) as { count?: number; error?: string };
         if (!regRes.ok) { failures.push(`${file.name}: ${regJ.error ?? "error"}`); return 0; }
         return regJ.count ?? 1;
       }
 
-      // Archivo pequeño: multipart directo
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("kind", "general");
-      if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
+      fd.append("kind", kind);
+      if (serviceIds.length > 0) fd.append("service_ids", serviceIds.join(","));
       const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
       const j = await res.json().catch(() => ({})) as { count?: number; error?: string };
       if (!res.ok) { failures.push(`${file.name}: ${j.error ?? "error"}`); return 0; }
@@ -511,7 +483,8 @@ export function DocumentsTab({
             const BATCH = 5;
             for (let i = 0; i < extracted.length; i += BATCH) {
               const batch = extracted.slice(i, i + BATCH);
-              const counts = await Promise.all(batch.map((f) => uploadSingleFile(f, failures)));
+              const uploadKind = filter !== "all" ? filter : "general";
+              const counts = await Promise.all(batch.map((f) => uploadSingleFile(f, uploadKind, uploadServiceIds, failures)));
               okCount += counts.reduce((a, b) => a + b, 0);
             }
           }
@@ -519,7 +492,7 @@ export function DocumentsTab({
           failures.push(`${file.name}: ${e instanceof Error ? e.message : "ZIP inválido o corrupto"}`);
         }
       } else {
-        okCount += await uploadSingleFile(file, failures);
+        okCount += await uploadSingleFile(file, filter !== "all" ? filter : "general", uploadServiceIds, failures);
       }
     }
 

@@ -406,7 +406,7 @@ Toda etapa DM-IA que devuelva URLs en su respuesta JSON debe aplicar este patró
 
 ### ⚠️ NO usar validateUrl() para URLs de IA
 
-`validateUrl()` (HEAD/GET con user-agent de bot) es bloqueado por los CDNs corporativos de empresas grandes (BP, Iberdrola, Pemex, SASB, GRI, etc.) aunque la URL sea correcta. Caso confirmado may-2026: las 3 empresas más grandes del benchmark tenían URL correcta pero `validateUrl` las descartaba.
+`validateUrl()` (HEAD/GET con user-agent de bot) es bloqueado por los CDNs corporativos de empresas grandes (BP, Iberdrola, Pemex, SASB, GRI, etc.) aunque la URL sea correcta. Caso confirmado may-2026: las 3 empresas más grandes del benchmark tenían URL correcta pero `validateUrl` las descartaba. **`validateUrl` eliminada de ambos routes.**
 
 **Regla:** para URLs aportadas por la IA (JSON de generate, web_search, o conocimiento de entrenamiento) → solo aplicar `isPublicHttpUrl()` (SSRF guard). No hacer fetch de validación.
 
@@ -430,6 +430,21 @@ const items = rawItems.map((item) => {
 
 Solo para URLs ingresadas por el usuario (no generadas por IA) donde se sospecha typo o URL incorrecta, y el dominio objetivo es probablemente un sitio pequeño sin CDN corporativo. Ejemplo: `ingest-report` donde el consultor pega una URL de informe.
 
+### dm-referentes: URLs canónicas hardcoded (may-2026)
+
+Para frameworks ESG conocidos, `search_urls` usa un mapa hardcoded antes de llamar a la IA.
+Razón: LLMs memorizan URLs desactualizadas (caso confirmado: IPIECA URL incorrecta). Hardcoded = siempre correcto.
+
+Frameworks en el mapa (actualizar si cambian sus URLs):
+`GRI · SASB · ESRS · TCFD · CDP · IPIECA · PRI · GRESB · GCCA · ISO26000 · GHG · SBTI · CSRD · TNFD · SDG`
+
+Para frameworks fuera del mapa → Aurora + `web_search_20250305` (fallback, mismo patrón que dm-benchmark-empresas).
+
+### dm-benchmark-empresas: forzar web_search (may-2026)
+
+El prompt de `search_urls` incluye "MANDATORY: call web_search before submit_url" para evitar `usedWebSearch=false`.
+Síntoma sin este fix: modelo responde con URL de conocimiento de entrenamiento sin buscar → URL puede ser desactualizada.
+
 ### Client-side: indicar ausencia de URL
 
 Cuando `url === null`, mostrar nudge "Sin URL verificada" en lugar de silencio:
@@ -449,8 +464,8 @@ Cuando `url === null`, mostrar nudge "Sin URL verificada" en lugar de silencio:
 )}
 ```
 
-- Si el consultor puede corregir la URL manualmente (ej. company cards): hacer el nudge clickeable → abre editor inline
-- Si es solo referencia (ej. framework cards): span no-interactivo es suficiente
+- Company cards: nudge clickeable → editor inline URL (implementado en `ReferentesSection.tsx`)
+- Framework cards: span no-interactivo es suficiente (la mayoría ya tienen URL del mapa hardcoded)
 
 ## Deploy — app-responsable (may-2026)
 

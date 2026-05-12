@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
 import type { AutoUpdateConfigRow } from "@/app/api/auto-update-config/route";
 
 export function AutoUpdateConfigTable({ initial }: { initial: AutoUpdateConfigRow[] }) {
   const [rows, setRows] = useState<AutoUpdateConfigRow[]>(initial);
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const now = useMemo(() => Date.now(), []);
   const toast = useToast();
 
   async function patch(resourceKey: string, updates: Partial<Pick<AutoUpdateConfigRow, "enabled" | "frequency_days">>) {
@@ -44,7 +45,7 @@ export function AutoUpdateConfigTable({ initial }: { initial: AutoUpdateConfigRo
     if (!row.last_run_at) return "Esta noche (00:45 CDMX)";
     const next = new Date(row.last_run_at);
     next.setDate(next.getDate() + row.frequency_days);
-    if (next.getTime() < Date.now()) return "Pendiente (próxima noche)";
+    if (next.getTime() < now) return "Pendiente (próxima noche)";
     return next.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
   }
 

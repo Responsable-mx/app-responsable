@@ -446,7 +446,7 @@ export function ClientForm(props: Props) {
 
           <div className="space-y-2">
             {engagements.filter((r) => !r._deleted).length === 0 && (
-              <p className="text-xs text-slate-400 py-2">Sin servicios. Usa "Agregar" para añadir uno.</p>
+              <p className="text-xs text-slate-400 py-2">Sin servicios. Usa &ldquo;Agregar&rdquo; para añadir uno.</p>
             )}
             {engagements.filter((r) => !r._deleted).map((row) => (
               <div key={row._key} className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded">

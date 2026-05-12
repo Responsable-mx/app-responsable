@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import type {
@@ -74,11 +74,41 @@ function FrameworkCard({
   framework,
   enabled,
   onToggle,
+  onUrlSave,
 }: {
   framework: ReferenteFramework;
   enabled: boolean;
   onToggle: () => void;
+  onUrlSave: (id: string, url: string | null) => Promise<void>;
 }) {
+  const [editingUrl, setEditingUrl]   = useState(false);
+  const [urlDraft, setUrlDraft]       = useState(framework.url ?? "");
+  const [savingUrl, setSavingUrl]     = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const openEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUrlDraft(framework.url ?? "");
+    setEditingUrl(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleSaveUrl = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSavingUrl(true);
+    try {
+      await onUrlSave(framework.id, urlDraft.trim() || null);
+      setEditingUrl(false);
+    } finally {
+      setSavingUrl(false);
+    }
+  };
+
+  const cancelEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingUrl(false);
+  };
+
   return (
     <div
       className={`
@@ -116,26 +146,76 @@ function FrameworkCard({
             )}
           </div>
         </div>
-        {framework.url ? (
-          <a
-            href={framework.url}
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* URL area — view or edit */}
+        {editingUrl ? (
+          <div
+            className="flex items-center gap-1 shrink-0"
             onClick={(e) => e.stopPropagation()}
-            className="text-[10px] text-brand-primary underline shrink-0 hover:text-brand-primary-dark"
           >
-            Ver →
-          </a>
+            <input
+              ref={inputRef}
+              type="url"
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleSaveUrl(e as unknown as React.MouseEvent);
+                if (e.key === "Escape") setEditingUrl(false);
+              }}
+              placeholder="https://..."
+              className="font-sans text-[10px] border border-slate-300 rounded px-2 py-1 w-48 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+            />
+            <button
+              type="button"
+              onClick={(e) => void handleSaveUrl(e)}
+              disabled={savingUrl}
+              className="text-[10px] font-semibold text-brand-primary hover:text-brand-primary-dark disabled:opacity-50 px-1"
+            >
+              {savingUrl ? "…" : "OK"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="text-[10px] text-slate-400 hover:text-slate-600 px-1"
+            >
+              ✕
+            </button>
+          </div>
         ) : (
-          <span
-            title="La IA no pudo verificar la URL oficial de este referente."
-            className="inline-flex items-center gap-1 text-[10px] text-slate-400 italic shrink-0"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-            Sin URL verificada
-          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            {framework.url ? (
+              <a
+                href={framework.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[10px] text-brand-primary underline hover:text-brand-primary-dark"
+              >
+                Ver →
+              </a>
+            ) : (
+              <span
+                title="La IA no pudo verificar la URL oficial de este referente."
+                className="inline-flex items-center gap-1 text-[10px] text-slate-400 italic"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                Sin URL
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={openEdit}
+              title="Editar URL"
+              className="p-0.5 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
+              aria-label="Editar URL del referente"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
       <p className="text-xs text-slate-600 mt-2 leading-snug">{framework.description}</p>
@@ -318,9 +398,10 @@ export function ReferentesSection({
   const rec = resp?.data;
   const { push } = useToast();
 
-  const [subStep, setSubStep]         = useState<SubStep>(1);
-  const [loadingFW, setLoadingFW]     = useState(false);
+  const [subStep, setSubStep]             = useState<SubStep>(1);
+  const [loadingFW, setLoadingFW]         = useState(false);
   const [loadingTopics, setLoadingTopics] = useState(false);
+  const [loadingSearchUrls, setLoadingSearchUrls] = useState(false);
   // Local toggle state — sincroniza con DB en blur/confirm
   const [localEnabled, setLocalEnabled] = useState<string[] | null>(null);
 
@@ -371,6 +452,48 @@ export function ReferentesSection({
     }
   }, [key, mutate, onDataMutate, push]);
 
+  const handleSearchUrls = useCallback(async () => {
+    setLoadingSearchUrls(true);
+    try {
+      const r = await fetch(key, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "search_urls" }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: "Error desconocido" }));
+        throw new Error((err as { error?: string }).error ?? "Error al buscar URLs");
+      }
+      const result = await r.json() as { data: { updated: number; total: number } };
+      await mutate();
+      onDataMutate?.();
+      const { updated, total } = result.data;
+      if (updated === 0) {
+        push("info", `Búsqueda completada — no se encontraron URLs verificables para los ${total} referentes.`);
+      } else {
+        push("success", `${updated} de ${total} URL${updated !== 1 ? "s" : ""} encontrada${updated !== 1 ? "s" : ""} y verificada${updated !== 1 ? "s" : ""}.`);
+      }
+    } catch (e) {
+      push("error", e instanceof Error ? e.message : "Error al buscar URLs.");
+    } finally {
+      setLoadingSearchUrls(false);
+    }
+  }, [key, mutate, onDataMutate, push]);
+
+  const handleUrlSave = useCallback(async (frameworkId: string, url: string | null) => {
+    const res = await fetch(key, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update_framework", id: frameworkId, url }),
+    });
+    if (!res.ok) {
+      push("error", "Error al actualizar la URL");
+      return;
+    }
+    await mutate();
+    onDataMutate?.();
+  }, [key, mutate, onDataMutate, push]);
+
   const handleGenerateTopics = useCallback(async () => {
     if (localEnabled) await handleSaveEnabled();
     setLoadingTopics(true);
@@ -393,9 +516,13 @@ export function ReferentesSection({
     }
   }, [handleSaveEnabled, localEnabled, key, mutate, onDataMutate, push]);
 
-  const proposed = rec?.proposed_frameworks ?? [];
+  const proposed    = rec?.proposed_frameworks ?? [];
+  const noUrlCount  = proposed.filter((fw) => !fw.url).length;
   const hasTopics   = (rec?.topics_raw ?? []).length > 0;
   const hasGrouped  = (rec?.topics_grouped ?? []).length > 0;
+
+  const selectAll = () => setLocalEnabled(proposed.map((fw) => fw.id));
+  const clearAll  = () => setLocalEnabled([]);
 
   return (
     <div>
@@ -452,6 +579,43 @@ export function ReferentesSection({
           {/* Lista de frameworks propuestos */}
           {proposed.length > 0 && (
             <>
+              {/* Controls bar */}
+              <div className="flex items-center gap-3 mb-3 flex-wrap">
+                {noUrlCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSearchUrls()}
+                    disabled={loadingSearchUrls}
+                    title={`${noUrlCount} referente${noUrlCount !== 1 ? "s" : ""} sin URL — buscar con IA`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loadingSearchUrls ? (
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    )}
+                    {loadingSearchUrls ? "Buscando URLs…" : `Buscar URLs (${noUrlCount})`}
+                  </button>
+                )}
+                <div className="ml-auto flex items-center gap-2">
+                  <button type="button" onClick={selectAll} className="text-xs text-teal-600 hover:text-teal-800 font-medium">
+                    Seleccionar todas
+                  </button>
+                  <span className="text-slate-300 text-xs">/</span>
+                  <button type="button" onClick={clearAll} className="text-xs text-slate-400 hover:text-slate-600">
+                    Limpiar
+                  </button>
+                  <span className="text-xs text-slate-600 font-semibold tabular-nums">
+                    {enabledFW.length} seleccionado{enabledFW.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
                 {proposed.map((fw) => (
                   <FrameworkCard
@@ -459,6 +623,7 @@ export function ReferentesSection({
                     framework={fw}
                     enabled={enabledFW.includes(fw.id)}
                     onToggle={() => handleToggle(fw.id)}
+                    onUrlSave={handleUrlSave}
                   />
                 ))}
               </div>
@@ -474,7 +639,7 @@ export function ReferentesSection({
                   >
                     {loadingFW ? "Regenerando..." : "Regenerar propuesta IA"}
                   </button>
-                  {localEnabled && (
+                  {localEnabled && localEnabled.length > 0 && (
                     <button
                       type="button"
                       onClick={handleSaveEnabled}

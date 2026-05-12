@@ -21,6 +21,12 @@ const PatchBody = z.object({
   enabled_frameworks: z.array(z.string()).min(1).max(20),
 });
 
+const UpdateFrameworkBody = z.object({
+  action: z.literal("update_framework"),
+  id:     z.string().min(1).max(50),
+  url:    z.union([z.string().url(), z.literal(""), z.null()]).optional(),
+});
+
 const FrameworkSchema = z.object({
   id:          z.string().min(1).max(50),
   name:        z.string().min(1).max(100),
@@ -177,10 +183,45 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const body = await req.json().catch(() => null) as { action?: string } | null;
   if (!body?.action) return NextResponse.json({ error: "action requerido" }, { status: 400 });
 
+  const admin  = createAdminClient();
+
+  // ── Action: update_framework (editar URL manualmente) ──────────────────────
+  if (body.action === "update_framework") {
+    const parsed = UpdateFrameworkBody.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    const { id: frameworkId, url } = parsed.data;
+
+    const { data: rec } = await admin
+      .from("dm_referentes")
+      .select("proposed_frameworks")
+      .eq("client_id", id)
+      .maybeSingle();
+
+    const proposed = (rec?.proposed_frameworks ?? []) as ReferenteFramework[];
+    const updated  = proposed.map((f) =>
+      f.id === frameworkId
+        ? { ...f, url: (url === "" || url === null) ? null : url }
+        : f
+    );
+
+    const { error } = await admin.from("dm_referentes").upsert({
+      client_id: id,
+      proposed_frameworks: updated,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "client_id" });
+
+    if (error) {
+      console.error("[dm-referentes update_framework]", error);
+      return NextResponse.json({ error: "Error de base de datos" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
-  const admin  = createAdminClient();
   const { model } = getModelConfig("aurora");
 
   // ── Action: generate_frameworks ─────────────────────────────────────────────

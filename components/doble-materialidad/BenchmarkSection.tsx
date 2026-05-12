@@ -334,61 +334,45 @@ export function BenchmarkSection({
       ) : (
         // Configuración expandida
         <div className="space-y-4">
-          {/* Campos del benchmark — colapsable */}
-          <div className="bg-slate-50 rounded p-3">
-            <button
-              type="button"
-              onClick={() => setFieldsExpanded((v) => !v)}
-              aria-expanded={fieldsExpanded}
-              aria-controls="esrs-fields-panel"
-              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 w-full text-left"
-            >
-              Estándares ESRS ({iros.length > 0 ? iros.length : 10} · 2 dimensiones c/u)
-              <svg
-                className={`w-3 h-3 transition-transform ${fieldsExpanded ? "rotate-180" : ""}`}
-                viewBox="0 0 12 12"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path strokeLinecap="round" d="M3 4.5l3 3 3-3" />
-              </svg>
-            </button>
-            {fieldsExpanded && (
-              <div id="esrs-fields-panel" className="flex flex-wrap gap-1.5 mt-2">
-                {(iros.length > 0 ? iros : []).map((iro) => (
-                  <span
-                    key={iro.id}
-                    className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-sm"
-                    title={`Impacto: ${iro.impact_desc}\nRiesgo: ${iro.risk_desc}`}
-                  >
-                    {iro.esrs_standard} · {iro.label}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Fuente de empresas */}
-          {hasReferentes ? (
-            /* Modo Etapa 3: empresas auto-importadas al montar — solo agregar extras */
-            <div className="flex items-center gap-3 flex-wrap">
+          {/* Campos del benchmark — oculto en modo Etapa 3 */}
+          {!hasReferentes && (
+            <div className="bg-slate-50 rounded p-3">
               <button
                 type="button"
-                onClick={() => setShowAddForm((v) => !v)}
-                className="text-xs text-brand-primary hover:underline flex items-center gap-1"
+                onClick={() => setFieldsExpanded((v) => !v)}
+                aria-expanded={fieldsExpanded}
+                aria-controls="esrs-fields-panel"
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 w-full text-left"
               >
-                <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M6 2v8M2 6h8" />
+                Estándares ESRS ({iros.length > 0 ? iros.length : 10} · 2 dimensiones c/u)
+                <svg
+                  className={`w-3 h-3 transition-transform ${fieldsExpanded ? "rotate-180" : ""}`}
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path strokeLinecap="round" d="M3 4.5l3 3 3-3" />
                 </svg>
-                Agregar empresa adicional
               </button>
-              {companies.length > 0 && (
-                <span className="text-xs text-slate-400">{companies.length} empresa{companies.length !== 1 ? "s" : ""} en benchmark</span>
+              {fieldsExpanded && (
+                <div id="esrs-fields-panel" className="flex flex-wrap gap-1.5 mt-2">
+                  {(iros.length > 0 ? iros : []).map((iro) => (
+                    <span
+                      key={iro.id}
+                      className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-sm"
+                      title={`Impacto: ${iro.impact_desc}\nRiesgo: ${iro.risk_desc}`}
+                    >
+                      {iro.esrs_standard} · {iro.label}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
-          ) : (
-            /* Modo clásico: proponer con IA */
+          )}
+
+          {/* Fuente de empresas — solo en modo clásico (sin Etapa 3) */}
+          {!hasReferentes && (
             <div className="flex items-center gap-3 flex-wrap">
               <Button
                 size="sm"

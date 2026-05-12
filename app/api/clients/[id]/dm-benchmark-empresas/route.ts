@@ -412,8 +412,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               { signal: AbortSignal.timeout(28_000) }
             );
 
-            // Extract URL from citations (trusted — Anthropic already fetched the page)
-            // or from text (needs HTTP validation — could be hallucinated).
+            // Detect if web_search was actually used (tool_use block in response)
+            const usedWebSearch = (msg.content ?? []).some(
+              (b: { type: string; name?: string }) => b.type === "tool_use" && b.name === "web_search"
+            );
+
+            // Extract URL: citations preferred, fallback to text
             let foundUrl: string | null = null;
             let fromCitation = false;
             for (const block of msg.content ?? []) {
@@ -427,18 +431,21 @@ export async function POST(req: NextRequest, { params }: Ctx) {
                   if (picked) { foundUrl = picked; fromCitation = true; }
                 }
                 if (!foundUrl) {
-                  const match = block.text.match(/https?:\/\/[^\s"'<>\n]+/);
-                  if (match && !/null/i.test(match[0])) foundUrl = match[0];
+                  const match = block.text.match(/https?:\/\/[^\s"'<>\n.,)]+/);
+                  if (match && !/^null$/i.test(match[0])) foundUrl = match[0];
                 }
               }
             }
 
+            console.log(`[search_urls] ${empresa.nombre}: usedWebSearch=${usedWebSearch} fromCitation=${fromCitation} url=${foundUrl}`);
+
             if (!foundUrl) return { id: empresa.id, url: null };
-            // Citation URLs are verified by Anthropic's search — only check SSRF guard.
-            // Text-extracted URLs may be hallucinated — run full HTTP validation.
-            if (fromCitation) {
+            // If web_search was used OR URL came from citation → URL is from real search results,
+            // only SSRF guard needed. Corporate CDNs (Pemex/BP/Iberdrola) block bot validators.
+            if (usedWebSearch || fromCitation) {
               return { id: empresa.id, url: isPublicHttpUrl(foundUrl).ok ? foundUrl : null };
             }
+            // Model used training data (no web_search) → validate to avoid hallucinations
             const valid = await validateUrl(foundUrl);
             return { id: empresa.id, url: valid ? foundUrl : null };
           } catch {

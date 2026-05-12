@@ -408,16 +408,66 @@ export function DocumentsTab({
     ".md": "text/markdown",
   };
 
+  // Vercel body limit ~4.5MB — archivos mayores van vía presigned URL de Supabase
+  const DIRECT_MAX = 4 * 1024 * 1024;
+
   async function uploadSingleFile(file: File, failures: string[]): Promise<number> {
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("kind", "general");
-    if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
     try {
+      if (file.size > DIRECT_MAX) {
+        // Paso 1: obtener URL firmada de Supabase
+        const presignRes = await fetch(`/api/clients/${clientId}/documents/presign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, mimeType: file.type, size: file.size }),
+        });
+        const presignData = await presignRes.json().catch(() => ({})) as { signedUrl?: string; storagePath?: string; error?: string };
+        if (!presignRes.ok) {
+          failures.push(`${file.name}: ${presignData.error ?? "error obteniendo URL"}`);
+          return 0;
+        }
+        const { signedUrl, storagePath } = presignData;
+        if (!signedUrl || !storagePath) {
+          failures.push(`${file.name}: respuesta de presign incompleta`);
+          return 0;
+        }
+
+        // Paso 2: subir directo a Supabase (sin pasar por Vercel)
+        const uploadRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!uploadRes.ok) {
+          failures.push(`${file.name}: error subiendo a storage (HTTP ${uploadRes.status})`);
+          return 0;
+        }
+
+        // Paso 3: registrar en DB vía API
+        const regRes = await fetch(`/api/clients/${clientId}/documents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storagePath,
+            filename: file.name,
+            mimeType: file.type,
+            kind: "general",
+            serviceIds: uploadServiceIds,
+          }),
+        });
+        const regJ = await regRes.json().catch(() => ({})) as { count?: number; error?: string };
+        if (!regRes.ok) { failures.push(`${file.name}: ${regJ.error ?? "error"}`); return 0; }
+        return regJ.count ?? 1;
+      }
+
+      // Archivo pequeño: multipart directo
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "general");
+      if (uploadServiceIds.length > 0) fd.append("service_ids", uploadServiceIds.join(","));
       const res = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: fd });
-      const j = await res.json().catch(() => ({}));
+      const j = await res.json().catch(() => ({})) as { count?: number; error?: string };
       if (!res.ok) { failures.push(`${file.name}: ${j.error ?? "error"}`); return 0; }
-      return (j.count as number) ?? 1;
+      return j.count ?? 1;
     } catch (e) {
       failures.push(`${file.name}: ${e instanceof Error ? e.message : "error"}`);
       return 0;

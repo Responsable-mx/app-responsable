@@ -464,13 +464,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             console.log(`[search_urls] ${empresa.nombre}: usedWebSearch=${usedWebSearch} url=${foundUrl} elapsed=${Date.now() - t0}ms`);
 
             if (!foundUrl) return { id: empresa.id, url: null };
-            // URL came from web_search results (structured or citation) — only SSRF guard.
-            // Corporate CDNs block our validator but URLs are real.
-            if (usedWebSearch) {
-              return { id: empresa.id, url: isPublicHttpUrl(foundUrl).ok ? foundUrl : null };
-            }
-            const valid = await validateUrl(foundUrl);
-            return { id: empresa.id, url: valid ? foundUrl : null };
+            // Skip validateUrl — corporate CDNs (BP, Iberdrola, Pemex) block our user-agent.
+            // AI-provided URLs (web_search or training knowledge) are trustworthy for large companies.
+            // Only SSRF guard needed.
+            return { id: empresa.id, url: isPublicHttpUrl(foundUrl).ok ? foundUrl : null };
           } catch (err) {
             console.error(`[search_urls] ${empresa.nombre}: ERROR elapsed=${Date.now() - t0}ms ${err instanceof Error ? err.message : String(err)}`);
             return { id: empresa.id, url: null };

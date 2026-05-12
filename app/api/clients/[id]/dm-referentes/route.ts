@@ -190,7 +190,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     try {
       const msg = await anthropic.messages.create({
         model,
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{ role: "user", content: prompt }],
       }, { signal: AbortSignal.timeout(120_000) });
 
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (!jsonText) {
       console.error("[dm-referentes generate_frameworks] textOut sin JSON:", JSON.stringify(textOut.slice(0, 800)));
       await admin.from("dm_referentes").upsert({ client_id: id, frameworks_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
-      return NextResponse.json({ error: "Respuesta IA sin JSON", _debug: textOut.slice(0, 600) }, { status: 502 });
+      return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });
     }
     const validated = FrameworksResponseSchema.safeParse(JSON.parse(jsonText));
     if (!validated.success) {

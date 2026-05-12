@@ -78,6 +78,12 @@ export function BenchmarkSection({
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(companies.filter((c) => c.validated).map((c) => c.id))
   );
+  // En modo Etapa 3: auto-seleccionar todas cuando el SWR refetch trae las companies importadas
+  useEffect(() => {
+    if (hasReferentes && companies.length > 0) {
+      setSelected(new Set(companies.map((c) => c.id)));
+    }
+  }, [hasReferentes, companies]);
   const [tableFilter, setTableFilter] = useState<"all" | "E" | "S" | "G">("all");
   const [onlyBrechas, setOnlyBrechas] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -540,8 +546,8 @@ export function BenchmarkSection({
             </div>
           )}
 
-          {/* Selección masiva — links inline, no botones */}
-          {companies.length > 0 && (
+          {/* Selección masiva — oculta en modo Etapa 3 (empresas vienen de Referentes) */}
+          {!hasReferentes && companies.length > 0 && (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -562,8 +568,8 @@ export function BenchmarkSection({
             </div>
           )}
 
-          {/* Lista de empresas por categoría — orden canónico fijo */}
-          {RELATION_ORDER.filter((r) => groupedByRelation[r]?.length).map((relation) => {
+          {/* Lista de empresas — oculta en modo Etapa 3 (gestionado en etapa anterior) */}
+          {!hasReferentes && RELATION_ORDER.filter((r) => groupedByRelation[r]?.length).map((relation) => {
             const group = groupedByRelation[relation]!;
             return (
             <div key={relation}>

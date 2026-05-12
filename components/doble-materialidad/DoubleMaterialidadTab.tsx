@@ -405,10 +405,10 @@ export function DoubleMaterialidadTab({
   const hasNis       = nisRows.length > 0;
   const hasReport    = latestReport?.parse_status === "ok";
 
-  // stage4 = Benchmark — activo cuando Contexto done (no bloquear en Referentes)
+  // stage4 = Benchmark — activo cuando Empresas de referencia done
   const stage4Status: StageStatus = hasBenchmark
     ? "done"
-    : stage1Status === "done"
+    : stage3Status === "done"
     ? "active"
     : "pending";
 
@@ -755,7 +755,7 @@ export function DoubleMaterialidadTab({
         status={stage4Status}
         accent="border-l-blue-600"
         isActive={activeStageId === "dm-sec-benchmark"}
-        subtitle="Selecciona empresas comparables y ejecuta el análisis sectorial"
+        subtitle="Compara el desempeño ESG contra las empresas de referencia seleccionadas en Etapa 3"
         headerRight={
           companies.length > 0 ? (
             <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
@@ -780,6 +780,9 @@ export function DoubleMaterialidadTab({
             setIsPolling(true);
             void mutateBenchmark();
           }}
+          referentCompanies={(benchmarkEmpresasRec?.proposed_companies ?? []).filter(
+            (c) => (benchmarkEmpresasRec?.enabled_companies ?? []).includes(c.id)
+          )}
         />
       </CollapsibleStageSection>
 

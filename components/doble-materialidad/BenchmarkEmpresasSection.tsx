@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import type {
@@ -62,9 +62,16 @@ function EmpresaCard({
   const [editingUrl, setEditingUrl] = useState(false);
   const [urlDraft, setUrlDraft]     = useState(empresa.reporte_url ?? "");
   const [saving, setSaving]         = useState(false);
+  const [isClamped, setIsClamped]   = useState(false);
+  const justRef = useRef<HTMLParagraphElement>(null);
 
   const hasJustification = !!empresa.justificacion;
-  const longJust = hasJustification && empresa.justificacion!.length > 180;
+
+  useLayoutEffect(() => {
+    if (!expanded && justRef.current) {
+      setIsClamped(justRef.current.scrollHeight > justRef.current.clientHeight);
+    }
+  }, [empresa.justificacion, expanded]);
 
   const handleSaveUrl = async () => {
     setSaving(true);
@@ -195,10 +202,13 @@ function EmpresaCard({
           {/* Row 3: justificación */}
           {hasJustification && (
             <div className="mt-2">
-              <p className={`text-xs text-slate-500 leading-relaxed ${longJust && !expanded ? "line-clamp-2" : ""}`}>
+              <p
+                ref={justRef}
+                className={`text-xs text-slate-500 leading-relaxed ${!expanded ? "line-clamp-2" : ""}`}
+              >
                 {empresa.justificacion}
               </p>
-              {longJust && (
+              {(isClamped || expanded) && (
                 <button
                   type="button"
                   onClick={() => setExpanded((x) => !x)}

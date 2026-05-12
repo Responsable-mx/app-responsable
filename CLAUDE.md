@@ -332,7 +332,7 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 
 ## Retrieval semántico de documentos (Wave 5c → 7)
 
-Pipeline en 2 niveles, swap transparente cuando llegue Voyage API key.
+Pipeline en 2 niveles, swap transparente. BM25 activo en prod; Voyage configurado localmente, pendiente activación prod.
 
 ### Hoy — BM25 sobre markdown_content (activo en prod via DOC_RELEVANCE_ENABLED=true)
 
@@ -341,23 +341,31 @@ Pipeline en 2 niveles, swap transparente cuando llegue Voyage API key.
 - Beneficio: ~70% menos input tokens en docs >30K chars
 - Limitación: no entiende sinónimos ("emisiones" ≠ "huella climática")
 
-### Mañana — Embeddings vectoriales con Voyage AI (Wave 7 infra lista)
+### Voyage AI — Embeddings vectoriales (Wave 7)
 
-- **Migración 0076** (pendiente OK textual del usuario para `--confirm-destructive`):
-  - `CREATE EXTENSION vector`
-  - `document_chunks` tabla con `embedding vector(1024)` (Voyage voyage-2 dims)
-  - Índice IVFFlat cosine + índices por document_id, client_id
-  - RLS: SELECT authenticated, INSERT/UPDATE solo service_role
-- **`lib/documents/embeddings.ts`** ya en repo:
-  - `generateEmbedding(text)` y `generateQueryEmbedding(query)` (input_type "document" vs "query")
-  - `persistDocumentChunks({documentId, clientId, markdownContent})` upsert idempotente con content_hash dedupe
-  - `searchSimilarChunks({query, clientId, limit})` cosine similarity en JS (suficiente <500 chunks/cliente); retorna null si VOYAGE_API_KEY falta → caller usa BM25
-- **Activación cuando llegue API key:**
-  1. Vercel env: `VOYAGE_API_KEY=<key>` + opcional `VOYAGE_MODEL=voyage-2`
-  2. Aplicar migración 0076 (`--confirm-destructive`)
-  3. Crear cron `/api/cron/embed-chunks` (6h) que itere documents sin embeddings
-  4. Modificar `ai-fill/route.ts` para llamar `searchSimilarChunks` antes que BM25
-- **Beneficio esperado**: +25% precisión retrieval en queries con sinónimos / idiomas distintos / paráfrasis
+**Estado activación (may-2026):**
+- [x] `VOYAGE_API_KEY` + `VOYAGE_MODEL=voyage-2` → en `.env.local` (local listo)
+- [x] `lib/documents/embeddings.ts` + `app/api/cron/embed-chunks/route.ts` → en repo
+- [x] `supabase/migrations/0076_document_chunks_embeddings.sql` → en repo (no aplicada aún)
+- [ ] Agregar `VOYAGE_API_KEY` + `VOYAGE_MODEL` en Vercel env vars (prod)
+- [ ] Aplicar migración 0076 a Supabase (`--confirm-destructive`)
+- [ ] `ai-fill/route.ts`: llamar `searchSimilarChunks` antes que BM25
+
+**`lib/documents/embeddings.ts`:**
+- `generateEmbedding(text)` y `generateQueryEmbedding(query)` (input_type "document" vs "query")
+- `persistDocumentChunks({documentId, clientId, markdownContent})` upsert idempotente con content_hash dedupe
+- `searchSimilarChunks({query, clientId, limit})` cosine similarity en JS (suficiente <500 chunks/cliente); retorna null si VOYAGE_API_KEY falta → caller usa BM25
+
+**Migración 0076:**
+- `CREATE EXTENSION vector`
+- tabla `document_chunks` con `embedding vector(1024)` (voyage-2 dims)
+- Índice IVFFlat cosine + índices por document_id, client_id
+- RLS: SELECT authenticated, INSERT/UPDATE solo service_role
+- Aplicar con: `node ~/.claude/scripts/apply-sql.mjs supabase/migrations/0076_document_chunks_embeddings.sql --project=lyideepglavkmuuujoqz --confirm-destructive`
+
+**Beneficio esperado:** +25% precisión retrieval vs BM25 en queries con sinónimos / idiomas distintos / paráfrasis.
+
+**Buena práctica — key en sesión de chat:** Si el usuario pega una API key en el chat de Claude Code, guardar inmediatamente en `.env.local` (o `.env.global`). Las keys en historial JSONL de sesiones quedan expuestas en texto claro en `~/.claude/projects/*/**.jsonl`.
 
 ## Deploy — app-responsable (may-2026)
 

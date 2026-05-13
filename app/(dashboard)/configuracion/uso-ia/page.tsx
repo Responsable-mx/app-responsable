@@ -662,54 +662,6 @@ export default async function UsoIaPage() {
           </>
         )}
 
-        {/* Modos de importación */}
-        <div className="mb-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-            Cómo importar documentos
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {[
-              {
-                modo: "Subir archivo",
-                desc: "PDF, Word, Excel, PowerPoint, TXT desde el tab Documentos del cliente. Preserva tablas GRI/ESRS.",
-                costo: "LlamaParse: gratis hasta 10,000 págs/mes",
-                tip: "Preferir PDF nativo (no escaneado). Evitar documentos con contraseña.",
-              },
-              {
-                modo: "Pegar texto",
-                desc: "Copia el contenido del informe y pégalo directamente en el modal de importación del cuestionario.",
-                costo: "Sin costo de parseo",
-                tip: "Ideal para secciones específicas. La IA lo procesa igual que un archivo.",
-              },
-              {
-                modo: "URL del informe",
-                desc: "La IA descarga y parsea el PDF desde la URL pública del informe GRI/ESG del cliente.",
-                costo: "LlamaParse: gratis hasta 10,000 págs/mes",
-                tip: "Usar el botón 'Buscar informe' del perfil del cliente — la IA localiza y sube el informe oficial.",
-              },
-            ].map((m) => (
-              <div key={m.modo} className="bg-white border border-slate-200 rounded p-3 shadow-sm">
-                <p className="text-xs font-bold text-slate-900 mb-1">{m.modo}</p>
-                <p className="text-[11px] text-slate-600 leading-relaxed mb-2">{m.desc}</p>
-                <p className="text-[10px] text-emerald-700 font-medium mb-1">{m.costo}</p>
-                <p className="text-[10px] text-slate-500 leading-relaxed">{m.tip}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Buenas prácticas de documentos */}
-        <div className="bg-slate-50 border border-slate-200 rounded px-4 py-3 text-[11px] text-slate-600 leading-relaxed">
-          <p className="font-semibold text-slate-700 mb-1">Para obtener el mejor resultado de la IA:</p>
-          <ul className="space-y-1 list-none">
-            <li>— Subir el <span className="font-medium">informe de sustentabilidad más reciente</span> del cliente antes de iniciar el cuestionario.</li>
-            <li>— Si el cliente tiene informe financiero, subirlo también — Aurora puede cruzar datos de ambos.</li>
-            <li>— Los informes de <span className="font-medium">empresas comparadoras</span> se suben también como documentos del cliente (tipo "General").</li>
-            <li>— Costo total estimado para el piloto (10 clientes, ~100 págs c/u):{" "}
-              <span className="font-semibold text-slate-800">$0 — todo dentro del free tier de LlamaParse y Voyage AI.</span>
-            </li>
-          </ul>
-        </div>
       </div>
     </div>
   );

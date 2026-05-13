@@ -46,6 +46,7 @@ export function PromptEditor({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
   const [lastSyncedContent, setLastSyncedContent] = useState<string | null>(
     null,
   );
@@ -176,7 +177,7 @@ export function PromptEditor({
               Restaurar original
             </Button>
           )}
-          <Button onClick={save} disabled={!canSave} loading={saving} size="sm">
+          <Button onClick={() => canSave && setConfirmSave(true)} disabled={!canSave} loading={saving} size="sm">
             Guardar
           </Button>
         </div>
@@ -185,6 +186,14 @@ export function PromptEditor({
       {showHistory && (
         <HistoryPanel promptKey={promptKey} onRestored={() => mutate()} />
       )}
+
+      {/* Hint de impacto */}
+      <div className="mb-3 bg-amber-50 border border-amber-200 rounded px-3 py-2 text-[11px] text-amber-800 leading-relaxed">
+        <span className="font-semibold">Impacto inmediato:</span> este prompt controla cómo{" "}
+        <strong>{PROMPT_LABELS[promptKey]}</strong> se comporta para todos los consultores.
+        Puedes cambiar el tono o las instrucciones —{" "}
+        no elimines las referencias a ESRS, GRI o la metodología porque la IA las usa para contextualizar cada respuesta.
+      </div>
 
       {/* Label + botón copiar */}
       <div className="flex items-center justify-between mb-1.5">
@@ -256,6 +265,20 @@ export function PromptEditor({
         tone="destructive"
         onConfirm={resetToDefault}
         onCancel={() => setConfirmReset(false)}
+      />
+
+      <ConfirmModal
+        open={confirmSave}
+        title={`Guardar cambios en "${PROMPT_LABELS[promptKey]}"`}
+        description={`Este cambio afecta el comportamiento de ${PROMPT_LABELS[promptKey]} para todos los consultores desde ahora. La versión anterior quedará en el historial — puedes restaurarla si algo sale mal.`}
+        confirmLabel="Guardar"
+        cancelLabel="Cancelar"
+        tone="primary"
+        onConfirm={async () => {
+          setConfirmSave(false);
+          await save();
+        }}
+        onCancel={() => setConfirmSave(false)}
       />
     </div>
   );

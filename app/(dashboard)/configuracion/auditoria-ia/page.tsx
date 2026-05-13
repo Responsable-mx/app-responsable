@@ -421,6 +421,9 @@ export default async function AuditoriaIaPage() {
                 : `~${usdFmt.format(cacheSavingsUsd)} ahorrados — rendimiento óptimo`,
               red: false,
               tooltip: "Porcentaje de tokens que la IA leyó de caché en lugar de procesarlos de nuevo. Más alto = menos costo. Objetivo: >40% en uso regular.",
+              /** Progress bar hacia el 40% objetivo */
+              barPct: cacheRatio > 0 ? Math.min(100, Math.round((cacheRatio * 100 / 40) * 100)) : 0,
+              barOptimal: cacheRatio >= 0.4,
             },
           ].map((kpi) => (
             <div key={kpi.label} className="bg-white border border-slate-200 rounded px-3 py-2.5" title={kpi.tooltip}>
@@ -428,6 +431,19 @@ export default async function AuditoriaIaPage() {
               <p className={`text-2xl font-bold mt-1 tabular-nums ${kpi.red ? "text-rose-700" : "text-slate-900"}`}>
                 {kpi.value}
               </p>
+              {"barPct" in kpi && typeof kpi.barPct === "number" && kpi.barPct > 0 && (
+                <div className="mt-1.5 mb-0.5">
+                  <div className="h-1 bg-slate-100 rounded-none overflow-hidden">
+                    <div
+                      className={kpi.barOptimal ? "h-1 bg-emerald-500" : "h-1 bg-brand-primary"}
+                      style={{ width: `${kpi.barPct}%` }}
+                    />
+                  </div>
+                  {!kpi.barOptimal && (
+                    <p className="text-[9px] text-slate-400 mt-0.5">Objetivo: 40%</p>
+                  )}
+                </div>
+              )}
               <p className={`text-[10px] mt-0.5 ${kpi.red ? "text-rose-500" : "text-slate-400"}`}>{kpi.sub}</p>
             </div>
           ))}
@@ -447,7 +463,7 @@ export default async function AuditoriaIaPage() {
           </a>
         </p>
 
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {decisions.map((d, i) => {
             const ps = prioridadStyle[d.prioridad];
             return (

@@ -236,8 +236,8 @@ export default async function UsoIaPage() {
                     <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                       <th className="pb-1.5 text-left">Modelo</th>
                       <th className="pb-1.5 text-right">Llamadas</th>
-                      <th className="pb-1.5 text-right">T. entrada</th>
-                      <th className="pb-1.5 text-right">T. salida</th>
+                      <th className="pb-1.5 text-right cursor-help" title="Tokens de entrada = texto enviado a la IA. 1 página de Word ≈ 700 tokens.">T. entrada ⓘ</th>
+                      <th className="pb-1.5 text-right cursor-help" title="Tokens de salida = respuesta generada por la IA.">T. salida ⓘ</th>
                       <th className="pb-1.5 text-right">Costo USD</th>
                       <th className="pb-1.5 text-right">% costo</th>
                     </tr>
@@ -285,8 +285,8 @@ export default async function UsoIaPage() {
                     <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                       <th className="pb-1.5 text-left">Rol</th>
                       <th className="pb-1.5 text-right">Llamadas</th>
-                      <th className="pb-1.5 text-right">T. entrada</th>
-                      <th className="pb-1.5 text-right">T. salida</th>
+                      <th className="pb-1.5 text-right cursor-help" title="Tokens de entrada = texto enviado a la IA. 1 página de Word ≈ 700 tokens.">T. entrada ⓘ</th>
+                      <th className="pb-1.5 text-right cursor-help" title="Tokens de salida = respuesta generada por la IA.">T. salida ⓘ</th>
                       <th className="pb-1.5 text-right">Costo</th>
                       <th className="pb-1.5 text-right">% costo</th>
                       <th className="pb-1.5 text-right">Latencia</th>
@@ -531,8 +531,8 @@ export default async function UsoIaPage() {
                       <th className="py-2 pr-3">Día</th>
                       <th className="py-2 pr-3">Rol</th>
                       <th className="py-2 pr-3 text-right">Llamadas</th>
-                      <th className="py-2 pr-3 text-right">T. entrada</th>
-                      <th className="py-2 pr-3 text-right">T. salida</th>
+                      <th className="py-2 pr-3 text-right cursor-help" title="Tokens de entrada = texto enviado a la IA. 1 página de Word ≈ 700 tokens.">T. entrada ⓘ</th>
+                      <th className="py-2 pr-3 text-right cursor-help" title="Tokens de salida = respuesta generada por la IA.">T. salida ⓘ</th>
                       <th className="py-2 pr-3 text-right">Caché</th>
                       <th className="py-2 pr-3 text-right">Latencia (s)</th>
                       <th className="py-2 pr-3 text-right">Errores</th>

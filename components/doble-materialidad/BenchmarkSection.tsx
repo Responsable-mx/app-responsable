@@ -352,7 +352,7 @@ export function BenchmarkSection({
       {/* ── Configuración: colapsada cuando hay resultado ── */}
       {hasDone && !configExpanded ? (
         // Fila resumen colapsada
-        <div className="flex items-center justify-between border border-slate-200 rounded px-3 py-2 bg-slate-50/60">
+        <div className="flex items-center justify-between border border-slate-200 rounded px-3 py-2 bg-slate-50/60 gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" viewBox="0 0 16 16" fill="currentColor">
               <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.354-9.354a.5.5 0 00-.708 0L7 9.293 5.354 7.646a.5.5 0 00-.708.708l2 2a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" clipRule="evenodd" />
@@ -368,16 +368,28 @@ export function BenchmarkSection({
               {latestResult!.companies_snapshot.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => setConfigExpanded(true)}
-            className="text-xs text-brand-primary hover:underline flex items-center gap-0.5"
-          >
-            Editar
-            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" d="M3 4.5l3 3 3-3" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setConfigExpanded(true)}
+              className="text-xs text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-0.5"
+            >
+              Editar
+              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" d="M3 4.5l3 3 3-3" />
+              </svg>
+            </button>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={isPolling}
+              onClick={() => void handleCompare()}
+              disabled={isPolling || selected.size < 2}
+              title={selected.size < 2 ? "Selecciona al menos 2 empresas para re-ejecutar" : `Re-ejecutar con ${selected.size} empresas`}
+            >
+              {isPolling ? "Ejecutando…" : "Re-ejecutar"}
+            </Button>
+          </div>
         </div>
       ) : (
         // Configuración expandida

@@ -687,13 +687,7 @@ export function DoubleMaterialidadTab({
         accent="border-l-blue-600"
         isActive={activeStageId === "dm-sec-benchmark"}
         subtitle="Compara el desempeño ESG contra las empresas de referencia seleccionadas en Etapa 3"
-        headerRight={
-          companies.length > 0 ? (
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
-              {validatedCompanies} de {companies.length} validadas
-            </span>
-          ) : null
-        }
+        headerRight={null}
       >
         {/* Horizontes temporales — config del estudio, mismo panel que Benchmark */}
         <div className="mb-5 pb-5 border-b border-slate-100">

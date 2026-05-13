@@ -18,7 +18,7 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ### Bloque D-169–D-173 — Hallazgos auditoría completa sesión 32 (2026-05-12)
 
-### 🔴 D-169 — Next.js 16.2.4 con 13 CVEs activos (middleware bypass + SSRF + XSS + DoS)
+### ~~🔴 D-169 — Next.js 16.2.4 con 13 CVEs activos (middleware bypass + SSRF + XSS + DoS)~~ ✅ RESUELTO (sesión 32)
 - Versión instalada: 16.2.4. 13 advisories activos incluyendo: middleware bypass × 4 (GHSA-492v, GHSA-267c, GHSA-36qx, GHSA-26hh), SSRF via WebSocket upgrades, CSP nonce XSS, cache poisoning × 2, DoS × 3.
 - **La auth usa middleware** (`lib/supabase/middleware.ts`) → middleware bypass CVEs son directamente explotables si bypasearan la autenticación.
 - Fix: `npm audit fix` bumps a 16.2.6 (3 packages: next + @next/swc-win32-x64-msvc + @next/env, sin breaking changes). Esfuerzo: 5min + push.
@@ -29,11 +29,11 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - Patrón correcto en `dm-benchmark` (D-111), `dm-report` (D-122), `research-reports` (D-123).
 - Fix: añadir `await checkRateLimit(user.email, "dm_referentes_generate", 3, 300_000)` al inicio de los 3 handlers. Esfuerzo ~30min.
 
-### 🟡 D-171 — Regresión ESLint: 3 errors (sesión 31 = 0 errors)
+### ~~🟡 D-171 — Regresión ESLint: 3 errors (sesión 31 = 0 errors)~~ ✅ RESUELTO (sesión 32)
 - `components/doble-materialidad/BenchmarkSection.tsx:84` — `setSelected(new Set(...))` dentro de `useEffect` body. Regla `react-hooks/set-state-in-effect`. Fix: `useState(() => new Set(companies.map(c => c.id)))` lazy initializer.
 - `components/doble-materialidad/ReferentesSection.tsx:307` — 2× `"` sin escapar. Regla `react/no-unescaped-entities`. Fix: `&quot;`.
 
-### 🟢 D-172 — `DoubleMaterialidadTab.tsx:544` — `stepperCompact` unused (ESLint warning)
+### ~~🟢 D-172 — `DoubleMaterialidadTab.tsx:544` — `stepperCompact` unused (ESLint warning)~~ ✅ RESUELTO (sesión 32)
 - Regresión: sesión 28/31 = 0 warnings. Fix: eliminar asignación o `_stepperCompact`.
 
 ### 🟢 D-173 — Módulo DM-IA: 4 archivos, 3648L total

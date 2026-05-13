@@ -722,6 +722,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Error al crear registro de resultado" }, { status: 500 });
   }
 
+  // max_tokens dinámico: (N empresas + cliente) × 40 dims × ~50 tok + 4K overhead.
+  // 12K era suficiente para 8, pero con 12+ empresas el JSON se trunca y extractJsonObject retorna null.
+  const entityCount = companies.length + 1; // +1 = el propio cliente
+  const dynamicMaxTokens = Math.min(48000, Math.max(16000, entityCount * 1800 + 4000));
+
   // Submeter batch — retorna en <3s independientemente del tiempo de procesamiento
   try {
     const batch = await anthropic.beta.messages.batches.create(
@@ -730,7 +735,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           custom_id: resultRow.id,
           params: {
             model,
-            max_tokens: 12000, // 8 empresas × 20 dims × ~40 tokens + overhead = ~9K max real. 12K seguro.
+            max_tokens: dynamicMaxTokens,
             system: [
               {
                 type: "text",

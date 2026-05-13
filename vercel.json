@@ -6,6 +6,7 @@
     { "path": "/api/cron/audit-health", "schedule": "0 10 1,15 * *" },
     { "path": "/api/cron/delayed-activities", "schedule": "0 14 * * *" },
     { "path": "/api/cron/refresh-reports", "schedule": "0 11 1 6,12 *" },
+    { "path": "/api/cron/ingest-competitor-reports", "schedule": "0 6 * * *" },
     { "path": "/api/cron/embed-chunks", "schedule": "30 6 * * *" },
     { "path": "/api/cron/auto-update", "schedule": "45 6 * * *" }
   ]

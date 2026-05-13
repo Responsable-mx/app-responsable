@@ -24,7 +24,7 @@ export function PreferencesPanel({
         push("error", j.error ?? "Error al reiniciar el tour");
       } else {
         setTourVersion(j.data.version);
-        push("success", `Tour reiniciado a v${j.data.version}. Todos los consultores lo verán en su próxima visita a /chat.`);
+        push("success", `Tour reiniciado a v${j.data.version}. Todos los consultores lo verán en su próxima visita al chat.`);
       }
     } catch {
       push("error", "Error de conexión");
@@ -41,7 +41,7 @@ export function PreferencesPanel({
         <h2 className="text-lg font-semibold text-slate-900">Tour guiado</h2>
         <p className="text-sm text-slate-600 mt-1">
           El tour aparece automáticamente la primera vez que un consultor
-          entra a <code className="bg-slate-100 px-1 rounded">/chat</code>.
+          entra al chat.
         </p>
         <div className="mt-4 bg-slate-50 border border-slate-200 rounded p-4 flex items-start justify-between gap-4">
           <div>
@@ -56,7 +56,7 @@ export function PreferencesPanel({
             </p>
           </div>
           <Button
-            variant="destructive"
+            variant="secondary"
             size="sm"
             onClick={() => setConfirm(true)}
             disabled={busy}
@@ -78,10 +78,10 @@ export function PreferencesPanel({
         title="Reiniciar tour para todo el equipo"
         description={`Se incrementará la versión del tour (a v${
           tourVersion + 1
-        }). En la próxima visita a /chat, TODOS los consultores verán el tour de nuevo. No afecta datos ni configuración.`}
+        }). En la próxima visita al chat, TODOS los consultores verán el tour de nuevo. No afecta datos ni configuración.`}
         confirmLabel="Reiniciar"
         cancelLabel="Cancelar"
-        tone="destructive"
+        tone="primary"
         onConfirm={bump}
         onCancel={() => setConfirm(false)}
       />

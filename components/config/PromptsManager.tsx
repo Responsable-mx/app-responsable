@@ -24,7 +24,7 @@ const fetcher = (url: string) =>
 const GROUPS: { label: string; prefix: string }[] = [
   { label: "SISTEMA", prefix: "system." },
   { label: "ROLES IA", prefix: "role." },
-  { label: "DIRECT MESSAGES", prefix: "dm." },
+  { label: "MENSAJES DIRECTOS", prefix: "dm." },
 ];
 
 export function PromptsManager() {
@@ -77,7 +77,7 @@ export function PromptsManager() {
                         <span className="truncate">{PROMPT_LABELS[k]}</span>
                         {m?.has_override && (
                           <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm flex-shrink-0">
-                            Custom
+                            Editado
                           </span>
                         )}
                       </button>

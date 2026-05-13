@@ -495,14 +495,8 @@ export default async function HerramientasPage() {
       </div>
 
       <p className="text-[10px] text-slate-400 mt-8 leading-relaxed">
-        Para activar una herramienta propuesta: agregar las variables de entorno en Vercel → Settings → Environment Variables y redeploya.
-        Para agregar una herramienta nueva: añadir una entrada al array{" "}
-        <code className="font-mono bg-slate-100 px-1 rounded">PROPOSED_TOOLS</code> (si es propuesta) o{" "}
-        <code className="font-mono bg-slate-100 px-1 rounded">TOOLS</code> (si ya tiene health check) en{" "}
-        <code className="font-mono bg-slate-100 px-1 rounded">
-          app/(dashboard)/configuracion/herramientas/page.tsx
-        </code>
-        .
+        Para activar una herramienta propuesta: pide al equipo técnico que agregue la variable de entorno correspondiente en el servidor.
+        Para agregar una herramienta nueva al catálogo: contacta al equipo técnico — requiere un cambio en el código de la app.
       </p>
     </div>
   );

@@ -87,7 +87,7 @@ const DOC_STEPS: FlowStep[] = [
     tool: "Voyage AI — cron nocturno",
     timing: "Nocturno",
     lane: "C",
-    warn: "Gap actual: entre la subida y el cron nocturno, solo la búsqueda básica está activa (puede tardar horas). Fix pendiente: activar el procesamiento semántico de forma inmediata tras la subida, sin esperar al cron.",
+    warn: "Gap actual: entre la subida y el cron nocturno solo la búsqueda básica está activa (puede tardar horas). Chat IA y AI-fill ya funcionan con búsqueda básica — el semántico mejorará la precisión cuando esté listo. Fix pendiente: activar el procesamiento semántico inmediatamente tras la subida, sin esperar al cron.",
   },
 ];
 
@@ -96,25 +96,25 @@ const DOC_STEPS: FlowStep[] = [
 const ROLES = [
   {
     name: "Aurora", fn: "Autora", model: "Sonnet",
-    cost: "$3 / $15 por 1M tokens",
+    cost: "$3 / $15 por millón de tokens (≈ 700 págs)",
     why: "Construye el borrador inicial. Necesita calidad narrativa y velocidad.",
     borderColor: "border-l-teal-500", dotColor: "bg-teal-500",
   },
   {
     name: "Rebeca", fn: "Revisora", model: "Sonnet",
-    cost: "$3 / $15 por 1M tokens",
+    cost: "$3 / $15 por millón de tokens (≈ 700 págs)",
     why: "Detecta omisiones y riesgos. Checklist estructurado — no necesita el modelo más caro.",
     borderColor: "border-l-slate-400", dotColor: "bg-slate-400",
   },
   {
     name: "Elena", fn: "Elevadora", model: "Opus",
-    cost: "$15 / $75 por 1M tokens",
+    cost: "$15 / $75 por millón de tokens (≈ 700 págs)",
     why: "Insights estratégicos y trade-offs profundos. Justifica el modelo más potente.",
     borderColor: "border-l-amber-500", dotColor: "bg-amber-500",
   },
   {
     name: "Valeria", fn: "Validadora", model: "Haiku",
-    cost: "$0.25 / $1.25 por 1M tokens",
+    cost: "$0.25 / $1.25 por millón de tokens (≈ 700 págs)",
     why: "Verifica DoD y consistencia. Validación estructurada — no requiere narrativa.",
     borderColor: "border-l-emerald-500", dotColor: "bg-emerald-500",
   },
@@ -505,7 +505,8 @@ export default function FlujoIaPage() {
       <div>
         <SectionLabel>Referencia rápida — herramientas por flujo</SectionLabel>
         <div className="bg-white border border-slate-200 rounded overflow-hidden">
-          <table className="w-full text-xs">
+          <div className="overflow-x-auto">
+          <table className="min-w-full w-max text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
                 <th className="px-4 py-2.5 text-left">Herramienta</th>
@@ -536,14 +537,33 @@ export default function FlujoIaPage() {
                   : "text-slate-400";
                 return (
                   <tr key={row.tool} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 font-semibold text-slate-800">{row.tool}</td>
+                    <td className="px-4 py-2 font-semibold text-slate-800 whitespace-nowrap">{row.tool}</td>
                     <td className="px-4 py-2 text-slate-500 leading-relaxed">{row.where}</td>
-                    <td className={`px-4 py-2 text-right font-medium text-xs ${statusColor}`}>{row.status}</td>
+                    <td className={`px-4 py-2 text-right font-medium text-xs ${statusColor} whitespace-nowrap`}>
+                      {row.status === "Propuesto" ? (
+                        <span className="inline-flex items-center justify-end gap-2">
+                          Propuesto
+                          <a href="/configuracion/herramientas" className="text-brand-primary hover:underline text-[10px] font-semibold">
+                            Ver →
+                          </a>
+                        </span>
+                      ) : row.status === "Parcial" ? (
+                        <span
+                          title="Activo en local; pendiente activar en producción"
+                          className="cursor-help underline decoration-dotted decoration-amber-400"
+                        >
+                          Parcial
+                        </span>
+                      ) : (
+                        row.status
+                      )}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          </div>
         </div>
         <p className="text-[10px] text-slate-400 mt-3">
           Detalle de activación y costo:{" "}

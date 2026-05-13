@@ -117,10 +117,11 @@ export default async function AuditoriaIaPage() {
 
   // Etiqueta legible por rol
   const roleLabel: Record<string, string> = {
-    aurora:  "Aurora — Autora",
-    rebeca:  "Rebeca — Revisora",
-    elena:   "Elena — Elevadora",
-    valeria: "Valeria — Validadora",
+    aurora:      "Aurora — Autora",
+    rebeca:      "Rebeca — Revisora",
+    elena:       "Elena — Elevadora",
+    valeria:     "Valeria — Validadora",
+    embeddings:  "Indexación de documentos",
   };
 
   // ── Decisiones disponibles ────────────────────────────────────────────────
@@ -521,7 +522,8 @@ export default async function AuditoriaIaPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {usage.by_role.map((r) => {
+                {/* Roles del equipo */}
+                {usage.by_role.filter(r => r.role !== "embeddings").map((r) => {
                   const roleErr = r.errors;
                   const roleErrRate = r.calls > 0 ? roleErr / r.calls : 0;
                   const label = roleLabel[r.role.toLowerCase()] ?? r.role;
@@ -545,6 +547,44 @@ export default async function AuditoriaIaPage() {
                     </tr>
                   );
                 })}
+                {/* Proceso automático — cron nocturno, no es un consultor */}
+                {usage.by_role.some(r => r.role === "embeddings") && (
+                  <>
+                    <tr>
+                      <td colSpan={5} className="px-4 pt-3 pb-1">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-t border-slate-100 pt-2">
+                          Proceso automático — indexación nocturna (cron, no es un consultor)
+                        </p>
+                      </td>
+                    </tr>
+                    {usage.by_role.filter(r => r.role === "embeddings").map((r) => {
+                      const label = roleLabel[r.role.toLowerCase()] ?? r.role;
+                      return (
+                        <tr key={r.role} className="opacity-60 bg-slate-50/60">
+                          <td className="px-4 py-2.5 font-semibold text-indigo-700">
+                            {label}
+                            <span className="ml-1.5 text-[10px] font-normal text-slate-400">(Voyage · cron)</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                            {numFmt.format(r.calls)} veces
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">
+                            {r.avg_latency_ms > 0 ? latenciaLabel(r.avg_latency_ms) : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                            {usdFmt.format(r.cost_usd)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums"
+                              title="Errores del cron de indexación — no afectan el chat de consultores">
+                            {r.errors > 0
+                              ? <span>{r.errors} <span className="text-[10px]">(cron)</span></span>
+                              : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </>
+                )}
               </tbody>
             </table>
           </div>

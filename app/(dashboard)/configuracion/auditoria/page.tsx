@@ -33,6 +33,12 @@ const ENTITY_LABEL: Record<string, string> = {
   stage_activity: "Actividad",
   stage_template: "Plantilla",
   client_document: "Documento",
+  // Módulo Doble Materialidad
+  dm_benchmark_company: "Empresa benchmark",
+  dm_config: "Config. DM",
+  questionnaire_snapshot: "Snapshot cuestionario",
+  client_engagement: "Participación cliente",
+  auto_update_config: "Config. actualización automática",
 };
 
 type AuditRow = {
@@ -214,7 +220,7 @@ export default async function AuditoriaPage() {
             </table>
           </div>
           <div className="border-t border-slate-200 px-4 py-2 bg-slate-50 text-[11px] text-slate-500 text-right">
-            Mostrando {rows.length} de hasta 200 entradas · solo admins activos pueden ver este registro
+            Mostrando las últimas {rows.length} entradas · solo admins activos pueden ver este registro
           </div>
         </div>
       )}

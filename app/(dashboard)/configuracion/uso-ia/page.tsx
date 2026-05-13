@@ -508,7 +508,7 @@ export default async function UsoIaPage() {
                       <tr key={c.client_id}>
                         <td className="py-1.5 text-slate-700">
                           {c.client_name ?? (
-                            <span className="font-mono text-slate-600">{c.client_id.slice(0, 8)}…</span>
+                            <span className="text-slate-400 italic">Cliente eliminado</span>
                           )}
                         </td>
                         <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{c.calls}</td>

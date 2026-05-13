@@ -48,15 +48,6 @@ export function BenchmarkSection({
   const [confirmRepropose, setConfirmRepropose] = useState(false);
   const [fieldsExpanded, setFieldsExpanded] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addingManual, setAddingManual] = useState(false);
-  const [manualForm, setManualForm] = useState({
-    name: "",
-    relation: "competitor_nacional" as CompanyRelation,
-    country: "",
-    sector: "",
-    website: "",
-    justification: "",
-  });
   const hasDone = latestResult?.status === "done";
   const hasReferentes = referentCompanies.length > 0;
   // Colapsar configuración por default cuando ya existe un resultado

@@ -16,6 +16,20 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-177–D-178 — Hallazgos auditoría sesión 33 (2026-05-12)
+
+### 🟡 D-177 — Voyage fetch sin timeout en `lib/documents/embeddings.ts`
+- `fetch("https://api.voyageai.com/v1/embeddings", {...})` línea 43 — sin `signal: AbortSignal.timeout(N)`.
+- Cron `embed-chunks` tiene `maxDuration=300`. Si Voyage API cuelga, Lambda espera 5min completos hasta kill de Vercel.
+- Fix: `signal: AbortSignal.timeout(30_000)` (30s suficiente para embeddings).
+
+### 🟢 D-178 — `logAiCall` con `latencyMs: 0` en dm-benchmark-company-iros
+- `app/api/clients/[id]/dm-benchmark-company-iros/route.ts:215` — `latencyMs: 0` hardcodeado.
+- Batch API es async (submit POST → poll GET) — no hay latencia real por call, pero 0ms en dashboard impide detectar lenteadas de Anthropic.
+- Fix: calcular `Date.now() - new Date(batch.submitted_at).getTime()` al completar el batch. Columna `submitted_at` existe en `dm_benchmark_iro_batches`.
+
+---
+
 ### Bloque D-174–D-176 — Hallazgos /audit-ia sesión 32b (2026-05-12)
 
 ### ~~🟢 D-176 — `console.log` debug redundante en `dm-benchmark-empresas/search_urls`~~ ✅ RESUELTO (sesión 32b)
@@ -163,9 +177,9 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-146 — extract-profile no registraba en logAiCall~~ ✅ RESUELTO
 - Tokens propagados desde `resp.usage` → `ProfileExtractResult` → route → `logAiCall`. Sesión 22.
 
-### ~~🟢 D-147 — Cache in-memory de extract-profile se pierde en cada deploy~~ ✅ ACEPTADO MVP DEFINITIVO (sesión 27)
-- **Descripción**: `const cache = new Map()` en `lib/ai/extract-profile.ts`. TTL 30min, 200 entradas, 8 usuarios.
-- **Decisión sesión 27**: NO migrar a DB. Trade-off: round-trip Supabase por lookup vs persistencia entre deploys. Para 8 usuarios + cache TTL corto, perf > persistencia. Re-evaluar cuando users >50 o issue real reportado.
+### ~~🟢 D-147 — Cache in-memory de extract-profile se pierde en cada deploy~~ ✅ RESUELTO (sesión 33)
+- **Fix**: tabla `profile_url_cache` (mig 0091) — `url_hash PK`, `result JSONB`, `expires_at`, RLS solo service_role. `getCached`/`setCached` async fail-open. Cleanup expirados best-effort (fire-and-forget).
+- **Nota histórica**: decisión sesión 27 fue "NO migrar" — revertida sesión 33 al implementar la funcionalidad completa con baja complejidad real.
 
 ---
 

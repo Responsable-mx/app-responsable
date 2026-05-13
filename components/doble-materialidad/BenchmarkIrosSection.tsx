@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -54,7 +54,7 @@ export function BenchmarkIrosSection({
     { revalidateOnFocus: false, refreshInterval: isPolling ? 5_000 : 0 }
   );
 
-  const groups = resp?.data?.groups ?? [];
+  const groups = useMemo(() => resp?.data?.groups ?? [], [resp]);
   const prevStatusesRef = useRef<Record<string, string>>({});
   const didAutoStartRef = useRef(false);
 
@@ -69,6 +69,7 @@ export function BenchmarkIrosSection({
           prevStatusesRef.current[g.company_id] = "pending";
         }
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-restart polling al detectar batches pendientes; didAutoStartRef previene re-entrada
       setIsPolling(true);
     }
   }, [groups]);
@@ -89,12 +90,14 @@ export function BenchmarkIrosSection({
       if (curr) prevStatusesRef.current[g.company_id] = curr;
       if (curr === "pending") hasPending = true;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza estado polling con estado real de batches; isPolling en deps previene loop
     if (!hasPending) setIsPolling(false);
   }, [groups, isPolling, push]);
 
   // Set default active company when validated list loads
   useEffect(() => {
     if (!activeCompanyId && validatedCompanies.length > 0 && validatedCompanies[0]) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- inicializa tab activa cuando llegan los datos; guard !activeCompanyId previene loop
       setActiveCompanyId(validatedCompanies[0].id);
     }
   }, [validatedCompanies, activeCompanyId]);
@@ -333,7 +336,7 @@ function CompanyIroPanel({
 
       {!isPending && !isFailed && iros.length === 0 && (
         <div className="py-8 text-center text-sm text-slate-400 border border-dashed border-slate-200 rounded">
-          Sin IROs generados. Haz clic en "Generar IROs con IA" para analizar esta empresa.
+          Sin IROs generados. Haz clic en &quot;Generar IROs con IA&quot; para analizar esta empresa.
         </div>
       )}
     </div>

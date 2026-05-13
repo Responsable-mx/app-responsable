@@ -122,7 +122,6 @@ export function useReportPolling(
       !isReportPolling
     ) {
       pollingStartReportId.current = latestReportId ?? null;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- restart polling al detectar pending+batch_id externos; guard !isReportPolling previene loop
       setIsReportPolling(true);
     }
   }, [latestReportStatus, latestReportBatchId, latestReportId, isReportPolling, setIsReportPolling]);

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { listCatalog } from "@/lib/catalogs";
 import { isPublicHttpUrl } from "@/lib/documents/ssrf";
 import { getTaskConfig } from "@/lib/ai/models";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Extracción de perfil desde URL/HTML → tarea estructurada → Haiku (12× más barato que Sonnet)
 const MODEL = getTaskConfig("extract").model;
@@ -28,24 +29,44 @@ export type ProfileExtractResult = {
   cacheReadTokens?: number;
 };
 
-// ── Cache 30 min ─────────────────────────────────────────────
-type CacheEntry = { result: ProfileExtractResult; expiresAt: number };
-const cache = new Map<string, CacheEntry>();
+// ── Cache DB-backed (profile_url_cache) ──────────────────────
+// Sobrevive deploys y múltiples instancias serverless.
+// Fail-open: errores de DB no rompen el flujo principal.
 
 function hashKey(url: string): string {
   return crypto.createHash("sha256").update(url.trim().toLowerCase()).digest("hex");
 }
 
-function getCached(key: string): ProfileExtractResult | null {
-  const entry = cache.get(key);
-  if (!entry || Date.now() > entry.expiresAt) { cache.delete(key); return null; }
-  return { ...entry.result, cached: true };
+async function getCached(key: string): Promise<ProfileExtractResult | null> {
+  try {
+    const db = createAdminClient();
+    const { data } = await db
+      .from("profile_url_cache")
+      .select("result")
+      .eq("url_hash", key)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (!data) return null;
+    return { ...(data.result as ProfileExtractResult), cached: true };
+  } catch {
+    return null;
+  }
 }
 
-function setCached(key: string, result: ProfileExtractResult): void {
-  cache.set(key, { result: { ...result, cached: false }, expiresAt: Date.now() + CACHE_TTL_MS });
-  if (cache.size > 200) {
-    [...cache.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt).slice(0, 50).forEach(([k]) => cache.delete(k));
+async function setCached(key: string, result: ProfileExtractResult): Promise<void> {
+  try {
+    const db = createAdminClient();
+    const expiresAt = new Date(Date.now() + CACHE_TTL_MS).toISOString();
+    await db.from("profile_url_cache").upsert({
+      url_hash: key,
+      result: { ...result, cached: false },
+      cached_at: new Date().toISOString(),
+      expires_at: expiresAt,
+    });
+    // Cleanup expirados — best-effort, no await
+    void db.from("profile_url_cache").delete().lt("expires_at", new Date().toISOString());
+  } catch {
+    // Non-critical — continuar sin cachear
   }
 }
 
@@ -209,7 +230,7 @@ Reglas:
 // ── API pública ──────────────────────────────────────────────
 export async function extractProfileFromUrl(rawUrl: string): Promise<ProfileExtractResult> {
   const key = hashKey(rawUrl);
-  const cached = getCached(key);
+  const cached = await getCached(key);
   if (cached) return cached;
 
   const url = validateUrl(rawUrl);
@@ -221,6 +242,6 @@ export async function extractProfileFromUrl(rawUrl: string): Promise<ProfileExtr
   // que suele ser una foto hero o banner, no el logotipo de la empresa.
   const logoUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`;
   const result: ProfileExtractResult = { ...fields, logo_url: logoUrl, cached: false };
-  setCached(key, result);
+  await setCached(key, result);
   return result;
 }

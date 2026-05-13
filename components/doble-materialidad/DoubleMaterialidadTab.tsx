@@ -59,6 +59,10 @@ const ReporteSection = dynamic(
   () => import("@/components/doble-materialidad/ReporteSection").then((m) => ({ default: m.ReporteSection })),
   { loading: () => dmFallback, ssr: false }
 );
+const BenchmarkIrosSection = dynamic(
+  () => import("@/components/doble-materialidad/BenchmarkIrosSection").then((m) => ({ default: m.BenchmarkIrosSection })),
+  { loading: () => dmFallback, ssr: false }
+);
 
 // catalogLabel + _CATALOG_MAP movidos a catalog-lookup.ts (D-150 sesión 27)
 
@@ -710,6 +714,19 @@ export function DoubleMaterialidadTab({
             (c) => (benchmarkEmpresasRec?.enabled_companies ?? []).includes(c.id)
           )}
         />
+
+        {/* IROs de empresas de referencia — solo si hay al menos 1 validada */}
+        {validatedCompanies > 0 && (
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <p className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-3">
+              IROs por empresa de referencia
+            </p>
+            <BenchmarkIrosSection
+              clientId={clientId}
+              companies={companies}
+            />
+          </div>
+        )}
       </CollapsibleStageSection>
 
       {/* ── Etapa 5 — IROs del cliente ── */}

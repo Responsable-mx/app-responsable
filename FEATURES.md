@@ -61,6 +61,7 @@
 
 ## Futuro (Fase 3)
 
+- [C] ✅ **Herramientas conectadas** — `/configuracion/herramientas` explica Voyage AI, LlamaParse y QStash en lenguaje no técnico ("Cómo funciona" + "Lo que ganas"). Badge activa/inactiva según env vars reales. Patrón data-driven: agregar herramienta = 1 objeto al array `TOOLS`. may-2026
 - [C] Generación de documentos DOCX con branding ResponSable
 - [C] Generación de presentaciones PPTX con branding ResponSable
 - [C] Integración Basecamp (notificaciones)

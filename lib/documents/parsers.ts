@@ -48,21 +48,63 @@ export async function parseToMarkdown(buffer: Buffer, fileType: FileType): Promi
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
-  // LlamaParse preserva tablas GRI/ESRS multi-columna que pdf-parse aplana.
-  // Activo solo si LLAMA_CLOUD_API_KEY está configurada; fallback = pdf-parse.
+  // Cadena de calidad: LlamaParse → Mistral OCR → pdf-parse.
+  // LlamaParse y Mistral preservan tablas GRI/ESRS multi-columna; pdf-parse las aplana.
   if (process.env.LLAMA_CLOUD_API_KEY) {
     try {
       const md = await parsePdfWithLlamaParse(buffer);
       if (md && md.length > 200) return cleanText(md);
     } catch (e) {
-      console.error("[parsers] LlamaParse failed, falling back to pdf-parse:", e);
+      console.error("[parsers] LlamaParse failed, trying Mistral OCR:", e);
     }
   }
-  // Fallback: importar desde /lib directamente — el entry point de pdf-parse carga archivos
+  if (process.env.MISTRAL_API_KEY) {
+    try {
+      const md = await parsePdfWithMistralOcr(buffer);
+      if (md && md.length > 200) return cleanText(md);
+    } catch (e) {
+      console.error("[parsers] Mistral OCR failed, falling back to pdf-parse:", e);
+    }
+  }
+  // Último fallback: importar desde /lib directamente — el entry point de pdf-parse carga archivos
   // de test que no existen en producción (ENOENT ./test/data/05-versions-space.pdf).
   const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
   const result = await pdfParse(buffer);
   return cleanText(result.text);
+}
+
+/**
+ * Parseo de PDF con Mistral OCR (mistral-ocr-latest).
+ * Fallback de LlamaParse — $1/1k páginas batch, 96.6% precisión en tablas.
+ * Envía el PDF como base64 en una sola llamada síncrona (sin polling).
+ */
+async function parsePdfWithMistralOcr(buffer: Buffer): Promise<string | null> {
+  const apiKey = process.env.MISTRAL_API_KEY!;
+  const base64 = buffer.toString("base64");
+
+  const res = await fetch("https://api.mistral.ai/v1/ocr", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "mistral-ocr-latest",
+      document: {
+        type: "document_url",
+        document_url: `data:application/pdf;base64,${base64}`,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Mistral OCR failed ${res.status}: ${err.slice(0, 200)}`);
+  }
+
+  const json = (await res.json()) as { pages?: Array<{ markdown?: string }> };
+  if (!json.pages?.length) return null;
+  return json.pages.map((p) => p.markdown ?? "").join("\n\n");
 }
 
 /**

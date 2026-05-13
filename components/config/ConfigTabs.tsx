@@ -13,6 +13,7 @@ import {
   IconShield,
   IconClipboard,
   IconLayers,
+  IconPlugin,
 } from "@/components/ui/Icons";
 
 const TABS = [
@@ -22,6 +23,7 @@ const TABS = [
   { href: "/configuracion/plantillas", label: "Plantillas", Icon: IconGrid },
   { href: "/configuracion/prompts", label: "Prompts IA", Icon: IconBrain },
   { href: "/configuracion/iros", label: "IROs ESRS", Icon: IconLayers },
+  { href: "/configuracion/herramientas", label: "Herramientas", Icon: IconPlugin },
   { href: "/configuracion/uso-ia", label: "Uso IA", Icon: IconTarget },
   { href: "/configuracion/auto-update", label: "Actualizaciones", Icon: IconSliders },
   { href: "/configuracion/auditoria", label: "Auditoría", Icon: IconClipboard },

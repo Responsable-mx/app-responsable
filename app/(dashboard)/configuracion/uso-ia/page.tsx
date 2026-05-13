@@ -104,6 +104,10 @@ export default async function UsoIaPage() {
     : 0;
   const voyageSystemErrors = s ? Math.max(0, s.total_errors - llmErrors) : 0;
 
+  // Desglose de llamadas: equipo vs. cron de indexación
+  const voyageCalls = s ? (s.by_role.find(r => r.role === "embeddings")?.calls ?? 0) : 0;
+  const llmCalls = s ? s.total_calls - voyageCalls : 0;
+
   // Top consultores sin entradas del sistema (cron@, service_role)
   const realTopUsers = s
     ? s.top_users.filter(u =>
@@ -138,7 +142,7 @@ export default async function UsoIaPage() {
           ))}
         </div>
       )}
-      <p className="text-sm text-slate-600 mb-4 inline-flex items-center gap-1.5">
+      <p className="text-sm text-slate-600 mb-4 inline-flex flex-wrap items-center gap-1.5">
         Uso de los 4 roles IA en los últimos 30 días.
         <span
           className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold cursor-help"
@@ -147,6 +151,10 @@ export default async function UsoIaPage() {
         >
           ⓘ
         </span>
+        <span className="text-slate-300 select-none">·</span>
+        <a href="/configuracion/auditoria-ia" className="text-brand-primary text-xs font-medium hover:underline underline-offset-2">
+          Para decisiones accionables → Auditoría IA
+        </a>
       </p>
 
       {!s ? (
@@ -179,7 +187,9 @@ export default async function UsoIaPage() {
                 <Metric
                   label="Llamadas"
                   value={numFmt.format(s.total_calls)}
-                  hint={s.avg_latency_ms > 0 ? `Latencia promedio: ${(s.avg_latency_ms / 1000).toFixed(1)} s` : undefined}
+                  hint={llmCalls > 0 && voyageCalls > 0
+                    ? `${numFmt.format(llmCalls)} del equipo · ${numFmt.format(voyageCalls)} indexación`
+                    : s.avg_latency_ms > 0 ? `Latencia promedio: ${(s.avg_latency_ms / 1000).toFixed(1)} s` : undefined}
                   spark={callsSeries}
                   sparkColor="#0f766e"
                 />

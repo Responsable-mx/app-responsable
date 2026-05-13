@@ -358,6 +358,15 @@ export default async function HerramientasPage() {
                 </div>
               </div>
 
+              {/* Pipeline link — solo cuando está activa */}
+              {tool.health.status === "ok" && (
+                <p className="text-[11px] text-slate-400 mt-3 border-t border-slate-100 pt-3">
+                  <a href="/configuracion/flujos-ia" className="text-brand-primary hover:underline underline-offset-2">
+                    Ver cómo encaja en el pipeline →
+                  </a>
+                </p>
+              )}
+
               {/* Footer: setup si inactiva, env key si hay error */}
               {tool.health.status === "inactive" && tool.setupUrl && (
                 <p className="text-[11px] text-slate-500 mt-3 border-t border-slate-100 pt-3">

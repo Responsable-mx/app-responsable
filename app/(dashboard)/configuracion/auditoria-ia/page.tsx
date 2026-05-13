@@ -326,6 +326,13 @@ export default async function AuditoriaIaPage() {
   const ordenPrioridad: Record<Prioridad, number> = { urgente: 0, importante: 1, conveniente: 2 };
   decisions.sort((a, b) => ordenPrioridad[a.prioridad] - ordenPrioridad[b.prioridad]);
 
+  // Links destino por tipo de recomendación
+  const recLinks: Partial<Record<Decision["recomendacion"], string>> = {
+    investigar: "/configuracion/uso-ia",
+    activar:    "/configuracion/herramientas",
+    revisar:    "/configuracion/prompts",
+  };
+
   // Etiquetas de recomendación
   const recLabel: Record<Decision["recomendacion"], string> = {
     activar:     "✅ Activar pronto",
@@ -433,7 +440,10 @@ export default async function AuditoriaIaPage() {
         </p>
         <p className="text-sm text-slate-600 mb-4 leading-relaxed">
           Cada tarjeta describe una mejora concreta: qué cambia, por qué importa y qué se necesita para activarla.
-          Están ordenadas por prioridad basada en los datos de los últimos 30 días.
+          Están ordenadas por prioridad basada en los datos de los últimos 30 días.{" "}
+          <a href="/configuracion/uso-ia" className="text-brand-primary text-xs hover:underline underline-offset-2">
+            Ver métricas completas → Uso IA
+          </a>
         </p>
 
         <div className="flex flex-col gap-4">
@@ -471,9 +481,18 @@ export default async function AuditoriaIaPage() {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">Lo que se necesita</p>
                     <p className="text-[11px] text-slate-600">{d.necesita}</p>
                   </div>
-                  <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-sm whitespace-nowrap">
-                    {recLabel[d.recomendacion]}
-                  </span>
+                  {recLinks[d.recomendacion] ? (
+                    <a
+                      href={recLinks[d.recomendacion]}
+                      className="text-[11px] font-semibold text-brand-primary bg-brand-primary-light border border-brand-primary/20 px-2 py-1 rounded-sm whitespace-nowrap hover:underline underline-offset-2"
+                    >
+                      {recLabel[d.recomendacion]} →
+                    </a>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-sm whitespace-nowrap">
+                      {recLabel[d.recomendacion]}
+                    </span>
+                  )}
                 </div>
               </div>
             );

@@ -58,8 +58,8 @@ type FlowStep = {
 const DOC_STEPS: FlowStep[] = [
   {
     n: 1,
-    label: "Subida del archivo",
-    desc: "El consultor sube el informe del cliente o de una empresa competidora desde el tab Documentos. Formatos: PDF, DOCX, XLSX, PPTX, TXT. Tope 25 MB por archivo.",
+    label: "Archivo recibido",
+    desc: "El documento entra al sistema por cualquiera de los 3 modos descritos arriba: subida directa, texto pegado o URL del informe. El sistema detecta el origen automáticamente.",
     tool: "—",
     timing: "Manual",
     lane: "A",

@@ -11,6 +11,7 @@ export function StagePill({
   selected,
   compact = false,
   className = "",
+  title,
 }: {
   label: string;
   status: StageStatus;
@@ -22,6 +23,8 @@ export function StagePill({
   /** Oculta subtítulo cuando el stepper está pinned — reduce altura sticky stack */
   compact?: boolean;
   className?: string;
+  /** Tooltip nativo del browser — mostrado en hover cuando compact=true */
+  title?: string;
 }) {
   const pillBase =
     `flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-sm border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 ${className}`;
@@ -101,6 +104,7 @@ export function StagePill({
         type="button"
         onClick={() => scrollToDmSection(sectionId)}
         aria-label={`Ir a ${label}`}
+        title={title}
         className={pillStyle}
       >
         {inner}

@@ -70,8 +70,21 @@ function parseSynthesis(text: string): SynthesisSection[] | null {
   return sections.length >= 2 ? sections : null;
 }
 
+// Regex con todos los marcadores — extrae texto previo al primer marcador
+const FIRST_MARKER_RE = /[Ss]us fortalezas son[:\s]|[Ff]ortalezas[:\s]|[Ll]as brechas críticas son[:\s]|[Bb]rechas críticas[:\s]|[Pp]rioridad(?:es)? inmediata[:\s]|[Pp]rioridad[:\s]/;
+
 function SynthesisBlock({ narrative, createdAt }: { narrative: string; createdAt: string }) {
   const sections = parseSynthesis(narrative);
+
+  // Extraer párrafo de apertura (antes del primer marcador)
+  let intro: string | null = null;
+  if (sections) {
+    const m = FIRST_MARKER_RE.exec(narrative);
+    if (m && m.index > 20) {
+      const candidate = narrative.slice(0, m.index).trim();
+      if (candidate.length > 0) intro = candidate;
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -80,6 +93,9 @@ function SynthesisBlock({ narrative, createdAt }: { narrative: string; createdAt
       </p>
       {sections ? (
         <div className="space-y-2">
+          {intro && (
+            <p className="text-sm text-slate-600 leading-relaxed">{intro}</p>
+          )}
           {sections.map((s) => (
             <div key={s.label} className={`border-l-4 ${s.accent} pl-3 py-1.5`}>
               <span className={`text-[10px] font-bold uppercase tracking-widest ${s.labelCls} block mb-0.5`}>

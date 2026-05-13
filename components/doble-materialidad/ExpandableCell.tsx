@@ -27,8 +27,8 @@ const NO_DATA_CHIP = (
   </span>
 );
 
-export function ExpandableCell({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
+export function ExpandableCell({ text, defaultExpanded = false }: { text: string; defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   if (!text || text === "—") return NO_DATA_CHIP;
   if (/^sin datos/i.test(text)) return NO_DATA_CHIP;

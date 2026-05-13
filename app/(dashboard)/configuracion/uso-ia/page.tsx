@@ -519,6 +519,59 @@ export default async function UsoIaPage() {
         </>
       )}
 
+      {/* Herramientas externas — referencia de costo */}
+      <div className="mt-8 mb-6">
+        <Panel title="Costo de herramientas conectadas">
+          <p className="text-[11px] text-slate-600 mb-3 leading-relaxed">
+            Servicios externos que procesan documentos. Se cobran por uso — no por mes.
+            Referencia para estimar gasto según volumen de informes.
+          </p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                <th className="pb-1.5 text-left">Herramienta</th>
+                <th className="pb-1.5 text-left">Qué cobra</th>
+                <th className="pb-1.5 text-right">Precio</th>
+                <th className="pb-1.5 text-right">Free tier</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              <tr>
+                <td className="py-1.5 font-semibold text-indigo-700">Voyage AI</td>
+                <td className="py-1.5 text-slate-600">Por millón de tokens (fragmentos de documentos)</td>
+                <td className="py-1.5 text-right text-slate-900 tabular-nums">$0.10 / 1M tokens</td>
+                <td className="py-1.5 text-right text-emerald-700 tabular-nums">200M tokens/mes</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 font-semibold text-amber-700">LlamaParse</td>
+                <td className="py-1.5 text-slate-600">Por página de PDF procesada (1 vez por informe)</td>
+                <td className="py-1.5 text-right text-slate-900 tabular-nums">$3.00 / 1k páginas</td>
+                <td className="py-1.5 text-right text-emerald-700 tabular-nums">10,000 páginas</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 font-semibold text-rose-700">Mistral OCR</td>
+                <td className="py-1.5 text-slate-600">Por página (fallback de LlamaParse, batch más barato)</td>
+                <td className="py-1.5 text-right text-slate-900 tabular-nums">$1.00 / 1k páginas</td>
+                <td className="py-1.5 text-right text-slate-400 tabular-nums">Sin free tier</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 font-semibold text-teal-700">QStash</td>
+                <td className="py-1.5 text-slate-600">Por mensaje despachado (1 empresa = 1 mensaje/día)</td>
+                <td className="py-1.5 text-right text-slate-900 tabular-nums">$1.00 / 100k msgs</td>
+                <td className="py-1.5 text-right text-emerald-700 tabular-nums">1,000 msgs/día</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-[10px] text-slate-500 mt-3 leading-relaxed">
+            Estimado piloto (10 clientes, 8 competidoras c/u, reportes ~100 pág):
+            LlamaParse ~8,000 páginas = <span className="font-semibold text-slate-700">gratis</span> con free tier ·
+            QStash ~80 msgs/día = <span className="font-semibold text-slate-700">gratis</span> con free tier ·
+            Voyage AI embeddings = <span className="font-semibold text-slate-700">gratis</span> con free tier.
+            Costo variable total estimado: <span className="font-semibold text-slate-700">$0 en el piloto</span>.
+          </p>
+        </Panel>
+      </div>
+
       {/* Documentos por cliente — Sprint B */}
       {docs && (
         <div className="mt-8">

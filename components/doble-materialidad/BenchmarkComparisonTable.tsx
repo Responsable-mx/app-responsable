@@ -40,6 +40,8 @@ export function BenchmarkComparisonTable({
   >("all");
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   useEffect(() => {
     if (!tableFullscreen) return;
@@ -47,6 +49,21 @@ export function BenchmarkComparisonTable({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [tableFullscreen]);
+
+  // Scroll-fade: detectar si hay contenido oculto a la derecha en la tabla normal
+  // colFilter determina qué columnas son visibles → re-check al cambiar
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const check = () => setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2);
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      el.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, [colFilter]);
 
   const allFields = latestResult.fields_snapshot;
   const allCompanies = latestResult.companies_snapshot;
@@ -105,66 +122,64 @@ export function BenchmarkComparisonTable({
   };
 
   const filterBar = (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {(["all", ...cats] as const).map((c) => {
-          const count = c === "all" ? allFields.length : (catCounts[c] ?? 0);
-          return (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setTableFilter(c)}
-              className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
-                tableFilter === c
-                  ? "bg-brand-primary text-white border-brand-primary"
-                  : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
-              }`}
-            >
-              {c === "all" ? "Todas" : catLabel[c]}
-              <span className="ml-1 opacity-60">({count})</span>
-            </button>
-          );
-        })}
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {(["all", ...cats] as const).map((c) => {
+        const count = c === "all" ? allFields.length : (catCounts[c] ?? 0);
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setTableFilter(c)}
+            className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
+              tableFilter === c
+                ? "bg-brand-primary text-white border-brand-primary"
+                : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+            }`}
+          >
+            {c === "all" ? "Todas" : catLabel[c]}
+            <span className="ml-1 opacity-60">({count})</span>
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => setOnlyBrechas((v) => !v)}
+        className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
+          onlyBrechas
+            ? "bg-rose-50 text-rose-600 border-rose-200"
+            : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+        }`}
+      >
+        {onlyBrechas ? `Solo brechas (${filteredFields.length})` : "Solo brechas"}
+      </button>
+      {/* Divisor visual entre filtros de dimensión y filtro de empresa */}
+      <div className="w-px h-3 bg-slate-200 self-center shrink-0 mx-0.5" />
+      <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Empresa:</span>
+      <button
+        type="button"
+        onClick={() => setColFilter("all")}
+        className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
+          colFilter === "all"
+            ? "bg-slate-700 text-white border-slate-700"
+            : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+        }`}
+      >
+        Todas ({allCompanies.length})
+      </button>
+      {REL_PILLS.filter((r) => (relCounts[r.key] ?? 0) > 0).map((r) => (
         <button
+          key={r.key}
           type="button"
-          onClick={() => setOnlyBrechas((v) => !v)}
+          onClick={() => setColFilter(r.key)}
           className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
-            onlyBrechas
-              ? "bg-rose-50 text-rose-600 border-rose-200"
-              : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
-          }`}
-        >
-          {onlyBrechas ? `Solo brechas (${filteredFields.length})` : "Solo brechas"}
-        </button>
-      </div>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold mr-0.5">Empresa:</span>
-        <button
-          type="button"
-          onClick={() => setColFilter("all")}
-          className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
-            colFilter === "all"
+            colFilter === r.key
               ? "bg-slate-700 text-white border-slate-700"
               : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
           }`}
         >
-          Todas ({allCompanies.length})
+          {r.label} ({relCounts[r.key] ?? 0})
         </button>
-        {REL_PILLS.filter((r) => (relCounts[r.key] ?? 0) > 0).map((r) => (
-          <button
-            key={r.key}
-            type="button"
-            onClick={() => setColFilter(r.key)}
-            className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
-              colFilter === r.key
-                ? "bg-slate-700 text-white border-slate-700"
-                : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
-            }`}
-          >
-            {r.label} ({relCounts[r.key] ?? 0})
-          </button>
-        ))}
-      </div>
+      ))}
     </div>
   );
 
@@ -227,7 +242,7 @@ export function BenchmarkComparisonTable({
                   </div>
                 </td>
                 <td className="py-3 pr-6 max-w-[220px] align-top bg-brand-primary-light/20 px-3">
-                  <ExpandableCell text={clientText} />
+                  <ExpandableCell text={clientText} defaultExpanded={onlyBrechas} />
                   {clientText && clientText !== "—" && !/^sin datos/i.test(clientText) && (
                     <a
                       href={searchHref(clientName, field.label)}
@@ -243,7 +258,7 @@ export function BenchmarkComparisonTable({
                   const compText = lookupComparisonValue(latestResult.comparison, field.key, company.name);
                   return (
                     <td key={company.name} className="py-3 pr-6 max-w-[220px] align-top">
-                      <ExpandableCell text={compText} />
+                      <ExpandableCell text={compText} defaultExpanded={onlyBrechas} />
                       {compText && compText !== "—" && !/^sin datos/i.test(compText) && (
                         <a
                           href={searchHref(company.name, field.label)}
@@ -286,6 +301,7 @@ export function BenchmarkComparisonTable({
               type="button"
               disabled={exporting}
               onClick={() => void handleExport()}
+              title="Exportar a Excel"
               className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors disabled:opacity-50"
             >
               {exporting ? "Exportando…" : "↓ Excel"}
@@ -303,8 +319,17 @@ export function BenchmarkComparisonTable({
       </div>
 
       {/* Tabla — scroll horizontal modo normal */}
-      <div className="relative overflow-x-auto">
-        {tableElement}
+      <div className="relative">
+        <div ref={scrollRef} className="overflow-x-auto">
+          {tableElement}
+        </div>
+        {/* Fade-right: indica scroll oculto a la derecha */}
+        {canScrollRight && (
+          <div
+            className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-white to-transparent pointer-events-none"
+            aria-hidden="true"
+          />
+        )}
       </div>
       {scrollHint}
 
@@ -323,6 +348,7 @@ export function BenchmarkComparisonTable({
                   type="button"
                   disabled={exporting}
                   onClick={() => void handleExport()}
+                  title="Exportar a Excel"
                   className="px-2 py-0.5 rounded-sm text-[10px] font-medium border border-slate-200 bg-white text-slate-500 hover:border-slate-400 transition-colors disabled:opacity-50"
                 >
                   {exporting ? "Exportando…" : "↓ Excel"}

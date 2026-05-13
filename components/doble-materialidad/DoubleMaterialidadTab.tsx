@@ -575,6 +575,7 @@ export function DoubleMaterialidadTab({
                     className="flex-1"
                     subtitle={subtitle}
                     sectionId={s.sectionId}
+                    title={`${s.label} — ${subtitle}`}
                   />
                   {idx < stagesData.length - 1 && (
                     <div

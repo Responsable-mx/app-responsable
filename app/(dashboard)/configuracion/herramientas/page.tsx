@@ -102,6 +102,80 @@ async function checkQStash(): Promise<ToolHealth> {
   }
 }
 
+// ── Herramientas propuestas (sin health check — pendientes de activar) ─────────
+
+type ProposedTool = {
+  name: string;
+  tagline: string;
+  whatItDoes: string;
+  whatYouGain: string;
+  cost: string;
+  freeTier: string;
+  usedIn: string;
+  setupUrl?: string;
+  setupLabel?: string;
+  envKey?: string;
+};
+
+const PROPOSED_TOOLS: ProposedTool[] = [
+  {
+    name: "Voyage Rerank — Mejor selección de fragmentos",
+    tagline: "Elige los fragmentos más relevantes antes de enviárselos a la IA.",
+    whatItDoes:
+      "Después de buscar fragmentos de documentos, Voyage Rerank los reordena según cuál es realmente más útil para la pregunta específica. El paso de búsqueda encuentra candidatos; el reranking elige los mejores.",
+    whatYouGain:
+      "Aurora, Rebeca, Elena y Valeria reciben fragmentos más precisos del informe del cliente → respuestas más exactas y menos alucinaciones. Se estima +25% de precisión vs. búsqueda simple.",
+    cost: "$0 (incluido con Voyage AI)",
+    freeTier: "1,000,000 llamadas / mes gratis",
+    usedIn: "Chat IA — paso de recuperación de contexto",
+    setupUrl: "https://www.voyageai.com",
+    setupLabel: "voyageai.com",
+    envKey: "VOYAGE_API_KEY (ya configurada)",
+  },
+  {
+    name: "Upstash Redis — Caché de respuestas repetidas",
+    tagline: "Evita llamar a la IA cuando la respuesta ya existe.",
+    whatItDoes:
+      "Guarda en memoria las respuestas a preguntas frecuentes (marcos ESG como GRI o ESRS, benchmarks sectoriales) durante horas. Si otro consultor hace la misma pregunta, responde al instante sin cobrar tokens.",
+    whatYouGain:
+      "Ahorro estimado del 30-50% en llamadas a la IA para benchmarks sectoriales repetidos. Respuesta en <10 ms vs. 3-10 segundos. Ya tenemos cuenta de Upstash vía QStash.",
+    cost: "$0 con free tier",
+    freeTier: "256 MB de caché gratuita",
+    usedIn: "Benchmark de empresas — consultas de frameworks ESG recurrentes",
+    setupUrl: "https://console.upstash.com",
+    setupLabel: "console.upstash.com",
+    envKey: "UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN",
+  },
+  {
+    name: "Gemini Flash 2.0 — Extracción económica de datos",
+    tagline: "Extrae datos de documentos a 40× menor costo que el modelo actual.",
+    whatItDoes:
+      "Modelo de Google especializado en leer documentos y extraer información estructurada (nombres, números, fechas, indicadores GRI). No genera narrativa, solo extrae — y lo hace muy rápido.",
+    whatYouGain:
+      "El paso de AI-fill hoy usa Sonnet ($3/1M tokens). Migrar la extracción a Gemini Flash ($0.075/1M) reduce ese costo 40×. La narrativa y síntesis siguen en Sonnet/Opus. Ahorro estimado: $20-40/mes en volumen piloto.",
+    cost: "$0.075 / 1M tokens entrada",
+    freeTier: "Sin free tier (costo muy bajo desde el primer token)",
+    usedIn: "AI-fill cuestionario — paso de extracción de datos de documentos",
+    setupUrl: "https://console.cloud.google.com",
+    setupLabel: "Google AI Studio",
+    envKey: "GOOGLE_AI_API_KEY",
+  },
+  {
+    name: "Anthropic Batch API — Reportes en segundo plano",
+    tagline: "Genera reportes largos al 50% del costo, sin bloquear al consultor.",
+    whatItDoes:
+      "En lugar de esperar 3-5 minutos a que Opus genere el reporte PDF en tiempo real, se encola como trabajo en segundo plano. Anthropic lo procesa en los próximos minutos y notifica cuando está listo.",
+    whatYouGain:
+      "50% de descuento automático en el reporte DM (hoy el costo más alto de la app). El consultor puede seguir trabajando mientras el reporte se genera. Aplica también a la generación masiva de IROs.",
+    cost: "50% del costo normal (Opus $2.50 vs $5 / 1M tokens)",
+    freeTier: "No aplica (es el precio regular con descuento)",
+    usedIn: "DM-IA etapa 7 (Reporte PDF) + etapa 4 (IROs propios masivos)",
+    setupUrl: "https://docs.anthropic.com/en/docs/build-with-claude/message-batches",
+    setupLabel: "docs.anthropic.com",
+    envKey: "ANTHROPIC_API_KEY (ya configurada)",
+  },
+];
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
 function StatusBadge({ health }: { health: ToolHealth }) {
@@ -317,9 +391,105 @@ export default async function HerramientasPage() {
         })}
       </div>
 
+      {/* ── Herramientas propuestas ─────────────────────────────────────────── */}
+      <div className="mt-10">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+          Herramientas propuestas
+        </p>
+        <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+          Herramientas evaluadas y recomendadas para la siguiente fase. Cada una
+          reduce costo, mejora velocidad o precisión en un flujo específico.
+          Ninguna es obligatoria — la app funciona sin ellas.
+        </p>
+        <div className="flex flex-col gap-4">
+          {PROPOSED_TOOLS.map((tool) => (
+            <div
+              key={tool.name}
+              className="bg-white border border-slate-200 border-l-4 border-l-amber-400 rounded p-5 shadow-sm"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-sm font-bold text-slate-900 leading-tight">
+                    {tool.name}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 italic">
+                    {tool.tagline}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-sm shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                  Propuesta
+                </span>
+              </div>
+
+              {/* Body */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                <div className="bg-slate-50 rounded p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                    Cómo funciona
+                  </p>
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    {tool.whatItDoes}
+                  </p>
+                </div>
+                <div className="bg-teal-50 rounded p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600 mb-1">
+                    Lo que ganas
+                  </p>
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    {tool.whatYouGain}
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer: costo + dónde se usa */}
+              <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] text-slate-600">
+                <div>
+                  <span className="font-semibold text-slate-700">Costo:</span>{" "}
+                  {tool.cost}
+                  {tool.freeTier !== "No aplica (es el precio regular con descuento)" && (
+                    <> · <span className="text-emerald-700 font-medium">{tool.freeTier}</span></>
+                  )}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-700">Se usa en:</span>{" "}
+                  {tool.usedIn}
+                </div>
+                <div>
+                  {tool.envKey && (
+                    <>
+                      <span className="font-semibold text-slate-700">Variable necesaria:</span>{" "}
+                      <code className="font-mono text-[10px] bg-slate-100 px-1 rounded">
+                        {tool.envKey}
+                      </code>
+                    </>
+                  )}
+                  {tool.setupUrl && (
+                    <>
+                      {" · "}
+                      <a
+                        href={tool.setupUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand-primary underline underline-offset-2"
+                      >
+                        {tool.setupLabel ?? tool.setupUrl}
+                      </a>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <p className="text-[10px] text-slate-400 mt-8 leading-relaxed">
+        Para activar una herramienta propuesta: agregar las variables de entorno en Vercel → Settings → Environment Variables y redeploya.
         Para agregar una herramienta nueva: añadir una entrada al array{" "}
-        <code className="font-mono bg-slate-100 px-1 rounded">TOOLS</code> en{" "}
+        <code className="font-mono bg-slate-100 px-1 rounded">PROPOSED_TOOLS</code> (si es propuesta) o{" "}
+        <code className="font-mono bg-slate-100 px-1 rounded">TOOLS</code> (si ya tiene health check) en{" "}
         <code className="font-mono bg-slate-100 px-1 rounded">
           app/(dashboard)/configuracion/herramientas/page.tsx
         </code>

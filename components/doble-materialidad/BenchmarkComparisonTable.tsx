@@ -25,10 +25,12 @@ export function BenchmarkComparisonTable({
   clientId,
   clientName,
   latestResult,
+  companyUrls = {},
 }: {
   clientId: string;
   clientName: string;
   latestResult: BenchmarkResult;
+  companyUrls?: Record<string, { reportUrl: string | null; websiteUrl: string | null }>;
 }) {
   const { push } = useToast();
   const [tableFilter, setTableFilter] = useState<"all" | "E" | "S" | "G">("all");
@@ -99,8 +101,16 @@ export function BenchmarkComparisonTable({
     return texts.some(isBrechaText);
   });
 
-  const searchHref = (companyName: string, fieldLabel: string) =>
-    `https://www.google.com/search?q=${encodeURIComponent(`${companyName} ${fieldLabel} ESG reporte sustentabilidad`)}`;
+  const sourceHref = (companyName: string, fieldLabel: string) => {
+    const urls = companyUrls[companyName];
+    if (urls?.reportUrl) return { href: urls.reportUrl, label: "↗ reporte", cls: "text-brand-primary hover:text-brand-primary-dark" };
+    if (urls?.websiteUrl) return { href: urls.websiteUrl, label: "↗ sitio web", cls: "text-slate-400 hover:text-brand-primary" };
+    return {
+      href: `https://www.google.com/search?q=${encodeURIComponent(`${companyName} ${fieldLabel} ESG reporte sustentabilidad`)}`,
+      label: "⌕ buscar",
+      cls: "text-slate-400 hover:text-slate-600",
+    };
+  };
 
   const handleExport = async () => {
     setExporting(true);
@@ -243,32 +253,30 @@ export function BenchmarkComparisonTable({
                 </td>
                 <td className="py-3 pr-6 max-w-[220px] align-top bg-brand-primary-light/20 px-3">
                   <ExpandableCell text={clientText} defaultExpanded={onlyBrechas} />
-                  {clientText && clientText !== "—" && !/^sin datos/i.test(clientText) && (
-                    <a
-                      href={searchHref(clientName, field.label)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-[9px] text-slate-400 hover:text-brand-primary mt-0.5"
-                    >
-                      ↗ fuente
-                    </a>
-                  )}
+                  {clientText && clientText !== "—" && !/^sin datos/i.test(clientText) && (() => {
+                    const src = sourceHref(clientName, field.label);
+                    return (
+                      <a href={src.href} target="_blank" rel="noopener noreferrer"
+                        className={`inline-flex items-center text-[9px] mt-0.5 ${src.cls}`}>
+                        {src.label}
+                      </a>
+                    );
+                  })()}
                 </td>
                 {visibleCompanies.map((company) => {
                   const compText = lookupComparisonValue(latestResult.comparison, field.key, company.name);
                   return (
                     <td key={company.name} className="py-3 pr-6 max-w-[220px] align-top">
                       <ExpandableCell text={compText} defaultExpanded={onlyBrechas} />
-                      {compText && compText !== "—" && !/^sin datos/i.test(compText) && (
-                        <a
-                          href={searchHref(company.name, field.label)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-[9px] text-slate-400 hover:text-brand-primary mt-0.5"
-                        >
-                          ↗ fuente
-                        </a>
-                      )}
+                      {compText && compText !== "—" && !/^sin datos/i.test(compText) && (() => {
+                        const src = sourceHref(company.name, field.label);
+                        return (
+                          <a href={src.href} target="_blank" rel="noopener noreferrer"
+                            className={`inline-flex items-center text-[9px] mt-0.5 ${src.cls}`}>
+                            {src.label}
+                          </a>
+                        );
+                      })()}
                     </td>
                   );
                 })}

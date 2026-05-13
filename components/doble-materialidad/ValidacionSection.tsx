@@ -36,8 +36,6 @@ type Props = {
   clientId: string;
   /** IROs incluidos en el inventario — se filtran a los que tienen include=true */
   iros: IroInventoryItem[];
-  /** Callback cuando todas las decisiones están completas */
-  onAllDecided?: () => void;
 };
 
 // ── Fetcher ───────────────────────────────────────────────────────────────────

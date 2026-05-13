@@ -187,3 +187,24 @@ export function IconLayers(p: Props) {
     </svg>
   );
 }
+
+// Ícono para flujos / pipelines de trabajo (señal de actividad)
+export function IconActivity(p: Props) {
+  return (
+    <svg {...base(p.className, p.strokeWidth)} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  );
+}
+
+// Ícono para auditoría / gráfica de barras (medir decisiones)
+export function IconBarChart(p: Props) {
+  return (
+    <svg {...base(p.className, p.strokeWidth)} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+      <line x1="2" y1="20" x2="22" y2="20" />
+    </svg>
+  );
+}

@@ -392,10 +392,10 @@ export function DoubleMaterialidadTab({
     ? "active"
     : "locked";
 
-  // stage10 = Reporte (etapa final — requiere benchmark + IROs)
+  // stage10 = Reporte (etapa final — requiere benchmark + IROs + resumen IA)
   const stage10Status: StageStatus = hasReport
     ? "done"
-    : hasBenchmark && hasIros
+    : hasBenchmark && hasIros && hasResumen
     ? "active"
     : "pending";
 

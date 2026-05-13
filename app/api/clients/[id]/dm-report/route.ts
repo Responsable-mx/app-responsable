@@ -188,10 +188,28 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         });
 
         if (narrative) {
-          // Reconstruir el nombre del cliente desde el doc o dejarlo genérico
-          const clientData = await getClient(id).catch(() => null);
+          // Re-leer datos de benchmark para reconstruir la sección "Detalle del Benchmark".
+          // Sin esto, companies/fields/comparison llegan vacíos y esa sección queda en blanco.
+          const [clientData, benchRes] = await Promise.all([
+            getClient(id).catch(() => null),
+            admin
+              .from("dm_benchmark_results")
+              .select("companies_snapshot, comparison")
+              .eq("client_id", id)
+              .eq("status", "done")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+          ]);
           const clientName = clientData?.name ?? "Cliente";
-          const markdown = buildMarkdownReport(clientName, narrative, [], [], {});
+          const companies = (
+            (benchRes.data?.companies_snapshot ?? []) as Array<{ name: string }>
+          ).map((c) => c.name);
+          const comparison = (
+            benchRes.data?.comparison ?? {}
+          ) as Record<string, Record<string, string>>;
+          const fields = Object.keys(comparison);
+          const markdown = buildMarkdownReport(clientName, narrative, companies, fields, comparison);
 
           await admin
             .from("client_documents")

@@ -745,7 +745,19 @@ export function BenchmarkSection({
       )}
 
       {/* ── Tabla comparativa ── */}
-      {hasComparisonData && <BenchmarkComparisonTable clientId={clientId} clientName={clientName} latestResult={latestResult!} />}
+      {hasComparisonData && (
+        <BenchmarkComparisonTable
+          clientId={clientId}
+          clientName={clientName}
+          latestResult={latestResult!}
+          companyUrls={Object.fromEntries(
+            companies.map((c) => [
+              c.name,
+              { reportUrl: c.sustainability_report_url ?? null, websiteUrl: c.website ?? null },
+            ])
+          )}
+        />
+      )}
 
 
       {latestResult?.status === "failed" && (

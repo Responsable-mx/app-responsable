@@ -86,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
     const { error } = await admin
       .from("dm_resumenes")
-      .update({ content: trimmed })
+      .update({ content: trimmed, reviewed_at: null })
       .eq("id", latest.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     void logChange({

@@ -541,7 +541,7 @@ export function DoubleMaterialidadTab({
   // IMPORTANTE: estos hooks deben ir ANTES del early return de loadingBenchmark
   // para que el conteo de hooks sea constante en todo render (#310).
   const stepperSentinelRef = useRef<HTMLDivElement>(null);
-  const [stepperCompact, setStepperCompact] = useState(false);
+  const [_stepperCompact, setStepperCompact] = useState(false);
   useEffect(() => {
     const el = stepperSentinelRef.current;
     if (!el) return;

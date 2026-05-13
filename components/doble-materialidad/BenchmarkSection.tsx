@@ -81,6 +81,7 @@ export function BenchmarkSection({
   // En modo Etapa 3: auto-seleccionar todas cuando el SWR refetch trae las companies importadas
   useEffect(() => {
     if (hasReferentes && companies.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot: sincroniza selección cuando llegan las empresas importadas por primera vez
       setSelected(new Set(companies.map((c) => c.id)));
     }
   }, [hasReferentes, companies]);

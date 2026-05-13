@@ -304,7 +304,7 @@ function TopicsRawTable({ topics }: { topics: TopicRaw[] }) {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <p className="text-xs text-slate-400 text-center py-4">Sin resultados para "{filter}"</p>
+          <p className="text-xs text-slate-400 text-center py-4">Sin resultados para &quot;{filter}&quot;</p>
         )}
       </div>
     </div>

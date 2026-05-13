@@ -381,6 +381,7 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
   const status      = rec?.generation_status ?? "idle";
 
   const [localEnabled, setLocalEnabled] = useState<string[]>(enabledDB);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza estado local cuando enabledDB cambia desde el servidor (SWR refetch)
   useEffect(() => setLocalEnabled(enabledDB), [enabledDB]);
 
   const isDirty = useMemo(() => {

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import type { AutoUpdateConfigRow } from "@/app/api/auto-update-config/route";
 
 export function AutoUpdateConfigTable({ initial }: { initial: AutoUpdateConfigRow[] }) {
   const [rows, setRows] = useState<AutoUpdateConfigRow[]>(initial);
   const [pending, setPending] = useState<Record<string, boolean>>({});
-  const now = useMemo(() => Date.now(), []);
+  const [now] = useState(Date.now);
   const toast = useToast();
 
   async function patch(resourceKey: string, updates: Partial<Pick<AutoUpdateConfigRow, "enabled" | "frequency_days">>) {

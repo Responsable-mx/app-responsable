@@ -39,7 +39,7 @@ const KIND_COLOR: Record<DocMeta["kind"], string> = {
   proposal: "bg-violet-100 text-violet-800",
 };
 
-const TYPE_BADGE: Record<DocMeta["file_type"], string> = {
+const _TYPE_BADGE: Record<DocMeta["file_type"], string> = {
   pdf: "PDF",
   docx: "DOCX",
   pptx: "PPTX",

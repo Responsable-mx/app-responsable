@@ -7,6 +7,7 @@ import {
   listClientsForTable,
   getClient,
   getClientMini,
+  getClientEngagements,
   createClientRow,
   updateClientRow,
   deleteClientRow,
@@ -168,5 +169,10 @@ describe("dev mode guards (sin Supabase)", () => {
     expect(heineken).toBeDefined();
     expect(heineken?.sector).toBe("bebidas");
     expect(Array.isArray(heineken?.frameworks)).toBe(true);
+  });
+
+  it("getClientEngagements devuelve array vacío en dev mode", async () => {
+    const result = await getClientEngagements("dev-heineken");
+    expect(Array.isArray(result)).toBe(true);
   });
 });

@@ -34,6 +34,7 @@ export function HorizontesConfig({
   const horizons = data?.data ?? DM_HORIZON_DEFAULTS;
   const [draft, setDraft] = useState<DmHorizons | null>(null);
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false); // colapsado por default
 
   const current = draft ?? horizons;
   const isDirty = draft !== null && (
@@ -63,6 +64,7 @@ export function HorizontesConfig({
       if (!res.ok) throw new Error(json.error ?? "Error al guardar");
       push("success", "Horizontes actualizados.");
       setDraft(null);
+      setOpen(false);
       mutate();
     } catch (e) {
       push("error", e instanceof Error ? e.message : "Error al guardar horizontes");
@@ -73,6 +75,27 @@ export function HorizontesConfig({
 
   const HORIZON_LABELS = ["Corto plazo", "Mediano plazo", "Largo plazo"] as const;
   const HORIZON_KEYS:   Array<keyof DmHorizons> = ["corto_year", "mediano_year", "largo_year"];
+
+  // Vista colapsada: línea compacta con valores actuales
+  if (!open) {
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          Horizontes temporales del estudio
+        </span>
+        <span className="text-xs text-slate-500 tabular-nums">
+          Corto ≤{horizons.corto_year} · Mediano {horizons.mediano_year} · Largo {horizons.largo_year}
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-[10px] text-brand-primary hover:underline font-medium"
+        >
+          Editar
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -103,15 +126,13 @@ export function HorizontesConfig({
             Guardar
           </Button>
         )}
-        {isDirty && (
-          <button
-            type="button"
-            className="text-xs text-slate-400 hover:underline self-end pb-1"
-            onClick={() => setDraft(null)}
-          >
-            Cancelar
-          </button>
-        )}
+        <button
+          type="button"
+          className="text-xs text-slate-400 hover:underline self-end pb-1"
+          onClick={() => { setDraft(null); setOpen(false); }}
+        >
+          {isDirty ? "Cancelar" : "Cerrar"}
+        </button>
       </div>
       <p className="text-[10px] text-slate-400 mt-1.5">
         Usados por la IA para clasificar horizontes de cada IRO · Defaults: ≤{DM_HORIZON_DEFAULTS.corto_year} / {DM_HORIZON_DEFAULTS.mediano_year} / {DM_HORIZON_DEFAULTS.largo_year}

@@ -32,7 +32,7 @@ export function BenchmarkComparisonTable({
 }) {
   const { push } = useToast();
   const [tableFilter, setTableFilter] = useState<"all" | "E" | "S" | "G">("all");
-  const [onlyBrechas, setOnlyBrechas] = useState(false);
+  const [onlyBrechas, setOnlyBrechas] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [tableFullscreen, setTableFullscreen] = useState(false);
   const [colFilter, setColFilter] = useState<

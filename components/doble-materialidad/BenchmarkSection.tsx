@@ -20,6 +20,89 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
+// ── Síntesis estructurada ─────────────────────────────────────────────────────
+
+type SynthesisSection = { label: string; text: string; accent: string; labelCls: string };
+
+function parseSynthesis(text: string): SynthesisSection[] | null {
+  // Buscar marcadores comunes en el output de la IA
+  const MARKERS: Array<{ re: RegExp; label: string; accent: string; labelCls: string }> = [
+    {
+      re: /[Ss]us fortalezas son[:\s]|[Ff]ortalezas[:\s]/,
+      label: "Fortalezas",
+      accent: "border-l-emerald-500",
+      labelCls: "text-emerald-700",
+    },
+    {
+      re: /[Ll]as brechas críticas son[:\s]|[Bb]rechas críticas[:\s]/,
+      label: "Brechas críticas",
+      accent: "border-l-amber-500",
+      labelCls: "text-amber-700",
+    },
+    {
+      re: /[Pp]rioridad(?:es)? inmediata[:\s]|[Pp]rioridad[:\s]/,
+      label: "Prioridad inmediata",
+      accent: "border-l-brand-primary",
+      labelCls: "text-brand-primary",
+    },
+  ];
+
+  const positions: Array<{ idx: number; markerIdx: number; matchEnd: number }> = [];
+  for (let i = 0; i < MARKERS.length; i++) {
+    const m = MARKERS[i]!.re.exec(text);
+    if (m) positions.push({ idx: m.index, markerIdx: i, matchEnd: m.index + m[0].length });
+  }
+  if (positions.length < 2) return null; // no hay suficientes marcadores → fallback
+
+  positions.sort((a, b) => a.idx - b.idx);
+
+  const sections: SynthesisSection[] = [];
+  // Texto previo al primer marcador = intro (opcional, no renderizar como sección propia)
+  for (let p = 0; p < positions.length; p++) {
+    const pos = positions[p]!;
+    const marker = MARKERS[pos.markerIdx]!;
+    const end = p + 1 < positions.length ? positions[p + 1]!.idx : text.length;
+    const sectionText = text.slice(pos.matchEnd, end).trim().replace(/^[:\s]+/, "");
+    if (sectionText) {
+      sections.push({ label: marker.label, text: sectionText, accent: marker.accent, labelCls: marker.labelCls });
+    }
+  }
+  return sections.length >= 2 ? sections : null;
+}
+
+function SynthesisBlock({ narrative, createdAt }: { narrative: string; createdAt: string }) {
+  const sections = parseSynthesis(narrative);
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        Síntesis del benchmark
+      </p>
+      {sections ? (
+        <div className="space-y-2">
+          {sections.map((s) => (
+            <div key={s.label} className={`border-l-4 ${s.accent} pl-3 py-1.5`}>
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${s.labelCls} block mb-0.5`}>
+                {s.label}
+              </span>
+              <p className="text-sm text-slate-700 leading-relaxed">{s.text}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="border-l-4 border-l-brand-primary pl-4 py-2">
+          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{narrative}</p>
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400">
+        {new Date(createdAt).toLocaleDateString("es-MX", {
+          day: "numeric", month: "long", year: "numeric",
+        })}
+      </p>
+    </div>
+  );
+}
+
 export function BenchmarkSection({
   clientId,
   clientName,
@@ -637,21 +720,10 @@ export function BenchmarkSection({
 
       {/* ── Resultado narrativo del último benchmark ── */}
       {hasDone && latestResult!.narrative && (
-        <div className="border-l-4 border-l-brand-primary pl-4 py-2 bg-white">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-            Síntesis del benchmark
-          </p>
-          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-            {latestResult!.narrative}
-          </p>
-          <p className="text-[10px] text-slate-400 mt-2">
-            {new Date(latestResult!.created_at).toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </p>
-        </div>
+        <SynthesisBlock
+          narrative={latestResult!.narrative}
+          createdAt={latestResult!.created_at}
+        />
       )}
 
       {/* ── Tabla comparativa ── */}

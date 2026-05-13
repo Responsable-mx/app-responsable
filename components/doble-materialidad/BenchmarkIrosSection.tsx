@@ -142,8 +142,47 @@ export function BenchmarkIrosSection({
   const activeGroup = groups.find((g) => g.company_id === activeCompanyId) ?? null;
   const activeCompany = validatedCompanies.find((c) => c.id === activeCompanyId);
 
+  // Companies that still need IROs generated (no batch or batch failed, not currently pending/generating)
+  const pendingGeneration = validatedCompanies.filter((c) => {
+    const group = groups.find((g) => g.company_id === c.id);
+    const status = group?.batch?.status;
+    return status !== "done" && status !== "pending" && !generating.has(c.id);
+  });
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+
+  const generateAll = async () => {
+    if (bulkGenerating || pendingGeneration.length === 0) return;
+    setBulkGenerating(true);
+    let queued = 0;
+    for (const company of pendingGeneration) {
+      await generateIros(company.id);
+      queued++;
+      // Pequeña pausa entre requests para no saturar el rate limit DB
+      if (queued < pendingGeneration.length) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+    setBulkGenerating(false);
+  };
+
   return (
     <div className="space-y-4">
+      {/* ── Bulk generate header ── */}
+      {pendingGeneration.length > 0 && groups.length > 0 && (
+        <div className="flex items-center justify-between gap-3 flex-wrap py-2 px-3 bg-slate-50 border border-slate-200 rounded">
+          <span className="text-xs text-slate-600">
+            <span className="font-medium text-slate-700">{pendingGeneration.length}</span> empresa{pendingGeneration.length !== 1 ? "s" : ""} sin IROs generados
+          </span>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={bulkGenerating || isPolling}
+            onClick={() => void generateAll()}
+          >
+            Generar todos ({pendingGeneration.length})
+          </Button>
+        </div>
+      )}
       {/* ── Company tabs ── */}
       <div className="flex gap-1 flex-wrap pb-1 border-b border-slate-100">
         {validatedCompanies.map((company) => {

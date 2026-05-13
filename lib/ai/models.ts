@@ -51,7 +51,24 @@ export const MODEL_CONFIG: Record<RoleId, ModelConfig> = {
   },
 };
 
-export function getModelConfig(role: RoleId): ModelConfig {
+/** Elena routing heuristic: Opus para mensajes complejos (>80 palabras o
+ *  palabras clave estratégicas), Sonnet para mensajes cortos/seguimiento.
+ *  -$50-80/mes estimado al escalar a >20 usuarios.
+ */
+function elenaModel(userMessage?: string): string {
+  if (!userMessage) return MODEL_CONFIG.elena.model;
+  const words = userMessage.trim().split(/\s+/).length;
+  const hasComplexKeywords = /trade.?off|estrateg|compara|analiza|profundiz|sector|referente|benchmark|riesgo|oportunidad/i.test(userMessage);
+  if (words < 80 && !hasComplexKeywords) {
+    return process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6";
+  }
+  return MODEL_CONFIG.elena.model;
+}
+
+export function getModelConfig(role: RoleId, userMessage?: string): ModelConfig {
+  if (role === "elena" && userMessage !== undefined) {
+    return { ...MODEL_CONFIG.elena, model: elenaModel(userMessage) };
+  }
   return MODEL_CONFIG[role];
 }
 

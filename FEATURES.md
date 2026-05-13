@@ -53,6 +53,8 @@
 
 - [B] **DM-IA navegación mejorada — Ruta B (arquitectura target)** — Sub-tabs por etapa (activeStage state + URL param `?stage=N`). Solo 1 etapa renderizada → DOM 7× más liviano. Extracción de `BenchmarkSection`, `IrosSection`, `ContextoSection`, `ReporteSection` a archivos separados. Stepper = tab bar con aria-selected. 5–6 archivos. Sprint siguiente.
 
+- [A] 🔜 **DM-IA Etapa 4: IROs por empresa benchmark** — Por cada empresa del benchmark, la IA extrae (o interpreta) sus IROs desde su informe de sustentabilidad. Tabla tabulada (1 pestaña/empresa) con 8 columnas: ID IRO · descripción causa-consecuencia · clasificación (impacto+/−/riesgo/oportunidad) · dónde ocurre (operación/upstream/downstream/sociedad/clientes/medio ambiente) · horizonte (corto/mediano/largo) · tema asociado · fuente (reporte/sitio web/interpretación IA) · nivel de confianza IA (alto=evidencia explícita/medio=inferencia/bajo=suposición). Nueva tabla `dm_benchmark_company_iros` (enum `cadena` ampliado a 6 valores). API Batch + polling. `BenchmarkIrosSection.tsx` como sub-sección dentro de la etapa Benchmark. Cache `revalidate: 3600`. may-2026
+
 ## En desarrollo (may-2026)
 
 - [A] 🔄 Templates de servicio + visión global proyectos — `/configuracion/servicios` (CRUD plantillas etapas/actividades/duraciones), aplicar plantilla a cliente, vista global en `/equipo`. 15 archivos, migración 0033. Semáforo 🟢.

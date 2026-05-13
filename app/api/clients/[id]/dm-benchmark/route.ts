@@ -144,19 +144,20 @@ ${iros.map((iro) =>
     try {
       const { searchCompetitorChunks } = await import("@/lib/documents/competitor");
       const esrsQuery = iros.map((iro) => `${iro.esrs_standard} ${iro.label} ${iro.impact_desc} ${iro.risk_desc}`).join(" ");
-      const perCompanyChunks: string[] = [];
-      for (const c of companies) {
-        if (!c.id) continue;
-        const matches = await searchCompetitorChunks({
-          query: esrsQuery,
-          benchmarkCompanyId: c.id,
-          limit: 8,
-        });
-        if (matches && matches.length > 0) {
-          const body = matches.map((m) => m.content).join("\n---\n").slice(0, 6000);
-          perCompanyChunks.push(`### ${c.name}\n${body}`);
-        }
-      }
+      const perCompanyChunks = (await Promise.all(
+        companies
+          .filter((c) => c.id)
+          .map(async (c) => {
+            const matches = await searchCompetitorChunks({
+              query: esrsQuery,
+              benchmarkCompanyId: c.id!,
+              limit: 8,
+            });
+            if (!matches || matches.length === 0) return null;
+            const body = matches.map((m) => m.content).join("\n---\n").slice(0, 6000);
+            return `### ${c.name}\n${body}`;
+          })
+      )).filter((x): x is string => x !== null);
       if (perCompanyChunks.length > 0) {
         competitorChunksSection = `\nINFORMACIÓN PRE-ENCONTRADA (reportes oficiales — usa esto antes que web_search):\n\n${perCompanyChunks.join("\n\n")}\n`;
       }

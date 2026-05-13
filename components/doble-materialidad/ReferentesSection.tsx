@@ -1,16 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
-import type {
-  ReferentesData,
-  ReferenteFramework,
-  TopicRaw,
-  TopicGrouped,
-} from "@/lib/dm/referentes-types";
-
-// ── Fetcher ───────────────────────────────────────────────────────────────────
+import type { ReferentesData, ReferenteFramework } from "@/lib/dm/referentes-types";
+import { FrameworkCard } from "./FrameworkCard";
+import { CoverageScore, TopicsRawTable, TopicsGroupedTable, exportReferentesCSV } from "./ReferentesTables";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -18,7 +13,7 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
-// ── Sub-step pill bar ─────────────────────────────────────────────────────────
+// ── Sub-step bar ──────────────────────────────────────────────────────────────
 
 const SUBSTEPS = [
   { id: 1, label: "Referentes propuestos" },
@@ -68,318 +63,7 @@ function SubStepBar({
   );
 }
 
-// ── Framework card ────────────────────────────────────────────────────────────
-
-function FrameworkCard({
-  framework,
-  enabled,
-  onToggle,
-  onUrlSave,
-}: {
-  framework: ReferenteFramework;
-  enabled: boolean;
-  onToggle: () => void;
-  onUrlSave: (id: string, url: string | null) => Promise<void>;
-}) {
-  const [editingUrl, setEditingUrl]   = useState(false);
-  const [urlDraft, setUrlDraft]       = useState(framework.url ?? "");
-  const [savingUrl, setSavingUrl]     = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const openEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setUrlDraft(framework.url ?? "");
-    setEditingUrl(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  const handleSaveUrl = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSavingUrl(true);
-    try {
-      await onUrlSave(framework.id, urlDraft.trim() || null);
-      setEditingUrl(false);
-    } finally {
-      setSavingUrl(false);
-    }
-  };
-
-  const cancelEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingUrl(false);
-  };
-
-  return (
-    <div
-      className={`
-        border rounded p-3 transition-all cursor-pointer select-none
-        ${enabled
-          ? "border-brand-primary bg-brand-primary/5"
-          : "border-slate-200 bg-white hover:bg-slate-50"}
-      `}
-      onClick={onToggle}
-      role="checkbox"
-      aria-checked={enabled}
-      tabIndex={0}
-      onKeyDown={(e) => (e.key === " " || e.key === "Enter") && onToggle()}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            className={`
-              w-4 h-4 rounded-sm border-2 flex items-center justify-center shrink-0 mt-0.5
-              ${enabled ? "bg-brand-primary border-brand-primary" : "border-slate-300"}
-            `}
-          >
-            {enabled && (
-              <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className={`text-xs font-bold ${enabled ? "text-brand-primary" : "text-slate-700"}`}>
-              {framework.name}
-            </p>
-            {framework.sector_note && (
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{framework.sector_note}</p>
-            )}
-          </div>
-        </div>
-
-        {/* URL area — view or edit */}
-        {editingUrl ? (
-          <div
-            className="flex items-center gap-1 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <input
-              ref={inputRef}
-              type="url"
-              value={urlDraft}
-              onChange={(e) => setUrlDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleSaveUrl(e as unknown as React.MouseEvent);
-                if (e.key === "Escape") setEditingUrl(false);
-              }}
-              placeholder="https://..."
-              className="font-sans text-[10px] border border-slate-300 rounded px-2 py-1 w-48 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-            />
-            <button
-              type="button"
-              onClick={(e) => void handleSaveUrl(e)}
-              disabled={savingUrl}
-              className="text-[10px] font-semibold text-brand-primary hover:text-brand-primary-dark disabled:opacity-50 px-1"
-            >
-              {savingUrl ? "…" : "OK"}
-            </button>
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="text-[10px] text-slate-400 hover:text-slate-600 px-1"
-            >
-              ✕
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1 shrink-0">
-            {framework.url ? (
-              <a
-                href={framework.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-[10px] text-brand-primary underline hover:text-brand-primary-dark"
-              >
-                Ver →
-              </a>
-            ) : (
-              <span
-                title="La IA no pudo verificar la URL oficial de este referente."
-                className="inline-flex items-center gap-1 text-[10px] text-slate-400 italic"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-                Sin URL
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={openEdit}
-              title="Editar URL"
-              className="p-0.5 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
-              aria-label="Editar URL del referente"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
-          </div>
-        )}
-      </div>
-      <p className="text-xs text-slate-600 mt-2 leading-snug">{framework.description}</p>
-    </div>
-  );
-}
-
-// ── Coverage score bar ────────────────────────────────────────────────────────
-
-function CoverageScore({ score, note }: { score: number; note?: string | null }) {
-  const pct = Math.round((score / 10) * 100);
-  const color = score >= 8 ? "bg-emerald-500" : score >= 6 ? "bg-amber-500" : "bg-rose-500";
-  return (
-    <div className="border-l-4 border-l-brand-primary pl-3 py-1 bg-slate-50 rounded-sm flex items-center gap-4">
-      <div className="shrink-0">
-        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Cobertura IA</p>
-        <p className="text-2xl font-bold text-slate-900 leading-none tabular-nums">{score.toFixed(1)}<span className="text-sm font-normal text-slate-500">/10</span></p>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="h-1 bg-slate-200 overflow-hidden mb-1.5">
-          <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
-        </div>
-        {note && <p className="text-xs text-slate-600 leading-snug">{note}</p>}
-      </div>
-    </div>
-  );
-}
-
-// ── Topics table ──────────────────────────────────────────────────────────────
-
-function TopicsRawTable({ topics }: { topics: TopicRaw[] }) {
-  const [filter, setFilter] = useState("");
-  const filtered = filter
-    ? topics.filter(
-        (t) =>
-          t.tema.toLowerCase().includes(filter.toLowerCase()) ||
-          t.referente.toLowerCase().includes(filter.toLowerCase()) ||
-          t.descripcion.toLowerCase().includes(filter.toLowerCase())
-      )
-    : topics;
-
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-          {topics.length} temas identificados
-        </p>
-        <input
-          type="text"
-          placeholder="Filtrar..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="text-xs border border-slate-200 rounded-sm px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 w-40"
-        />
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-max min-w-full text-xs border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              {["Tema", "Subtema", "Descripción", "Referente"].map((h) => (
-                <th
-                  key={h}
-                  className="text-left px-3 py-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 whitespace-nowrap"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((t, i) => (
-              <tr
-                key={i}
-                className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"} hover:bg-brand-primary/5`}
-              >
-                <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap max-w-[180px] truncate">{t.tema}</td>
-                <td className="px-3 py-2 text-slate-600 whitespace-nowrap max-w-[160px] truncate">{t.subtema ?? "—"}</td>
-                <td className="px-3 py-2 text-slate-700 max-w-[400px]">{t.descripcion}</td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-slate-100 text-[10px] font-semibold text-slate-600">
-                    {t.referente}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filtered.length === 0 && (
-          <p className="text-xs text-slate-400 text-center py-4">Sin resultados para &quot;{filter}&quot;</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TopicsGroupedTable({ topics }: { topics: TopicGrouped[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-max min-w-full text-xs border-collapse">
-        <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            {["Tema consolidado", "Descripción consolidada", "Referentes"].map((h) => (
-              <th
-                key={h}
-                className="text-left px-3 py-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 whitespace-nowrap"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {topics.map((t, i) => (
-            <tr
-              key={i}
-              className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"} hover:bg-brand-primary/5`}
-            >
-              <td className="px-3 py-2 font-medium text-slate-800 w-[220px] min-w-[180px] align-top break-words">{t.tema_consolidado}</td>
-              <td className="px-3 py-2 text-slate-700 max-w-[480px] align-top">{t.descripcion_consolidada}</td>
-              <td className="px-3 py-2 align-top">
-                <div className="flex flex-wrap gap-1">
-                  {t.referentes.map((r) => (
-                    <span key={r} className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-brand-primary/10 text-[10px] font-semibold text-brand-primary">
-                      {r}
-                    </span>
-                  ))}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ── Excel export ──────────────────────────────────────────────────────────────
-
-function exportToExcel(raw: TopicRaw[], grouped: TopicGrouped[], clientName: string) {
-  // CSV doble hoja simulado como un solo archivo con separador de sección.
-  // Para Excel real se necesitaría SheetJS (no instalado) — exportar como CSV por ahora.
-  const rawRows = [
-    ["Tema", "Subtema", "Descripción", "Referente"],
-    ...raw.map((t) => [t.tema, t.subtema ?? "", t.descripcion, t.referente]),
-  ];
-  const groupedRows = [
-    ["Tema consolidado", "Descripción consolidada", "Referentes"],
-    ...grouped.map((t) => [t.tema_consolidado, t.descripcion_consolidada, t.referentes.join(", ")]),
-  ];
-
-  const toCSV = (rows: string[][]) =>
-    rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
-
-  const content = `TABLA DE TEMAS (fuentes originales)\n${toCSV(rawRows)}\n\nTEMAS AGRUPADOS (consolidado)\n${toCSV(groupedRows)}`;
-  const blob    = new Blob(["﻿" + content], { type: "text/csv;charset=utf-8;" });
-  const url     = URL.createObjectURL(blob);
-  const a       = document.createElement("a");
-  a.href        = url;
-  a.download    = `referentes-sostenibilidad-${clientName.replace(/\s+/g, "-").toLowerCase()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── Componente principal ──────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function ReferentesSection({
   clientId,
@@ -398,12 +82,11 @@ export function ReferentesSection({
   const rec = resp?.data;
   const { push } = useToast();
 
-  const [subStep, setSubStep]             = useState<SubStep>(1);
-  const [loadingFW, setLoadingFW]         = useState(false);
-  const [loadingTopics, setLoadingTopics] = useState(false);
+  const [subStep, setSubStep]                     = useState<SubStep>(1);
+  const [loadingFW, setLoadingFW]                 = useState(false);
+  const [loadingTopics, setLoadingTopics]         = useState(false);
   const [loadingSearchUrls, setLoadingSearchUrls] = useState(false);
-  // Local toggle state — sincroniza con DB en blur/confirm
-  const [localEnabled, setLocalEnabled] = useState<string[] | null>(null);
+  const [localEnabled, setLocalEnabled]           = useState<string[] | null>(null);
 
   const enabledFW = localEnabled ?? rec?.enabled_frameworks ?? [];
 
@@ -424,10 +107,7 @@ export function ReferentesSection({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled_frameworks: localEnabled }),
     });
-    if (!res.ok) {
-      push("error", "Error al guardar la selección");
-      return;
-    }
+    if (!res.ok) { push("error", "Error al guardar la selección"); return; }
     setLocalEnabled(null);
     await mutate();
     onDataMutate?.();
@@ -441,10 +121,7 @@ export function ReferentesSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "generate_frameworks" }),
       });
-      if (!res.ok) {
-        push("error", "Error al generar referentes");
-        return;
-      }
+      if (!res.ok) { push("error", "Error al generar referentes"); return; }
       await mutate();
       onDataMutate?.();
     } finally {
@@ -486,10 +163,7 @@ export function ReferentesSection({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update_framework", id: frameworkId, url }),
     });
-    if (!res.ok) {
-      push("error", "Error al actualizar la URL");
-      return;
-    }
+    if (!res.ok) { push("error", "Error al actualizar la URL"); return; }
     await mutate();
     onDataMutate?.();
   }, [key, mutate, onDataMutate, push]);
@@ -503,10 +177,7 @@ export function ReferentesSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "generate_topics" }),
       });
-      if (!res.ok) {
-        push("error", "Error al generar tabla de temas");
-        return;
-      }
+      if (!res.ok) { push("error", "Error al generar tabla de temas"); return; }
       push("success", "Tabla de temas generada.");
       setSubStep(2);
       await mutate();
@@ -516,12 +187,12 @@ export function ReferentesSection({
     }
   }, [handleSaveEnabled, localEnabled, key, mutate, onDataMutate, push]);
 
-  const proposed    = rec?.proposed_frameworks ?? [];
-  const noUrlCount  = proposed.filter((fw) => !fw.url).length;
-  const hasTopics   = (rec?.topics_raw ?? []).length > 0;
-  const hasGrouped  = (rec?.topics_grouped ?? []).length > 0;
+  const proposed   = rec?.proposed_frameworks ?? [];
+  const noUrlCount = proposed.filter((fw: ReferenteFramework) => !fw.url).length;
+  const hasTopics  = (rec?.topics_raw ?? []).length > 0;
+  const hasGrouped = (rec?.topics_grouped ?? []).length > 0;
 
-  const selectAll = () => setLocalEnabled(proposed.map((fw) => fw.id));
+  const selectAll = () => setLocalEnabled(proposed.map((fw: ReferenteFramework) => fw.id));
   const clearAll  = () => setLocalEnabled([]);
 
   return (
@@ -536,7 +207,6 @@ export function ReferentesSection({
       {/* ── Sub-step 1: Referentes propuestos ── */}
       {subStep === 1 && (
         <div>
-          {/* Banner IA */}
           <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded mb-4">
             <svg className="w-4 h-4 mt-0.5 text-brand-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
@@ -546,7 +216,6 @@ export function ReferentesSection({
             </p>
           </div>
 
-          {/* Estado: sin datos todavía */}
           {proposed.length === 0 && (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <svg className="w-10 h-10 text-slate-200 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
@@ -576,10 +245,8 @@ export function ReferentesSection({
             </div>
           )}
 
-          {/* Lista de frameworks propuestos */}
           {proposed.length > 0 && (
             <>
-              {/* Controls bar */}
               <div className="flex items-center gap-3 mb-3 flex-wrap">
                 {noUrlCount > 0 && (
                   <button
@@ -617,7 +284,7 @@ export function ReferentesSection({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                {proposed.map((fw) => (
+                {proposed.map((fw: ReferenteFramework) => (
                   <FrameworkCard
                     key={fw.id}
                     framework={fw}
@@ -628,7 +295,6 @@ export function ReferentesSection({
                 ))}
               </div>
 
-              {/* Acciones */}
               <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
                 <div className="flex items-center gap-2">
                   <button
@@ -676,7 +342,6 @@ export function ReferentesSection({
       {/* ── Sub-step 2: Tabla de temas (raw) ── */}
       {subStep === 2 && (
         <div>
-          {/* Status row */}
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
@@ -694,19 +359,16 @@ export function ReferentesSection({
             </button>
           </div>
 
-          {/* Coverage score */}
           {rec?.coverage_score != null && (
             <div className="mb-4">
               <CoverageScore score={rec.coverage_score} note={rec.coverage_note} />
             </div>
           )}
 
-          {/* Tabla raw */}
           {(rec?.topics_raw ?? []).length > 0 && (
             <TopicsRawTable topics={rec!.topics_raw} />
           )}
 
-          {/* CTA → temas agrupados */}
           {hasTopics && (
             <div className="flex justify-end mt-4 pt-3 border-t border-slate-100">
               <button
@@ -725,7 +387,6 @@ export function ReferentesSection({
       {/* ── Sub-step 3: Temas agrupados ── */}
       {subStep === 3 && (
         <div>
-          {/* Status row */}
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
@@ -735,7 +396,7 @@ export function ReferentesSection({
             </div>
             <button
               type="button"
-              onClick={() => exportToExcel(rec?.topics_raw ?? [], rec?.topics_grouped ?? [], clientName)}
+              onClick={() => exportReferentesCSV(rec?.topics_raw ?? [], rec?.topics_grouped ?? [], clientName)}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/5 px-3 py-1.5 rounded-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
             >
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -745,7 +406,6 @@ export function ReferentesSection({
             </button>
           </div>
 
-          {/* Nota IA */}
           {rec?.coverage_note && (
             <div className="border-l-4 border-l-brand-primary pl-3 bg-slate-50 py-2 rounded-sm mb-4">
               <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-0.5">Nota de cobertura IA</p>
@@ -753,7 +413,6 @@ export function ReferentesSection({
             </div>
           )}
 
-          {/* Tabla agrupada */}
           {(rec?.topics_grouped ?? []).length > 0 && (
             <TopicsGroupedTable topics={rec!.topics_grouped} />
           )}

@@ -114,14 +114,16 @@ export async function POST(req: NextRequest) {
     clientId ? getClient(clientId).catch(() => null) : Promise.resolve(null),
     clientId ? getQuestionnaireBundle(clientId, "doble-materialidad").catch(() => null) : Promise.resolve(null),
   ]);
-  const config = getModelConfig(role);
+  const lastUserMsg = messages.filter((m) => m.role === "user").pop();
+  const lastUserText = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
+  const config = getModelConfig(role, lastUserText);
   const baseSystemBlocks = await buildSystemBlocks(role, client, questionnaire);
   // Wave 3c (D): memoria de feedback negativo del consultor para este rol+cliente.
   // Se agrega como 3er bloque SIN cache_control — refleja feedback nuevo sin
   // invalidar los 2 bloques cacheados (contexto cliente + reglas del rol).
   const feedbackText = await buildFeedbackMemoryBlock({ role, clientId: clientId || null }).catch(() => "");
   const systemBlocks = feedbackText
-    ? [...baseSystemBlocks, { type: "text" as const, text: feedbackText }]
+    ? [...baseSystemBlocks, { type: "text" as const, text: feedbackText, cache_control: { type: "ephemeral" as const } }]
     : baseSystemBlocks;
 
   // Circuit breaker: rechazar inmediatamente si Anthropic está en cascada de fallos

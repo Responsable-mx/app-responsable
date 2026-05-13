@@ -51,9 +51,11 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-172 — `DoubleMaterialidadTab.tsx:544` — `stepperCompact` unused (ESLint warning)~~ ✅ RESUELTO (sesión 32)
 - Regresión: sesión 28/31 = 0 warnings. Fix: eliminar asignación o `_stepperCompact`.
 
-### 🟢 D-173 — Módulo DM-IA: 4 archivos, 3648L total
-- BenchmarkSection 1205L · DoubleMaterialidadTab 950L · BenchmarkEmpresasSection 729L · ReferentesSection 764L.
-- Candidato para refactor conjunto en mismo sprint que D-150 BenchmarkSection (pendiente smoke test Nuvoil/Altamira).
+### ~~🟢 D-173 — Módulo DM-IA: 4 archivos, 3648L total~~ ✅ RESUELTO (sesión 33)
+- BenchmarkSection 1205L → 832L (extraído BenchmarkComparisonTable.tsx 383L).
+- BenchmarkEmpresasSection 729L → 372L (EmpresaCard.tsx 200L + ManualAddEmpresaForm.tsx 137L ya extraídos; `<select>` → `<SelectField>` fixeado).
+- ReferentesSection 764L → 423L (sub-componentes ya extraídos).
+- DoubleMaterialidadTab 951L — sin cambios (pura orquestación, prop drilling explosion si se fragmenta).
 
 ---
 

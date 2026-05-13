@@ -120,6 +120,7 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 | `dm_benchmark_results` (resultado comparación benchmark DM) | Poco — días/semanas | `revalidate: 3600` (SWR) |
 | Reporte PDF DM generado por IA | On-demand — solo al regenerar | sin caché — guardar en `client_documents` kind=`dm_report`, regenerar solo al click "Generar reporte" |
 | `dm_iro_config` (definiciones ESRS E1–G1 editables por admin) | Casi nunca — admin edita rarísimo | `revalidate: 7200` (2h, in-memory cache en lib/dm/iros.ts) |
+| `dm_benchmark_company_iros` (IROs por empresa benchmark — generados 1 vez, rarísimo regenerar) | Poco — semanas/meses | `revalidate: 3600` (SWR con `revalidateOnFocus: false`) |
 
 ### Aplicar migraciones
 - Helper: `node scripts/apply-sql.mjs` (modo paranoico, 17 patrones bloqueados)

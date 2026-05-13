@@ -15,6 +15,7 @@ export function CollapsibleStageSection({
   accent,
   isActive,
   lockReason,
+  isNextLocked = false,
   subtitle,
   narrativeTitle,
   headerRight,
@@ -29,6 +30,8 @@ export function CollapsibleStageSection({
   isActive: boolean;
   /** Mensaje mostrado cuando status === "locked" — explica qué se necesita para desbloquear */
   lockReason?: string;
+  /** Cuando true, el botón "Siguiente" se deshabilita — la etapa siguiente aún no está disponible */
+  isNextLocked?: boolean;
   /** Subtitle pedagógico bajo el H2 (mockup-v7 pattern) */
   subtitle?: string;
   /** Override del H2 — narrativa ejecutiva en lugar de "N. Label" genérico (mockup-v7 pattern) */
@@ -136,16 +139,32 @@ export function CollapsibleStageSection({
             <span />
           )}
           {next ? (
-            <button
-              type="button"
-              onClick={() => scrollToDmSection(next.id)}
-              className="inline-flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold py-2 px-4 rounded hover:bg-brand-primary-dark transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
-            >
-              Siguiente: {next.label}
-              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            </button>
+            isNextLocked ? (
+              <button
+                type="button"
+                disabled
+                title="Completa esta etapa para avanzar a la siguiente"
+                aria-disabled="true"
+                className="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-400 text-xs font-semibold py-2 px-4 rounded cursor-not-allowed select-none"
+              >
+                <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Siguiente: {next.label}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => scrollToDmSection(next.id)}
+                className="inline-flex items-center gap-1.5 bg-brand-primary text-white text-xs font-semibold py-2 px-4 rounded hover:bg-brand-primary-dark transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
+              >
+                Siguiente: {next.label}
+                <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )
           ) : (
             <span className="text-[11px] text-slate-400 italic">Última etapa</span>
           )}

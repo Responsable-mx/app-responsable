@@ -320,21 +320,27 @@ export function DoubleMaterialidadTab({
 
   // stage2 = Referentes de Sostenibilidad (nuevos frameworks + tabla de temas)
   const hasReferentes = referentesRec?.topics_status === "done" && (referentesRec?.enabled_frameworks ?? []).length > 0;
+  const stage2HasContent = (referentesRec?.enabled_frameworks ?? []).length > 0;
   const stage2Status: StageStatus = hasReferentes
     ? "done"
     : stage1Status === "done"
     ? "active"
-    : "pending";
+    : stage2HasContent
+    ? "pending"
+    : "locked";
 
   // stage3 = Benchmark de empresas — activo cuando Referentes done
   const hasEmpresasReferencia =
     benchmarkEmpresasRec?.generation_status === "done" &&
     (benchmarkEmpresasRec?.enabled_companies ?? []).length > 0;
+  const stage3HasContent = benchmarkEmpresasRec !== null;
   const stage3Status: StageStatus = hasEmpresasReferencia
     ? "done"
     : stage2Status === "done"
     ? "active"
-    : "pending";
+    : stage3HasContent
+    ? "pending"
+    : "locked";
 
   const hasBenchmark = latestResult?.status === "done";
   const hasIros      = irosStatus === "done" && iros.length > 0;
@@ -342,18 +348,23 @@ export function DoubleMaterialidadTab({
   const hasReport    = latestReport?.parse_status === "ok";
 
   // stage4 = Benchmark — activo cuando Empresas de referencia done
+  const stage4HasContent = companies.length > 0 || latestResult !== null;
   const stage4Status: StageStatus = hasBenchmark
     ? "done"
     : stage3Status === "done"
     ? "active"
-    : "pending";
+    : stage4HasContent
+    ? "pending"
+    : "locked";
 
   // stage5 = IROs
   const stage5Status: StageStatus = hasIros
     ? "done"
     : hasBenchmark
     ? "active"
-    : "pending";
+    : iros.length > 0
+    ? "pending"
+    : "locked";
 
   // stage6 = Matriz (visualización IROs scored) — auto-done cuando IROs están validados
   const scoredIros = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length;
@@ -365,12 +376,14 @@ export function DoubleMaterialidadTab({
         ? "pending"
         : "locked";
 
-  // stage7 = NIS / IBSO
+  // stage7 = NIS / IBSO — locked si no hay IROs completos y tampoco datos NIS existentes
   const stage7Status: StageStatus = hasNis
     ? "done"
     : hasIros
     ? "active"
-    : "pending";
+    : nisRows.length > 0
+    ? "pending"
+    : "locked";
 
   // stage8 = Resumen ejecutivo IA — locked si no hay IROs calificados
   const hasResumen = resumenResp?.data?.status === "done";
@@ -397,7 +410,9 @@ export function DoubleMaterialidadTab({
     ? "done"
     : hasBenchmark && hasIros && hasResumen
     ? "active"
-    : "pending";
+    : latestReport !== null
+    ? "pending"
+    : "locked";
 
   // Conteos por cuadrante — pasados a ResumenEjecutivoSection para KPI cards
   const scoredIncluded = iros.filter(
@@ -600,6 +615,7 @@ export function DoubleMaterialidadTab({
         status={stage1Status}
         accent="border-l-teal-500"
         isActive={activeStageId === "dm-sec-contexto"}
+        isNextLocked={stage2Status === "locked"}
         subtitle="Estado del llenado — base para el benchmark y los IROs"
         headerRight={
           questionnaireProgress && questionnaireProgress.total > 0 ? (
@@ -646,6 +662,8 @@ export function DoubleMaterialidadTab({
         status={stage2Status}
         accent="border-l-green-600"
         isActive={activeStageId === "dm-sec-referentes"}
+        isNextLocked={stage3Status === "locked"}
+        lockReason="Completa el cuestionario de contexto del cliente (Etapa 1) para identificar los referentes de sostenibilidad aplicables al sector."
         subtitle="Frameworks de sostenibilidad aplicables al sector · tabla de temas y agrupación"
         headerRight={
           (referentesRec?.enabled_frameworks ?? []).length > 0 ? (
@@ -670,6 +688,8 @@ export function DoubleMaterialidadTab({
         status={stage3Status}
         accent="border-l-cyan-600"
         isActive={activeStageId === "dm-sec-benchmark-empresas"}
+        isNextLocked={stage4Status === "locked"}
+        lockReason="Confirma los referentes de sostenibilidad (Etapa 2) para identificar las empresas de referencia del benchmark."
         subtitle="Identifica empresas con informes de sostenibilidad públicos · valida las que entran al benchmark"
         headerRight={null}
       >
@@ -687,6 +707,8 @@ export function DoubleMaterialidadTab({
         status={stage4Status}
         accent="border-l-blue-600"
         isActive={activeStageId === "dm-sec-benchmark"}
+        isNextLocked={stage5Status === "locked"}
+        lockReason="Valida las empresas de referencia (Etapa 3) para ejecutar el benchmark competitivo ESG. Las empresas del benchmark deben estar confirmadas antes de comparar desempeño."
         subtitle="Compara el desempeño ESG contra las empresas de referencia seleccionadas en Etapa 3"
         headerRight={null}
       >
@@ -733,6 +755,8 @@ export function DoubleMaterialidadTab({
         status={stage5Status}
         accent="border-l-violet-600"
         isActive={activeStageId === "dm-sec-iros"}
+        isNextLocked={stage6Status === "locked"}
+        lockReason="Ejecuta el benchmark competitivo (Etapa 4) para identificar y calificar los Impactos, Riesgos y Oportunidades del cliente."
         subtitle="Impactos, Riesgos y Oportunidades identificados y calificados para inclusión en el estudio"
         headerRight={
           iros.length > 0 ? (
@@ -764,6 +788,7 @@ export function DoubleMaterialidadTab({
         status={stage6Status}
         accent="border-l-brand-primary"
         isActive={activeStageId === "dm-sec-matriz"}
+        isNextLocked={stage7Status === "locked"}
         lockReason="Registra y califica al menos 3 IROs con score de impacto y financiero para activar la matriz."
         subtitle="Visualización X/Y de IROs · Impacto vs Materialidad financiera · Ejes 0–10"
         narrativeTitle={
@@ -793,6 +818,8 @@ export function DoubleMaterialidadTab({
         status={stage7Status}
         accent="border-l-amber-600"
         isActive={activeStageId === "dm-sec-nis"}
+        isNextLocked={stage8Status === "locked"}
+        lockReason="Completa el inventario de IROs (Etapa 5) para analizar las brechas de información por área material."
         subtitle="NIS/IBSO (Normas de Información de Sostenibilidad · Indicadores de Brechas) — disponibilidad y calidad por IRO material"
         headerRight={
           quadrantCounts.brechas_criticas > 0 ? (
@@ -819,6 +846,7 @@ export function DoubleMaterialidadTab({
         status={stage8Status}
         accent="border-l-sky-600"
         isActive={activeStageId === "dm-sec-resumen"}
+        isNextLocked={stage9Status === "locked"}
         lockReason="Completa el inventario de IROs (Etapa 5) para generar el resumen ejecutivo con IA."
         subtitle="Narrativa generada por IA con insights, trade-offs y recomendaciones estratégicas"
       >
@@ -833,6 +861,7 @@ export function DoubleMaterialidadTab({
         status={stage9Status}
         accent="border-l-amber-500"
         isActive={activeStageId === "dm-sec-validacion"}
+        isNextLocked={stage10Status === "locked"}
         lockReason="Genera el resumen ejecutivo (Etapa 8) para iniciar la sesión de validación con el cliente."
         subtitle="Decisiones del cliente sobre cada IRO incluido — aprobación, ajuste o descarte"
         headerRight={
@@ -854,6 +883,7 @@ export function DoubleMaterialidadTab({
         status={stage10Status}
         accent="border-l-emerald-600"
         isActive={activeStageId === "dm-sec-reporte"}
+        lockReason="Completa el benchmark (Etapa 4), el inventario de IROs (Etapa 5) y el resumen ejecutivo (Etapa 8) para generar el reporte final de doble materialidad."
         subtitle="Documento final consolidado · benchmark + IROs + matriz + validación cliente"
         headerRight={
           hasReport ? (

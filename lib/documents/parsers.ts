@@ -48,11 +48,73 @@ export async function parseToMarkdown(buffer: Buffer, fileType: FileType): Promi
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
-  // Importar desde /lib directamente — el entry point de pdf-parse carga archivos
+  // LlamaParse preserva tablas GRI/ESRS multi-columna que pdf-parse aplana.
+  // Activo solo si LLAMA_CLOUD_API_KEY está configurada; fallback = pdf-parse.
+  if (process.env.LLAMA_CLOUD_API_KEY) {
+    try {
+      const md = await parsePdfWithLlamaParse(buffer);
+      if (md && md.length > 200) return cleanText(md);
+    } catch (e) {
+      console.error("[parsers] LlamaParse failed, falling back to pdf-parse:", e);
+    }
+  }
+  // Fallback: importar desde /lib directamente — el entry point de pdf-parse carga archivos
   // de test que no existen en producción (ENOENT ./test/data/05-versions-space.pdf).
   const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
   const result = await pdfParse(buffer);
   return cleanText(result.text);
+}
+
+/**
+ * Parseo de PDF con LlamaParse (LlamaIndex Cloud).
+ * Preserva tablas, columnas y layouts complejos de informes ESG/GRI.
+ * Flujo async: upload → poll hasta done → retornar markdown.
+ * Timeout 120s — informes ESG de 100+ páginas suelen tardar 30-60s.
+ */
+async function parsePdfWithLlamaParse(buffer: Buffer): Promise<string | null> {
+  const apiKey = process.env.LLAMA_CLOUD_API_KEY!;
+  const BASE = "https://api.cloud.llamaindex.ai/api/parsing";
+
+  // 1. Upload del PDF
+  const formData = new FormData();
+  const blob = new Blob([new Uint8Array(buffer)], { type: "application/pdf" });
+  formData.append("file", blob, "document.pdf");
+
+  const uploadRes = await fetch(`${BASE}/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (!uploadRes.ok) {
+    const err = await uploadRes.text();
+    throw new Error(`LlamaParse upload failed ${uploadRes.status}: ${err.slice(0, 200)}`);
+  }
+
+  const { id: jobId } = (await uploadRes.json()) as { id: string };
+
+  // 2. Poll hasta status=SUCCESS (timeout 120s)
+  const POLL_INTERVAL = 4_000;
+  const MAX_POLLS = 30; // 30 × 4s = 120s
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+    const statusRes = await fetch(`${BASE}/job/${jobId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!statusRes.ok) continue;
+    const { status } = (await statusRes.json()) as { status: string };
+    if (status === "SUCCESS") {
+      // 3. Obtener resultado en markdown
+      const mdRes = await fetch(`${BASE}/job/${jobId}/result/markdown`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!mdRes.ok) throw new Error(`LlamaParse result fetch failed ${mdRes.status}`);
+      const { markdown } = (await mdRes.json()) as { markdown: string };
+      return markdown ?? null;
+    }
+    if (status === "ERROR") throw new Error("LlamaParse job returned ERROR status");
+  }
+  throw new Error("LlamaParse timeout after 120s");
 }
 
 async function parseDocx(buffer: Buffer): Promise<string> {

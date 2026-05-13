@@ -1,7 +1,21 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-12 (sesión 32 completa — /audit + /audit-ia + cleanup)
+**Fecha:** 2026-05-12 (sesión 32 completa — /audit + /audit-ia + cleanup + limpiar-todo)
 **Calificación global:** 9.8 / 10 (vs 9.7 sesión 31)
+
+---
+
+## Fixes sesión 32c — limpiar y actualizar todo (2026-05-12)
+
+### ✅ D-170 — Rate limiting añadido a dm-referentes + dm-benchmark-empresas
+- `checkAiRateLimit(user, { max: 3, windowMs: 5 * 60_000 })` en `generate_frameworks`, `generate_topics` (dm-referentes) y `generate` (dm-benchmark-empresas).
+- Patron consistente con dm-benchmark (D-111), dm-report (D-122), research-reports (D-123).
+
+### ✅ D-174/175 — System blocks con cache_control:ephemeral en search_urls
+- Ambas routes ahora tienen system block estático: instrucción role + "always call web_search before submit_url" + `cache_control: { type: "ephemeral" }`.
+- Hit rate esperado bajo (user block 100% dinámico) pero patrón correcto.
+
+### ✅ 340/340 tests pasan — sin regresiones post-cambios
 
 ---
 
@@ -10,9 +24,9 @@
 ### ✅ D-176 — console.log starting redundante en dm-benchmark-empresas/search_urls
 - `route.ts:368` `console.log starting: ${empresa.nombre}` eliminado. Timing capturado en líneas 414/440.
 
-### 🟢 D-174/175 — search_urls sin system block (ambas routes)
+### ✅ D-174/175 — search_urls sin system block (ambas routes) — resuelto en 32c
 - Cache hit = 0% por user block 100% dinámico (empresa/framework único por call).
-- Beneficio si se añade system block: ~$0-1/mes en concurrencia batch. Prioridad baja.
+- Fix aplicado: system block + cache_control:ephemeral en ambas routes.
 
 ### ✅ DoubleMaterialidadTab lazy loading (D-173 bundle weight)
 - 9 secciones migradas a `next/dynamic`. Bundle inicial DM-IA ↓40-60%.
@@ -54,32 +68,37 @@ D-168 ✅ `FRAMEWORKS_SYSTEM`, `TOPICS_SYSTEM`, `GENERATE_SYSTEM` con `cache_con
 
 ---
 
-## Pendientes activos post-sesión 32
+## Pendientes activos post-sesión 32c
 
 | ID | Sev | Descripción | Acción |
 |----|-----|-------------|--------|
-| D-169 | 🔴 | Next.js 16.2.4 → 16.2.6 (13 CVEs + middleware bypass) | `npm audit fix` + push |
-| D-170 | 🟡 | dm-referentes + dm-benchmark-empresas sin rate limit | `checkRateLimit` en 3 actions |
-| D-171 | 🟡 | 3 ESLint errors (BenchmarkSection:84, ReferentesSection:307×2) | Fix lazy init + `&quot;` |
-| D-172 | 🟢 | `stepperCompact` unused (ESLint warning) | `_` prefix |
 | D-173 | 🟢 | DM-IA módulo 3648L | Refactor con D-150 BenchmarkSection |
 | D-147 | 🟢 | Cache in-memory extract-profile | Aceptado MVP definitivo |
 
+### Resueltos en sesión 32c
+- ✅ D-169 — Next.js 16.2.4 → 16.2.6 (`npm audit fix`, 13 CVEs)
+- ✅ D-170 — Rate limit añadido a 3 actions DM-IA
+- ✅ D-171 — ESLint 3 errors → 0 (lazy init + &quot;)
+- ✅ D-172 — `stepperCompact` → `_stepperCompact`
+- ✅ D-174 — system block + cache_control en dm-referentes/search_urls
+- ✅ D-175 — system block + cache_control en dm-benchmark-empresas/search_urls
+- ✅ D-176 — console.log redundante eliminado
+
 ---
 
-## Score sesión 32
+## Score sesión 32c (post-limpiar-todo)
 
-| Dimensión | Post-31 | Post-32 |
-|-----------|---------|---------|
-| Seguridad | 9.8 | 9.4 (D-169 Next.js middleware bypass CVEs) |
-| Confiabilidad | 9.8 | 9.8 |
-| UX | 9.2 | 9.2 |
-| Arquitectura | 9.8 | 9.7 (D-173 DM módulo pesado) |
-| Rendimiento | 9.2 | 9.2 |
-| Calidad de código | 9.9 | 9.5 (D-171 regresión 3 ESLint errors) |
-| Observabilidad | 9.7 | 9.7 |
-| Deuda técnica | 9.7 | 9.5 (4 items nuevos) |
-| **Global** | **9.7** | **9.5** |
+| Dimensión | Post-31 | Post-32 (audit) | Post-32c (fixes) |
+|-----------|---------|---------|---------|
+| Seguridad | 9.8 | 9.4 (D-169 CVEs) | **9.8** ✅ D-169 resuelto |
+| Confiabilidad | 9.8 | 9.8 | 9.8 |
+| UX | 9.2 | 9.2 | 9.2 |
+| Arquitectura | 9.8 | 9.7 (D-173) | 9.7 (D-173 aún open) |
+| Rendimiento | 9.2 | 9.2 | **9.4** lazy loading DM-IA ↓40-60% bundle |
+| Calidad de código | 9.9 | 9.5 (D-171 3 ESLint errors) | **9.9** ✅ ESLint 0 errors/warnings |
+| Observabilidad | 9.7 | 9.7 | 9.7 |
+| Deuda técnica | 9.7 | 9.5 (4 items nuevos) | **9.8** solo D-173+D-147 open |
+| **Global** | **9.7** | **9.5** | **9.8** |
 
 ---
 

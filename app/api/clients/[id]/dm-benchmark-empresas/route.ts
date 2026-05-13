@@ -9,6 +9,7 @@ import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicHttpUrl } from "@/lib/documents/ssrf";
+import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 import type {
   BenchmarkEmpresasData,
   BenchmarkEmpresa,
@@ -241,6 +242,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   // ── Action: generate ───────────────────────────────────────────────────────
   if (body.action === "generate") {
+    const rl = await checkAiRateLimit(user, { max: 3, windowMs: 5 * 60_000, errorMessage: "Demasiadas solicitudes de generación. Espera 5 minutos." });
+    if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
+
     if (anthropicBreaker.isOpen) {
       return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
     }
@@ -371,6 +375,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               {
                 model,
                 max_tokens: 1200,
+                system: [{ type: "text" as const, text: "You are an ESG report URL finder. Use web_search to find the official sustainability or annual report page for a company. Always call web_search before submit_url. Return only the current, canonical URL.", cache_control: { type: "ephemeral" as const } }],
                 tools: [
                   { type: "web_search_20250305", name: "web_search", max_uses: 3 },
                   {

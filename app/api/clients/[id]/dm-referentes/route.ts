@@ -9,6 +9,7 @@ import { logAiCall } from "@/lib/ai/logging";
 import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicHttpUrl } from "@/lib/documents/ssrf";
+import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 import type { ReferentesData, ReferenteFramework, TopicRaw, TopicGrouped } from "@/lib/dm/referentes-types";
 
 export const runtime    = "nodejs";
@@ -208,6 +209,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   // ── Action: generate_frameworks ─────────────────────────────────────────────
   if (body.action === "generate_frameworks") {
+    const rl = await checkAiRateLimit(user, { max: 3, windowMs: 5 * 60_000, errorMessage: "Demasiadas solicitudes de marcos. Espera 5 minutos." });
+    if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
+
     await admin.from("dm_referentes").upsert({
       client_id: id,
       frameworks_status: "generating",
@@ -275,6 +279,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   // ── Action: generate_topics ─────────────────────────────────────────────────
   if (body.action === "generate_topics") {
+    const rl = await checkAiRateLimit(user, { max: 3, windowMs: 5 * 60_000, errorMessage: "Demasiadas solicitudes de temas. Espera 5 minutos." });
+    if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
     const { data: rec } = await admin
       .from("dm_referentes")
       .select("proposed_frameworks, enabled_frameworks")
@@ -419,6 +425,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
                 {
                   model: searchModel,
                   max_tokens: 800,
+                  system: [{ type: "text" as const, text: "You are an ESG framework URL finder. Use web_search to find the official URL for ESG/sustainability frameworks. Always call web_search before submit_url. Return only the official canonical URL.", cache_control: { type: "ephemeral" as const } }],
                   tools: [
                     { type: "web_search_20250305", name: "web_search", max_uses: 2 },
                     {

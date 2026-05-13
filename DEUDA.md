@@ -21,11 +21,11 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟢 D-176 — `console.log` debug redundante en `dm-benchmark-empresas/search_urls`~~ ✅ RESUELTO (sesión 32b)
 - `console.log(`[search_urls] starting: ${empresa.nombre}`)` en `route.ts:368` — redundante (timing ya capturado en líneas 414/440). Eliminado.
 
-### 🟢 D-174 — `dm-referentes/search_urls` sin system block → 0% cache hit
+### ~~🟢 D-174 — `dm-referentes/search_urls` sin system block → 0% cache hit~~ ✅ RESUELTO (sesión 32)
 - `app/api/clients/[id]/dm-referentes/route.ts:~415` — llamada Anthropic sin `system` block estático. Cada call es única (framework distinto en user block) → cache hit = 0% incluso con system block. Beneficio: ~$0-1/mes en batches concurrentes (hits en call #2-3 dentro de 5min TTL).
 - Fix: Añadir system block estático con instrucciones generales de búsqueda de URLs + `cache_control: ephemeral`.
 
-### 🟢 D-175 — `dm-benchmark-empresas/search_urls` sin system block → 0% cache hit
+### ~~🟢 D-175 — `dm-benchmark-empresas/search_urls` sin system block → 0% cache hit~~ ✅ RESUELTO (sesión 32)
 - `app/api/clients/[id]/dm-benchmark-empresas/route.ts:~370` — mismo patrón. Beneficio mínimo (empresa única por call).
 - Fix: Mismo patrón que D-174.
 
@@ -38,11 +38,11 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 - **La auth usa middleware** (`lib/supabase/middleware.ts`) → middleware bypass CVEs son directamente explotables si bypasearan la autenticación.
 - Fix: `npm audit fix` bumps a 16.2.6 (3 packages: next + @next/swc-win32-x64-msvc + @next/env, sin breaking changes). Esfuerzo: 5min + push.
 
-### 🟡 D-170 — `dm-referentes` y `dm-benchmark-empresas` sin rate limiting
+### ~~🟡 D-170 — `dm-referentes` y `dm-benchmark-empresas` sin rate limiting~~ ✅ RESUELTO (sesión 32)
 - `app/api/clients/[id]/dm-referentes/route.ts`: actions `generate_topics` (16K max_tokens, Sonnet, ~$0.24/call) y `generate_frameworks` (4K, ~$0.06/call) — sin `checkRateLimit`.
 - `app/api/clients/[id]/dm-benchmark-empresas/route.ts`: action `generate` (4K, ~$0.06/call) — sin `checkRateLimit`.
 - Patrón correcto en `dm-benchmark` (D-111), `dm-report` (D-122), `research-reports` (D-123).
-- Fix: añadir `await checkRateLimit(user.email, "dm_referentes_generate", 3, 300_000)` al inicio de los 3 handlers. Esfuerzo ~30min.
+- Fix: `checkAiRateLimit(user, { max: 3, windowMs: 5 * 60_000 })` añadido a los 3 handlers.
 
 ### ~~🟡 D-171 — Regresión ESLint: 3 errors (sesión 31 = 0 errors)~~ ✅ RESUELTO (sesión 32)
 - `components/doble-materialidad/BenchmarkSection.tsx:84` — `setSelected(new Set(...))` dentro de `useEffect` body. Regla `react-hooks/set-state-in-effect`. Fix: `useState(() => new Set(companies.map(c => c.id)))` lazy initializer.

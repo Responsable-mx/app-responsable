@@ -16,6 +16,7 @@ import {
   IconPlugin,
   IconActivity,
   IconBarChart,
+  IconSettings,
 } from "@/components/ui/Icons";
 
 type TabItem = { href: string; label: string; Icon: React.ComponentType<{ className?: string }> };
@@ -46,8 +47,8 @@ const GROUPS: Group[] = [
       { href: "/configuracion/uso-ia",      label: "Uso IA",         Icon: IconTarget },
       { href: "/configuracion/auditoria-ia",label: "Auditoría IA",   Icon: IconBarChart },
       { href: "/configuracion/auto-update", label: "Actualizaciones",Icon: IconSliders },
-      { href: "/configuracion/auditoria",   label: "Auditoría",      Icon: IconClipboard },
-      { href: "/configuracion/preferencias",label: "Preferencias",   Icon: IconSliders },
+      { href: "/configuracion/auditoria",   label: "Historial de cambios", Icon: IconClipboard },
+      { href: "/configuracion/preferencias",label: "Preferencias",         Icon: IconSettings },
     ],
   },
 ];

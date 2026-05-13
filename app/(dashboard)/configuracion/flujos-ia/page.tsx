@@ -354,6 +354,46 @@ export default function FlujoIaPage() {
           ))}
         </div>
 
+        {/* Modos de entrada de documentos */}
+        <div className="mb-5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+            Cómo entran los documentos al sistema
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              {
+                modo: "1 · Subir archivo",
+                where: "Tab Documentos del cliente",
+                desc: "PDF, Word, Excel, PowerPoint, TXT. El sistema elige el lector correcto automáticamente.",
+                costo: "LlamaParse: gratis hasta 10,000 págs/mes",
+                tip: "PDF nativo (no escaneado) + sin contraseña = mejor resultado.",
+              },
+              {
+                modo: "2 · Pegar texto",
+                where: "Modal de importación del cuestionario",
+                desc: "El consultor copia el contenido del informe directamente. Sin costo de parseo.",
+                costo: "Sin costo adicional",
+                tip: "Ideal para secciones específicas del informe.",
+              },
+              {
+                modo: "3 · URL del informe",
+                where: "Botón 'Buscar informe' del perfil del cliente",
+                desc: "La IA descarga y parsea el PDF desde la URL pública del informe GRI/ESG.",
+                costo: "LlamaParse: gratis hasta 10,000 págs/mes",
+                tip: "La IA localiza el informe oficial — el consultor solo valida.",
+              },
+            ].map((m) => (
+              <div key={m.modo} className="bg-white border border-slate-200 rounded p-3 shadow-sm">
+                <p className="text-xs font-bold text-slate-900 mb-0.5">{m.modo}</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">{m.where}</p>
+                <p className="text-[11px] text-slate-600 leading-relaxed mb-2">{m.desc}</p>
+                <p className="text-[10px] text-emerald-700 font-semibold mb-1">{m.costo}</p>
+                <p className="text-[10px] text-slate-400 italic">{m.tip}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <VerticalTimeline steps={DOC_STEPS} />
 
         <div className="mt-4 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-[11px] text-slate-600 leading-relaxed">
@@ -362,6 +402,10 @@ export default function FlujoIaPage() {
           del cliente en cada respuesta) · <span className="font-medium">AI-fill</span> (datos del
           informe para rellenar el cuestionario) · <span className="font-medium">Benchmark</span>{" "}
           (comparación con informes de empresas competidoras).
+          <span className="block mt-1.5 text-slate-500">
+            <span className="font-medium text-slate-600">Costo total estimado para el piloto</span> (10 clientes, ~100 págs c/u):
+            LlamaParse gratis · Voyage AI gratis · QStash gratis — <span className="font-semibold text-slate-700">$0 variable en parseo y embeddings</span>.
+          </span>
         </div>
       </div>
 

@@ -98,6 +98,21 @@ export default async function UsoIaPage() {
   ]);
   const alerts = s ? computeCostAlerts(s) : [];
 
+  // Errores LLM solamente (excluye cron de embeddings/Voyage)
+  const llmErrors = s
+    ? s.by_role.filter(r => r.role !== "embeddings").reduce((sum, r) => sum + r.errors, 0)
+    : 0;
+  const voyageSystemErrors = s ? Math.max(0, s.total_errors - llmErrors) : 0;
+
+  // Top consultores sin entradas del sistema (cron@, service_role)
+  const realTopUsers = s
+    ? s.top_users.filter(u =>
+        !u.user_email.toLowerCase().startsWith("cron") &&
+        !u.user_email.includes("service_role") &&
+        !u.user_email.includes("@system")
+      )
+    : [];
+
   return (
     <div className="px-8 py-6 max-w-6xl mx-auto">
       {alerts.length > 0 && (
@@ -164,6 +179,7 @@ export default async function UsoIaPage() {
                 <Metric
                   label="Llamadas"
                   value={numFmt.format(s.total_calls)}
+                  hint={s.avg_latency_ms > 0 ? `Latencia promedio: ${(s.avg_latency_ms / 1000).toFixed(1)} s` : undefined}
                   spark={callsSeries}
                   sparkColor="#0f766e"
                 />
@@ -189,12 +205,14 @@ export default async function UsoIaPage() {
                   sparkColor="#0891b2"
                 />
                 <Metric
-                  label="Errores"
-                  value={String(s.total_errors)}
-                  tone={s.total_errors > 0 ? "red" : "ok"}
-                  hint={`Latencia ~${(s.avg_latency_ms / 1000).toFixed(1)} s`}
+                  label="Errores IA"
+                  value={String(llmErrors)}
+                  tone={llmErrors > 0 ? "red" : "ok"}
+                  hint={voyageSystemErrors > 0
+                    ? `+${voyageSystemErrors} del sistema (indexación nocturna)`
+                    : llmErrors === 0 ? "Sin errores en el período" : undefined}
                   spark={errorsSeries}
-                  sparkColor={s.total_errors > 0 ? "#be123c" : "#94a3b8"}
+                  sparkColor={llmErrors > 0 ? "#be123c" : "#94a3b8"}
                 />
               </div>
             );
@@ -266,16 +284,16 @@ export default async function UsoIaPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {s.by_role.map((r) => {
+                    {/* ── Roles conversacionales (Aurora/Rebeca/Elena/Valeria) ── */}
+                    {s.by_role.filter(r => r.role !== "embeddings").map((r) => {
                       const pct = s.cost_usd_estimate_max > 0
                         ? Math.round((r.cost_usd / s.cost_usd_estimate_max) * 100)
                         : 0;
                       const ROLE_LABELS: Record<string, { name: string; model: string }> = {
-                        aurora:     { name: "Aurora · Autor",     model: "Sonnet" },
-                        rebeca:     { name: "Rebeca · Revisor",   model: "Sonnet" },
-                        elena:      { name: "Elena · Elevador",   model: "Opus" },
-                        valeria:    { name: "Valeria · Validador", model: "Haiku" },
-                        embeddings: { name: "Embeddings · Voyage", model: "Voyage" },
+                        aurora:  { name: "Aurora · Autor",      model: "Sonnet" },
+                        rebeca:  { name: "Rebeca · Revisor",    model: "Sonnet" },
+                        elena:   { name: "Elena · Elevador",    model: "Opus"   },
+                        valeria: { name: "Valeria · Validador", model: "Haiku"  },
                       };
                       const meta = ROLE_LABELS[r.role] ?? { name: r.role, model: "—" };
                       return (
@@ -291,7 +309,42 @@ export default async function UsoIaPage() {
                           <td className="py-1.5 text-right text-slate-600 tabular-nums">{pct}%</td>
                           <td className="py-1.5 text-right text-slate-600 tabular-nums">{(r.avg_latency_ms / 1000).toFixed(1)}s</td>
                           <td className={`py-1.5 text-right tabular-nums ${r.errors > 0 ? "text-rose-700" : "text-slate-400"}`}>
-                            {r.errors}
+                            {r.errors > 0 ? r.errors : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {/* ── Proceso automático (cron de indexación) ── */}
+                    {s.by_role.some(r => r.role === "embeddings") && (
+                      <tr>
+                        <td colSpan={8} className="pt-3 pb-1 px-0">
+                          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-t border-slate-100 pt-2">
+                            Proceso automático — indexación de documentos (cron nocturno, no es un consultor)
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                    {s.by_role.filter(r => r.role === "embeddings").map((r) => {
+                      const pct = s.cost_usd_estimate_max > 0
+                        ? Math.round((r.cost_usd / s.cost_usd_estimate_max) * 100)
+                        : 0;
+                      return (
+                        <tr key={r.role} className="opacity-60">
+                          <td className="py-1.5 font-semibold text-indigo-700">
+                            Búsqueda semántica
+                            <span className="ml-1.5 text-[10px] font-normal text-slate-400">(Voyage · cron)</span>
+                          </td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{numFmt.format(r.calls)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{numFmt.format(r.input_tokens)}</td>
+                          <td className="py-1.5 text-right text-slate-400 tabular-nums">—</td>
+                          <td className="py-1.5 text-right text-slate-600 font-medium tabular-nums">{usdFmt.format(r.cost_usd)}</td>
+                          <td className="py-1.5 text-right text-slate-600 tabular-nums">{pct}%</td>
+                          <td className="py-1.5 text-right text-slate-400 tabular-nums">—</td>
+                          <td className="py-1.5 text-right text-slate-400 tabular-nums"
+                              title="Errores del cron de indexación — no afectan el chat de consultores">
+                            {r.errors > 0
+                              ? <span>{r.errors} <span className="text-[10px]">(cron)</span></span>
+                              : "—"}
                           </td>
                         </tr>
                       );
@@ -408,7 +461,7 @@ export default async function UsoIaPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Panel title="Top consultores">
-              {s.top_users.length === 0 ? (
+              {realTopUsers.length === 0 ? (
                 <Empty />
               ) : (
                 <table className="w-full text-xs">
@@ -419,7 +472,7 @@ export default async function UsoIaPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {s.top_users.map((u) => (
+                    {realTopUsers.map((u) => (
                       <tr key={u.user_email}>
                         <td className="py-1.5 font-mono text-slate-700">{u.user_email}</td>
                         <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{u.calls}</td>
@@ -572,59 +625,92 @@ export default async function UsoIaPage() {
         </Panel>
       </div>
 
-      {/* Documentos por cliente — Sprint B */}
-      {docs && (
-        <div className="mt-8">
-          <div className="mb-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              Documentos por cliente
-            </p>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Archivos subidos + informes IA convertidos a Markdown como contexto persistente.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <DocStat label="Total" value={numFmt.format(docs.total)} />
-            <DocStat label="Últimos 7d" value={numFmt.format(docs.recent_count)} />
-            <DocStat
-              label="General"
-              value={numFmt.format(docs.by_kind.general)}
-              tone="neutral"
-            />
-            <DocStat
-              label="Informe sust."
-              value={numFmt.format(docs.by_kind.sustainability_report)}
-              tone="emerald"
-            />
-            <DocStat
-              label="Informe fin."
-              value={numFmt.format(docs.by_kind.financial_report)}
-              tone="amber"
-            />
-          </div>
-          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-            <DocStat
-              label="Parse OK"
-              value={numFmt.format(docs.by_parse_status.ok)}
-              tone="emerald"
-            />
-            <DocStat
-              label="Parse pendiente"
-              value={numFmt.format(docs.by_parse_status.pending)}
-              tone="neutral"
-            />
-            <DocStat
-              label="Parse fallido"
-              value={numFmt.format(docs.by_parse_status.failed)}
-              tone={docs.by_parse_status.failed > 0 ? "rose" : "neutral"}
-            />
-            <DocStat
-              label="Storage usado"
-              value={`${(docs.total_bytes / 1024 / 1024).toFixed(1)} MB`}
-            />
+      {/* ── Documentos del cliente ─────────────────────────────────────────── */}
+      <div className="mt-8">
+        <div className="mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            Documentos del cliente — base de toda la IA
+          </p>
+          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+            La calidad de las respuestas IA depende directamente de los documentos subidos. Sin documentos,
+            la IA trabaja solo con datos públicos. Con ellos, cita cifras y compromisos reales del cliente.
+          </p>
+        </div>
+
+        {/* KPIs de documentos */}
+        {docs && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+              <DocStat label="Total documentos" value={numFmt.format(docs.total)} />
+              <DocStat label="Últimos 7 días" value={numFmt.format(docs.recent_count)} />
+              <DocStat label="Informe sustentabilidad" value={numFmt.format(docs.by_kind.sustainability_report)} tone="emerald" />
+              <DocStat label="Informe financiero" value={numFmt.format(docs.by_kind.financial_report)} tone="amber" />
+              <DocStat label="Documentos generales" value={numFmt.format(docs.by_kind.general)} />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <DocStat label="Leídos correctamente" value={numFmt.format(docs.by_parse_status.ok)} tone="emerald" />
+              <DocStat label="En proceso" value={numFmt.format(docs.by_parse_status.pending)} />
+              <DocStat label="Con error de lectura" value={numFmt.format(docs.by_parse_status.failed)} tone={docs.by_parse_status.failed > 0 ? "rose" : "neutral"} />
+              <DocStat label="Espacio usado" value={`${(docs.total_bytes / 1024 / 1024).toFixed(1)} MB`} />
+            </div>
+            {docs.by_parse_status.failed > 0 && (
+              <div className="bg-rose-50 border border-rose-200 rounded px-4 py-2.5 mb-4 text-xs text-rose-800 leading-relaxed">
+                <span className="font-bold">⚠ {docs.by_parse_status.failed} documento{docs.by_parse_status.failed > 1 ? "s" : ""} con error.</span>{" "}
+                La IA no puede leer su contenido. Revisa el tab Documentos de cada cliente y vuelve a subir en formato PDF plano (sin protección de contraseña).
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Modos de importación */}
+        <div className="mb-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+            Cómo importar documentos
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              {
+                modo: "Subir archivo",
+                desc: "PDF, Word, Excel, PowerPoint, TXT desde el tab Documentos del cliente. Preserva tablas GRI/ESRS.",
+                costo: "LlamaParse: gratis hasta 10,000 págs/mes",
+                tip: "Preferir PDF nativo (no escaneado). Evitar documentos con contraseña.",
+              },
+              {
+                modo: "Pegar texto",
+                desc: "Copia el contenido del informe y pégalo directamente en el modal de importación del cuestionario.",
+                costo: "Sin costo de parseo",
+                tip: "Ideal para secciones específicas. La IA lo procesa igual que un archivo.",
+              },
+              {
+                modo: "URL del informe",
+                desc: "La IA descarga y parsea el PDF desde la URL pública del informe GRI/ESG del cliente.",
+                costo: "LlamaParse: gratis hasta 10,000 págs/mes",
+                tip: "Usar el botón 'Buscar informe' del perfil del cliente — la IA localiza y sube el informe oficial.",
+              },
+            ].map((m) => (
+              <div key={m.modo} className="bg-white border border-slate-200 rounded p-3 shadow-sm">
+                <p className="text-xs font-bold text-slate-900 mb-1">{m.modo}</p>
+                <p className="text-[11px] text-slate-600 leading-relaxed mb-2">{m.desc}</p>
+                <p className="text-[10px] text-emerald-700 font-medium mb-1">{m.costo}</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">{m.tip}</p>
+              </div>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* Buenas prácticas de documentos */}
+        <div className="bg-slate-50 border border-slate-200 rounded px-4 py-3 text-[11px] text-slate-600 leading-relaxed">
+          <p className="font-semibold text-slate-700 mb-1">Para obtener el mejor resultado de la IA:</p>
+          <ul className="space-y-1 list-none">
+            <li>— Subir el <span className="font-medium">informe de sustentabilidad más reciente</span> del cliente antes de iniciar el cuestionario.</li>
+            <li>— Si el cliente tiene informe financiero, subirlo también — Aurora puede cruzar datos de ambos.</li>
+            <li>— Los informes de <span className="font-medium">empresas comparadoras</span> se suben también como documentos del cliente (tipo "General").</li>
+            <li>— Costo total estimado para el piloto (10 clientes, ~100 págs c/u):{" "}
+              <span className="font-semibold text-slate-800">$0 — todo dentro del free tier de LlamaParse y Voyage AI.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }

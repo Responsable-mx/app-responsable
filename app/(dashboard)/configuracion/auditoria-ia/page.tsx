@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getUsageSummary } from "@/lib/ai/usage";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Auditoría IA · Configuración · App ResponSable",
@@ -43,8 +44,25 @@ type Decision = {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+async function getDocStats() {
+  try {
+    const sb = createAdminClient();
+    const { data, error } = await sb.from("client_documents").select("parse_status");
+    if (error) return null;
+    const rows = data ?? [];
+    return {
+      total: rows.length,
+      failed: rows.filter(r => r.parse_status === "failed").length,
+      pending: rows.filter(r => r.parse_status === "pending").length,
+    };
+  } catch { return null; }
+}
+
 export default async function AuditoriaIaPage() {
-  const usage = await getUsageSummary(30).catch(() => null);
+  const [usage, docStats] = await Promise.all([
+    getUsageSummary(30).catch(() => null),
+    getDocStats(),
+  ]);
 
   // Métricas derivadas
   const voyageModel  = usage?.by_model.find(m => m.family === "voyage");
@@ -82,6 +100,12 @@ export default async function AuditoriaIaPage() {
     rojo:     { bg: "bg-rose-50",    border: "border-rose-200",    dot: "bg-rose-500",    text: "text-rose-800"    },
   };
   const sc = semaforoColor[semaforo];
+
+  // Ahorro real de caché: tokens que habrían costado precio completo pero se leyeron de caché
+  // Sonnet: $3 input vs $0.30 cache read → ahorro $2.70 por 1M tokens reutilizados
+  const cacheSavingsUsd = usage
+    ? Number((usage.total_cache_read_tokens * 2.7 / 1_000_000).toFixed(2))
+    : 0;
 
   // Descripción del estado en lenguaje simple
   const semaforoDesc =
@@ -272,6 +296,32 @@ export default async function AuditoriaIaPage() {
     );
   }
 
+  // ── Decisiones de documentos (independientes del uso IA) ────────────────
+  if (docStats !== null) {
+    if (docStats.failed > 0) {
+      decisions.push({
+        prioridad: docStats.failed > 3 ? "urgente" : "importante",
+        titulo: `${docStats.failed} documento${docStats.failed > 1 ? "s" : ""} no se pudo${docStats.failed > 1 ? "ieron" : ""} leer — la IA los ignora`,
+        queMejora: "Recuperar el contenido de esos archivos para que la IA los use en chat y AI-fill.",
+        porQueImporta: `Cuando un informe falla al leerse, el consultor cree que está disponible pero la IA lo ignora. Aurora y el AI-fill responden con datos públicos en lugar de los datos reales del cliente — sin avisar.`,
+        ejemplo: `Si el informe financiero de un cliente falló al parsearse, Rebeca no puede citar sus cifras aunque el consultor lo haya subido hace días.`,
+        necesita: "Ir al tab Documentos de cada cliente. Volver a subir en PDF plano (sin protección de contraseña). Toma 2 minutos por documento.",
+        recomendacion: "investigar",
+      });
+    }
+    if (docStats.total === 0) {
+      decisions.push({
+        prioridad: "importante",
+        titulo: "Sin documentos del cliente — la IA trabaja solo con datos públicos",
+        queMejora: "Subir el informe de sustentabilidad del cliente multiplica la precisión del AI-fill y el chat.",
+        porQueImporta: "Sin documentos, Aurora responde con benchmarks públicos y búsqueda web. Con el informe del cliente, cita cifras y compromisos reales — la diferencia entre un borrador genérico y uno listo para entregar.",
+        ejemplo: "Si el informe GRI de Nuvoil reporta 12% de reducción de emisiones, Aurora puede citarlo exactamente en lugar de usar un estimado sectorial.",
+        necesita: "El consultor sube el PDF desde el tab Documentos de cada cliente. Tarda <30 segundos. Sin costo adicional.",
+        recomendacion: "activar",
+      });
+    }
+  }
+
   // Ordenar: urgente → importante → conveniente
   const ordenPrioridad: Record<Prioridad, number> = { urgente: 0, importante: 1, conveniente: 2 };
   decisions.sort((a, b) => ordenPrioridad[a.prioridad] - ordenPrioridad[b.prioridad]);
@@ -309,34 +359,60 @@ export default async function AuditoriaIaPage() {
             {
               label: "Respuestas exitosas",
               value: llmCalls > 0 ? `${successRate}%` : "—",
-              sub: llmCalls > 0
-                ? (errorRate > 0.05 ? `⚠️ ${llmErrors} errores detectados` : "Todo funcionando")
-                : "Sin datos",
+              sub: llmCalls === 0
+                ? "Sin actividad en 30 días"
+                : errorRate > 0.2
+                ? `${llmErrors} fallas en ${numFmt.format(llmCalls)} consultas — ver diagnóstico`
+                : errorRate > 0.05
+                ? `${llmErrors} fallas detectadas — ver diagnóstico abajo`
+                : `${numFmt.format(llmCalls)} consultas sin interrupciones`,
               red: errorRate > 0.05,
-              tooltip: "Porcentaje de veces que la IA respondió sin errores en los últimos 30 días.",
+              tooltip: "Porcentaje de veces que la IA respondió sin errores en los últimos 30 días. Una falla = el consultor vio respuesta vacía o mensaje de error.",
             },
             {
               label: "Costo del mes",
               value: usdFmt.format(costoMes),
-              sub: costoMes < 20 ? "Razonable para el volumen actual" : costoMes < 50 ? "Hay oportunidades de ahorro" : "Alto — revisar",
-              red: costoMes > 50,
-              tooltip: "Estimado de lo que costaron todas las llamadas a IA en los últimos 30 días.",
+              sub: costoMes === 0
+                ? "Sin actividad registrada"
+                : costoMes < 30
+                ? `${Math.round((costoMes / 150) * 100)}% del presupuesto piloto — amplia holgura`
+                : costoMes < 100
+                ? `${Math.round((costoMes / 150) * 100)}% del presupuesto mensual ($150 límite)`
+                : costoMes < 150
+                ? `${Math.round((costoMes / 150) * 100)}% del presupuesto — monitorear de cerca`
+                : "Superó el presupuesto piloto de $150",
+              red: costoMes > 100,
+              tooltip: "Costo estimado de todas las llamadas a IA en los últimos 30 días. Presupuesto piloto definido en $150 USD/mes.",
             },
             {
               label: "Velocidad de respuesta",
               value: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "—",
-              sub: latenciaLabel(latenciaMs),
+              sub: latenciaMs <= 0
+                ? "Sin datos"
+                : latenciaMs < 5_000
+                ? "Ágil — consultor no percibe espera"
+                : latenciaMs < 10_000
+                ? "Aceptable — consultor espera pero fluye"
+                : latenciaMs < 20_000
+                ? `${(latenciaMs / 1000).toFixed(0)}s interrumpe el trabajo — revisar documentos largos`
+                : `${(latenciaMs / 1000).toFixed(0)}s — posibles timeouts, ver diagnóstico`,
               red: latenciaMs > 15_000,
-              tooltip: "Tiempo promedio que espera el consultor desde que envía su pregunta hasta que aparece la respuesta.",
+              tooltip: "Tiempo promedio que espera el consultor desde que envía su pregunta hasta que recibe la respuesta completa. Objetivo: <10s.",
             },
             {
-              label: "Ahorro por reutilización",
+              label: "Caché activo",
               value: cacheRatio > 0 ? `${Math.round(cacheRatio * 100)}%` : "—",
-              sub: cacheRatio > 0.3
-                ? `~${usdFmt.format(costoMes * cacheRatio)} ahorrados`
-                : "Margen de mejora",
+              sub: cacheRatio <= 0
+                ? "Sin actividad registrada"
+                : cacheSavingsUsd >= 0.5
+                ? `~${usdFmt.format(cacheSavingsUsd)} ahorrados este mes${cacheRatio < 0.2 ? " — objetivo: >40%" : ""}`
+                : cacheRatio < 0.2
+                ? "Bajo — objetivo >40% para prompts repetitivos"
+                : cacheRatio < 0.4
+                ? `~${usdFmt.format(cacheSavingsUsd)} ahorrados — en rango normal`
+                : `~${usdFmt.format(cacheSavingsUsd)} ahorrados — rendimiento óptimo`,
               red: false,
-              tooltip: "La IA reutiliza el contexto del cliente entre preguntas del mismo rol, evitando cobrar por leerlo de nuevo cada vez.",
+              tooltip: "Porcentaje de tokens que la IA leyó de caché en lugar de procesarlos de nuevo. Más alto = menos costo. Objetivo: >40% en uso regular.",
             },
           ].map((kpi) => (
             <div key={kpi.label} className="bg-white border border-slate-200 rounded px-3 py-2.5" title={kpi.tooltip}>

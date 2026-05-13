@@ -1,7 +1,7 @@
 # AUDIT_LAST.md — App ResponSable
 
 **Fecha:** 2026-05-12 (sesión 33 — /audit-health + /audit-seg + /audit-refactor + /simplify + cobertura)
-**Calificación global:** 9.7 / 10 (vs 9.8 sesión 32c)
+**Calificación global:** 9.8 / 10 (= sesión 32c)
 
 ---
 
@@ -107,14 +107,14 @@ Wave 7 optimizaciones (QW1-QW5 + B4) revisadas:
 | Dimensión | Post-32c | Post-33 (fixes) | Delta |
 |-----------|----------|-----------------|-------|
 | Seguridad | 9.8 | 9.8 | = |
-| Confiabilidad | 9.8 | 9.6 (D-177 Voyage hang) | ↓ |
+| Confiabilidad | 9.8 | 9.8 ✅ D-177 resuelto | = |
 | UX | 9.2 | 9.2 | = |
 | Arquitectura | 9.7 | 9.7 | = |
 | Rendimiento | 9.4 | 9.4 | = |
 | Calidad de código | 9.9 | 9.9 (ESLint 0/0 restaurado) | = |
-| Observabilidad | 9.7 | 9.6 (D-178 latencyMs=0) | ↓ |
-| Deuda técnica | 9.8 | 9.7 (2 nuevos: D-177/178) | ↓ |
-| **Global** | **9.8** | **9.7** | ↓0.1 |
+| Observabilidad | 9.7 | 9.6 (D-178 latencyMs=0 open) | ↓ |
+| Deuda técnica | 9.8 | 9.8 (D-177 cerrado, D-178 menor) | = |
+| **Global** | **9.8** | **9.8** | = |
 
 ---
 
@@ -122,7 +122,7 @@ Wave 7 optimizaciones (QW1-QW5 + B4) revisadas:
 
 | ID | Sev | Descripción | Acción |
 |----|-----|-------------|--------|
-| D-177 | 🟡 | Voyage fetch sin timeout — Lambda puede hang 5min | `AbortSignal.timeout(30_000)` en embeddings.ts:43 |
+| D-177 | ✅ | Voyage fetch sin timeout | Resuelto sesión 33 — `AbortSignal.timeout(30_000)` |
 | D-178 | 🟢 | latencyMs=0 en logAiCall IROs batch | Calcular desde `submitted_at` columna existente |
 | D-04 | ⏸ | Metodología ResponSable no definida | Bloqueo de negocio, no técnico |
 
@@ -141,4 +141,4 @@ Wave 7 optimizaciones (QW1-QW5 + B4) revisadas:
 | s28 | 9.7 |
 | s31 | 9.7 |
 | s32c | 9.8 |
-| **s33** | **9.7** |
+| **s33** | **9.8** |

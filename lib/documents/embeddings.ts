@@ -42,6 +42,7 @@ async function callVoyageRaw(
   try {
     const res = await fetch("https://api.voyageai.com/v1/embeddings", {
       method: "POST",
+      signal: AbortSignal.timeout(30_000),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         input: inputs.map((s) => s.slice(0, cap)),

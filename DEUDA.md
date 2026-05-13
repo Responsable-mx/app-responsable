@@ -18,10 +18,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ### Bloque D-177–D-178 — Hallazgos auditoría sesión 33 (2026-05-12)
 
-### 🟡 D-177 — Voyage fetch sin timeout en `lib/documents/embeddings.ts`
-- `fetch("https://api.voyageai.com/v1/embeddings", {...})` línea 43 — sin `signal: AbortSignal.timeout(N)`.
-- Cron `embed-chunks` tiene `maxDuration=300`. Si Voyage API cuelga, Lambda espera 5min completos hasta kill de Vercel.
-- Fix: `signal: AbortSignal.timeout(30_000)` (30s suficiente para embeddings).
+### ~~🟡 D-177 — Voyage fetch sin timeout en `lib/documents/embeddings.ts`~~ ✅ RESUELTO (sesión 33)
+- `signal: AbortSignal.timeout(30_000)` añadido en `callVoyageRaw`. Lambda ya no puede hang 5min si Voyage cuelga.
 
 ### 🟢 D-178 — `logAiCall` con `latencyMs: 0` en dm-benchmark-company-iros
 - `app/api/clients/[id]/dm-benchmark-company-iros/route.ts:215` — `latencyMs: 0` hardcodeado.

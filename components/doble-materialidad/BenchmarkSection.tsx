@@ -5,7 +5,6 @@ import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { SelectField } from "@/components/ui/SelectField";
 import { RELATION_LABELS, RELATION_ORDER, type CompanyRelation } from "@/lib/dm/fields";
 import type { DmIroConfig } from "@/lib/dm/iros";
 import { ExpandableCell } from "@/components/doble-materialidad/ExpandableCell";
@@ -13,6 +12,7 @@ import type { BenchmarkCompany, BenchmarkResult, RejectionReason } from "./bench
 import { REJECTION_OPTIONS } from "./benchmark-helpers";
 import { BenchmarkComparisonTable } from "./BenchmarkComparisonTable";
 import type { BenchmarkEmpresa } from "@/lib/dm/benchmark-empresas-types";
+import { ManualAddCompanyForm } from "@/components/doble-materialidad/ManualAddCompanyForm";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -190,35 +190,21 @@ export function BenchmarkSection({
     }
   }, [clientId, selected, companies, push, onStartPolling]);
 
-  const handleAddManual = useCallback(async () => {
-    if (!manualForm.name.trim()) return;
-    setAddingManual(true);
-    try {
-      const res = await fetch(`/api/clients/${clientId}/dm-benchmark`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "add_manual",
-          name: manualForm.name.trim(),
-          relation: manualForm.relation,
-          country: manualForm.country.trim() || null,
-          sector: manualForm.sector.trim() || null,
-          website: manualForm.website.trim() || null,
-          justification: manualForm.justification.trim() || null,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Error al agregar empresa");
-      push("success", `${manualForm.name.trim()} agregada al benchmark.`);
-      setShowAddForm(false);
-      setManualForm({ name: "", relation: "competitor_nacional", country: "", sector: "", website: "", justification: "" });
-      onDataMutate();
-    } catch (e) {
-      push("error", e instanceof Error ? e.message : "Error al agregar empresa");
-    } finally {
-      setAddingManual(false);
-    }
-  }, [clientId, manualForm, push, onDataMutate]);
+  const handleAddManual = useCallback(async (data: {
+    name: string; relation: CompanyRelation; country: string | null;
+    sector: string | null; website: string | null; justification: string | null;
+  }) => {
+    const res = await fetch(`/api/clients/${clientId}/dm-benchmark`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "add_manual", ...data }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "Error al agregar empresa");
+    push("success", `${data.name} agregada al benchmark.`);
+    setShowAddForm(false);
+    onDataMutate();
+  }, [clientId, push, onDataMutate]);
 
   const handleRemoveCompany = useCallback(async (companyId: string) => {
     try {
@@ -404,118 +390,10 @@ export function BenchmarkSection({
 
           {/* Formulario agregar empresa manual — justo bajo el botón para visibilidad inmediata */}
           {showAddForm && (
-            <div className="border border-brand-primary/30 rounded p-3 space-y-2.5 bg-slate-50/60">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                Agregar empresa manualmente
-              </p>
-              {/* Nombre + Relación */}
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
-                    Nombre <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={manualForm.name}
-                    onChange={(e) => setManualForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Ej: Grupo Bimbo"
-                    maxLength={200}
-                    className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                  />
-                </div>
-                <div className="w-52 shrink-0">
-                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
-                    Tipo de relación <span className="text-rose-500">*</span>
-                  </label>
-                  <SelectField
-                    value={manualForm.relation}
-                    onChange={(v) => setManualForm((f) => ({ ...f, relation: v as CompanyRelation }))}
-                    options={[
-                      { value: "competitor_nacional",       label: RELATION_LABELS.competitor_nacional },
-                      { value: "competitor_internacional",  label: RELATION_LABELS.competitor_internacional },
-                      { value: "sector",                    label: RELATION_LABELS.sector },
-                      { value: "cadena_valor",              label: RELATION_LABELS.cadena_valor },
-                    ]}
-                  />
-                </div>
-              </div>
-              {/* País + Sector */}
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">País</label>
-                  <input
-                    type="text"
-                    value={manualForm.country}
-                    onChange={(e) => setManualForm((f) => ({ ...f, country: e.target.value }))}
-                    placeholder="Ej: México"
-                    maxLength={100}
-                    className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Sector</label>
-                  <input
-                    type="text"
-                    value={manualForm.sector}
-                    onChange={(e) => setManualForm((f) => ({ ...f, sector: e.target.value }))}
-                    placeholder="Ej: Alimentos y bebidas"
-                    maxLength={200}
-                    className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                  />
-                </div>
-              </div>
-              {/* Website */}
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
-                  Sitio web
-                </label>
-                <input
-                  type="url"
-                  value={manualForm.website}
-                  onChange={(e) => setManualForm((f) => ({ ...f, website: e.target.value }))}
-                  placeholder="https://www.ejemplo.com"
-                  maxLength={300}
-                  className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                />
-              </div>
-              {/* Justificación */}
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
-                  Justificación
-                </label>
-                <textarea
-                  value={manualForm.justification}
-                  onChange={(e) => setManualForm((f) => ({ ...f, justification: e.target.value }))}
-                  placeholder="¿Por qué incluir esta empresa en el benchmark? ¿Qué reporta en sostenibilidad?"
-                  maxLength={600}
-                  rows={2}
-                  className="font-sans w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 bg-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-none"
-                />
-                <p className="text-[10px] text-slate-300 text-right">{manualForm.justification.length}/600</p>
-              </div>
-              {/* Acciones */}
-              <div className="flex items-center gap-2 pt-0.5">
-                <Button
-                  size="sm"
-                  variant="primary"
-                  loading={addingManual}
-                  disabled={!manualForm.name.trim()}
-                  onClick={() => void handleAddManual()}
-                >
-                  Agregar empresa
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setManualForm({ name: "", relation: "competitor_nacional", country: "", sector: "", website: "", justification: "" });
-                  }}
-                  className="text-xs text-slate-500 hover:underline"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
+            <ManualAddCompanyForm
+              onAdd={(data) => handleAddManual(data)}
+              onCancel={() => setShowAddForm(false)}
+            />
           )}
 
           {/* Selección masiva — oculta en modo Etapa 3 (empresas vienen de Referentes) */}

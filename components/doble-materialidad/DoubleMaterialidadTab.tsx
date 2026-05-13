@@ -15,6 +15,7 @@ import type { NisItem } from "@/components/doble-materialidad/NisSection";
 import type { IroBatchStatus } from "@/components/doble-materialidad/IroSection";
 import type { BenchmarkData } from "@/components/doble-materialidad/benchmark-types";
 import { StagePill } from "@/components/doble-materialidad/StagePill";
+import { useBenchmarkPolling, useIroPolling, useReportPolling } from "@/hooks/useDmPolling";
 import { CollapsibleStageSection } from "@/components/doble-materialidad/CollapsibleStageSection";
 
 // ── Lazy loading por etapa (A — Wave 2) ──────────────────────
@@ -194,10 +195,10 @@ export function DoubleMaterialidadTab({
   const resumenKey     = `/api/clients/${clientId}/dm-resumen`;
   const validacionKey  = `/api/clients/${clientId}/dm-validacion`;
 
-  const [isPolling, setIsPolling] = useState(false);
   const { push } = useToast();
-  const pollingNotified = useRef(false);
-  const pollingStartId = useRef<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [isIroPolling, setIsIroPolling] = useState(false);
+  const [isReportPolling, setIsReportPolling] = useState(false);
 
   // Ruta B: una etapa visible a la vez.
   // Inicial: lee URL hash (#dm-sec-iros) si existe — permite deep-links y back/forward.
@@ -244,12 +245,6 @@ export function DoubleMaterialidadTab({
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  const [isIroPolling, setIsIroPolling] = useState(false);
-  const pollingNotifiedIro = useRef(false);
-
-  const [isReportPolling, setIsReportPolling] = useState(false);
-  const pollingNotifiedReport = useRef(false);
-  const pollingStartReportId = useRef<string | null>(null);
 
   const { data: referentesResp, mutate: mutateReferentes } = useSWR<{
     data: ReferentesData | null;
@@ -302,78 +297,15 @@ export function DoubleMaterialidadTab({
   const latestReport = reportResp?.data ?? null;
   const validatedCompanies = companies.filter((c) => c.validated).length;
 
-  // Detectar cuando el batch del benchmark termina
-  useEffect(() => {
-    if (!isPolling) {
-      pollingNotified.current = false;
-      return;
-    }
-    const isStale = latestResult?.id === pollingStartId.current;
-    if (isStale) return;
-    if (latestResult?.status === "done" && !pollingNotified.current) {
-      pollingNotified.current = true;
-      setIsPolling(false);
-      push("success", "Benchmark completado. Revisa el análisis comparativo.");
-    }
-    if (latestResult?.status === "failed" && !pollingNotified.current) {
-      pollingNotified.current = true;
-      setIsPolling(false);
-      push("error", "El benchmark falló. Intenta de nuevo.");
-    }
-  }, [latestResult?.id, latestResult?.status, isPolling, push]);
-
-  // Detectar cuando el batch de IROs termina
-  useEffect(() => {
-    if (!isIroPolling) {
-      pollingNotifiedIro.current = false;
-      return;
-    }
-    if (irosStatus === "done" && !pollingNotifiedIro.current) {
-      pollingNotifiedIro.current = true;
-      setIsIroPolling(false);
-      push("success", `${iros.length} IROs generados. Revisa y ajusta los scores.`);
-    }
-    if (irosStatus === "failed" && !pollingNotifiedIro.current) {
-      pollingNotifiedIro.current = true;
-      setIsIroPolling(false);
-      push("error", "La generación de IROs falló. Intenta de nuevo.");
-    }
-  }, [irosStatus, isIroPolling, iros.length, push]);
-
-  // Detectar cuando el batch del reporte termina
-  useEffect(() => {
-    if (!isReportPolling) {
-      pollingNotifiedReport.current = false;
-      return;
-    }
-    const isStale = latestReport?.id === pollingStartReportId.current;
-    if (isStale) return;
-    if (latestReport?.parse_status === "ok" && !pollingNotifiedReport.current) {
-      pollingNotifiedReport.current = true;
-      setIsReportPolling(false);
-      push("success", "Reporte generado. Puedes descargarlo en PDF.");
-    }
-    if (latestReport?.parse_status === "failed" && !pollingNotifiedReport.current) {
-      pollingNotifiedReport.current = true;
-      setIsReportPolling(false);
-      push("error", "El reporte falló. Intenta de nuevo.");
-    }
-  }, [latestReport?.id, latestReport?.parse_status, isReportPolling, push]);
-
-  // Auto-restart polling si al montar/cargar hay un reporte pending con batch_id.
-  // Caso: usuario disparó "Generar reporte", cambió de tab o refrescó — polling local murió,
-  // batch sigue corriendo en Anthropic. GET handler procesa pending sólo si alguien lo llama.
-  useEffect(() => {
-    if (
-      latestReport?.parse_status === "pending" &&
-      latestReport?.batch_id &&
-      !isReportPolling
-    ) {
-      pollingStartReportId.current = latestReport.id;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- restart polling al detectar pending+batch_id externos (SWR refresh tras refresh/tab change); guard !isReportPolling previene loop
-      setIsReportPolling(true);
-    }
-  }, [latestReport?.parse_status, latestReport?.batch_id, latestReport?.id, isReportPolling]);
+  const { startPolling: startBenchmarkPolling } = useBenchmarkPolling(
+    isPolling, setIsPolling, latestResult?.id, latestResult?.status, push
+  );
+  const { startPolling: startIroPolling } = useIroPolling(
+    isIroPolling, setIsIroPolling, irosStatus, iros.length, push
+  );
+  const { startPolling: startReportPolling } = useReportPolling(
+    isReportPolling, setIsReportPolling, latestReport?.id, latestReport?.parse_status, latestReport?.batch_id, push
+  );
 
   const stage1Status: StageStatus =
     questionnaireProgress &&
@@ -771,8 +703,7 @@ export function DoubleMaterialidadTab({
           onDataMutate={() => mutateBenchmark()}
           isPolling={isPolling}
           onStartPolling={() => {
-            pollingStartId.current = latestResult?.id ?? null;
-            setIsPolling(true);
+            startBenchmarkPolling(latestResult?.id);
             void mutateBenchmark();
           }}
           referentCompanies={(benchmarkEmpresasRec?.proposed_companies ?? []).filter(
@@ -806,8 +737,7 @@ export function DoubleMaterialidadTab({
           hasBenchmark={hasBenchmark}
           onMutate={() => void mutateIros()}
           onStartPolling={() => {
-            pollingNotifiedIro.current = false;
-            setIsIroPolling(true);
+            startIroPolling();
             void mutateIros();
           }}
         />
@@ -939,8 +869,7 @@ export function DoubleMaterialidadTab({
           onReportMutate={() => mutateReport()}
           isReportPolling={isReportPolling}
           onStartReportPolling={() => {
-            pollingStartReportId.current = latestReport?.id ?? null;
-            setIsReportPolling(true);
+            startReportPolling(latestReport?.id);
             void mutateReport();
           }}
         />

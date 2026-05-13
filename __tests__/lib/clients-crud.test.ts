@@ -28,6 +28,7 @@ function makeChain(): unknown {
     select: () => makeChain(),
     order: () => makeChain(),
     limit: () => makeChain(),
+    ilike: () => makeChain(),
     maybeSingle: () => Promise.resolve(chainResult.value),
     single: () => Promise.resolve(chainResult.value),
     then: (
@@ -133,6 +134,116 @@ describe("clients CRUD con Supabase mock", () => {
     chainResult.value = { error: { message: "fk_violation" } };
     const { deleteClientRow } = await import("@/lib/clients");
     await expect(deleteClientRow("abc")).rejects.toThrow(/fk_violation/);
+  });
+
+  it("listClients con search aplica ilike (branch line 422)", async () => {
+    chainResult.value = { data: [{ id: "1", name: "Heineken" }], error: null };
+    const { listClients } = await import("@/lib/clients");
+    const out = await listClients({ search: "Heineken" });
+    expect(out).toHaveLength(1);
+  });
+
+  it("getClientEngagements devuelve data en prod mode", async () => {
+    chainResult.value = { data: [{ id: "e1", client_id: "c1" }], error: null };
+    const { getClientEngagements } = await import("@/lib/clients");
+    const out = await getClientEngagements("c1");
+    expect(out).toHaveLength(1);
+  });
+
+  it("getClientEngagements propaga error", async () => {
+    chainResult.value = { data: null, error: { message: "eng-error" } };
+    const { getClientEngagements } = await import("@/lib/clients");
+    await expect(getClientEngagements("c1")).rejects.toThrow(/eng-error/);
+  });
+
+  it("getClientMini devuelve mini en prod mode", async () => {
+    chainResult.value = { data: { id: "1", has_double_materiality: false }, error: null };
+    const { getClientMini } = await import("@/lib/clients");
+    const out = await getClientMini("1");
+    expect(out?.id).toBe("1");
+    expect(out?.has_double_materiality).toBe(false);
+  });
+
+  it("getClientMini propaga error", async () => {
+    chainResult.value = { data: null, error: { message: "mini-err" } };
+    const { getClientMini } = await import("@/lib/clients");
+    await expect(getClientMini("1")).rejects.toThrow(/mini-err/);
+  });
+
+  it("listClientsLight devuelve data en prod mode", async () => {
+    chainResult.value = { data: [{ id: "1", name: "A" }, { id: "2", name: "B" }], error: null };
+    const { listClientsLight } = await import("@/lib/clients");
+    const out = await listClientsLight();
+    expect(out).toHaveLength(2);
+  });
+
+  it("listClientsLight con search aplica ilike", async () => {
+    chainResult.value = { data: [{ id: "1", name: "A" }], error: null };
+    const { listClientsLight } = await import("@/lib/clients");
+    const out = await listClientsLight({ search: "A" });
+    expect(out).toHaveLength(1);
+  });
+
+  it("listClientsLight propaga error", async () => {
+    chainResult.value = { data: null, error: { message: "light-err" } };
+    const { listClientsLight } = await import("@/lib/clients");
+    await expect(listClientsLight()).rejects.toThrow(/light-err/);
+  });
+
+  it("listClientsForTable devuelve data en prod mode", async () => {
+    chainResult.value = { data: [{ id: "1", name: "A", sector: "s" }], error: null };
+    const { listClientsForTable } = await import("@/lib/clients");
+    const out = await listClientsForTable();
+    expect(out).toHaveLength(1);
+  });
+
+  it("listClientsForTable con search aplica ilike", async () => {
+    chainResult.value = { data: [{ id: "1", name: "A" }], error: null };
+    const { listClientsForTable } = await import("@/lib/clients");
+    const out = await listClientsForTable({ search: "A" });
+    expect(out).toHaveLength(1);
+  });
+
+  it("listClientsForTable propaga error", async () => {
+    chainResult.value = { data: null, error: { message: "table-err" } };
+    const { listClientsForTable } = await import("@/lib/clients");
+    await expect(listClientsForTable()).rejects.toThrow(/table-err/);
+  });
+
+  it("updateClientRow propaga error", async () => {
+    chainResult.value = { data: null, error: { message: "update-err" } };
+    const { updateClientRow } = await import("@/lib/clients");
+    await expect(updateClientRow("1", { name: "X" }, "u@x.com")).rejects.toThrow(/update-err/);
+  });
+
+  it("getClientEngagements data null sin error devuelve []", async () => {
+    chainResult.value = { data: null, error: null };
+    const { getClientEngagements } = await import("@/lib/clients");
+    expect(await getClientEngagements("c1")).toEqual([]);
+  });
+
+  it("getClientMini data null sin error devuelve null", async () => {
+    chainResult.value = { data: null, error: null };
+    const { getClientMini } = await import("@/lib/clients");
+    expect(await getClientMini("no-existe")).toBeNull();
+  });
+
+  it("listClientsLight data null sin error devuelve []", async () => {
+    chainResult.value = { data: null, error: null };
+    const { listClientsLight } = await import("@/lib/clients");
+    expect(await listClientsLight()).toEqual([]);
+  });
+
+  it("listClientsForTable data null sin error devuelve []", async () => {
+    chainResult.value = { data: null, error: null };
+    const { listClientsForTable } = await import("@/lib/clients");
+    expect(await listClientsForTable()).toEqual([]);
+  });
+
+  it("listClients data null sin error devuelve []", async () => {
+    chainResult.value = { data: null, error: null };
+    const { listClients } = await import("@/lib/clients");
+    expect(await listClients()).toEqual([]);
   });
 });
 

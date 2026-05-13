@@ -163,7 +163,6 @@ export async function searchCompetitorChunks(opts: {
   if (!queryEmbedding) return null;
 
   const admin = createAdminClient();
-  // Filtrar chunks por document.benchmark_company_id via join
   const { data: docs } = await admin
     .from("client_documents")
     .select("id")
@@ -173,31 +172,15 @@ export async function searchCompetitorChunks(opts: {
   const docIds = (docs ?? []).map((d) => d.id as string);
   if (docIds.length === 0) return null;
 
-  const { data, error } = await admin
-    .from("document_chunks")
-    .select("content, embedding")
-    .in("document_id", docIds)
-    .not("embedding", "is", null)
-    .limit(300);
+  // pgvector RPC: cosine en Postgres — 0 bytes de embeddings en la red
+  const vec = `[${queryEmbedding.join(",")}]`;
+  const { data, error } = await admin.rpc("match_competitor_chunks", {
+    query_vec: vec,
+    p_doc_ids: docIds,
+    k: opts.limit ?? 10,
+  });
 
   if (error || !data) return null;
 
-  type Scored = { content: string; score: number };
-  const scored: Scored[] = data
-    .map((r) => {
-      const emb = r.embedding as unknown as number[] | string | null;
-      if (!emb) return null;
-      const arr = typeof emb === "string" ? (JSON.parse(emb) as number[]) : emb;
-      let dot = 0, normA = 0, normB = 0;
-      for (let i = 0; i < arr.length; i++) {
-        dot += queryEmbedding[i]! * arr[i]!;
-        normA += queryEmbedding[i]! * queryEmbedding[i]!;
-        normB += arr[i]! * arr[i]!;
-      }
-      const score = normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
-      return { content: r.content as string, score };
-    })
-    .filter((x): x is Scored => x !== null);
-
-  return scored.sort((a, b) => b.score - a.score).slice(0, opts.limit ?? 10);
+  return data as Array<{ content: string; score: number }>;
 }

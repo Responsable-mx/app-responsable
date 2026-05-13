@@ -26,25 +26,25 @@ type VoyageResponse = {
   model?: string;
 };
 
-/**
- * Llamada interna a Voyage API + log a ai_calls para cost tracking.
- * userEmail/clientId opcionales (cron embed-chunks no tiene contexto user).
- */
-async function callVoyage(
-  input: string,
+type VoyageMeta = { userEmail?: string; clientId?: string | null };
+
+/** Voyage API — 1 o N inputs en una sola llamada HTTP. */
+async function callVoyageRaw(
+  inputs: string[],
   inputType: "document" | "query",
-  meta?: { userEmail?: string; clientId?: string | null }
-): Promise<number[] | null> {
+  meta?: VoyageMeta
+): Promise<number[][] | null> {
   const apiKey = process.env.VOYAGE_API_KEY;
   if (!apiKey) return null;
   const model = process.env.VOYAGE_MODEL || "voyage-2";
+  const cap = inputType === "document" ? 30_000 : 4_000;
   const startedAt = Date.now();
   try {
     const res = await fetch("https://api.voyageai.com/v1/embeddings", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        input: input.slice(0, inputType === "document" ? 30_000 : 4_000),
+        input: inputs.map((s) => s.slice(0, cap)),
         model,
         input_type: inputType,
       }),
@@ -52,45 +52,44 @@ async function callVoyage(
     if (!res.ok) {
       const errText = await res.text();
       console.error("[embeddings] voyage error:", res.status, errText);
-      void logAiCall({
-        userEmail: meta?.userEmail ?? "cron@embeddings",
-        role: "embeddings",
-        clientId: meta?.clientId ?? null,
-        model,
-        inputTokens: 0,
-        outputTokens: 0,
-        latencyMs: Date.now() - startedAt,
-        error: `voyage ${res.status}: ${errText.slice(0, 200)}`,
-      });
+      void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: `voyage ${res.status}: ${errText.slice(0, 200)}` });
       return null;
     }
     const json = (await res.json()) as VoyageResponse;
     const tokens = json.usage?.total_tokens ?? 0;
-    void logAiCall({
-      userEmail: meta?.userEmail ?? "cron@embeddings",
-      role: "embeddings",
-      clientId: meta?.clientId ?? null,
-      model: json.model ?? model,
-      inputTokens: tokens,
-      outputTokens: 0,
-      latencyMs: Date.now() - startedAt,
-      error: null,
-    });
-    return json.data?.[0]?.embedding ?? null;
+    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model: json.model ?? model, inputTokens: tokens, outputTokens: 0, latencyMs: Date.now() - startedAt, error: null });
+    return json.data?.map((d) => d.embedding) ?? null;
   } catch (e) {
-    void logAiCall({
-      userEmail: meta?.userEmail ?? "cron@embeddings",
-      role: "embeddings",
-      clientId: meta?.clientId ?? null,
-      model,
-      inputTokens: 0,
-      outputTokens: 0,
-      latencyMs: Date.now() - startedAt,
-      error: e instanceof Error ? e.message : "Voyage fetch failed",
-    });
+    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: e instanceof Error ? e.message : "Voyage fetch failed" });
     console.error("[embeddings] voyage fetch failed:", e);
     return null;
   }
+}
+
+async function callVoyage(input: string, inputType: "document" | "query", meta?: VoyageMeta): Promise<number[] | null> {
+  const results = await callVoyageRaw([input], inputType, meta);
+  return results?.[0] ?? null;
+}
+
+/**
+ * Genera embeddings para un lote de textos en una sola llamada Voyage.
+ * Usado por el cron embed-chunks (32× menos HTTP calls vs 1-por-1).
+ */
+export async function generateEmbeddingsBatch(
+  texts: string[],
+  meta?: VoyageMeta
+): Promise<(number[] | null)[]> {
+  if (texts.length === 0) return [];
+  const BATCH_SIZE = 32;
+  const results: (number[] | null)[] = new Array(texts.length).fill(null);
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const slice = texts.slice(i, i + BATCH_SIZE);
+    const embeddings = await callVoyageRaw(slice, "document", meta);
+    if (embeddings) {
+      embeddings.forEach((emb, j) => { results[i + j] = emb; });
+    }
+  }
+  return results;
 }
 
 /**
@@ -162,10 +161,9 @@ export async function persistDocumentChunks(opts: {
 }
 
 /**
- * Búsqueda semántica de chunks. Si VOYAGE_API_KEY existe → cosine similarity
- * sobre embedding. Si no → fallback null (caller usa BM25 del relevance.ts).
- *
- * Devuelve top N chunks ordenados por similarity desc.
+ * Búsqueda semántica de chunks via pgvector RPC (mig 0090).
+ * Cosine similarity calculado en Postgres — 0 bytes de embeddings en la red.
+ * Fallback null si VOYAGE_API_KEY falta → caller usa BM25.
  */
 export async function searchSimilarChunks(opts: {
   query: string;
@@ -173,57 +171,25 @@ export async function searchSimilarChunks(opts: {
   limit?: number;
 }): Promise<ChunkRow[] | null> {
   const queryEmbedding = await generateQueryEmbedding(opts.query, { clientId: opts.clientId });
-  if (!queryEmbedding) return null; // Fallback: caller usa BM25
+  if (!queryEmbedding) return null;
 
   const admin = createAdminClient();
-  // pgvector cosine distance: <=> operator. 0 = idéntico, 2 = opuesto.
-  // Convertimos a string formato pgvector: [0.1,0.2,...]
   const vec = `[${queryEmbedding.join(",")}]`;
-  const limit = opts.limit ?? 10;
+  const k = opts.limit ?? 10;
 
-  // RPC requiere función SQL — por ahora usamos raw select via supabase.rpc
-  // Fallback simple: traer top chunks por client_id + filtrar en JS.
-  // En Wave 7+ se puede crear función search_chunks(client_id, query_vec, k)
-  // para empujar el filtro al server.
-  const { data, error } = await admin
-    .from("document_chunks")
-    .select("id, document_id, client_id, chunk_index, content, content_hash, embedding")
-    .eq("client_id", opts.clientId)
-    .not("embedding", "is", null)
-    .limit(500);
+  const { data, error } = await admin.rpc("match_document_chunks", {
+    query_vec: vec,
+    p_client_id: opts.clientId,
+    k,
+  });
 
   if (error || !data) return null;
 
-  // Cosine similarity en JS (suficiente para <500 chunks por cliente)
-  type ScoredRow = ChunkRow & { score: number };
-  const scored: ScoredRow[] = data
-    .map((r) => {
-      const emb = r.embedding as unknown as number[] | string | null;
-      if (!emb) return null;
-      const arr = typeof emb === "string" ? JSON.parse(emb) as number[] : emb;
-      const score = cosineSimilarity(queryEmbedding, arr);
-      return {
-        id: r.id as string,
-        document_id: r.document_id as string,
-        client_id: r.client_id as string,
-        chunk_index: r.chunk_index as number,
-        content: r.content as string,
-        content_hash: r.content_hash as string,
-        score,
-      };
-    })
-    .filter((x): x is ScoredRow => x !== null);
-
-  // Dejar vec sin uso reportado por linter sin afectar lógica
-  void vec;
-
-  return scored
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(({ score: _score, ...rest }) => rest);
+  return (data as Array<ChunkRow & { score: number }>).map(({ score: _score, ...rest }) => rest);
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
+/** Exportada para uso en competitor.ts — evita duplicar el algoritmo. */
+export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) return 0;
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {

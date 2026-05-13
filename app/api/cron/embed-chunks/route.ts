@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateEmbedding, persistDocumentChunks } from "@/lib/documents/embeddings";
+import { generateEmbeddingsBatch, persistDocumentChunks } from "@/lib/documents/embeddings";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -63,33 +63,32 @@ export async function GET(req: Request) {
     if (res.inserted > 0) docsChunked++;
   }
 
-  // ── Paso 2: embedder chunks pendientes ──
+  // ── Paso 2: embedder chunks pendientes (batch Voyage — 1 HTTP call por 32 chunks) ──
   const { data: pendingChunks } = await admin
     .from("document_chunks")
     .select("id, content")
     .is("embedding", null)
     .limit(BATCH_LIMIT);
 
-  for (const chunk of pendingChunks ?? []) {
-    const embedding = await generateEmbedding(chunk.content as string);
-    if (!embedding) {
-      failures++;
-      continue;
-    }
-    const { error } = await admin
-      .from("document_chunks")
-      .update({
-        embedding: embedding as unknown as string,
-        embedding_model: process.env.VOYAGE_MODEL ?? "voyage-2",
-        embedded_at: new Date().toISOString(),
+  const chunks = pendingChunks ?? [];
+  if (chunks.length > 0) {
+    const texts = chunks.map((c) => c.content as string);
+    const embeddings = await generateEmbeddingsBatch(texts);
+    const embModel = process.env.VOYAGE_MODEL ?? "voyage-2";
+    const embeddedAt = new Date().toISOString();
+
+    await Promise.all(
+      chunks.map(async (chunk, i) => {
+        const embedding = embeddings[i];
+        if (!embedding) { failures++; return; }
+        const { error } = await admin
+          .from("document_chunks")
+          .update({ embedding: embedding as unknown as string, embedding_model: embModel, embedded_at: embeddedAt })
+          .eq("id", chunk.id as string);
+        if (error) { failures++; console.error("[cron embed-chunks] update failed:", error.message); }
+        else chunksEmbedded++;
       })
-      .eq("id", chunk.id as string);
-    if (error) {
-      failures++;
-      console.error("[cron embed-chunks] update failed:", error.message);
-    } else {
-      chunksEmbedded++;
-    }
+    );
   }
 
   const latencyMs = Date.now() - startedAt;

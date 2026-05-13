@@ -492,7 +492,7 @@ export type PromptVersion = {
 // ── Cache in-memory (60s TTL) para evitar N queries por request ────
 type CacheEntry = { content: string; fetchedAt: number };
 const cache = new Map<PromptKey, CacheEntry>();
-const TTL_MS = 60_000;
+const TTL_MS = 300_000;
 
 export function invalidatePromptCache(key?: PromptKey) {
   if (key) cache.delete(key);

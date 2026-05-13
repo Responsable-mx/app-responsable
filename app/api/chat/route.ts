@@ -7,7 +7,7 @@ import { getModelConfig } from "@/lib/ai/models";
 import { buildSystemBlocks } from "@/lib/ai/roles";
 import { logAiCall } from "@/lib/ai/logging";
 import { validateAiResponse } from "@/lib/ai/response-validator";
-import { buildFeedbackMemoryBlock } from "@/lib/ai/feedback-memory";
+import { buildFeedbackMemoryBlock, countActiveFeedback } from "@/lib/ai/feedback-memory";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
 import { ChatRequestSchema } from "@/lib/validation";
@@ -121,7 +121,11 @@ export async function POST(req: NextRequest) {
   // Wave 3c (D): memoria de feedback negativo del consultor para este rol+cliente.
   // Se agrega como 3er bloque SIN cache_control — refleja feedback nuevo sin
   // invalidar los 2 bloques cacheados (contexto cliente + reglas del rol).
-  const feedbackText = await buildFeedbackMemoryBlock({ role, clientId: clientId || null }).catch(() => "");
+  // Skip la query completa si no hay rechazos activos (caso más común en piloto)
+  const feedbackCount = await countActiveFeedback({ role, clientId: clientId || null }).catch(() => 0);
+  const feedbackText = feedbackCount > 0
+    ? await buildFeedbackMemoryBlock({ role, clientId: clientId || null }).catch(() => "")
+    : "";
   const systemBlocks = feedbackText
     ? [...baseSystemBlocks, { type: "text" as const, text: feedbackText, cache_control: { type: "ephemeral" as const } }]
     : baseSystemBlocks;

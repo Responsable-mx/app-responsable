@@ -48,7 +48,7 @@ export function BenchmarkIrosSection({
     ? `/api/clients/${clientId}/dm-benchmark-company-iros`
     : null;
 
-  const { data: resp, mutate } = useSWR<{ data: { groups: IroGroup[] } }>(
+  const { data: resp, mutate, isLoading: loadingIros } = useSWR<{ data: { groups: IroGroup[] } }>(
     irosKey,
     fetcher,
     { revalidateOnFocus: false, refreshInterval: isPolling ? 5_000 : 0 }
@@ -150,6 +150,11 @@ export function BenchmarkIrosSection({
   });
   const [bulkGenerating, setBulkGenerating] = useState(false);
 
+  // Primer uso = datos cargados y NINGUNA empresa tiene IROs aún
+  const dataLoaded = !loadingIros && resp !== undefined;
+  const isFirstUse = dataLoaded && pendingGeneration.length === validatedCompanies.length;
+  const allDone = dataLoaded && pendingGeneration.length === 0;
+
   const generateAll = async () => {
     if (bulkGenerating || pendingGeneration.length === 0) return;
     setBulkGenerating(true);
@@ -167,11 +172,21 @@ export function BenchmarkIrosSection({
 
   return (
     <div className="space-y-4">
-      {/* ── Bulk generate header ── */}
-      {pendingGeneration.length > 0 && groups.length > 0 && (
-        <div className="flex items-center justify-between gap-3 flex-wrap py-2 px-3 bg-slate-50 border border-slate-200 rounded">
+      {/* ── Bulk generate banner ── */}
+      {/* Primer uso: banner prominente, sin botones individuales */}
+      {/* Parcial: banner secundario + botones individuales en tabs pendientes */}
+      {pendingGeneration.length > 0 && dataLoaded && (
+        <div className={`flex items-center justify-between gap-3 flex-wrap py-2 px-3 border rounded ${
+          isFirstUse
+            ? "bg-brand-primary-light border-brand-primary/30"
+            : "bg-slate-50 border-slate-200"
+        }`}>
           <span className="text-xs text-slate-600">
-            <span className="font-medium text-slate-700">{pendingGeneration.length}</span> empresa{pendingGeneration.length !== 1 ? "s" : ""} sin IROs generados
+            {isFirstUse ? (
+              <>Analiza los IROs de las <span className="font-medium text-slate-700">{pendingGeneration.length} empresas</span> de referencia con IA</>
+            ) : (
+              <><span className="font-medium text-slate-700">{pendingGeneration.length}</span> empresa{pendingGeneration.length !== 1 ? "s" : ""} sin IROs generados</>
+            )}
           </span>
           <Button
             variant="primary"
@@ -179,7 +194,9 @@ export function BenchmarkIrosSection({
             loading={bulkGenerating || isPolling}
             onClick={() => void generateAll()}
           >
-            Generar todos ({pendingGeneration.length})
+            {isFirstUse
+              ? `Generar todos (${pendingGeneration.length})`
+              : `Generar pendientes (${pendingGeneration.length})`}
           </Button>
         </div>
       )}
@@ -232,6 +249,8 @@ export function BenchmarkIrosSection({
           group={activeGroup}
           isGenerating={generating.has(activeCompanyId)}
           onGenerate={() => void generateIros(activeCompanyId)}
+          hideGenerateBtn={isFirstUse}
+          allDone={allDone}
         />
       )}
     </div>
@@ -243,16 +262,29 @@ function CompanyIroPanel({
   group,
   isGenerating,
   onGenerate,
+  hideGenerateBtn = false,
+  allDone = false,
 }: {
   company: BenchmarkCompany;
   group: IroGroup | null;
   isGenerating: boolean;
   onGenerate: () => void;
+  /** Primer uso: banner es el CTA principal, ocultar botón individual */
+  hideGenerateBtn?: boolean;
+  /** Todas las empresas ya generadas: botón cambia a "↺ Regenerar" */
+  allDone?: boolean;
 }) {
   const batch = group?.batch ?? null;
   const iros = group?.iros ?? [];
   const isPending = batch?.status === "pending";
   const isFailed = batch?.status === "failed" && !isPending;
+  const hasDone = iros.length > 0;
+
+  // Etiqueta y estilo del botón según contexto
+  const btnLabel = hasDone
+    ? "↺ Regenerar"
+    : "Generar IROs con IA";
+  const btnVariant: "primary" | "secondary" | "ghost" = hasDone ? "secondary" : "primary";
 
   return (
     <div className="space-y-3">
@@ -283,14 +315,18 @@ function CompanyIroPanel({
             </a>
           )}
         </div>
-        <Button
-          variant={iros.length > 0 ? "secondary" : "primary"}
-          size="sm"
-          loading={isGenerating || isPending}
-          onClick={onGenerate}
-        >
-          {iros.length > 0 ? "Regenerar IROs" : "Generar IROs con IA"}
-        </Button>
+        {/* Ocultar en primer uso (banner es CTA principal). Mostrar siempre si allDone o si tiene IROs. */}
+        {(!hideGenerateBtn || hasDone) && (
+          <Button
+            variant={btnVariant}
+            size="sm"
+            loading={isGenerating || isPending}
+            onClick={onGenerate}
+            title={hasDone ? `Regenerar IROs de ${company.name}` : undefined}
+          >
+            {btnLabel}
+          </Button>
+        )}
       </div>
 
       {/* Status banners */}
@@ -375,7 +411,9 @@ function CompanyIroPanel({
 
       {!isPending && !isFailed && iros.length === 0 && (
         <div className="py-8 text-center text-sm text-slate-400 border border-dashed border-slate-200 rounded">
-          Sin IROs generados. Haz clic en &quot;Generar IROs con IA&quot; para analizar esta empresa.
+          {hideGenerateBtn
+            ? "Sin IROs generados. Usa el botón superior para analizar todas las empresas."
+            : "Sin IROs generados. Haz clic en \"Generar IROs con IA\" para analizar esta empresa."}
         </div>
       )}
     </div>

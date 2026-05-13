@@ -385,16 +385,6 @@ export function BenchmarkSection({
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setConfigExpanded(true)}
-              className="text-xs text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-0.5"
-            >
-              Editar
-              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" d="M3 4.5l3 3 3-3" />
-              </svg>
-            </button>
             <Button
               size="sm"
               variant="secondary"

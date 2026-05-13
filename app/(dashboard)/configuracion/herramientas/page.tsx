@@ -88,7 +88,8 @@ async function checkQStash(): Promise<ToolHealth> {
   const token = process.env.QSTASH_TOKEN;
   if (!token) return { status: "inactive" };
   try {
-    const res = await fetch("https://qstash.upstash.io/v2/schedules", {
+    const base = (process.env.QSTASH_URL ?? "https://qstash.upstash.io").replace(/\/$/, "");
+    const res = await fetch(`${base}/v2/schedules`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(5000),
     });

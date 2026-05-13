@@ -74,8 +74,8 @@ const DOC_STEPS: FlowStep[] = [
   },
   {
     n: 3,
-    label: "Indexación BM25",
-    desc: "Los fragmentos del Markdown quedan disponibles para búsqueda por palabras clave. Chat IA y AI-fill ya pueden usar el contenido del documento.",
+    label: "Búsqueda básica activa",
+    desc: "Los fragmentos del documento quedan disponibles para búsqueda por palabras clave. Chat IA y AI-fill ya pueden usar el contenido del documento.",
     tool: "BM25 (búsqueda por palabras clave)",
     timing: "<1 s",
     lane: "A",
@@ -87,7 +87,7 @@ const DOC_STEPS: FlowStep[] = [
     tool: "Voyage AI — cron nocturno",
     timing: "Nocturno",
     lane: "C",
-    warn: "Gap actual: entre la subida y el cron, solo BM25 está activo (puede tardar horas). Fix pendiente: lanzar embedding inmediato post-subida vía QStash.",
+    warn: "Gap actual: entre la subida y el cron nocturno, solo la búsqueda básica está activa (puede tardar horas). Fix pendiente: activar el procesamiento semántico de forma inmediata tras la subida, sin esperar al cron.",
   },
 ];
 
@@ -175,7 +175,7 @@ const DM_STEPS: FlowStep[] = [
     tool: "Sonnet (propuesta) → QStash (comparativa en paralelo)",
     timing: "Propuesta <10 s · Comparativa ~60–90 s",
     lane: "A", model: "Sonnet",
-    note: "QStash lanza 1 trabajo por empresa en paralelo → sin espera secuencial",
+    note: "Las empresas se analizan en paralelo, no una por una — el tiempo total es el de la empresa más lenta, no la suma de todas.",
   },
   {
     n: 4, label: "IROs propios",

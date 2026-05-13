@@ -27,14 +27,6 @@ function latenciaLabel(ms: number) {
   return `Muy lenta (${s.toFixed(1)} s)`;
 }
 
-function tipoIa(family: string) {
-  if (family === "opus")   return "IA de máxima capacidad";
-  if (family === "sonnet") return "IA estándar";
-  if (family === "haiku")  return "IA ligera";
-  if (family === "voyage") return "Búsqueda semántica";
-  return family;
-}
-
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 type Prioridad = "urgente" | "importante" | "conveniente";
@@ -59,9 +51,12 @@ export default async function AuditoriaIaPage() {
   const voyageCalls  = voyageModel?.calls ?? 0;
   const llmCalls     = (usage?.total_calls ?? 0) - voyageCalls;
   const llmModels    = (usage?.by_model ?? []).filter(m => m.family !== "voyage");
-  const totalErrors  = usage?.total_errors ?? 0;
-  const errorRate    = llmCalls > 0 ? totalErrors / llmCalls : 0;
-  const successRate  = 100 - Math.round(errorRate * 100);
+  // LLM-only errors: excluye embeddings/voyage para que errorRate no supere 100%
+  const llmErrors    = (usage?.by_role ?? [])
+    .filter(r => r.role !== "embeddings")
+    .reduce((sum, r) => sum + r.errors, 0);
+  const errorRate    = llmCalls > 0 ? llmErrors / llmCalls : 0;
+  const successRate  = Math.max(0, 100 - Math.round(errorRate * 100));
   const opusModel    = usage?.by_model.find(m => m.family === "opus");
   const opusPct      = pct(opusModel?.calls ?? 0, llmCalls);
   const cacheRatio   = usage && (usage.total_input_tokens + usage.total_cache_read_tokens) > 0
@@ -96,19 +91,67 @@ export default async function AuditoriaIaPage() {
       ? `La IA funciona correctamente pero hay mejoras concretas disponibles que aumentarían la precisión de las respuestas y/o reducirían el costo mensual sin trabajo técnico mayor.`
       : `La IA responde bien, el costo está bajo control y los consultores reciben respuestas de calidad. Hay optimizaciones menores disponibles para el siguiente período.`;
 
+  // Etiqueta legible por rol
+  const roleLabel: Record<string, string> = {
+    aurora:  "Aurora — Autora",
+    rebeca:  "Rebeca — Revisora",
+    elena:   "Elena — Elevadora",
+    valeria: "Valeria — Validadora",
+  };
+
   // ── Decisiones disponibles ────────────────────────────────────────────────
   const decisions: Decision[] = [];
 
   if (usage) {
-    // Error rate crítico
+    // Error rate crítico — con diagnóstico automático por rol
     if (errorRate > 0.05 && llmCalls > 10) {
+      const llmRolesWithErrors = usage.by_role
+        .filter(r => r.role !== "embeddings" && r.errors > 0)
+        .sort((a, b) => b.errors - a.errors);
+      const topRole = llmRolesWithErrors[0];
+      const topRolePct = topRole && llmErrors > 0
+        ? Math.round((topRole.errors / llmErrors) * 100) : 0;
+      const isConcentrated = topRolePct >= 60;
+
+      let diagnostico: string;
+      let accion: string;
+
+      if (isConcentrated && topRole) {
+        const rLabel = roleLabel[topRole.role.toLowerCase()] ?? topRole.role;
+        const rErrRate = Math.round((topRole.errors / topRole.calls) * 100);
+        if (topRole.avg_latency_ms > 25_000) {
+          diagnostico = `${rLabel} concentra el ${topRolePct}% de los errores. Latencia promedio: ${(topRole.avg_latency_ms / 1000).toFixed(0)}s — probable timeout por documentos de cliente demasiado largos.`;
+          accion = `Revisar los documentos subidos de los clientes que usan ${rLabel}. Si tienen más de 200 páginas, fragmentarlos antes de subir.`;
+        } else if (rErrRate > 50) {
+          diagnostico = `${rLabel} falla en ${rErrRate}% de sus solicitudes (${topRole.errors} errores en ${topRole.calls} llamadas). Causa probable: herramienta externa caída (web_search, QStash) o prompt del sistema con error de configuración.`;
+          accion = `Verificar el estado de las herramientas en la sección Herramientas. Si están verdes, revisar logs de Vercel filtrando por "${topRole.role}" para ver el mensaje de error exacto.`;
+        } else {
+          diagnostico = `${rLabel} concentra el ${topRolePct}% de los errores (${topRole.errors} de ${llmErrors} totales, tasa ${rErrRate}%). El resto de roles funciona bien.`;
+          accion = `Revisar si los errores de ${rLabel} ocurren con un cliente o documento específico. Eso indicaría un problema de datos, no de infraestructura.`;
+        }
+      } else if (llmRolesWithErrors.length > 1) {
+        const rolesList = llmRolesWithErrors
+          .slice(0, 3)
+          .map(r => `${roleLabel[r.role.toLowerCase()] ?? r.role} (${r.errors})`)
+          .join(", ");
+        diagnostico = `Los errores están distribuidos entre varios roles: ${rolesList}. Cuando múltiples roles fallan al mismo tiempo, la causa suele ser externa: cuota de API agotada o fallo de herramienta compartida (web_search, QStash).`;
+        accion = `Verificar el estado de las herramientas en la sección Herramientas. Revisar si los errores se agrupan en el mismo período (cluster de tiempo = fallo externo).`;
+      } else if (topRole) {
+        const rLabel = roleLabel[topRole.role.toLowerCase()] ?? topRole.role;
+        diagnostico = `Todos los errores vienen de ${rLabel} (${topRole.errors} errores en ${topRole.calls} llamadas, tasa ${Math.round((topRole.errors / topRole.calls) * 100)}%).`;
+        accion = `Revisar los últimos mensajes enviados a ${rLabel} — buscar patrón común (mismo cliente, mismo documento, misma pregunta).`;
+      } else {
+        diagnostico = `No se identificó un rol específico como fuente de los errores.`;
+        accion = `Revisar logs de Vercel del período con más errores y buscar el mensaje exacto.`;
+      }
+
       decisions.push({
         prioridad: errorRate > 0.2 ? "urgente" : "importante",
         titulo: "La IA está fallando con frecuencia",
         queMejora: "Identificar y corregir la causa de las respuestas fallidas.",
-        porQueImporta: `En los últimos 30 días, ${totalErrors} de ${numFmt.format(llmCalls)} solicitudes terminaron en error — el consultor vio una respuesta vacía o un mensaje de falla. Eso interrumpe el trabajo y genera desconfianza en la herramienta.`,
-        ejemplo: `Si el error se concentra en un rol específico (Elena, Aurora…) o en un cliente con documentos muy largos, la causa suele ser un documento demasiado extenso para procesarlo de golpe.`,
-        necesita: "Revisar el detalle en Uso IA → ver qué rol tiene más errores → escalar al equipo técnico. Diagnóstico: medio día.",
+        porQueImporta: `En los últimos 30 días, ${llmErrors} de ${numFmt.format(llmCalls)} solicitudes terminaron en error — el consultor vio una respuesta vacía o un mensaje de falla. Eso interrumpe el trabajo y genera desconfianza en la herramienta.`,
+        ejemplo: diagnostico,
+        necesita: accion,
         recomendacion: "investigar",
       });
     }
@@ -247,14 +290,6 @@ export default async function AuditoriaIaPage() {
     conveniente: { badge: "bg-slate-100 text-slate-600",  border: "border-l-slate-300" },
   };
 
-  // Tabla de uso por rol (no técnica)
-  const roleLabel: Record<string, string> = {
-    aurora:  "Aurora — Autora",
-    rebeca:  "Rebeca — Revisora",
-    elena:   "Elena — Elevadora",
-    valeria: "Valeria — Validadora",
-  };
-
   return (
     <div className="px-8 py-6 max-w-4xl">
 
@@ -275,7 +310,7 @@ export default async function AuditoriaIaPage() {
               label: "Respuestas exitosas",
               value: llmCalls > 0 ? `${successRate}%` : "—",
               sub: llmCalls > 0
-                ? (errorRate > 0.05 ? `⚠️ ${totalErrors} errores detectados` : "Todo funcionando")
+                ? (errorRate > 0.05 ? `⚠️ ${llmErrors} errores detectados` : "Todo funcionando")
                 : "Sin datos",
               red: errorRate > 0.05,
               tooltip: "Porcentaje de veces que la IA respondió sin errores en los últimos 30 días.",

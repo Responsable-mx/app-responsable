@@ -720,6 +720,7 @@ export function DoubleMaterialidadTab({
           <div className="mt-6 pt-6 border-t border-slate-100">
             <p className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-3">
               IROs por empresa de referencia
+              <span className="ml-1.5 normal-case text-slate-300">({validatedCompanies})</span>
             </p>
             <BenchmarkIrosSection
               clientId={clientId}

@@ -192,7 +192,10 @@ export function PromptEditor({
         <span className="font-semibold">Impacto inmediato:</span> este prompt controla cómo{" "}
         <strong>{PROMPT_LABELS[promptKey]}</strong> se comporta para todos los consultores.
         Puedes cambiar el tono o las instrucciones —{" "}
-        no elimines las referencias a ESRS, GRI o la metodología porque la IA las usa para contextualizar cada respuesta.
+        no elimines las referencias a ESRS, GRI o la metodología porque la IA las usa para contextualizar cada respuesta.{" "}
+        <a href="/configuracion/flujos-ia" className="underline underline-offset-2 text-amber-900 font-medium hover:opacity-70">
+          Ver qué modelo usa este rol →
+        </a>
       </div>
 
       {/* Label + botón copiar */}

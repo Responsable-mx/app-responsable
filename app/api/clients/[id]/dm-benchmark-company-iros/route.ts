@@ -212,7 +212,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
               outputTokens: ext.outputTokens,
               cacheCreationTokens: ext.cacheCreationTokens,
               cacheReadTokens: ext.cacheReadTokens,
-              latencyMs: 0,
+              latencyMs: Date.now() - new Date(b.created_at).getTime(),
               error: null,
             });
           } else {

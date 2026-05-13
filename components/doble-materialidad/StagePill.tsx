@@ -9,6 +9,7 @@ export function StagePill({
   subtitle,
   sectionId,
   selected,
+  compact = false,
   className = "",
 }: {
   label: string;
@@ -18,6 +19,8 @@ export function StagePill({
   sectionId?: string;
   /** ¿Es el panel actualmente visible? (Ruta B — independiente del status) */
   selected: boolean;
+  /** Oculta subtítulo cuando el stepper está pinned — reduce altura sticky stack */
+  compact?: boolean;
   className?: string;
 }) {
   const pillBase =
@@ -82,9 +85,11 @@ export function StagePill({
           {label}
         </span>
       </div>
-      <span className={`text-[9px] whitespace-nowrap ${subTextClass}`}>
-        {subtitle}
-      </span>
+      {!compact && (
+        <span className={`text-[10px] whitespace-nowrap ${subTextClass}`}>
+          {subtitle}
+        </span>
+      )}
     </>
   );
 

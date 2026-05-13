@@ -365,7 +365,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const results = await Promise.allSettled(
         batch.map(async (empresa) => {
           const t0 = Date.now();
-          console.log(`[search_urls] starting: ${empresa.nombre}`);
           try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta: web_search + submit_url tools
             const msg = await (anthropic.messages.create as (opts: unknown, extra?: unknown) => Promise<any>)(

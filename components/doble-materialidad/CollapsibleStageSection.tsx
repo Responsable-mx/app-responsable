@@ -71,7 +71,7 @@ export function CollapsibleStageSection({
                 </span>
               )}
               {status === "active" && (
-                <span className="px-1.5 py-0.5 rounded-sm bg-brand-primary border border-brand-primary text-[10px] font-semibold text-white shrink-0">
+                <span className="px-1.5 py-0.5 rounded-sm bg-white border border-brand-primary text-[10px] font-semibold text-brand-primary-dark shrink-0">
                   En curso
                 </span>
               )}

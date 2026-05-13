@@ -541,7 +541,7 @@ export function DoubleMaterialidadTab({
   // IMPORTANTE: estos hooks deben ir ANTES del early return de loadingBenchmark
   // para que el conteo de hooks sea constante en todo render (#310).
   const stepperSentinelRef = useRef<HTMLDivElement>(null);
-  const [_stepperCompact, setStepperCompact] = useState(false);
+  const [stepperCompact, setStepperCompact] = useState(false);
   useEffect(() => {
     const el = stepperSentinelRef.current;
     if (!el) return;
@@ -616,8 +616,8 @@ export function DoubleMaterialidadTab({
       {/* Sentinel: IntersectionObserver lo monitorea — al salir de viewport, stepper queda pinned */}
       <div ref={stepperSentinelRef} className="h-px -mb-px" aria-hidden="true" />
       {/* ── Stepper V3 — card con pill bar + progress + chips ── */}
-      <div className="bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all">
-        <div className="flex items-center gap-2 px-4 py-2">
+      <div className={`bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all ${stepperCompact ? "shadow-none border-x-0 border-t-0 rounded-none" : ""}`}>
+        <div className={`flex items-center gap-2 px-4 transition-all ${stepperCompact ? "py-1" : "py-2"}`}>
           {/* Pills — ancho completo distribuido. overflow-x-auto como fallback en mobile */}
           <div className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {stagesData.map((s, idx) => {
@@ -635,6 +635,7 @@ export function DoubleMaterialidadTab({
                     label={s.label}
                     status={s.status}
                     selected={isSel}
+                    compact={stepperCompact}
                     className="flex-1"
                     subtitle={subtitle}
                     sectionId={s.sectionId}
@@ -666,7 +667,7 @@ export function DoubleMaterialidadTab({
         headerRight={
           questionnaireProgress && questionnaireProgress.total > 0 ? (
             <div className="flex items-center gap-1.5 shrink-0">
-              <div className="h-[3px] w-14 bg-slate-200 overflow-hidden rounded-sm">
+              <div className="h-[3px] w-14 bg-slate-200 overflow-hidden">
                 <div
                   className="h-full bg-teal-500 transition-all duration-300"
                   style={{ width: `${Math.round((questionnaireProgress.filled / questionnaireProgress.total) * 100)}%` }}

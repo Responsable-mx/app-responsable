@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { catalogLabel } from "@/components/doble-materialidad/catalog-lookup";
@@ -98,6 +99,7 @@ export function ContextoSection({
   frameworks?: string[] | null;
 }) {
   const isComplete = progress && progress.filled >= progress.total && progress.total > 0;
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // SWR dedup: ClientTabs ya carga este endpoint con la misma key → 0 fetches extra.
   const { data: bundleResp } = useSWR<{ data: QuestionnaireBundle }>(
@@ -145,38 +147,73 @@ export function ContextoSection({
       {/* KPI cards — Sector / Tamaño / Marcos / Alcance / Período */}
       {hasKpis && (
         <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Sector</p>
-            <p className="text-sm font-semibold text-slate-800 truncate">
-              {sector ? catalogLabel("sectors", sector) : "—"}
-            </p>
-          </div>
-          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tamaño</p>
-            <p className="text-sm font-semibold text-slate-800 truncate">
-              {size ? catalogLabel("client_sizes", size) : "—"}
-            </p>
-          </div>
-          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos</p>
-            <p className="text-sm font-semibold text-slate-800 leading-relaxed">
-              {frameworks && frameworks.length > 0
-                ? frameworks.map((f) => catalogLabel("frameworks", f)).join(", ")
-                : "—"}
-            </p>
-          </div>
-          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Alcance</p>
-            <p className="text-sm font-semibold text-slate-800 truncate" title={alcanceGeo ?? undefined}>
-              {alcanceGeo || "—"}
-            </p>
-          </div>
-          <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Período</p>
-            <p className="text-sm font-semibold text-slate-800 truncate">
-              {periodoInforme || "—"}
-            </p>
-          </div>
+          {/* Sector */}
+          {sector ? (
+            <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Sector</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">{catalogLabel("sectors", sector)}</p>
+            </div>
+          ) : (
+            <button type="button" onClick={onGoToCuestionario} title="Completar en Cuestionario"
+              className="border border-dashed border-slate-300 rounded p-3 bg-slate-50/30 text-left hover:border-brand-primary hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Sector</p>
+              <p className="text-sm text-slate-400">— Completar</p>
+            </button>
+          )}
+          {/* Tamaño */}
+          {size ? (
+            <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tamaño</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">{catalogLabel("client_sizes", size)}</p>
+            </div>
+          ) : (
+            <button type="button" onClick={onGoToCuestionario} title="Completar en Cuestionario"
+              className="border border-dashed border-slate-300 rounded p-3 bg-slate-50/30 text-left hover:border-brand-primary hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tamaño</p>
+              <p className="text-sm text-slate-400">— Completar</p>
+            </button>
+          )}
+          {/* Marcos */}
+          {frameworks && frameworks.length > 0 ? (
+            <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos</p>
+              <p className="text-sm font-semibold text-slate-800 leading-relaxed">
+                {frameworks.map((f) => catalogLabel("frameworks", f)).join(", ")}
+              </p>
+            </div>
+          ) : (
+            <button type="button" onClick={onGoToCuestionario} title="Completar en Cuestionario"
+              className="border border-dashed border-slate-300 rounded p-3 bg-slate-50/30 text-left hover:border-brand-primary hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos</p>
+              <p className="text-sm text-slate-400">— Completar</p>
+            </button>
+          )}
+          {/* Alcance */}
+          {alcanceGeo ? (
+            <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Alcance</p>
+              <p className="text-sm font-semibold text-slate-800 truncate" title={alcanceGeo}>{alcanceGeo}</p>
+            </div>
+          ) : (
+            <button type="button" onClick={onGoToCuestionario} title="Completar en Cuestionario"
+              className="border border-dashed border-slate-300 rounded p-3 bg-slate-50/30 text-left hover:border-brand-primary hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Alcance</p>
+              <p className="text-sm text-slate-400">— Completar</p>
+            </button>
+          )}
+          {/* Período */}
+          {periodoInforme ? (
+            <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Período</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">{periodoInforme}</p>
+            </div>
+          ) : (
+            <button type="button" onClick={onGoToCuestionario} title="Completar en Cuestionario"
+              className="border border-dashed border-slate-300 rounded p-3 bg-slate-50/30 text-left hover:border-brand-primary hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Período</p>
+              <p className="text-sm text-slate-400">— Completar</p>
+            </button>
+          )}
         </div>
       )}
 
@@ -217,8 +254,8 @@ export function ContextoSection({
         <div className="bg-amber-50 border border-amber-100 rounded mb-3 overflow-hidden">
           <div className="px-3 py-2 border-b border-amber-100">
             <p className="text-xs text-amber-800">
-              <strong>{progress.total - progress.filled} campos pendientes</strong>
-              {" "}— completarlos mejora la calidad del reporte final.
+              Para mejorar la calidad del análisis —{" "}
+              <strong>{progress.total - progress.filled} campo{progress.total - progress.filled !== 1 ? "s" : ""} pendiente{progress.total - progress.filled !== 1 ? "s" : ""}:</strong>
             </p>
           </div>
           <div className="divide-y divide-amber-100">
@@ -233,9 +270,14 @@ export function ContextoSection({
                     <span className="text-[10px] text-amber-600 tabular-nums whitespace-nowrap">
                       ({group.fields.length} campo{group.fields.length !== 1 ? "s" : ""})
                     </span>
-                    {group.aiCanFill && (
-                      <span className="text-[9px] bg-teal-50 border border-teal-200 text-teal-700 px-1.5 py-0.5 rounded-sm font-bold whitespace-nowrap shrink-0">
-                        ✦ IA puede llenar
+                    {group.aiCanFill ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-teal-50 border border-teal-200 text-teal-700 px-1.5 py-0.5 rounded-sm font-bold whitespace-nowrap shrink-0">
+                        <svg className="w-2.5 h-2.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+                        IA puede llenar
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0 italic">
+                        Info del cliente
                       </span>
                     )}
                   </div>
@@ -243,36 +285,60 @@ export function ContextoSection({
                     <button
                       type="button"
                       onClick={() => onGoToCuestionarioStep(group.stepIdx)}
-                      className="text-[10px] font-semibold text-amber-700 hover:text-amber-900 underline whitespace-nowrap shrink-0"
+                      className="text-[10px] font-semibold text-amber-700 hover:text-amber-900 underline whitespace-nowrap shrink-0 py-1.5 px-2 -mr-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                     >
                       Ir al paso →
                     </button>
                   )}
                 </div>
-                {/* Lista de campos (máx FIELDS_PER_GROUP visible) */}
-                <ul className="space-y-0.5">
-                  {group.fields.slice(0, FIELDS_PER_GROUP).map((f) => (
-                    <li key={f.key} className="flex items-start gap-1 text-[11px] text-amber-800">
-                      <span className="mt-0.5 shrink-0 text-amber-400">•</span>
-                      {onGoToCuestionarioStep ? (
-                        <button
-                          type="button"
-                          onClick={() => onGoToCuestionarioStep(group.stepIdx)}
-                          className="underline hover:text-amber-900 text-left"
-                        >
-                          {f.label}
-                        </button>
-                      ) : (
-                        <span>{f.label}</span>
+                {/* Lista de campos — expand in-place */}
+                {(() => {
+                  const isExpanded = expandedGroups.has(group.stepKey);
+                  const visible = isExpanded ? group.fields : group.fields.slice(0, FIELDS_PER_GROUP);
+                  const hidden = group.fields.length - FIELDS_PER_GROUP;
+                  return (
+                    <ul className="space-y-0.5">
+                      {visible.map((f) => (
+                        <li key={f.key} className="flex items-start gap-1 text-[11px] text-amber-800">
+                          <span className="mt-0.5 shrink-0 text-amber-400">•</span>
+                          {onGoToCuestionarioStep ? (
+                            <button
+                              type="button"
+                              onClick={() => onGoToCuestionarioStep(group.stepIdx)}
+                              className="underline hover:text-amber-900 text-left py-1 -my-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 rounded-sm"
+                            >
+                              {f.label}
+                            </button>
+                          ) : (
+                            <span>{f.label}</span>
+                          )}
+                        </li>
+                      ))}
+                      {!isExpanded && hidden > 0 && (
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedGroups((prev) => new Set([...prev, group.stepKey]))}
+                            className="text-[10px] text-amber-600 hover:text-amber-800 underline ml-3 py-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 rounded-sm"
+                          >
+                            …ver {hidden} más en este paso
+                          </button>
+                        </li>
                       )}
-                    </li>
-                  ))}
-                  {group.fields.length > FIELDS_PER_GROUP && (
-                    <li className="text-[10px] italic text-amber-600 ml-3">
-                      …y {group.fields.length - FIELDS_PER_GROUP} más en este paso
-                    </li>
-                  )}
-                </ul>
+                      {isExpanded && group.fields.length > FIELDS_PER_GROUP && (
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedGroups((prev) => { const s = new Set(prev); s.delete(group.stepKey); return s; })}
+                            className="text-[10px] text-amber-500 hover:text-amber-700 underline ml-3 py-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 rounded-sm"
+                          >
+                            Ver menos
+                          </button>
+                        </li>
+                      )}
+                    </ul>
+                  );
+                })()}
               </div>
             ))}
           </div>

@@ -1,7 +1,23 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-12 (sesión 32 — auditoría completa post-sesiones 29–31)
-**Calificación global:** 9.5 / 10 (vs 9.7 sesión 31 — D-169 Next.js CVEs + D-171 ESLint regresión)
+**Fecha:** 2026-05-12 (sesión 32 completa — /audit + /audit-ia + cleanup)
+**Calificación global:** 9.8 / 10 (vs 9.7 sesión 31)
+
+---
+
+## /audit-ia sesión 32b — hallazgos adicionales
+
+### ✅ D-176 — console.log starting redundante en dm-benchmark-empresas/search_urls
+- `route.ts:368` `console.log starting: ${empresa.nombre}` eliminado. Timing capturado en líneas 414/440.
+
+### 🟢 D-174/175 — search_urls sin system block (ambas routes)
+- Cache hit = 0% por user block 100% dinámico (empresa/framework único por call).
+- Beneficio si se añade system block: ~$0-1/mes en concurrencia batch. Prioridad baja.
+
+### ✅ DoubleMaterialidadTab lazy loading (D-173 bundle weight)
+- 9 secciones migradas a `next/dynamic`. Bundle inicial DM-IA ↓40-60%.
+- CollapsibleStageSection, ContextoSection, StagePill refactorizados asociados.
+- D-173 (source code 3648L) sigue abierto pero impacto rendimiento atenuado.
 
 ---
 

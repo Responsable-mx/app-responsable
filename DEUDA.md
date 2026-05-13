@@ -16,6 +16,21 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-174–D-176 — Hallazgos /audit-ia sesión 32b (2026-05-12)
+
+### ~~🟢 D-176 — `console.log` debug redundante en `dm-benchmark-empresas/search_urls`~~ ✅ RESUELTO (sesión 32b)
+- `console.log(`[search_urls] starting: ${empresa.nombre}`)` en `route.ts:368` — redundante (timing ya capturado en líneas 414/440). Eliminado.
+
+### 🟢 D-174 — `dm-referentes/search_urls` sin system block → 0% cache hit
+- `app/api/clients/[id]/dm-referentes/route.ts:~415` — llamada Anthropic sin `system` block estático. Cada call es única (framework distinto en user block) → cache hit = 0% incluso con system block. Beneficio: ~$0-1/mes en batches concurrentes (hits en call #2-3 dentro de 5min TTL).
+- Fix: Añadir system block estático con instrucciones generales de búsqueda de URLs + `cache_control: ephemeral`.
+
+### 🟢 D-175 — `dm-benchmark-empresas/search_urls` sin system block → 0% cache hit
+- `app/api/clients/[id]/dm-benchmark-empresas/route.ts:~370` — mismo patrón. Beneficio mínimo (empresa única por call).
+- Fix: Mismo patrón que D-174.
+
+---
+
 ### Bloque D-169–D-173 — Hallazgos auditoría completa sesión 32 (2026-05-12)
 
 ### ~~🔴 D-169 — Next.js 16.2.4 con 13 CVEs activos (middleware bypass + SSRF + XSS + DoS)~~ ✅ RESUELTO (sesión 32)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 type ScoreTier = "sólido" | "parcial" | "brecha";
 
@@ -38,12 +38,19 @@ export function ExpandableCell({
   showScore?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [isClamped, setIsClamped] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
+
+  useLayoutEffect(() => {
+    if (!expanded && textRef.current) {
+      setIsClamped(textRef.current.scrollHeight > textRef.current.clientHeight);
+    }
+  }, [text, expanded]);
 
   if (!text || text === "—") return NO_DATA_CHIP;
   if (/^sin datos/i.test(text)) return NO_DATA_CHIP;
 
   const score = showScore ? detectScore(text) : null;
-  const isLong = text.length > 140;
 
   return (
     <div>
@@ -52,10 +59,10 @@ export function ExpandableCell({
           {score}
         </span>
       )}
-      <p className={`text-slate-600 text-xs leading-relaxed${!expanded && isLong ? " line-clamp-3" : ""}`}>
+      <p ref={textRef} className={`text-slate-600 text-xs leading-relaxed${!expanded ? " line-clamp-3" : ""}`}>
         {text}
       </p>
-      {isLong && (
+      {(isClamped || expanded) && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}

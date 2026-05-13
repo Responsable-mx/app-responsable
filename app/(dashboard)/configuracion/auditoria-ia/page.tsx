@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-// ── Helpers UI ────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const numFmt = new Intl.NumberFormat("es-MX");
 const usdFmt = new Intl.NumberFormat("es-MX", {
@@ -18,436 +18,399 @@ function pct(n: number, d: number) {
   return d > 0 ? Math.round((n / d) * 100) : 0;
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded p-4 mb-5">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">{title}</p>
-      {children}
-    </div>
-  );
+function latenciaLabel(ms: number) {
+  if (ms <= 0) return "—";
+  const s = ms / 1000;
+  if (s < 3)  return `Muy rápida (${s.toFixed(1)} s)`;
+  if (s < 8)  return `Normal (${s.toFixed(1)} s)`;
+  if (s < 15) return `Lenta (${s.toFixed(1)} s)`;
+  return `Muy lenta (${s.toFixed(1)} s)`;
 }
 
-// ── Tabla: configuración actual tarea → modelo ────────────────────────────────
+function tipoIa(family: string) {
+  if (family === "opus")   return "IA de máxima capacidad";
+  if (family === "sonnet") return "IA estándar";
+  if (family === "haiku")  return "IA ligera";
+  if (family === "voyage") return "Búsqueda semántica";
+  return family;
+}
 
-type TaskConfig = {
-  task: string;
-  flow: string;
-  model: string;
-  costInput: string;
-  costOutput: string;
-  why: string;
-  status: "active" | "active-partial" | "proposed";
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+
+type Prioridad = "urgente" | "importante" | "conveniente";
+
+type Decision = {
+  prioridad: Prioridad;
+  titulo: string;
+  queMejora: string;
+  porQueImporta: string;
+  ejemplo?: string;
+  necesita: string;
+  recomendacion: "activar" | "revisar" | "planear" | "investigar";
 };
-
-const TASK_CONFIGS: TaskConfig[] = [
-  { task: "Chat — Aurora (autora)",       flow: "Chat IA",         model: "Sonnet 4.6",                costInput: "$3",     costOutput: "$15",    why: "Balance velocidad + calidad para borradores con contexto del cliente.",                           status: "active" },
-  { task: "Chat — Rebeca (revisora)",     flow: "Chat IA",         model: "Sonnet 4.6",                costInput: "$3",     costOutput: "$15",    why: "Checklist estructurado no requiere el modelo más caro.",                                          status: "active" },
-  { task: "Chat — Elena (elevadora)",     flow: "Chat IA",         model: "Opus 4.7",                  costInput: "$15",    costOutput: "$75",    why: "Insights estratégicos y narrativa ejecutiva requieren máxima capacidad.",                          status: "active" },
-  { task: "Chat — Valeria (validadora)",  flow: "Chat IA",         model: "Haiku 4.5",                 costInput: "$0.25",  costOutput: "$1.25",  why: "Validación estructurada (DoD, consistencia) — no requiere narrativa.",                            status: "active" },
-  { task: "AI-fill cuestionario",         flow: "DM-IA · Etapa 1", model: "Sonnet 4.6",                costInput: "$3",     costOutput: "$15",    why: "Combina extracción con síntesis contextual. Gemini Flash propuesto para extracción pura.",         status: "active" },
-  { task: "Benchmark empresas",           flow: "DM-IA · Etapa 3", model: "Sonnet 4.6",                costInput: "$3",     costOutput: "$15",    why: "Propuesta de empresas + narrativa comparativa.",                                                  status: "active" },
-  { task: "IROs propios",                 flow: "DM-IA · Etapa 4", model: "Sonnet 4.6",                costInput: "$3",     costOutput: "$15",    why: "Inventario de Impactos, Riesgos y Oportunidades con scores.",                                     status: "active" },
-  { task: "Resumen ejecutivo",            flow: "DM-IA · Etapa 5", model: "Sonnet 4.6",                costInput: "$3",     costOutput: "$15",    why: "Síntesis síncrona — consultor necesita el resultado al instante.",                                status: "active" },
-  { task: "Reporte PDF",                  flow: "DM-IA · Etapa 7", model: "Opus 4.7",                  costInput: "$15",    costOutput: "$75",    why: "Entregable final al cliente — máxima calidad narrativa. Candidato a Batch API (50% off).",         status: "active" },
-  { task: "Recuperación contexto chat",   flow: "Chat IA · Paso 2",model: "BM25 (keywords)",            costInput: "$0",     costOutput: "$0",     why: "Activo en prod. Voyage embeddings pendiente — mejora +25% precisión semántica.",                  status: "active-partial" },
-  { task: "AI-fill — extracción pura",    flow: "DM-IA · Etapa 1", model: "Gemini Flash 2.0 (propuesto)", costInput: "$0.075", costOutput: "$0.30", why: "Extracción de datos sin síntesis: 40× más barato que Sonnet.",                                   status: "proposed" },
-  { task: "Reporte PDF (async)",          flow: "DM-IA · Etapa 7", model: "Batch API (propuesto)",      costInput: "$7.50",  costOutput: "$37.50", why: "50% descuento automático. El consultor recibe notificación cuando está listo.",                  status: "proposed" },
-];
-
-function StatusDot({ status }: { status: TaskConfig["status"] }) {
-  if (status === "active") return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />Activo
-    </span>
-  );
-  if (status === "active-partial") return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />Parcial
-    </span>
-  );
-  return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
-      <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />Propuesto
-    </span>
-  );
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function AuditoriaIaPage() {
   const usage = await getUsageSummary(30).catch(() => null);
 
-  // ── Métricas derivadas ──────────────────────────────────────────────────────
-  const voyageModel = usage?.by_model.find(m => m.family === "voyage");
+  // Métricas derivadas
+  const voyageModel  = usage?.by_model.find(m => m.family === "voyage");
   const voyageCalls  = voyageModel?.calls ?? 0;
   const llmCalls     = (usage?.total_calls ?? 0) - voyageCalls;
-  const llmModels    = usage?.by_model.filter(m => m.family !== "voyage") ?? [];
+  const llmModels    = (usage?.by_model ?? []).filter(m => m.family !== "voyage");
   const totalErrors  = usage?.total_errors ?? 0;
   const errorRate    = llmCalls > 0 ? totalErrors / llmCalls : 0;
+  const successRate  = 100 - Math.round(errorRate * 100);
   const opusModel    = usage?.by_model.find(m => m.family === "opus");
-  const opusPctLlm   = pct(opusModel?.calls ?? 0, llmCalls);
+  const opusPct      = pct(opusModel?.calls ?? 0, llmCalls);
   const cacheRatio   = usage && (usage.total_input_tokens + usage.total_cache_read_tokens) > 0
-    ? usage.total_cache_read_tokens / (usage.total_input_tokens + usage.total_cache_read_tokens)
-    : 0;
+    ? usage.total_cache_read_tokens / (usage.total_input_tokens + usage.total_cache_read_tokens) : 0;
   const voyageActive = voyageCalls > 100;
+  const latenciaMs   = usage?.avg_latency_ms ?? 0;
+  const costoMes     = usage?.cost_usd_estimate_max ?? 0;
 
-  // ── Alertas ─────────────────────────────────────────────────────────────────
-  type Alert = { tone: "warn" | "info" | "error"; title: string; detail: string };
-  const alerts: Alert[] = [];
+  // Semáforo de salud general
+  const semaforo: "verde" | "amarillo" | "rojo" =
+    errorRate > 0.2 || costoMes > 100 ? "rojo"
+    : errorRate > 0.05 || !voyageActive || opusPct > 40 ? "amarillo"
+    : "verde";
+
+  const semaforoLabel = {
+    verde:    "Sistema funcionando bien",
+    amarillo: "Mejoras disponibles",
+    rojo:     "Requiere atención",
+  };
+  const semaforoColor = {
+    verde:    { bg: "bg-emerald-50", border: "border-emerald-200", dot: "bg-emerald-500", text: "text-emerald-800" },
+    amarillo: { bg: "bg-amber-50",   border: "border-amber-200",   dot: "bg-amber-400",   text: "text-amber-800"   },
+    rojo:     { bg: "bg-rose-50",    border: "border-rose-200",    dot: "bg-rose-500",    text: "text-rose-800"    },
+  };
+  const sc = semaforoColor[semaforo];
+
+  // Descripción del estado en lenguaje simple
+  const semaforoDesc =
+    semaforo === "rojo"
+      ? `La IA falló en ${Math.round(errorRate * 100)}% de las respuestas — esto afecta directamente a los consultores. Es necesario investigar la causa antes de seguir usando el sistema.`
+      : semaforo === "amarillo"
+      ? `La IA funciona correctamente pero hay mejoras concretas disponibles que aumentarían la precisión de las respuestas y/o reducirían el costo mensual sin trabajo técnico mayor.`
+      : `La IA responde bien, el costo está bajo control y los consultores reciben respuestas de calidad. Hay optimizaciones menores disponibles para el siguiente período.`;
+
+  // ── Decisiones disponibles ────────────────────────────────────────────────
+  const decisions: Decision[] = [];
 
   if (usage) {
-    // Error rate en LLM calls
-    if (errorRate > 0.1 && llmCalls > 10) {
-      alerts.push({
-        tone: "error",
-        title: `${totalErrors} errores en ${numFmt.format(llmCalls)} llamadas LLM (${Math.round(errorRate * 100)}%)`,
-        detail: "Tasa alta. Causas frecuentes: timeout en prompts largos, crédito de API agotado, o error en una herramienta (web_search, QStash). Revisar Uso IA → detalle por rol para identificar el rol afectado.",
-      });
-    } else if (errorRate > 0.02 && llmCalls > 10) {
-      alerts.push({
-        tone: "warn",
-        title: `${totalErrors} errores detectados (${Math.round(errorRate * 100)}% de llamadas LLM)`,
-        detail: "Tasa baja pero monitoreable. Revisar Uso IA para identificar si se concentran en un rol o cliente específico.",
+    // Error rate crítico
+    if (errorRate > 0.05 && llmCalls > 10) {
+      decisions.push({
+        prioridad: errorRate > 0.2 ? "urgente" : "importante",
+        titulo: "La IA está fallando con frecuencia",
+        queMejora: "Identificar y corregir la causa de las respuestas fallidas.",
+        porQueImporta: `En los últimos 30 días, ${totalErrors} de ${numFmt.format(llmCalls)} solicitudes terminaron en error — el consultor vio una respuesta vacía o un mensaje de falla. Eso interrumpe el trabajo y genera desconfianza en la herramienta.`,
+        ejemplo: `Si el error se concentra en un rol específico (Elena, Aurora…) o en un cliente con documentos muy largos, la causa suele ser un documento demasiado extenso para procesarlo de golpe.`,
+        necesita: "Revisar el detalle en Uso IA → ver qué rol tiene más errores → escalar al equipo técnico. Diagnóstico: medio día.",
+        recomendacion: "investigar",
       });
     }
 
+    // Voyage no activo
+    if (!voyageActive) {
+      decisions.push({
+        prioridad: "importante",
+        titulo: "Activar búsqueda inteligente de documentos",
+        queMejora: "La IA encontraría información relevante en los documentos aunque el consultor use palabras diferentes a las del informe.",
+        porQueImporta: "Hoy la búsqueda en documentos funciona por coincidencia de palabras exactas. Si el cuestionario pregunta «emisiones de carbono» y el informe del cliente dice «huella climática», la IA no los conecta y puede inventar la respuesta o dejarla en blanco.",
+        ejemplo: "Con esta mejora activa, Aurora encontraría los datos correctos aunque el consultor use terminología distinta a la del informe GRI del cliente.",
+        necesita: "Media jornada de trabajo técnico. Sin costo adicional en los primeros 100,000 búsquedas al mes.",
+        recomendacion: "activar",
+      });
+    }
+
+    // Voyage Rerank (después de embeddings)
+    decisions.push({
+      prioridad: voyageActive ? "importante" : "conveniente",
+      titulo: voyageActive
+        ? "Mejorar la selección de fragmentos relevantes"
+        : "Activar selección precisa de fragmentos (siguiente paso tras búsqueda inteligente)",
+      queMejora: "La IA recibe solo los fragmentos más útiles del documento antes de responder — menos ruido, más precisión.",
+      porQueImporta: "Cuando un informe del cliente tiene 200 páginas, la búsqueda extrae múltiples fragmentos candidatos. Sin selección precisa, la IA recibe algunos irrelevantes y puede perder el dato clave. Con esta mejora, se filtran los mejores antes de enviárselos.",
+      ejemplo: "En un informe de 180 páginas sobre Nuvoil, la diferencia entre recibir el fragmento correcto de la tabla GRI vs. uno genérico de la introducción.",
+      necesita: voyageActive
+        ? "1 hora de trabajo técnico. Sin costo adicional (usa la misma suscripción ya activa)."
+        : "Se activa inmediatamente después de la búsqueda inteligente, sin trabajo extra.",
+      recomendacion: "activar",
+    });
+
     // Opus overuse
-    if (opusPctLlm > 40) {
-      alerts.push({
-        tone: "warn",
-        title: `Opus representa el ${opusPctLlm}% de las llamadas LLM`,
-        detail: `Debería ser ≤20% (Elena + Reporte PDF). Si supera el 40%, hay llamadas rutinarias enrutadas a Elena que podrían ir a Aurora o Rebeca. Revisar distribución de roles en Uso IA.`,
+    if (opusPct > 20 && llmCalls > 20) {
+      decisions.push({
+        prioridad: "conveniente",
+        titulo: `La IA de máxima capacidad se usa más de lo recomendado (${opusPct}%)`,
+        queMejora: "Reasignar algunas tareas a una IA de menor costo sin pérdida visible de calidad.",
+        porQueImporta: `La IA de máxima capacidad (que usa Elena y el Reporte PDF) cuesta 5 veces más que la IA estándar. Debería usarse solo en tareas estratégicas — si representa más del 20% del volumen, hay tareas de revisión o análisis básico que podrían usar una IA más económica.`,
+        ejemplo: "Si los consultores abren Elena para tareas de revisión rápida que Aurora resolvería igual de bien, el costo sube sin beneficio real.",
+        necesita: "Revisar con el equipo de consultores qué tareas usan qué rol — 1 hora de conversación.",
+        recomendacion: "revisar",
       });
     }
 
     // Alta latencia
-    if (usage.avg_latency_ms > 15_000) {
-      alerts.push({
-        tone: "warn",
-        title: `Latencia promedio alta: ${(usage.avg_latency_ms / 1000).toFixed(1)} s`,
-        detail: "Las llamadas más lentas son Opus y el Reporte PDF. Batch API procesa esas llamadas async al 50% del costo — el consultor recibe notificación en vez de esperar bloqueado.",
+    if (latenciaMs > 10_000) {
+      decisions.push({
+        prioridad: "conveniente",
+        titulo: "El Reporte PDF tarda demasiado — el consultor espera bloqueado",
+        queMejora: "Procesar el reporte en segundo plano: el consultor sigue trabajando y recibe una notificación cuando esté listo.",
+        porQueImporta: `El reporte final de Doble Materialidad tarda entre 3 y 5 minutos en generarse. Hoy el consultor tiene que quedarse esperando sin poder hacer nada. Además cuesta el doble que si se procesara de forma diferida.`,
+        ejemplo: "El consultor lanza el reporte, sigue revisando otros clientes, y recibe un aviso: «Tu reporte de Nuvoil está listo». Igual de rápido para él, mitad del costo.",
+        necesita: "Medio día de trabajo técnico. Reduce el costo del reporte en un 50%.",
+        recomendacion: "planear",
       });
     }
 
-    // Caché funcionando bien
-    if (cacheRatio > 0.4) {
-      alerts.push({
-        tone: "info",
-        title: `Caché de prompt eficiente: ${Math.round(cacheRatio * 100)}% de tokens ahorrados`,
-        detail: `${numFmt.format(usage.total_cache_read_tokens)} tokens no se cobraron a precio normal. Los 2 breakpoints ephemeral (contexto cliente + rol) están funcionando.`,
-      });
-    }
-
-    // Voyage sin activar en prod
-    if (!voyageActive) {
-      alerts.push({
-        tone: "info",
-        title: "Voyage AI embeddings no activo en producción",
-        detail: "VOYAGE_API_KEY configurada localmente. Activar en Vercel + migración 0076 mejora +25% precisión del chat. Ver pasos en Herramientas.",
-      });
-    }
-
-    // Feedback negativo frecuente
-    if (usage.feedback_total_down > 10) {
-      const topReason = usage.feedback_top_reasons[0];
-      alerts.push({
-        tone: "warn",
-        title: `Feedback negativo: ${usage.feedback_total_down} rechazos en 30 días`,
-        detail: `${topReason ? `Razón más común: "${topReason.reason_code}" (${topReason.count}×). ` : ""}Revisar en Uso IA qué rol y cliente concentran los rechazos.`,
-      });
-    }
-  }
-
-  // ── Recomendaciones dinámicas ────────────────────────────────────────────────
-  type Rec = { action: string; why: string; gain: string; effort: string; tone: "emerald" | "amber" | "rose" };
-  const recs: Rec[] = [];
-
-  if (usage) {
-    // 1. Errores altos
-    if (errorRate > 0.05 && llmCalls > 10) {
-      recs.push({
-        tone: "rose",
-        action: `Investigar los ${totalErrors} errores (${Math.round(errorRate * 100)}% de llamadas LLM)`,
-        why: `Revisar Uso IA → por rol para identificar cuál falla. Causas comunes: timeout de contexto largo, crédito agotado, o bug en herramienta (web_search, QStash). Logs en Vercel Functions.`,
-        gain: "Recuperar fiabilidad — un error se ve como respuesta vacía o lentitud extrema",
-        effort: "1–2h diagnóstico",
-      });
-    }
-
-    // 2. Voyage embeddings
-    if (!voyageActive) {
-      recs.push({
-        tone: "emerald",
-        action: "Activar Voyage AI embeddings en producción",
-        why: "VOYAGE_API_KEY configurada localmente. Pasos: agregar en Vercel + aplicar migración 0076 + activar en ai-fill. Ver Herramientas → Voyage AI.",
-        gain: "+25% precisión semántica en chat",
-        effort: "2h",
-      });
-    }
-
-    // 3. Voyage Rerank (siempre relevante, urgencia depende de si voyage activo)
-    recs.push({
-      tone: voyageActive ? "emerald" : "amber",
-      action: "Activar Voyage Rerank",
-      why: voyageActive
-        ? "Voyage ya activo en prod. Rerank usa la misma API key — una llamada extra de <100ms por respuesta selecciona los fragmentos más relevantes antes de enviárselos a la IA."
-        : "Se activa justo después de que embeddings esté activo. Misma API key de Voyage, sin costo adicional.",
-      gain: "+15% precisión retrieval, costo $0",
-      effort: "1h",
+    // Caché de benchmarks
+    decisions.push({
+      prioridad: "conveniente",
+      titulo: "Evitar pagar dos veces por la misma información de benchmark",
+      queMejora: "Si dos consultores consultan datos del mismo sector (p. ej. energía, manufactura), la segunda respuesta se reutiliza sin cobrar.",
+      porQueImporta: "Los benchmarks sectoriales (marcos GRI, ESRS, TCFD por industria) son iguales para todos los clientes del mismo giro. Hoy cada consulta llama a la IA y cobra tokens aunque la pregunta ya fue respondida antes.",
+      ejemplo: "Si esta semana 3 proyectos del sector energético generaron benchmarks, con esta mejora el segundo y tercer benchmark se responden al instante y sin costo de IA.",
+      necesita: "Medio día de trabajo técnico. Sin costo: usamos la cuenta de infraestructura que ya tenemos.",
+      recomendacion: "planear",
     });
 
-    // 4. Opus overuse
-    if (opusPctLlm > 20 && llmCalls > 20) {
-      recs.push({
-        tone: "amber",
-        action: `Opus al ${opusPctLlm}% de llamadas LLM — revisar distribución de roles`,
-        why: `Debería ser ≤20%. Si consultores usan Elena para revisiones rutinarias o benchmarks, reconfigurar flujo hacia Aurora/Rebeca. El ahorro es significativo: Opus cuesta 5× más que Sonnet.`,
-        gain: `Reducir el ${opusPctLlm - 20}% de llamadas Opus por encima del umbral`,
-        effort: "2h revisión de uso por rol",
-      });
-    }
-
-    // 5. Alta latencia → Batch API
-    if (usage.avg_latency_ms > 10_000) {
-      recs.push({
-        tone: "amber",
-        action: "Migrar Reporte PDF a Anthropic Batch API",
-        why: `Latencia promedio ${(usage.avg_latency_ms / 1000).toFixed(1)} s. El reporte DM (Opus, 3–5 min) bloquea al consultor. Batch API lo procesa en segundo plano al 50% del costo — el consultor recibe notificación cuando está listo.`,
-        gain: "−50% costo Reporte PDF + consultor no espera bloqueado",
-        effort: "6h",
-      });
-    }
-
-    // 6. Costo alto → Gemini Flash
+    // Extracción económica (Gemini Flash)
     const sonnetModel = usage.by_model.find(m => m.family === "sonnet");
-    if (usage.cost_usd_estimate_max > 5 && (sonnetModel?.calls ?? 0) > 10) {
-      recs.push({
-        tone: "amber",
-        action: "Migrar extracción AI-fill a Gemini Flash",
-        why: "El paso de extracción pura de datos del cuestionario (sin síntesis) es candidato ideal — Gemini Flash es 40× más barato que Sonnet en esa tarea. La síntesis y el contexto siguen en Sonnet.",
-        gain: `−40× costo en extracción · ahorro estimado ~${usdFmt.format(usage.cost_usd_estimate_max * 0.15)}/mes`,
-        effort: "8h",
+    if (costoMes > 5 && (sonnetModel?.calls ?? 0) > 10) {
+      decisions.push({
+        prioridad: "conveniente",
+        titulo: "Reducir el costo del llenado automático del cuestionario",
+        queMejora: "Usar una IA más económica para extraer datos del informe del cliente — sin afectar la calidad de análisis.",
+        porQueImporta: `El AI-fill tiene dos fases: extraer datos del informe (mecánico) y sintetizarlos (requiere criterio). Hoy ambas usan la misma IA cara. Separar la extracción reduce el costo de esa tarea en hasta 40 veces.`,
+        ejemplo: `Con el volumen actual (${numFmt.format(sonnetModel?.calls ?? 0)} consultas en 30 días), el ahorro estimado sería ~${usdFmt.format(costoMes * 0.15)}/mes.`,
+        necesita: "Un día de trabajo técnico. Requiere configurar una clave de servicio adicional.",
+        recomendacion: "planear",
       });
     }
 
-    // 7. Redis cache (siempre recomendable si no está activo)
-    recs.push({
-      tone: "amber",
-      action: "Configurar Upstash Redis para caché de benchmarks",
-      why: "Ya tenemos cuenta Upstash vía QStash — solo agregar 2 variables de entorno. Benchmarks sectoriales repetidos (GRI, ESRS, TCFD) se responden en <10ms sin cobrar tokens.",
-      gain: "−30–50% llamadas IA en benchmarks sectoriales repetidos",
-      effort: "4h",
-    });
-
-    // 8. Feedback negativo
+    // Feedback negativo
     if (usage.feedback_total_down > 5) {
       const topReason = usage.feedback_top_reasons[0];
-      recs.push({
-        tone: "amber",
-        action: "Revisar prompts — feedback negativo frecuente",
-        why: `${usage.feedback_total_down} rechazos en 30 días.${topReason ? ` Razón más común: "${topReason.reason_code}" (${topReason.count}×).` : ""} Ver distribución por rol y cliente en Uso IA para priorizar qué prompt revisar primero.`,
-        gain: "Mejorar calidad de respuestas al consultor",
-        effort: "2–4h por prompt revisado",
+      decisions.push({
+        prioridad: usage.feedback_total_down > 20 ? "importante" : "conveniente",
+        titulo: "Los consultores están rechazando respuestas con frecuencia",
+        queMejora: "Identificar qué tipo de respuesta no satisface a los consultores y ajustar las instrucciones de la IA.",
+        porQueImporta: `${usage.feedback_total_down} respuestas fueron calificadas negativamente en los últimos 30 días. Cada rechazo significa que el consultor tuvo que reescribir o ignorar la respuesta — tiempo perdido.`,
+        ejemplo: topReason
+          ? `La razón más frecuente de rechazo: "${topReason.reason_code}" (${topReason.count} veces). Ajustar las instrucciones de ese rol reduciría la mayoría de rechazos.`
+          : "Ver en Uso IA qué rol concentra más rechazos.",
+        necesita: "Revisión de las instrucciones del rol afectado. 2–4 horas según la complejidad.",
+        recomendacion: "revisar",
       });
     }
   } else {
-    // Fallback sin datos
-    recs.push(
-      { tone: "emerald", action: "Activar Voyage AI embeddings en producción", why: "VOYAGE_API_KEY configurada localmente. Agregar en Vercel + migración 0076 + activar en ai-fill.", gain: "+25% precisión semántica en chat", effort: "2h" },
-      { tone: "emerald", action: "Activar Voyage Rerank", why: "Misma API key de Voyage. Se activa después de embeddings.", gain: "+15% precisión retrieval, costo $0", effort: "1h" },
-      { tone: "amber",   action: "Configurar Upstash Redis para caché", why: "Ya tenemos cuenta Upstash vía QStash. 2 env vars.", gain: "−30–50% llamadas IA en benchmarks repetidos", effort: "4h" },
-      { tone: "amber",   action: "Migrar Reporte PDF a Anthropic Batch API", why: "Reporte DM (Opus, 3–5 min) bloquea al consultor. Batch API al 50% del costo.", gain: "−50% costo Reporte PDF", effort: "6h" },
-      { tone: "amber",   action: "Migrar extracción AI-fill a Gemini Flash", why: "Extracción pura de datos: 40× más barato que Sonnet.", gain: "−40× costo en extracción de cuestionario", effort: "8h" },
+    // Sin datos: mostrar decisiones base siempre relevantes
+    decisions.push(
+      {
+        prioridad: "importante",
+        titulo: "Activar búsqueda inteligente de documentos",
+        queMejora: "La IA encontraría información relevante en documentos aunque el consultor use palabras diferentes.",
+        porQueImporta: "Hoy la búsqueda funciona solo por coincidencia exacta de palabras. Si el informe dice 'huella climática' y el cuestionario pregunta 'emisiones de carbono', la IA no los conecta.",
+        necesita: "Media jornada de trabajo técnico. Sin costo adicional en los primeros 100,000 búsquedas/mes.",
+        recomendacion: "activar",
+      },
+      {
+        prioridad: "conveniente",
+        titulo: "Procesar el Reporte PDF en segundo plano",
+        queMejora: "El consultor no espera bloqueado 3–5 minutos — recibe notificación cuando el reporte está listo.",
+        porQueImporta: "Genera mejor experiencia y reduce el costo del reporte en 50%.",
+        necesita: "Medio día de trabajo técnico.",
+        recomendacion: "planear",
+      },
     );
   }
 
-  const toneMap = {
-    rose:    "border-rose-200 bg-rose-50",
-    emerald: "border-emerald-200 bg-emerald-50",
-    amber:   "border-amber-200 bg-amber-50",
+  // Ordenar: urgente → importante → conveniente
+  const ordenPrioridad: Record<Prioridad, number> = { urgente: 0, importante: 1, conveniente: 2 };
+  decisions.sort((a, b) => ordenPrioridad[a.prioridad] - ordenPrioridad[b.prioridad]);
+
+  // Etiquetas de recomendación
+  const recLabel: Record<Decision["recomendacion"], string> = {
+    activar:     "✅ Activar pronto",
+    revisar:     "🔍 Revisar con el equipo",
+    planear:     "📅 Planear para siguiente ciclo",
+    investigar:  "⚠️ Investigar de inmediato",
   };
-  const circleTone = {
-    rose:    "bg-rose-200 text-rose-800",
-    emerald: "bg-emerald-200 text-emerald-800",
-    amber:   "bg-amber-200 text-amber-800",
+
+  const prioridadStyle: Record<Prioridad, { badge: string; border: string }> = {
+    urgente:     { badge: "bg-rose-100 text-rose-800",    border: "border-l-rose-400" },
+    importante:  { badge: "bg-amber-100 text-amber-800",  border: "border-l-amber-400" },
+    conveniente: { badge: "bg-slate-100 text-slate-600",  border: "border-l-slate-300" },
   };
-  const gainTone = {
-    rose:    "text-rose-700 border-rose-200",
-    emerald: "text-emerald-700 border-emerald-200",
-    amber:   "text-emerald-700 border-emerald-200",
+
+  // Tabla de uso por rol (no técnica)
+  const roleLabel: Record<string, string> = {
+    aurora:  "Aurora — Autora",
+    rebeca:  "Rebeca — Revisora",
+    elena:   "Elena — Elevadora",
+    valeria: "Valeria — Validadora",
   };
 
   return (
-    <div className="px-8 py-6 max-w-5xl">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-        Auditoría de decisiones IA
-      </p>
-      <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-        Revisa si la app usa los modelos y herramientas correctos en cada tarea,
-        y qué optimizaciones concretas hay disponibles. Las recomendaciones se generan
-        a partir de los datos reales de los últimos 30 días.
-      </p>
+    <div className="px-8 py-6 max-w-4xl">
 
-      {/* ── Alertas ─────────────────────────────────────────────────────────── */}
-      {alerts.length > 0 && (
-        <div className="space-y-2 mb-6">
-          {alerts.map((a, i) => (
-            <div
-              key={i}
-              role="alert"
-              className={`border-l-4 rounded-r p-3 ${
-                a.tone === "error"   ? "border-l-rose-500 bg-rose-50 text-rose-900"
-                : a.tone === "warn" ? "border-l-amber-500 bg-amber-50 text-amber-900"
-                : "border-l-teal-500 bg-teal-50 text-teal-900"
-              }`}
-            >
-              <p className="text-sm font-bold">{a.title}</p>
-              <p className="text-xs mt-0.5 leading-relaxed opacity-90">{a.detail}</p>
-            </div>
-          ))}
+      {/* ── Estado general ─────────────────────────────────────────────────── */}
+      <div className={`flex items-start gap-3 border ${sc.border} ${sc.bg} rounded-lg px-4 py-3 mb-6`}>
+        <span className={`w-3 h-3 rounded-full ${sc.dot} shrink-0 mt-1`} />
+        <div>
+          <p className={`text-sm font-bold ${sc.text}`}>{semaforoLabel[semaforo]}</p>
+          <p className={`text-xs mt-0.5 leading-relaxed ${sc.text} opacity-90`}>{semaforoDesc}</p>
         </div>
-      )}
+      </div>
 
-      {/* ── KPIs ────────────────────────────────────────────────────────────── */}
+      {/* ── Métricas clave ──────────────────────────────────────────────────── */}
       {usage && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {[
             {
-              label: "Llamadas LLM (30d)",
-              value: numFmt.format(llmCalls),
-              sub: voyageCalls > 0 ? `+ ${numFmt.format(voyageCalls)} embeddings` : undefined,
-            },
-            { label: "Costo estimado", value: usdFmt.format(usage.cost_usd_estimate_max) },
-            {
-              label: "Caché activo",
-              value: usage.total_input_tokens > 0 ? `${Math.round(cacheRatio * 100)}%` : "—",
-            },
-            {
-              label: "Tasa de error",
-              value: llmCalls > 0 ? `${Math.round(errorRate * 100)}%` : "—",
+              label: "Respuestas exitosas",
+              value: llmCalls > 0 ? `${successRate}%` : "—",
+              sub: llmCalls > 0
+                ? (errorRate > 0.05 ? `⚠️ ${totalErrors} errores detectados` : "Todo funcionando")
+                : "Sin datos",
               red: errorRate > 0.05,
-              sub: totalErrors > 0 ? `${totalErrors} errores` : "0 errores",
+              tooltip: "Porcentaje de veces que la IA respondió sin errores en los últimos 30 días.",
+            },
+            {
+              label: "Costo del mes",
+              value: usdFmt.format(costoMes),
+              sub: costoMes < 20 ? "Razonable para el volumen actual" : costoMes < 50 ? "Hay oportunidades de ahorro" : "Alto — revisar",
+              red: costoMes > 50,
+              tooltip: "Estimado de lo que costaron todas las llamadas a IA en los últimos 30 días.",
+            },
+            {
+              label: "Velocidad de respuesta",
+              value: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "—",
+              sub: latenciaLabel(latenciaMs),
+              red: latenciaMs > 15_000,
+              tooltip: "Tiempo promedio que espera el consultor desde que envía su pregunta hasta que aparece la respuesta.",
+            },
+            {
+              label: "Ahorro por reutilización",
+              value: cacheRatio > 0 ? `${Math.round(cacheRatio * 100)}%` : "—",
+              sub: cacheRatio > 0.3
+                ? `~${usdFmt.format(costoMes * cacheRatio)} ahorrados`
+                : "Margen de mejora",
+              red: false,
+              tooltip: "La IA reutiliza el contexto del cliente entre preguntas del mismo rol, evitando cobrar por leerlo de nuevo cada vez.",
             },
           ].map((kpi) => (
-            <div key={kpi.label} className="bg-white border border-slate-200 rounded px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">{kpi.label}</p>
-              <p className={`text-xl font-bold mt-0.5 tabular-nums ${"red" in kpi && kpi.red ? "text-rose-700" : "text-slate-900"}`}>
+            <div key={kpi.label} className="bg-white border border-slate-200 rounded px-3 py-2.5" title={kpi.tooltip}>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold leading-snug">{kpi.label}</p>
+              <p className={`text-2xl font-bold mt-1 tabular-nums ${kpi.red ? "text-rose-700" : "text-slate-900"}`}>
                 {kpi.value}
               </p>
-              {"sub" in kpi && kpi.sub && (
-                <p className="text-[10px] text-slate-400 mt-0.5">{kpi.sub}</p>
-              )}
+              <p className={`text-[10px] mt-0.5 ${kpi.red ? "text-rose-500" : "text-slate-400"}`}>{kpi.sub}</p>
             </div>
           ))}
         </div>
       )}
 
-      {/* ── Distribución de modelos ──────────────────────────────────────────── */}
-      {usage && usage.by_model.length > 0 && (
-        <Panel title="Distribución real de modelos — últimos 30 días">
+      {/* ── Decisiones disponibles ──────────────────────────────────────────── */}
+      <div className="mb-8">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+          Decisiones disponibles
+        </p>
+        <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+          Cada tarjeta describe una mejora concreta: qué cambia, por qué importa y qué se necesita para activarla.
+          Están ordenadas por prioridad basada en los datos de los últimos 30 días.
+        </p>
 
-          {/* LLMs */}
-          {llmModels.length > 0 && (
-            <div className="mb-5">
-              <p className="text-[10px] font-semibold text-slate-400 mb-2 uppercase tracking-widest">
-                Modelos LLM — {numFmt.format(llmCalls)} llamadas
-              </p>
-              <div className="space-y-2">
-                {llmModels.map((m) => {
-                  const p_ = pct(m.calls, llmCalls);
-                  const isOver = m.family === "opus" && p_ > 20;
-                  const barColor =
-                    isOver         ? "bg-rose-400"
-                    : m.family === "opus"    ? "bg-violet-400"
-                    : m.family === "sonnet"  ? "bg-teal-500"
-                    : m.family === "haiku"   ? "bg-emerald-400"
-                    : "bg-slate-400";
-                  const expected: Record<string, string> = {
-                    opus: "≤20% recomendado", sonnet: "50–70% normal", haiku: "10–30% normal",
-                  };
-                  return (
-                    <div key={m.family}>
-                      <div className="flex justify-between text-[11px] mb-0.5">
-                        <span className={`font-semibold capitalize ${isOver ? "text-rose-600" : "text-slate-700"}`}>
-                          {m.family}
-                        </span>
-                        <span className="text-slate-500">
-                          {numFmt.format(m.calls)} llamadas · {p_}%
-                          {expected[m.family] && (
-                            <span className={`ml-1 ${isOver ? "text-rose-400" : "text-slate-400"}`}>
-                              ({expected[m.family]})
-                            </span>
-                          )}
-                          <span className="ml-1 text-slate-400">· {usdFmt.format(m.cost_usd)}</span>
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded h-1">
-                        <div className={`h-1 rounded ${barColor}`} style={{ width: `${p_}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+        <div className="flex flex-col gap-4">
+          {decisions.map((d, i) => {
+            const ps = prioridadStyle[d.prioridad];
+            return (
+              <div key={i} className={`bg-white border border-l-4 ${ps.border} border-slate-200 rounded-lg p-5`}>
+                {/* Header */}
+                <div className="flex flex-wrap items-start gap-2 mb-3">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${ps.badge}`}>
+                    {d.prioridad}
+                  </span>
+                  <p className="text-sm font-bold text-slate-900 leading-snug flex-1">{d.titulo}</p>
+                </div>
 
-          {/* Embeddings (Voyage) — separado de LLMs */}
-          {voyageModel && (
-            <div>
-              <p className="text-[10px] font-semibold text-slate-400 mb-2 uppercase tracking-widest">
-                Embeddings — {numFmt.format(voyageCalls)} llamadas
-              </p>
-              <div>
-                <div className="flex justify-between text-[11px] mb-0.5">
-                  <span className="font-semibold text-slate-700">Voyage AI</span>
-                  <span className="text-slate-500">
-                    {numFmt.format(voyageModel.calls)} llamadas
-                    <span className="text-slate-400 ml-1">· proporcional a docs</span>
-                    <span className="ml-1 text-slate-400">· {usdFmt.format(voyageModel.cost_usd)}</span>
+                {/* ¿Qué mejora? */}
+                <p className="text-xs font-semibold text-slate-700 mb-0.5">¿Qué mejora?</p>
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">{d.queMejora}</p>
+
+                {/* ¿Por qué importa? */}
+                <p className="text-xs font-semibold text-slate-700 mb-0.5">¿Por qué importa?</p>
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">{d.porQueImporta}</p>
+
+                {/* Ejemplo concreto */}
+                {d.ejemplo && (
+                  <div className="bg-slate-50 border border-slate-200 rounded px-3 py-2 mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">Ejemplo</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{d.ejemplo}</p>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">Lo que se necesita</p>
+                    <p className="text-[11px] text-slate-600">{d.necesita}</p>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-sm whitespace-nowrap">
+                    {recLabel[d.recomendacion]}
                   </span>
                 </div>
-                <div className="w-full bg-slate-100 rounded h-1">
-                  <div className="h-1 rounded bg-indigo-400" style={{ width: "100%" }} />
-                </div>
               </div>
-            </div>
-          )}
+            );
+          })}
+        </div>
+      </div>
 
-          <p className="text-[10px] text-slate-400 mt-3">
-            Ver detalle completo (tokens, costo, latencia, errores) en{" "}
-            <a href="/configuracion/uso-ia" className="text-brand-primary underline underline-offset-2">Uso IA →</a>
-          </p>
-        </Panel>
-      )}
-
-      {/* ── Por rol ─────────────────────────────────────────────────────────── */}
+      {/* ── Uso por rol ──────────────────────────────────────────────────────── */}
       {usage && usage.by_role.length > 0 && (
-        <Panel title="Uso por rol — últimos 30 días">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[480px]">
+        <div className="mb-8">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+            Cómo se usó cada rol IA — últimos 30 días
+          </p>
+          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+            Cuántas veces usó el equipo cada asistente, qué tan rápido respondió y si hubo fallas.
+          </p>
+          <div className="bg-white border border-slate-200 rounded overflow-hidden">
+            <table className="w-full text-xs">
               <thead>
                 <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
-                  <th className="pb-2 text-left">Rol</th>
-                  <th className="pb-2 text-right">Llamadas</th>
-                  <th className="pb-2 text-right">Costo</th>
-                  <th className="pb-2 text-right">Latencia prom.</th>
-                  <th className="pb-2 text-right">Errores</th>
+                  <th className="px-4 py-2.5 text-left">Rol</th>
+                  <th className="px-4 py-2.5 text-right">Veces usado</th>
+                  <th className="px-4 py-2.5 text-right">Velocidad promedio</th>
+                  <th className="px-4 py-2.5 text-right">Costo</th>
+                  <th className="px-4 py-2.5 text-right">Fallas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {usage.by_role.map((r) => {
-                  const roleErrors = r.errors;
-                  const roleErrorRate = r.calls > 0 ? roleErrors / r.calls : 0;
+                  const roleErr = r.errors;
+                  const roleErrRate = r.calls > 0 ? roleErr / r.calls : 0;
+                  const label = roleLabel[r.role.toLowerCase()] ?? r.role;
                   return (
                     <tr key={r.role} className="hover:bg-slate-50">
-                      <td className="py-2 font-semibold text-slate-800 capitalize">{r.role}</td>
-                      <td className="py-2 text-right text-slate-600 tabular-nums">{numFmt.format(r.calls)}</td>
-                      <td className="py-2 text-right text-slate-600 tabular-nums">{usdFmt.format(r.cost_usd)}</td>
-                      <td className="py-2 text-right text-slate-600 tabular-nums">
-                        {r.avg_latency_ms > 0 ? `${(r.avg_latency_ms / 1000).toFixed(1)} s` : "—"}
+                      <td className="px-4 py-2.5 font-semibold text-slate-800">{label}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                        {numFmt.format(r.calls)} veces
                       </td>
-                      <td className={`py-2 text-right tabular-nums font-medium ${roleErrorRate > 0.05 ? "text-rose-600" : "text-slate-500"}`}>
-                        {roleErrors > 0 ? `${roleErrors} (${Math.round(roleErrorRate * 100)}%)` : "—"}
+                      <td className="px-4 py-2.5 text-right text-slate-600">
+                        {r.avg_latency_ms > 0 ? latenciaLabel(r.avg_latency_ms) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                        {usdFmt.format(r.cost_usd)}
+                      </td>
+                      <td className={`px-4 py-2.5 text-right font-medium ${roleErrRate > 0.05 ? "text-rose-600" : "text-slate-400"}`}>
+                        {roleErr > 0
+                          ? `${roleErr} (${Math.round(roleErrRate * 100)}%)`
+                          : "Ninguna"}
                       </td>
                     </tr>
                   );
@@ -455,79 +418,67 @@ export default async function AuditoriaIaPage() {
               </tbody>
             </table>
           </div>
-        </Panel>
+        </div>
       )}
 
-      {/* ── Configuración actual de modelos ─────────────────────────────────── */}
-      <Panel title="Configuración actual — tarea → modelo → costo">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs min-w-[640px]">
+      {/* ── Qué IA se usa en cada tarea ─────────────────────────────────────── */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+          Qué IA se usa en cada tarea y por qué
+        </p>
+        <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+          Cada tarea usa el tipo de IA adecuado a su complejidad — no siempre la más potente es la mejor opción.
+        </p>
+        <div className="bg-white border border-slate-200 rounded overflow-hidden">
+          <table className="w-full text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
-                <th className="pb-2 text-left">Tarea</th>
-                <th className="pb-2 text-left">Flujo</th>
-                <th className="pb-2 text-left">Modelo</th>
-                <th className="pb-2 text-right">Entrada/1M</th>
-                <th className="pb-2 text-right">Salida/1M</th>
-                <th className="pb-2 text-right">Estado</th>
+                <th className="px-4 py-2.5 text-left">Tarea</th>
+                <th className="px-4 py-2.5 text-left">Tipo de IA</th>
+                <th className="px-4 py-2.5 text-left">Por qué esta y no otra</th>
+                <th className="px-4 py-2.5 text-right">Estado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {TASK_CONFIGS.map((tc) => (
-                <tr key={tc.task} className={`hover:bg-slate-50 ${tc.status === "proposed" ? "opacity-55" : ""}`}>
-                  <td className="py-2 font-semibold text-slate-800">
-                    {tc.task}
-                    <p className="text-[10px] text-slate-500 font-normal mt-0.5 leading-relaxed max-w-[260px]">{tc.why}</p>
-                  </td>
-                  <td className="py-2 text-slate-500">{tc.flow}</td>
-                  <td className="py-2 font-mono text-slate-700 text-[11px]">{tc.model}</td>
-                  <td className="py-2 text-right tabular-nums text-slate-700">{tc.costInput}</td>
-                  <td className="py-2 text-right tabular-nums text-slate-700">{tc.costOutput}</td>
-                  <td className="py-2 text-right"><StatusDot status={tc.status} /></td>
-                </tr>
-              ))}
+              {[
+                { tarea: "Aurora — redactar borrador",        tipo: "IA estándar",            porque: "Necesita velocidad y calidad narrativa, sin el costo de la IA de máxima capacidad.",                                  estado: "Activo" },
+                { tarea: "Rebeca — revisar y detectar fallas",tipo: "IA estándar",            porque: "Un checklist estructurado no requiere el modelo más caro — Rebeca verifica, no crea.",                               estado: "Activo" },
+                { tarea: "Elena — elevar al estratégico",     tipo: "IA de máxima capacidad", porque: "Los insights de negocio, trade-offs y narrativa ejecutiva requieren el razonamiento más profundo.",                   estado: "Activo" },
+                { tarea: "Valeria — validar entregable",      tipo: "IA ligera",              porque: "Verificar listas de criterios no requiere narrativa — una IA más simple lo hace igual de bien a menor costo.",       estado: "Activo" },
+                { tarea: "AI-fill — rellenar cuestionario",   tipo: "IA estándar",            porque: "Combina extracción de datos con síntesis contextual. Hay potencial de usar IA más económica en la extracción pura.", estado: "Activo" },
+                { tarea: "Benchmark de empresas",             tipo: "IA estándar",            porque: "Proponer empresas comparables y generar narrativa de brechas y fortalezas.",                                         estado: "Activo" },
+                { tarea: "IROs — inventario de impactos",     tipo: "IA estándar",            porque: "Análisis ESG con scores de impacto financiero y de negocio.",                                                        estado: "Activo" },
+                { tarea: "Resumen ejecutivo",                 tipo: "IA estándar",            porque: "El consultor necesita el resultado de inmediato — no puede esperar un procesamiento en segundo plano.",              estado: "Activo" },
+                { tarea: "Reporte PDF final",                 tipo: "IA de máxima capacidad", porque: "Es el entregable al cliente — requiere la máxima calidad narrativa y análisis.",                                      estado: "Activo" },
+                { tarea: "Búsqueda en documentos del cliente",tipo: "Búsqueda básica → semántica (pendiente)", porque: "Hoy busca por palabras exactas. Activar búsqueda semántica mejora +25% la precisión.",              estado: "Parcial" },
+                { tarea: "Extracción de datos AI-fill",       tipo: "IA económica (propuesto)", porque: "Solo extrae datos sin interpretarlos — una IA más económica hace el mismo trabajo a 40× menor costo.",             estado: "Propuesto" },
+                { tarea: "Reporte PDF en segundo plano",      tipo: "Procesamiento diferido (propuesto)", porque: "El consultor no espera bloqueado — recibe notificación cuando el reporte está listo al 50% del costo.",  estado: "Propuesto" },
+              ].map((row) => {
+                const estadoColor =
+                  row.estado === "Activo" ? "text-emerald-700"
+                  : row.estado === "Parcial" ? "text-amber-700"
+                  : "text-slate-400";
+                return (
+                  <tr key={row.tarea} className={`hover:bg-slate-50 ${row.estado === "Propuesto" ? "opacity-60" : ""}`}>
+                    <td className="px-4 py-2.5 font-semibold text-slate-800">{row.tarea}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{row.tipo}</td>
+                    <td className="px-4 py-2.5 text-slate-500 leading-relaxed">{row.porque}</td>
+                    <td className={`px-4 py-2.5 text-right font-medium ${estadoColor}`}>{row.estado}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] text-slate-400 mt-2">
-          Costo en USD por millón de tokens (entrada / salida). Cache hits reducen el costo de entrada ~90%.
-        </p>
-      </Panel>
-
-      {/* ── Recomendaciones ─────────────────────────────────────────────────── */}
-      <Panel title="Próximos ajustes recomendados — basados en datos reales">
-        <div className="flex flex-col gap-3">
-          {recs.map((rec, idx) => (
-            <div key={idx} className={`border rounded p-3 ${toneMap[rec.tone]}`}>
-              <div className="flex items-start gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${circleTone[rec.tone]}`}>
-                  {idx + 1}
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-900">{rec.action}</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{rec.why}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-2 text-[10px]">
-                    <span className={`bg-white/70 font-semibold px-1.5 py-0.5 rounded-sm border ${gainTone[rec.tone]}`}>
-                      Ganancia: {rec.gain}
-                    </span>
-                    <span className="bg-white/70 text-slate-600 px-1.5 py-0.5 rounded-sm border border-slate-200">
-                      Esfuerzo: {rec.effort}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-[10px] text-slate-400 mt-4">
-          Detalle de implementación:{" "}
+        <p className="text-[10px] text-slate-400 mt-3">
+          Para el detalle técnico de cada configuración:{" "}
           <a href="/configuracion/flujos-ia" className="text-brand-primary underline underline-offset-2">Flujos IA →</a>
           {" · "}
           <a href="/configuracion/herramientas" className="text-brand-primary underline underline-offset-2">Herramientas →</a>
-          {" · "}
+          {" · "}Métricas completas:{" "}
           <a href="/configuracion/uso-ia" className="text-brand-primary underline underline-offset-2">Uso IA →</a>
         </p>
-      </Panel>
+      </div>
     </div>
   );
 }

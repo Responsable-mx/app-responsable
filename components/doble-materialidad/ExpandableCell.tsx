@@ -27,13 +27,22 @@ const NO_DATA_CHIP = (
   </span>
 );
 
-export function ExpandableCell({ text, defaultExpanded = false }: { text: string; defaultExpanded?: boolean }) {
+export function ExpandableCell({
+  text,
+  defaultExpanded = false,
+  showScore = true,
+}: {
+  text: string;
+  defaultExpanded?: boolean;
+  /** Mostrar chip sólido/parcial/brecha — desactivar en contextos donde el texto no es comparativo (ej. descripciones de IROs) */
+  showScore?: boolean;
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   if (!text || text === "—") return NO_DATA_CHIP;
   if (/^sin datos/i.test(text)) return NO_DATA_CHIP;
 
-  const score = detectScore(text);
+  const score = showScore ? detectScore(text) : null;
   const isLong = text.length > 140;
 
   return (

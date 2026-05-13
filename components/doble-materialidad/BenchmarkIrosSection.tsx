@@ -209,11 +209,17 @@ export function BenchmarkIrosSection({
           const isPending = batch?.status === "pending";
           const isFailed = batch?.status === "failed";
           const isActive = activeCompanyId === company.id;
+          // Truncar nombres largos en el tab — título completo visible en tooltip
+          const MAX_TAB = 22;
+          const tabLabel = company.name.length > MAX_TAB
+            ? company.name.slice(0, MAX_TAB) + "…"
+            : company.name;
 
           return (
             <button
               key={company.id}
               type="button"
+              title={company.name.length > MAX_TAB ? company.name : undefined}
               onClick={() => setActiveCompanyId(company.id)}
               className={[
                 "px-3 py-1.5 text-xs font-medium rounded-sm border transition-colors",
@@ -222,7 +228,7 @@ export function BenchmarkIrosSection({
                   : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300",
               ].join(" ")}
             >
-              {company.name}
+              {tabLabel}
               {hasIros && (
                 <span className="ml-1.5 tabular-nums text-[10px] opacity-60">
                   [{group!.iros.length}]
@@ -345,67 +351,53 @@ function CompanyIroPanel({
         </div>
       )}
 
-      {/* IRO table */}
+      {/* IRO list — chips inline bajo la descripción */}
       {iros.length > 0 && (
-        <div className="overflow-x-auto rounded border border-slate-200">
-          <table className="min-w-full w-max text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 w-10">#</th>
-                <th className="px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 min-w-[300px]">IRO identificado</th>
-                <th className="px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 whitespace-nowrap">Clasificación</th>
-                <th className="px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 whitespace-nowrap">¿Dónde ocurre?</th>
-                <th className="px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 whitespace-nowrap">Horizonte</th>
-                <th className="px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 min-w-[140px]">Tema asociado</th>
-                <th className="px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 whitespace-nowrap">Fuente</th>
-                <th className="px-3 py-2 text-left uppercase tracking-widest text-[10px] font-bold text-slate-400 whitespace-nowrap">Confianza IA</th>
-              </tr>
-            </thead>
-            <tbody>
-              {iros.map((iro, idx) => (
-                <tr
-                  key={iro.id}
-                  className={[
-                    "border-b border-slate-100 transition-colors hover:bg-slate-50",
-                    idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
-                  ].join(" ")}
-                >
-                  <td className="sticky left-0 z-10 bg-inherit px-3 py-2.5 text-slate-400 tabular-nums font-mono text-[11px]">
-                    {iro.n_iro}
-                  </td>
-                  <td className="px-3 py-2.5 align-top">
-                    <ExpandableCell text={iro.descripcion} />
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap align-top">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium border ${TIPO_BADGE[iro.tipo]}`}>
-                      {TIPO_LABELS[iro.tipo]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap align-top text-slate-600">
+        <div className="rounded border border-slate-200 divide-y divide-slate-100">
+          {iros.map((iro, idx) => (
+            <div
+              key={iro.id}
+              className={[
+                "flex gap-3 px-3 py-3 items-start transition-colors hover:bg-slate-50",
+                idx % 2 !== 0 ? "bg-slate-50/40" : "bg-white",
+              ].join(" ")}
+            >
+              {/* Número */}
+              <span className="text-slate-400 tabular-nums font-mono text-[11px] w-5 shrink-0 pt-0.5">
+                {iro.n_iro}
+              </span>
+              {/* Descripción + chips */}
+              <div className="flex-1 min-w-0">
+                <ExpandableCell text={iro.descripcion} showScore={false} />
+                {/* Metadata como chips inline — sin scroll horizontal */}
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium border ${TIPO_BADGE[iro.tipo]}`}>
+                    {TIPO_LABELS[iro.tipo]}
+                  </span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
                     {CADENA_LABELS[iro.cadena]}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap align-top">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
-                      {HORIZONTE_LABELS[iro.horizonte]}
+                  </span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
+                    {HORIZONTE_LABELS[iro.horizonte]}
+                  </span>
+                  {iro.tema_asociado && (
+                    <span
+                      className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-50 text-slate-500 border border-slate-200 max-w-[200px] truncate"
+                      title={iro.tema_asociado}
+                    >
+                      {iro.tema_asociado}
                     </span>
-                  </td>
-                  <td className="px-3 py-2.5 align-top text-slate-600">
-                    {iro.tema_asociado ?? <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap align-top">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium border ${FUENTE_BADGE[iro.fuente_tipo]}`}>
-                      {FUENTE_LABELS[iro.fuente_tipo]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap align-top">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium border ${CONFIANZA_BADGE[iro.confianza]}`}>
-                      {CONFIANZA_LABELS[iro.confianza]}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  )}
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium border ${FUENTE_BADGE[iro.fuente_tipo]}`}>
+                    {FUENTE_LABELS[iro.fuente_tipo]}
+                  </span>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium border ${CONFIANZA_BADGE[iro.confianza]}`}>
+                    {CONFIANZA_LABELS[iro.confianza]}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

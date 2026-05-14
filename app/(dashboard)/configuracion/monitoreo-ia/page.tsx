@@ -189,7 +189,8 @@ export default async function MonitoreoIaPage() {
   const rerankActive    = (s?.by_stage ?? []).some(st => st.stage === "rerank");
   const benchmarkCalls  = (s?.by_stage ?? []).filter(st => st.stage.startsWith("dm_benchmark")).reduce((sum, st) => sum + st.calls, 0);
   const benchmarkActive = benchmarkCalls >= THRESHOLDS.benchmarkMin;
-  const latenciaMs      = s?.avg_latency_ms ?? 0;
+  const auroraRole      = s?.by_role.find(r => r.role === "aurora");
+  const latenciaMs      = auroraRole?.avg_latency_ms ?? s?.avg_latency_ms ?? 0;
   const costoMes        = s?.cost_usd_estimate_max ?? 0;
   const cacheSavingsUsd = s ? Number((s.total_cache_read_tokens * 2.7 / 1_000_000).toFixed(2)) : 0;
   const voyageSystemErrors = s ? Math.max(0, s.total_errors - llmErrors) : 0;
@@ -276,6 +277,9 @@ export default async function MonitoreoIaPage() {
         if (topRole.avg_latency_ms > 25_000) {
           diagnostico = `${rLabel} concentra el ${topRolePct}% de los errores. Latencia promedio: ${(topRole.avg_latency_ms / 1000).toFixed(0)}s — probable timeout por documentos de cliente demasiado largos.`;
           accion      = `Revisar los documentos subidos de los clientes que usan ${rLabel}. Si tienen más de 200 páginas, fragmentarlos antes de subir.`;
+        } else if (topRole.avg_latency_ms < 2_000 && rErrRate > 20) {
+          diagnostico = `${rLabel} falla de forma instantánea — ${rErrRate}% de error rate con ${(topRole.avg_latency_ms / 1000).toFixed(1)}s de latencia media. Un fallo sin tiempo de proceso indica rechazo por cuota de API (rate limit) o mensaje demasiado largo para el modelo.`;
+          accion      = `Revisar en el panel de Anthropic si se alcanzó el límite de velocidad en los días con más errores. Si el problema persiste, pedir al consultor que divida preguntas largas en partes más pequeñas.`;
         } else if (rErrRate > 50) {
           diagnostico = `${rLabel} falla en ${rErrRate}% de sus solicitudes (${topRole.errors} errores en ${topRole.calls} llamadas). Causa probable: herramienta externa caída o prompt con error de configuración.`;
           accion      = `Verificar el estado de las herramientas en la sección Herramientas. Si están verdes, pedir al equipo técnico que revise el registro de errores filtrando por "${topRole.role}".`;
@@ -330,8 +334,8 @@ export default async function MonitoreoIaPage() {
       queMejora:     "La IA recibe solo los fragmentos más útiles del documento antes de responder — menos ruido, más precisión.",
       porQueImporta: "Cuando un informe del cliente tiene 200 páginas, la búsqueda extrae múltiples fragmentos candidatos. Sin selección precisa, la IA recibe algunos irrelevantes y puede perder el dato clave.",
       ejemplo:       "En un informe de 180 páginas sobre Nuvoil, la diferencia entre recibir el fragmento correcto de la tabla GRI vs. uno genérico de la introducción.",
-      necesita:      "2–3 horas de trabajo técnico. Sin costo adicional (usa la misma suscripción Voyage ya activa).",
-      recomendacion: "activar",
+      necesita:      "2–3 horas de trabajo técnico para implementar (no hay toggle — requiere código). Sin costo adicional, usa la misma suscripción Voyage ya activa.",
+      recomendacion: "planear",
     });
 
     if (opusPct > THRESHOLDS.opusPct.pct && llmCalls >= THRESHOLDS.opusPct.minCalls) decisions.push({
@@ -437,16 +441,26 @@ export default async function MonitoreoIaPage() {
     });
   }
 
+  if (voyageSystemErrors > 50) decisions.push({
+    prioridad:     voyageSystemErrors > 200 ? "importante" : "conveniente",
+    titulo:        `La indexación nocturna de documentos falló ${voyageSystemErrors} veces — la búsqueda puede tener huecos`,
+    queMejora:     "Confirmar que todos los fragmentos de los informes subidos están correctamente indexados para que la IA los encuentre.",
+    porQueImporta: `El proceso nocturno que convierte los documentos subidos en búsquedas inteligentes falló ${voyageSystemErrors} veces en los últimos 30 días. Cuando falla, la IA no tiene acceso a esos fragmentos — el consultor cree que Aurora busca en el documento completo pero en realidad puede tener huecos invisibles.`,
+    ejemplo:       `Si hubo un pico de errores de indexación algún día del mes, los documentos subidos ese día pueden no estar completamente disponibles para Aurora en el chat, aunque aparezcan como "subidos" en el tab Documentos.`,
+    necesita:      "Pedir al equipo técnico que revise los logs del cron de indexación (embed-chunks) y verifique que los documentos de los clientes activos estén completamente indexados.",
+    recomendacion: "investigar",
+  });
+
   const ordenPrioridad: Record<Prioridad, number> = { urgente: 0, importante: 1, conveniente: 2 };
   decisions.sort((a, b) => ordenPrioridad[a.prioridad] - ordenPrioridad[b.prioridad]);
 
   // ── Health checklist ──────────────────────────────────────────────────────
   const healthChecks: HealthCheck[] = s ? [
     { label: "Respuestas exitosas", status: errorRate > THRESHOLDS.errorRate.rate && llmCalls >= THRESHOLDS.errorRate.minCalls ? "rojo" : errorRate > 0.05 && llmCalls > 10 ? "amarillo" : llmCalls === 0 ? "neutral" : "verde", valor: llmCalls > 0 ? `${successRate}% (${llmErrors} fallas de ${numFmt.format(llmCalls)})` : "Sin actividad", meta: "Objetivo: >95%", trend: trendErrorRate },
-    { label: "Búsqueda semántica en documentos", status: voyageActive ? "verde" : "amarillo", valor: voyageActive ? `Activa — ${numFmt.format(voyageCalls)} búsquedas` : "Inactiva" },
+    { label: "Búsqueda semántica en documentos", status: !voyageActive ? "amarillo" : voyageSystemErrors > 100 ? "amarillo" : "verde", valor: voyageActive ? `Activa — ${numFmt.format(voyageCalls)} búsquedas${voyageSystemErrors > 50 ? ` · ${voyageSystemErrors} errores de indexación` : ""}` : "Inactiva" },
     { label: "Selección precisa de fragmentos", status: !voyageActive ? "neutral" : rerankActive ? "verde" : "amarillo", valor: !voyageActive ? "Requiere búsqueda semántica primero" : rerankActive ? "Activa" : "Lista para activar" },
     { label: "Uso de IA de máxima capacidad (Elena/Reporte)", status: llmCalls === 0 ? "neutral" : opusPct > THRESHOLDS.opusPct.pct && llmCalls >= THRESHOLDS.opusPct.minCalls ? "amarillo" : "verde", valor: llmCalls > 0 ? `${opusPct}% del volumen total` : "Sin datos", meta: `Objetivo: <${THRESHOLDS.opusPct.pct}%` },
-    { label: "Velocidad promedio de respuesta", status: latenciaMs === 0 ? "neutral" : latenciaMs > THRESHOLDS.latenciaMs * 2 ? "rojo" : latenciaMs > THRESHOLDS.latenciaMs ? "amarillo" : "verde", valor: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "Sin datos", meta: `Objetivo: <${THRESHOLDS.latenciaMs / 1000}s` },
+    { label: "Velocidad de Aurora (rol más usado)", status: latenciaMs === 0 ? "neutral" : latenciaMs > THRESHOLDS.latenciaMs * 2 ? "rojo" : latenciaMs > THRESHOLDS.latenciaMs ? "amarillo" : "verde", valor: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "Sin datos", meta: `Objetivo: <${THRESHOLDS.latenciaMs / 1000}s` },
     { label: "Caché de benchmarks sectoriales", status: benchmarkCalls === 0 ? "neutral" : benchmarkCalls >= THRESHOLDS.benchmarkMin ? "amarillo" : "neutral", valor: benchmarkCalls === 0 ? "Sin estudios DM este mes" : `${benchmarkCalls} estudio${benchmarkCalls > 1 ? "s" : ""} — ${benchmarkCalls >= THRESHOLDS.benchmarkMin ? "caché pendiente de implementar" : "volumen aún bajo"}` },
     { label: "Eficiencia del caché IA", status: llmCalls < THRESHOLDS.cacheRatio.minCalls ? "neutral" : cacheRatio >= 0.40 ? "verde" : cacheRatio >= THRESHOLDS.cacheRatio.max ? "amarillo" : "rojo", valor: cacheRatio > 0 ? `${Math.round(cacheRatio * 100)}% — ~${usdFmt.format(cacheSavingsUsd)} ahorrados` : "Sin datos", meta: "Objetivo: >40%", trend: trendCacheRatio },
     { label: "Satisfacción de consultores", status: s.feedback_total_down > THRESHOLDS.feedbackDown ? "rojo" : s.feedback_total_down > 10 ? "amarillo" : "verde", valor: s.feedback_total_down === 0 ? "Sin rechazos registrados" : `${s.feedback_total_down} respuesta${s.feedback_total_down > 1 ? "s" : ""} rechazada${s.feedback_total_down > 1 ? "s" : ""}`, meta: `Objetivo: <${THRESHOLDS.feedbackDown} rechazos/mes` },

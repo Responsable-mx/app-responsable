@@ -96,6 +96,12 @@ const docsFetcher = (url: string) =>
     return r.json() as Promise<{ data: DocLite[] }>;
   });
 
+const dmReportFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<{ data: { parse_status?: string } | null }>;
+  });
+
 
 export function ClientTabs({
   client,
@@ -270,6 +276,17 @@ export function ClientTabs({
     docsFetcher,
     { revalidateOnFocus: false }
   );
+
+  // SWR dm-report — solo para DM-IA: dot parpadeante cuando el reporte está generándose en background
+  const { data: dmReportData } = useSWR(
+    hasDmService ? `/api/clients/${client.id}/dm-report` : null,
+    dmReportFetcher,
+    {
+      revalidateOnFocus: false,
+      refreshInterval: (data) => (data?.data?.parse_status === "pending" ? 5000 : 0),
+    }
+  );
+  const dmReportPending = dmReportData?.data?.parse_status === "pending";
   // null = aún cargando; 0 = sin documentos; N = N docs
   const docCount: number | null = docsData ? docsData.data.length : null;
 
@@ -798,6 +815,7 @@ export function ClientTabs({
             label="DM-IA"
             badge={dmProgress ? `${dmProgress.done}/${dmProgress.total}` : null}
             badgeTitle={dmProgress ? `${dmProgress.done} de ${dmProgress.total} etapas completadas` : undefined}
+            dot={dmReportPending}
           />
         )}
         <TabButton
@@ -903,6 +921,7 @@ function TabButton({
   badge,
   badgeTitle,
   tabId,
+  dot,
 }: {
   active: boolean;
   onClick: () => void;
@@ -911,6 +930,7 @@ function TabButton({
   badge: string | null;
   badgeTitle?: string;
   tabId: string;
+  dot?: boolean;
 }) {
   // aria-label compone label + badge para screen readers: "Cuestionario, 1 de 9 pasos completados"
   const ariaFull = badge ? `${label}, ${badgeTitle ?? badge}` : label;
@@ -929,7 +949,12 @@ function TabButton({
           : "border-transparent text-slate-500 hover:text-slate-800"
       }`}
     >
-      <span className={`${active ? "text-brand-primary-dark" : "text-slate-500"} w-[18px] h-[18px] flex items-center justify-center shrink-0`} aria-hidden="true">{icon}</span>
+      <span className="relative w-[18px] h-[18px] flex items-center justify-center shrink-0">
+        <span className={`${active ? "text-brand-primary-dark" : "text-slate-500"} w-[18px] h-[18px] flex items-center justify-center`} aria-hidden="true">{icon}</span>
+        {dot && (
+          <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+        )}
+      </span>
       <span className="text-xs font-medium">{label}</span>
       {badge !== null && (
         <span

@@ -6,6 +6,9 @@ import { RELATION_LABELS, type CompanyRelation } from "@/lib/dm/fields";
 import { ExpandableCell } from "@/components/doble-materialidad/ExpandableCell";
 import type { BenchmarkResult } from "./benchmark-types";
 import { lookupComparisonValue, abbrevCompanyName } from "./benchmark-helpers";
+import { scrollToDmSection } from "@/components/doble-materialidad/DoubleMaterialidadTab";
+import { RankingChart, RadarEsgChart, BrechaUrgencyChart } from "@/components/doble-materialidad/BenchmarkCharts";
+import type { CompanyScore, CatScore, BrechaItem } from "@/components/doble-materialidad/BenchmarkCharts";
 
 const cats = ["E", "S", "G"] as const;
 const catLabel: Record<string, string> = { E: "Ambiental", S: "Social", G: "Gobernanza" };
@@ -55,6 +58,7 @@ export function BenchmarkComparisonTable({
   const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(true);
 
   useEffect(() => {
     if (!tableFullscreen) return;
@@ -92,6 +96,81 @@ export function BenchmarkComparisonTable({
     },
     { sólido: 0, parcial: 0, brecha: 0, otros: 0 }
   );
+
+  // Brechas del cliente — usadas por charts y CTA
+  const clientBrechaFields = allFields.filter(
+    (f) => detectScore(lookupComparisonValue(latestResult.comparison, f.key, clientName)) === "brecha"
+  );
+
+  // Media de sólidos entre empresas de referencia
+  const peerAvgSolido =
+    allCompanies.length > 0
+      ? Math.round(
+          allCompanies.reduce((sum, co) => {
+            return (
+              sum +
+              allFields.filter(
+                (f) =>
+                  detectScore(lookupComparisonValue(latestResult.comparison, f.key, co.name)) === "sólido"
+              ).length
+            );
+          }, 0) / allCompanies.length
+        )
+      : 0;
+
+  // Ranking por empresa para RankingChart
+  const companyRanking: CompanyScore[] = [
+    ...allCompanies.map((co) => {
+      const s = allFields.reduce(
+        (acc, f) => {
+          const sc = detectScore(lookupComparisonValue(latestResult.comparison, f.key, co.name));
+          if (sc) acc[sc]++;
+          return acc;
+        },
+        { sólido: 0, parcial: 0, brecha: 0 }
+      );
+      return { name: abbrevCompanyName(co.name), ...s, isClient: false };
+    }),
+    {
+      name: abbrevCompanyName(clientName),
+      sólido: scorecardAll.sólido,
+      parcial: scorecardAll.parcial,
+      brecha: scorecardAll.brecha,
+      isClient: true,
+    },
+  ];
+
+  // Scores por categoría E/S/G para RadarEsgChart
+  const catScores: CatScore[] = cats.map((cat) => {
+    const catFields = allFields.filter((f) => f.key.charAt(0).toUpperCase() === cat);
+    const total = catFields.length;
+    if (total === 0) return { cat, label: catLabel[cat] ?? cat, client: 0, peerAvg: 0 };
+    const clientSol = catFields.filter(
+      (f) => detectScore(lookupComparisonValue(latestResult.comparison, f.key, clientName)) === "sólido"
+    ).length;
+    const peerSolAvg =
+      allCompanies.length > 0
+        ? allCompanies.reduce((sum, co) => {
+            return (
+              sum +
+              catFields.filter(
+                (f) =>
+                  detectScore(lookupComparisonValue(latestResult.comparison, f.key, co.name)) === "sólido"
+              ).length
+            );
+          }, 0) / allCompanies.length
+        : 0;
+    return { cat, label: catLabel[cat] ?? cat, client: (clientSol / total) * 100, peerAvg: (peerSolAvg / total) * 100 };
+  });
+
+  // Urgencia de brechas para BrechaUrgencyChart
+  const brechaUrgency: BrechaItem[] = clientBrechaFields.map((f) => ({
+    label: f.label,
+    peerBrechas: allCompanies.filter(
+      (co) => detectScore(lookupComparisonValue(latestResult.comparison, f.key, co.name)) === "brecha"
+    ).length,
+    totalPeers: allCompanies.length,
+  }));
 
   const isBrechaText = (t: string) =>
     /ausencia|brecha|carece|sin reporte|sin meta|no publica|no mide|no tiene|no cuenta/.test(t.toLowerCase());
@@ -309,6 +388,16 @@ export function BenchmarkComparisonTable({
                     }
                     return null;
                   })()}
+                  {detectScore(clientText) === "brecha" && (
+                    <button
+                      type="button"
+                      onClick={() => scrollToDmSection("dm-sec-iros")}
+                      title="Ir a IROs para registrar esta brecha como riesgo u oportunidad"
+                      className="inline-flex items-center gap-0.5 text-[9px] text-indigo-500 hover:text-indigo-700 mt-0.5 font-medium transition-colors"
+                    >
+                      + IRO →
+                    </button>
+                  )}
                 </td>
                 {visibleCompanies.map((company) => {
                   const compText = lookupComparisonValue(latestResult.comparison, field.key, company.name);
@@ -350,27 +439,89 @@ export function BenchmarkComparisonTable({
 
   return (
     <div className="mt-2">
-      {/* Scorecard: posición global de Nuvoil */}
+      {/* Scorecard: posición global del cliente */}
       <div className="flex items-center gap-1.5 flex-wrap mb-3 px-0.5">
         <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
           {clientName}:
         </span>
         {scorecardItems.map(({ key, cls, icon }) =>
           scorecardAll[key] > 0 ? (
-            <span
+            <button
               key={key}
-              title={`${scorecardAll[key]} de ${allFields.length} dimensiones con posición "${key}"`}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-medium border cursor-default ${cls}`}
+              type="button"
+              onClick={() => setOnlyBrechas(key === "brecha")}
+              title={`${scorecardAll[key]} de ${allFields.length} dimensiones — click para filtrar tabla`}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-medium border cursor-pointer hover:opacity-75 transition-opacity ${cls}`}
             >
               <span aria-hidden="true">{icon}</span>
               {scorecardAll[key]}/{allFields.length} {key}
-            </span>
+            </button>
           ) : null
         )}
         {scorecardAll.otros > 0 && (
           <span className="text-[10px] text-slate-400 border border-slate-200 px-2 py-0.5 rounded-sm">
             {scorecardAll.otros} sin clasificar
           </span>
+        )}
+        {allCompanies.length > 0 && (
+          <span
+            title={`Media de dimensiones sólidas entre las ${allCompanies.length} empresas de referencia`}
+            className="text-[10px] text-indigo-500 border border-indigo-100 bg-indigo-50 px-2 py-0.5 rounded-sm ml-1"
+          >
+            Ref: ~{peerAvgSolido}/{allFields.length} sólido
+          </span>
+        )}
+      </div>
+
+      {/* Análisis visual — 3 gráficas SVG */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setChartsOpen((v) => !v)}
+          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors mb-2"
+        >
+          <svg
+            className={`w-3 h-3 transition-transform ${chartsOpen ? "" : "-rotate-90"}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          Análisis visual — posición ESG
+        </button>
+        {chartsOpen && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div className="bg-white border border-slate-100 rounded p-3">
+              <p className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-2">
+                Posición relativa por empresa
+              </p>
+              <RankingChart
+                companies={companyRanking}
+                totalFields={allFields.length}
+                peerAvgSolido={peerAvgSolido}
+              />
+            </div>
+            <div className="bg-white border border-slate-100 rounded p-3">
+              <p className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-2">
+                Cobertura por dimensión E/S/G
+              </p>
+              <RadarEsgChart catScores={catScores} />
+            </div>
+            {brechaUrgency.length > 0 && (
+              <div className="md:col-span-2 bg-white border border-slate-100 rounded p-3">
+                <p className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-1">
+                  Brechas por prioridad — ¿cuántas referencias comparten la misma brecha?
+                </p>
+                <p className="text-[9px] text-slate-400 mb-2">
+                  Barra más larga = brecha exclusiva del cliente = más urgente de atender
+                </p>
+                <BrechaUrgencyChart items={brechaUrgency} />
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -423,6 +574,27 @@ export function BenchmarkComparisonTable({
         )}
       </div>
       {scrollHint}
+
+      {/* CTA: convertir brechas en IROs */}
+      {clientBrechaFields.length > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-3 px-3 py-2.5 bg-rose-50 border border-rose-200 rounded">
+          <div>
+            <p className="text-xs font-semibold text-rose-700">
+              {clientBrechaFields.length} brecha{clientBrechaFields.length !== 1 ? "s" : ""} identificada{clientBrechaFields.length !== 1 ? "s" : ""}
+            </p>
+            <p className="text-[10px] text-rose-600 mt-0.5">
+              Convierte las brechas de {clientName} en IROs para construir el plan de acción
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => scrollToDmSection("dm-sec-iros")}
+            className="shrink-0 px-3 py-1.5 rounded text-[10px] font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors whitespace-nowrap"
+          >
+            Ir a IROs →
+          </button>
+        </div>
+      )}
 
       {/* Overlay fullscreen */}
       {tableFullscreen && (

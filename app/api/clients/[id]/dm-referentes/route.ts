@@ -223,6 +223,42 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const countries = (client.countries as string[] | null)?.join(", ") ?? "México";
     const userContent = buildFrameworksUserContent(sector, industry, countries);
 
+    // Cache de sector: si otro cliente del mismo sector ya tiene frameworks recientes, copiar sin IA
+    if (sector !== "no especificado") {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: peerClients } = await admin
+        .from("clients")
+        .select("id")
+        .eq("sector", sector)
+        .neq("id", id)
+        .limit(20);
+
+      if (peerClients && peerClients.length > 0) {
+        const peerIds = (peerClients as { id: string }[]).map((c) => c.id);
+        const { data: peerRef } = await admin
+          .from("dm_referentes")
+          .select("proposed_frameworks, enabled_frameworks")
+          .in("client_id", peerIds)
+          .eq("frameworks_status", "done")
+          .gte("updated_at", thirtyDaysAgo)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (peerRef?.proposed_frameworks) {
+          const frameworks = sanitizeFrameworkUrls(peerRef.proposed_frameworks as ReferenteFramework[]);
+          await admin.from("dm_referentes").upsert({
+            client_id: id,
+            proposed_frameworks: frameworks,
+            enabled_frameworks: frameworks.map((f) => f.id),
+            frameworks_status: "done",
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "client_id" });
+          return NextResponse.json({ data: { frameworks, enabled_frameworks: frameworks.map((f) => f.id), cached: true } });
+        }
+      }
+    }
+
     const anthropic  = createAnthropicClient();
     let textOut = "", inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
     const startedAt = Date.now();

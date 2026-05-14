@@ -11,6 +11,7 @@ import { ExpandableCell } from "@/components/doble-materialidad/ExpandableCell";
 import type { BenchmarkCompany, BenchmarkResult, RejectionReason } from "./benchmark-types";
 import { REJECTION_OPTIONS } from "./benchmark-helpers";
 import { BenchmarkComparisonTable } from "./BenchmarkComparisonTable";
+import { BenchmarkVisuals } from "./BenchmarkVisuals";
 import type { BenchmarkEmpresa } from "@/lib/dm/benchmark-empresas-types";
 import { ManualAddCompanyForm } from "@/components/doble-materialidad/ManualAddCompanyForm";
 
@@ -746,6 +747,11 @@ export function BenchmarkSection({
           narrative={latestResult!.narrative}
           createdAt={latestResult!.created_at}
         />
+      )}
+
+      {/* ── Visualizaciones ESG ── */}
+      {hasComparisonData && (
+        <BenchmarkVisuals latestResult={latestResult!} clientName={clientName} />
       )}
 
       {/* ── Tabla comparativa ── */}

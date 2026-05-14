@@ -21,6 +21,12 @@ const SCORE_CLASSES: Record<ScoreTier, string> = {
   brecha:  "bg-rose-50 text-rose-600 border border-rose-200",
 };
 
+const SCORE_TOOLTIPS: Record<ScoreTier, string> = {
+  sólido: "Posición sólida — evidencia de certificación ISO, reporte GRI/TCFD verificado, medición Scope 1/2, o estándar internacional reportado",
+  parcial: "Posición parcial — existe alguna evidencia o iniciativa, pero incompleta, básica o en proceso",
+  brecha:  "Brecha identificada — ausencia de reporte, sin métricas públicas, sin meta, o no cuenta con programa documentado",
+};
+
 const NO_DATA_CHIP = (
   <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 text-slate-400 border border-slate-200">
     sin datos
@@ -55,7 +61,10 @@ export function ExpandableCell({
   return (
     <div>
       {score && (
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium mb-1 ${SCORE_CLASSES[score]}`}>
+        <span
+          title={SCORE_TOOLTIPS[score]}
+          className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium mb-1 ${SCORE_CLASSES[score]}`}
+        >
           {score}
         </span>
       )}

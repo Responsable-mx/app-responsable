@@ -1,7 +1,34 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-14 (sesión 40 — 5 mejoras rendimiento/observabilidad: TTFT, embeddings inline, sources chip, costo cliente, pre-warm)
+**Fecha:** 2026-05-14 (sesión 41b — auditoría /configuracion: catálogo unificado herramientas + 6 fixes flujos-ia)
 **Calificación global:** 9.9 / 10
+
+---
+
+## Implementado sesión 41b
+
+### ✅ Catálogo unificado `herramientas/page.tsx`
+- `TOOL_CATALOG` array único con `implemented: boolean` + `healthKey` — elimina dos arrays desincronizados.
+- Voyage Rerank + Anthropic Batch API: corregidos de PROPUESTA → ACTIVO (implementados desde s35/s39 pero página nunca actualizada).
+- Health check dedup via Set de keys únicas (Voyage Embeddings + Rerank comparten un solo ping a la API).
+- Patrón documentado en CLAUDE.md: al implementar herramienta → `implemented: false → true` + `healthKey` + función en `HEALTH_CHECKS`.
+
+### ✅ 6 fixes `flujos-ia/page.tsx`
+- `revalidate` 86400 → 3600 (era 24h, ahora 1h).
+- DOC_STEPS paso 4: warn de brecha eliminado (inline embeddings s40 resuelve gap) → lane A + note positiva.
+- CHAT_STEPS paso 2: "pendiente prod" → "BM25 + Voyage + Rerank activos".
+- DM_STEPS paso 4: "Batch API propuesto" → "Anthropic Batch API activo".
+- Tabla referencia: Voyage Rerank + Batch API → Activo.
+- Link roto `/configuracion/auditoria-ia` (redirige a sí misma) → `/configuracion/monitoreo-ia`.
+
+### ✅ Auditoría 19 páginas /configuracion
+- 14 páginas sin issues (dinámicas, sin datos falsos).
+- Issues resueltos en herramientas + flujos-ia (únicos que tenían datos obsoletos).
+- Sección configuración 100% sincronizada con estado real de prod.
+
+## Pendientes activos post-sesión 41b
+
+Sin pendientes técnicos activos.
 
 ---
 

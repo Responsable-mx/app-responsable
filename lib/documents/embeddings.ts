@@ -4,14 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { chunkMarkdown } from "@/lib/documents/relevance";
 import { logAiCall } from "@/lib/ai/logging";
 
-// ── Embeddings de chunks (Wave 7 — F prep) ──────────────────
+// ── Embeddings de chunks (Wave 7 — activo en prod) ──────────────────
 //
-// Hoy: helpers + tabla listas, embeddings = NULL.
-// Mañana: VOYAGE_API_KEY en Vercel → cron pobla embeddings → swap
-// retrieval BM25 por similarity vector.
-//
-// Punto de swap: searchSimilarChunks() devuelve top chunks; hoy stub
-// que cae a BM25 si no hay embeddings; mañana usa pgvector cosine.
+// Voyage AI (voyage-3) genera embeddings vectoriales de los chunks de
+// documentos. searchSimilarChunks() busca por cosine similarity via
+// pgvector RPC. Fallback a BM25 si VOYAGE_API_KEY falta.
 // ───────────────────────────────────────────────────────────
 
 export type EmbeddingsConfig = {

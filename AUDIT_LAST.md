@@ -1,7 +1,58 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-12 (sesión 33 — /audit-health + /audit-seg + /audit-refactor + /simplify + cobertura)
-**Calificación global:** 9.8 / 10 (= sesión 32c)
+**Fecha:** 2026-05-14 (sesión 34 — fixes recomendaciones monitoreo-ia)
+**Calificación global:** 9.8 / 10
+
+---
+
+## Resumen ejecutivo sesión 34
+
+Análisis y corrección de las 4 tarjetas de recomendación en `/configuracion/monitoreo-ia`. 2 fixes técnicos + limpieza ESLint + stale comments.
+
+## Fixes aplicados en sesión 34
+
+### ✅ Voyage retry — `lib/documents/embeddings.ts`
+`callVoyageRaw` ahora reintenta 3 veces con backoff exponencial (500ms/1s/2s) ante 429 y 5xx. Solo loggea error después de agotar reintentos. Impacto: reduce falsos positivos en tarjeta "indexación nocturna" + permite que `rerankChunks` active la tarjeta "selección fragmentos".
+
+### ✅ Aurora timeout — `app/api/chat/route.ts`
+`maxDuration` 60→120s, `STREAM_TIMEOUT_MS` 45→100s. Aurora promediaba 46.7s (picos a 87.8s) — el timeout era menor que la latencia promedio, causando el 12% de error rate.
+
+### ✅ ESLint 2 problemas → 0/0
+- `MonitoreoIaTabs.tsx:20` — `setActive` en useEffect body → lazy initializer `useState(() => ...)` con `typeof window` guard.
+- `PricingConfigTable.tsx:3` — `useEffect` importado sin usar → removido del import.
+
+### ✅ Stale comments
+- `lib/documents/embeddings.ts` — bloque "Hoy/Mañana" sobre activación Voyage actualizado ("activo en prod").
+- `CLAUDE.md` — header "Wave 5c → 7, pendiente activación prod" → "Wave 7 — activo en prod".
+
+## Tests
+
+```
+Tests   : 357/357 passed (28 suites)
+ESLint  : 0 errors, 0 warnings
+TSC     : 0 errors
+```
+
+## Pendientes activos post-sesión 34
+
+| ID | Sev | Descripción | Acción |
+|----|-----|-------------|--------|
+| D-178 | 🟢 | latencyMs=0 en logAiCall IROs batch | Calcular desde `submitted_at` columna existente |
+| D-04 | ⏸ | Metodología ResponSable no definida | Bloqueo de negocio, no técnico |
+
+---
+
+## Score sesión 34
+
+| Dimensión | Post-33 | Post-34 | Delta |
+|-----------|---------|---------|-------|
+| Confiabilidad | 9.8 | 9.9 (retry Voyage + timeout Aurora) | ↑ |
+| Calidad de código | 9.9 | 9.9 (ESLint 0/0, stale comments limpios) | = |
+| **Global** | **9.8** | **9.8** | = |
+
+---
+
+## Auditoría anterior: 2026-05-12 (sesión 33)
 
 ---
 

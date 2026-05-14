@@ -330,9 +330,7 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 
 **Patrón canónico:** `components/ClientTabs.tsx`. Page.tsx queda thin: solo data fetching + `<ClientTabs>` con props extendidos (sectorLabels, visibleServices, prev/next, counter, updatedLabel, updatedAt, metaTooltip).
 
-## Retrieval semántico de documentos (Wave 5c → 7)
-
-Pipeline en 2 niveles, swap transparente. BM25 activo en prod; Voyage configurado localmente, pendiente activación prod.
+## Retrieval semántico de documentos (Wave 7 — activo en prod)
 
 ### Hoy — BM25 sobre markdown_content (activo en prod via DOC_RELEVANCE_ENABLED=true)
 

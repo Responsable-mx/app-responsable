@@ -525,7 +525,7 @@ export default function FlujoIaPage() {
                 { tool: "mammoth / exceljs",     where: "Parseo DOCX y XLSX",                                               status: "Activo" },
                 { tool: "QStash",                where: "Benchmark — 1 trabajo por empresa en paralelo",                   status: "Activo" },
                 { tool: "BM25 (keywords)",       where: "Chat + AI-fill — recuperación de contexto del cliente",            status: "Activo" },
-                { tool: "Voyage AI embeddings",  where: "Chat — búsqueda semántica (prod pendiente)",                      status: "Parcial" },
+                { tool: "Voyage AI embeddings",  where: "Chat + AI-fill — búsqueda semántica (669/669 chunks en prod)",   status: "Activo" },
                 { tool: "Voyage Rerank",         where: "Chat — selección fina de fragmentos",                              status: "Propuesto" },
                 { tool: "Upstash Redis",         where: "Caché benchmarks sectoriales repetidos",                           status: "Propuesto" },
                 { tool: "Anthropic Batch API",   where: "Reporte PDF · IROs masivos (−50% costo)",                         status: "Propuesto" },

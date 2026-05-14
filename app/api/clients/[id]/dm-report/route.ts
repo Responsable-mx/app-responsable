@@ -119,10 +119,32 @@ async function buildReportPrompt(
         .join("\n")}`
     : "";
 
-  // Brechas NIS/IBSO del cliente
-  const nisBrechas = clientNis.length
-    ? `\nMAPADE BRECHAS NIS/IBSO:\n${clientNis
-        .map((n) => `${n.ibso_label} [${n.categoria}]: ${n.estado} (calidad: ${n.calidad_dato})${n.accion ? ` — acción: ${n.accion}` : ""}`)
+  // Brechas NIS/IBSO del cliente — solo indicadores con brecha real
+  // Excluye no_aplica y disponible+alta (dato listo, no es brecha)
+  const nisConBrecha = clientNis.filter(
+    (n) => n.estado !== "no_aplica" && !(n.estado === "disponible" && n.calidad_dato === "alta")
+  );
+
+  // Cross-reference NIS brecha → IROs afectados por categoría ESG
+  const CAT_PATTERNS: Record<string, RegExp> = {
+    ambiental:  /emisi|co2|ghg|carbon|energi|agua|residuo|biodiversi|climat|ambient|contamin/i,
+    social:     /labor|person|salud|segur|igualdad|comunidad|trabajador|derechos|emplead|cadena/i,
+    gobernanza: /gobern|etica|corrupci|riesg|transparenc|cumplimient|directiv|consejo|gesti/i,
+  };
+  const iroRefsByCat = Object.fromEntries(
+    Object.entries(CAT_PATTERNS).map(([cat, regex]) => [
+      cat,
+      clientIros.filter((iro) => regex.test(iro.tema_esg)).map((iro) => `IRO-${iro.n_iro}`),
+    ])
+  );
+
+  const nisBrechas = nisConBrecha.length
+    ? `\nMAPA DE BRECHAS NIS/IBSO:\n${nisConBrecha
+        .map((n) => {
+          const refs = iroRefsByCat[n.categoria]?.join(", ") ?? "";
+          const iroRef = refs ? ` — IROs afectados: ${refs}` : "";
+          return `${n.ibso_label} [${n.categoria}]: ${n.estado} (calidad: ${n.calidad_dato})${n.accion ? ` — acción: ${n.accion}` : ""}${iroRef}`;
+        })
         .join("\n")}`
     : "";
 

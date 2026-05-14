@@ -371,7 +371,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }
 
     const anthropic = createAnthropicClient();
-    const { model } = getModelConfig("aurora");
+    // Haiku: búsqueda de URL es tarea formulaica (web_search + retornar link), no requiere Sonnet
+    const { model } = getModelConfig("valeria");
     const updatedMap = new Map<string, string>();
 
     // Concurrency: 3 simultaneous searches

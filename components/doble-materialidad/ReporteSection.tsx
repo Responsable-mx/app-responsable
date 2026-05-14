@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -62,6 +62,19 @@ export function ReporteSection({
   const [confirmGenerate, setConfirmGenerate] = useState(false);
 
   const canGenerate = latestResult?.status === "done";
+
+  // Detectar batch estancado: actualiza cada 30s mientras el reporte está pendiente
+  const [batchAgeMin, setBatchAgeMin] = useState(0);
+  useEffect(() => {
+    if (!latestReport?.created_at || latestReport.parse_status !== "pending") {
+      return;
+    }
+    const update = () =>
+      setBatchAgeMin(Math.floor((Date.now() - Date.parse(latestReport.created_at)) / 60_000));
+    update();
+    const id = setInterval(update, 30_000);
+    return () => clearInterval(id);
+  }, [latestReport?.created_at, latestReport?.parse_status]);
 
   // Checklist de cierre — pattern mockup-v7. 7 criterios cuantificados.
   // Cliente ve qué falta antes de gastar 2-5 min de IA + accountability del reporte.
@@ -242,12 +255,19 @@ export function ReporteSection({
 
       {/* Batch en proceso — spinner activo (sin nombrar modelo) */}
       {canGenerate && latestReport?.parse_status === "pending" && isReportPolling && (
-        <div className="flex items-center gap-2 text-xs text-slate-500 py-2 border-l-4 border-l-amber-400 pl-4">
-          <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          Generando reporte con IA — puede tardar 2-5 minutos. Puedes navegar otras etapas mientras esperas.
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs text-slate-500 py-2 border-l-4 border-l-amber-400 pl-4">
+            <svg className="w-4 h-4 animate-spin text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Generando reporte con IA — puede tardar 2-5 minutos. Puedes navegar otras etapas mientras esperas.
+          </div>
+          {batchAgeMin >= 10 && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              El proceso lleva más de {batchAgeMin} min. Si no termina pronto, intenta regenerar el reporte.
+            </div>
+          )}
         </div>
       )}
 

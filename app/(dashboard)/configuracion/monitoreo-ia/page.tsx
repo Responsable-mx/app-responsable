@@ -936,7 +936,8 @@ export default async function MonitoreoIaPage() {
                       <th className="pb-1.5 text-right">Llamadas</th>
                       <th className="pb-1.5 text-right">Costo</th>
                       <th className="pb-1.5 text-right">% costo</th>
-                      <th className="pb-1.5 text-right">Latencia</th>
+                      <th className="pb-1.5 text-right" title="Latencia total promedio (request → finalMessage)">Latencia</th>
+                      <th className="pb-1.5 text-right" title="Tiempo al primer token (usuario ve la primera letra)">TTFT</th>
                       <th className="pb-1.5 text-right">Errores</th>
                     </tr>
                   </thead>
@@ -957,13 +958,14 @@ export default async function MonitoreoIaPage() {
                           <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{usdFmt.format(r.cost_usd)}</td>
                           <td className="py-1.5 text-right text-slate-600 tabular-nums">{rPct}%</td>
                           <td className="py-1.5 text-right text-slate-600 tabular-nums">{(r.avg_latency_ms / 1000).toFixed(1)}s</td>
+                          <td className="py-1.5 text-right text-slate-500 tabular-nums">{r.avg_ttft_ms > 0 ? `${(r.avg_ttft_ms / 1000).toFixed(1)}s` : "—"}</td>
                           <td className={`py-1.5 text-right tabular-nums ${r.errors > 0 ? "text-rose-700" : "text-slate-400"}`}>{r.errors > 0 ? r.errors : "—"}</td>
                         </tr>
                       );
                     })}
                     {s.by_role.some(r => r.role === "embeddings") && (
                       <tr>
-                        <td colSpan={6} className="pt-3 pb-1 px-0">
+                        <td colSpan={7} className="pt-3 pb-1 px-0">
                           <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-t border-slate-100 pt-2">
                             Proceso automático — indexación de documentos (cron nocturno, no es un consultor)
                           </p>
@@ -978,6 +980,7 @@ export default async function MonitoreoIaPage() {
                           <td className="py-1.5 text-right text-slate-600 tabular-nums">{numFmt.format(r.calls)}</td>
                           <td className="py-1.5 text-right text-slate-600 font-medium tabular-nums">{usdFmt.format(r.cost_usd)}</td>
                           <td className="py-1.5 text-right text-slate-600 tabular-nums">{rPct}%</td>
+                          <td className="py-1.5 text-right text-slate-400 tabular-nums">—</td>
                           <td className="py-1.5 text-right text-slate-400 tabular-nums">—</td>
                           <td className="py-1.5 text-right text-slate-400 tabular-nums" title="Errores del cron — no afectan el chat de consultores">
                             {r.errors > 0 ? <span>{r.errors} <span className="text-[10px]">(cron)</span></span> : "—"}
@@ -1076,12 +1079,22 @@ export default async function MonitoreoIaPage() {
                 </table>
               )}
             </Panel>
-            <Panel title="Top clientes">
-              {s.top_clients.length === 0 ? <Empty /> : (
+            <Panel title="Costo IA por cliente (últimos 30 días)">
+              {(s.by_client ?? []).length === 0 ? <Empty text="Sin datos de clientes en el período." /> : (
                 <table className="w-full text-xs">
-                  <thead><tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold"><th className="pb-1.5 text-left">Cliente</th><th className="pb-1.5 text-right">Llamadas</th></tr></thead>
+                  <thead><tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                    <th className="pb-1.5 text-left">Cliente</th>
+                    <th className="pb-1.5 text-right">Llamadas</th>
+                    <th className="pb-1.5 text-right">Costo USD</th>
+                  </tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {s.top_clients.map(c => <tr key={c.client_id}><td className="py-1.5 text-slate-700">{c.client_name ?? <span className="text-slate-400 italic">Cliente eliminado</span>}</td><td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{c.calls}</td></tr>)}
+                    {(s.by_client ?? []).map(c => (
+                      <tr key={c.client_id}>
+                        <td className="py-1.5 text-slate-700">{c.client_name ?? <span className="text-slate-400 italic">Sin nombre</span>}</td>
+                        <td className="py-1.5 text-right text-slate-600 tabular-nums">{c.calls}</td>
+                        <td className="py-1.5 text-right text-slate-900 font-medium tabular-nums">{usdFmt.format(c.cost_usd)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               )}

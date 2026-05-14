@@ -270,6 +270,14 @@ export function ClientTabs({
     };
   }, [checkTabScroll]);
 
+  // Pre-calentar caché de Anthropic: dispara una llamada mínima al montar el tab
+  // para que el primer mensaje real del consultor sea cache_read (~10% del costo).
+  useEffect(() => {
+    if (!client.id) return;
+    fetch(`/api/clients/${client.id}/warm-context`, { method: "POST" }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id]);
+
   // SWR docs — misma URL que DocumentsTab → SWR deduplica; sin llamada extra cuando ese tab ya cargó
   const { data: docsData } = useSWR(
     `/api/clients/${client.id}/documents`,

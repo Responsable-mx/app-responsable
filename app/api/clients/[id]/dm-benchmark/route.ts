@@ -297,7 +297,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           outputTokens,
           cacheCreationTokens,
           cacheReadTokens,
-          latencyMs: 0, // batch — latencia no aplica
+          latencyMs: Date.now() - new Date(latestResult.created_at as string).getTime(),
           error: batchError,
         });
 

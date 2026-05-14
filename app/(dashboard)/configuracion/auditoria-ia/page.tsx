@@ -809,73 +809,145 @@ export default async function AuditoriaIaPage() {
       )}
 
       {/* ── Costo por etapa del flujo ──────────────────────────────────────── */}
-      {usage && usage.by_stage.length > 0 && (
-        <div className="mb-8">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-            Costo y velocidad por etapa — últimos 30 días
-          </p>
-          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-            Cuánto costó y cuánto tardó cada etapa del flujo de trabajo. Útil para detectar qué partes del proceso consumen más presupuesto.
-          </p>
-          <div className="bg-white border border-slate-200 rounded overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="min-w-full w-max text-xs">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
-                  <th className="px-4 py-2.5 text-left">Etapa</th>
-                  <th className="px-4 py-2.5 text-right">Llamadas</th>
-                  <th className="px-4 py-2.5 text-right">Costo total</th>
-                  <th className="px-4 py-2.5 text-right">Velocidad promedio</th>
-                  <th className="px-4 py-2.5 text-right">Fallas</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {usage.by_stage.map((s) => {
-                  const errRate = s.calls > 0 ? s.errors / s.calls : 0;
-                  const stageLabel: Record<string, string> = {
-                    chat:                      "Chat con los 4 roles",
-                    dm_referentes:             "DM — Referentes ESG",
-                    dm_benchmark_empresas:     "DM — Propuesta de empresas",
-                    dm_benchmark:              "DM — Comparativa benchmark",
-                    dm_benchmark_company_iros: "DM — IROs por empresa",
-                    dm_iros:                   "DM — IROs del cliente",
-                    dm_resumen:                "DM — Resumen ejecutivo",
-                    dm_report:                 "DM — Reporte PDF",
-                    ai_fill:                   "Cuestionario — AI-fill",
-                    doc_fill:                  "Cuestionario — Doc-fill",
-                    research_reports:          "Búsqueda de informes",
-                    extract_profile:           "Extracción de perfil",
-                    embeddings:                "Indexación de documentos",
-                  };
-                  return (
-                    <tr key={s.stage} className="hover:bg-slate-50">
-                      <td className="px-4 py-2.5 font-semibold text-slate-800">
-                        {stageLabel[s.stage] ?? s.stage}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
-                        {numFmt.format(s.calls)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
-                        {usdFmt.format(s.cost_usd)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">
-                        {s.avg_latency_ms > 0 ? latenciaLabel(s.avg_latency_ms) : "—"}
-                      </td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${errRate > 0.05 ? "text-rose-600" : "text-slate-400"}`}>
-                        {s.errors > 0 ? `${s.errors} (${Math.round(errRate * 100)}%)` : "Ninguna"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
+      {usage && usage.by_stage.length > 0 && (() => {
+        const stageLabel: Record<string, string> = {
+          chat:                      "Chat con los 4 roles",
+          dm_referentes:             "DM — Referentes ESG",
+          dm_benchmark_empresas:     "DM — Propuesta de empresas",
+          dm_benchmark:              "DM — Comparativa benchmark",
+          dm_benchmark_company_iros: "DM — IROs por empresa",
+          dm_iros:                   "DM — IROs del cliente",
+          dm_resumen:                "DM — Resumen ejecutivo",
+          dm_report:                 "DM — Reporte PDF",
+          ai_fill:                   "Cuestionario — AI-fill",
+          doc_fill:                  "Cuestionario — Doc-fill",
+          research_reports:          "Búsqueda de informes",
+          extract_profile:           "Extracción de perfil",
+          embeddings:                "Indexación de documentos",
+          rerank:                    "Reranking semántico",
+        };
+
+        const DM_STAGES = new Set([
+          "dm_referentes","dm_benchmark_empresas","dm_benchmark",
+          "dm_benchmark_company_iros","dm_iros","dm_resumen","dm_report",
+        ]);
+
+        const dmStages    = usage.by_stage.filter(s => DM_STAGES.has(s.stage));
+        const otherStages = usage.by_stage.filter(s => !DM_STAGES.has(s.stage));
+        const dmCost      = dmStages.reduce((a, s) => a + s.cost_usd, 0);
+        const dmCalls     = dmStages.reduce((a, s) => a + s.calls, 0);
+        const totalCost   = usage.by_stage.reduce((a, s) => a + s.cost_usd, 0);
+        const dmPct       = totalCost > 0 ? Math.round((dmCost / totalCost) * 100) : 0;
+
+        const StageRow = ({ s }: { s: typeof usage.by_stage[0] }) => {
+          const errRate = s.calls > 0 ? s.errors / s.calls : 0;
+          return (
+            <tr className="hover:bg-slate-50">
+              <td className="px-4 py-2.5 font-medium text-slate-800">
+                {stageLabel[s.stage] ?? s.stage}
+              </td>
+              <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                {numFmt.format(s.calls)}
+              </td>
+              <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                {usdFmt.format(s.cost_usd)}
+              </td>
+              <td className="px-4 py-2.5 text-right text-slate-600">
+                {s.avg_latency_ms > 0 ? latenciaLabel(s.avg_latency_ms) : "—"}
+              </td>
+              <td className={`px-4 py-2.5 text-right font-medium ${errRate > 0.05 ? "text-rose-600" : "text-slate-400"}`}>
+                {s.errors > 0 ? `${s.errors} (${Math.round(errRate * 100)}%)` : "Ninguna"}
+              </td>
+            </tr>
+          );
+        };
+
+        const tableHead = (
+          <thead>
+            <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
+              <th className="px-4 py-2.5 text-left">Etapa</th>
+              <th className="px-4 py-2.5 text-right">Llamadas</th>
+              <th className="px-4 py-2.5 text-right">Costo total</th>
+              <th className="px-4 py-2.5 text-right">Velocidad promedio</th>
+              <th className="px-4 py-2.5 text-right">Fallas</th>
+            </tr>
+          </thead>
+        );
+
+        return (
+          <div className="mb-8">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+              Costo y velocidad por etapa — últimos 30 días
+            </p>
+            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+              Qué parte del flujo consume más presupuesto. Útil para priorizar dónde optimizar.
+            </p>
+
+            {/* ── Grupo DM-IA ── */}
+            {dmStages.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">
+                    Doble Materialidad IA
+                  </p>
+                  <span className="text-[10px] text-slate-400 tabular-nums">
+                    {numFmt.format(dmCalls)} llamadas · {usdFmt.format(dmCost)} · {dmPct}% del costo total
+                  </span>
+                </div>
+                <div className="bg-white border border-slate-200 rounded overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full w-max text-xs">
+                      {tableHead}
+                      <tbody className="divide-y divide-slate-50">
+                        {dmStages.map(s => <StageRow key={s.stage} s={s} />)}
+                      </tbody>
+                      {dmStages.length > 1 && (
+                        <tfoot>
+                          <tr className="bg-slate-50 border-t border-slate-200 font-semibold text-slate-700">
+                            <td className="px-4 py-2 text-[10px] uppercase tracking-widest text-slate-500">
+                              Total DM-IA
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums">
+                              {numFmt.format(dmCalls)}
+                            </td>
+                            <td className="px-4 py-2 text-right tabular-nums text-brand-primary">
+                              {usdFmt.format(dmCost)}
+                            </td>
+                            <td colSpan={2} />
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Grupo Chat y otros ── */}
+            {otherStages.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  Chat y otras funciones
+                </p>
+                <div className="bg-white border border-slate-200 rounded overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full w-max text-xs">
+                      {tableHead}
+                      <tbody className="divide-y divide-slate-50">
+                        {otherStages.map(s => <StageRow key={s.stage} s={s} />)}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-400 mt-2">
+              Solo se muestran etapas con actividad en los últimos 30 días.
+            </p>
           </div>
-          <p className="text-[10px] text-slate-400 mt-2">
-            Solo se muestran etapas con actividad en los últimos 30 días. Las etapas nuevas aparecerán aquí una vez que el sistema registre sus primeras llamadas.
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Qué IA se usa en cada tarea ─────────────────────────────────────── */}
       <div>

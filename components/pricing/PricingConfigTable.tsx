@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
+import type { AiCostByStage } from "@/app/api/clients/[id]/ai-costs/route";
 
 // Tipos que espeja la forma JSON de lib/pricing/stats.ts
 type ProjectDetail = {
@@ -99,6 +100,28 @@ export function PricingConfigTable({
     if (dmStats && dmStats.count > 0) initial.add("doble_materialidad_ia");
     return initial;
   });
+
+  // Desglose IA por etapa (solo DM-IA, por cliente)
+  const [aiCache, setAiCache] = useState<Map<string, AiCostByStage[] | "loading" | "error">>(new Map());
+  const [aiExpanded, setAiExpanded] = useState<Set<string>>(new Set());
+
+  async function toggleAiCosts(clientId: string) {
+    setAiExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(clientId)) { next.delete(clientId); return next; }
+      next.add(clientId);
+      return next;
+    });
+    if (aiCache.has(clientId)) return;
+    setAiCache((prev) => new Map(prev).set(clientId, "loading"));
+    try {
+      const res = await fetch(`/api/clients/${clientId}/ai-costs?days=90`);
+      const j = (await res.json()) as { data: AiCostByStage[] };
+      setAiCache((prev) => new Map(prev).set(clientId, j.data ?? []));
+    } catch {
+      setAiCache((prev) => new Map(prev).set(clientId, "error"));
+    }
+  }
 
   function toggleExpand(key: string) {
     setExpandedKeys((prev) => {
@@ -358,117 +381,214 @@ export function PricingConfigTable({
                 )}
 
                 {/* ── Detalle proyectos (expandible) ───────────── */}
-                {isExpanded && svc && svc.projects.length > 0 && (
-                  <tr>
-                    <td
-                      colSpan={COLS}
-                      className="px-4 pb-4 pt-0 bg-slate-50 border-t border-slate-100"
-                    >
-                      <div className="mt-2 ml-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-                          Proyectos — {row.label}
-                        </p>
-                        <div className="border border-slate-200 rounded overflow-hidden">
-                          <table className="min-w-full text-xs">
-                            <thead>
-                              <tr className="bg-white text-[9px] uppercase tracking-widest font-bold text-slate-400 border-b border-slate-100">
-                                <th className="px-3 py-1.5 text-left">Cliente</th>
-                                <th className="px-3 py-1.5 text-left">Tipo</th>
-                                <th className="px-3 py-1.5 text-right">Costo real</th>
-                                <th className="px-3 py-1.5 text-right">Precio venta</th>
-                                <th className="px-3 py-1.5 text-right">Margen</th>
-                                <th className="px-3 py-1.5 text-left min-w-[160px]">Notas</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                              {svc.projects.map((p) => {
-                                const mg = marginPct(p.actual_cost, p.sale_price);
-                                return (
-                                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-3 py-2 font-medium text-slate-700 whitespace-nowrap">
-                                      {p.client_name}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      {p.is_pilot ? (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-sm">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                                          Piloto
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
-                                          Real
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-800">
-                                      {fmtUSD(p.actual_cost) ?? (
-                                        <span className="text-slate-300">—</span>
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 text-right tabular-nums text-slate-600">
-                                      {fmtUSD(p.sale_price) ?? (
-                                        <span className="text-slate-300">—</span>
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 text-right">
-                                      {mg ? (
-                                        <span
-                                          className={`font-bold ${
-                                            parseFloat(mg) >= 0
-                                              ? "text-emerald-600"
-                                              : "text-rose-600"
-                                          }`}
-                                        >
-                                          {mg}
-                                        </span>
-                                      ) : (
-                                        <span className="text-slate-300">—</span>
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-500 max-w-[200px]">
-                                      {p.cost_notes ? (
-                                        <span className="line-clamp-2 leading-relaxed">
-                                          {p.cost_notes}
-                                        </span>
-                                      ) : (
-                                        <span className="text-slate-300">—</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                            {svc.avg_actual_cost != null && (
-                              <tfoot>
-                                <tr className="bg-slate-100 border-t border-slate-200">
-                                  <td className="px-3 py-1.5">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                      Promedio{" "}
-                                      <span className="text-slate-400 normal-case font-normal">
-                                        ({svc.count}{" "}
-                                        {svc.count === 1 ? "proyecto" : "proyectos"})
-                                      </span>
-                                      {svc.only_pilots && (
-                                        <span className="ml-1 text-amber-600">
-                                          · solo pilotos
-                                        </span>
-                                      )}
-                                    </span>
-                                  </td>
-                                  <td />
-                                  <td className="px-3 py-1.5 text-right tabular-nums font-bold text-slate-800">
-                                    {fmtUSD(svc.avg_actual_cost)}
-                                  </td>
-                                  <td colSpan={3} />
+                {isExpanded && svc && svc.projects.length > 0 && (() => {
+                  const isDmIa = row.service_key === "doble_materialidad_ia";
+                  const DM_STAGE_LABELS: Record<string, string> = {
+                    dm_referentes:             "Referentes ESG",
+                    dm_benchmark_empresas:     "Propuesta de empresas",
+                    dm_benchmark:              "Comparativa benchmark",
+                    dm_benchmark_company_iros: "IROs por empresa",
+                    dm_iros:                   "IROs del cliente",
+                    dm_resumen:                "Resumen ejecutivo",
+                    dm_report:                 "Reporte PDF",
+                    chat:                      "Chat con roles IA",
+                  };
+                  return (
+                    <tr>
+                      <td
+                        colSpan={COLS}
+                        className="px-4 pb-4 pt-0 bg-slate-50 border-t border-slate-100"
+                      >
+                        <div className="mt-2 ml-2">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                            Proyectos — {row.label}
+                          </p>
+                          <div className="border border-slate-200 rounded overflow-hidden">
+                            <table className="min-w-full text-xs">
+                              <thead>
+                                <tr className="bg-white text-[9px] uppercase tracking-widest font-bold text-slate-400 border-b border-slate-100">
+                                  <th className="px-3 py-1.5 text-left">Cliente</th>
+                                  <th className="px-3 py-1.5 text-left">Tipo</th>
+                                  <th className="px-3 py-1.5 text-right">Costo real</th>
+                                  <th className="px-3 py-1.5 text-right">Precio venta</th>
+                                  <th className="px-3 py-1.5 text-right">Margen</th>
+                                  <th className="px-3 py-1.5 text-left min-w-[160px]">Notas</th>
+                                  {isDmIa && <th className="px-3 py-1.5 text-center">Etapas IA</th>}
                                 </tr>
-                              </tfoot>
-                            )}
-                          </table>
+                              </thead>
+                              <tbody className="divide-y divide-slate-50">
+                                {svc.projects.map((p) => {
+                                  const mg = marginPct(p.actual_cost, p.sale_price);
+                                  const isAiOpen = aiExpanded.has(p.client_id);
+                                  const aiData = aiCache.get(p.client_id);
+                                  return (
+                                    <>
+                                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-3 py-2 font-medium text-slate-700 whitespace-nowrap">
+                                          {p.client_name}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          {p.is_pilot ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-sm">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                                              Piloto
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
+                                              Real
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-800">
+                                          {fmtUSD(p.actual_cost) ?? (
+                                            <span className="text-slate-300">—</span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                                          {fmtUSD(p.sale_price) ?? (
+                                            <span className="text-slate-300">—</span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                          {mg ? (
+                                            <span className={`font-bold ${parseFloat(mg) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                                              {mg}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-300">—</span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2 text-slate-500 max-w-[200px]">
+                                          {p.cost_notes ? (
+                                            <span className="line-clamp-2 leading-relaxed">{p.cost_notes}</span>
+                                          ) : (
+                                            <span className="text-slate-300">—</span>
+                                          )}
+                                        </td>
+                                        {isDmIa && (
+                                          <td className="px-3 py-2 text-center">
+                                            <button
+                                              onClick={() => toggleAiCosts(p.client_id)}
+                                              className="text-[10px] font-semibold text-brand-primary hover:text-brand-primary-dark transition-colors"
+                                            >
+                                              {isAiOpen ? "▲ ocultar" : "▼ ver etapas"}
+                                            </button>
+                                          </td>
+                                        )}
+                                      </tr>
+                                      {/* Expansión etapas IA */}
+                                      {isDmIa && isAiOpen && (
+                                        <tr key={`${p.id}-ai`}>
+                                          <td colSpan={7} className="px-4 py-3 bg-slate-100 border-t border-slate-200">
+                                            {aiData === "loading" && (
+                                              <p className="text-xs text-slate-400 italic">Cargando desglose IA…</p>
+                                            )}
+                                            {aiData === "error" && (
+                                              <p className="text-xs text-rose-500">Error al cargar datos de IA.</p>
+                                            )}
+                                            {Array.isArray(aiData) && aiData.length === 0 && (
+                                              <p className="text-xs text-slate-400 italic">
+                                                Sin llamadas etiquetadas aún — los datos aparecerán conforme se use DM-IA (últimos 90 días).
+                                              </p>
+                                            )}
+                                            {Array.isArray(aiData) && aiData.length > 0 && (() => {
+                                              const dmStages = aiData.filter(s => s.stage.startsWith("dm_"));
+                                              const otherStages = aiData.filter(s => !s.stage.startsWith("dm_"));
+                                              const dmTotal = dmStages.reduce((a, s) => a + s.cost_usd, 0);
+                                              return (
+                                                <div className="space-y-2">
+                                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+                                                    Costo por etapa — últimos 90 días · {p.client_name}
+                                                  </p>
+                                                  <table className="min-w-full text-[11px] bg-white border border-slate-200 rounded overflow-hidden">
+                                                    <thead>
+                                                      <tr className="text-[9px] uppercase tracking-widest font-bold text-slate-400 border-b border-slate-100">
+                                                        <th className="px-3 py-1.5 text-left">Etapa</th>
+                                                        <th className="px-3 py-1.5 text-right">Llamadas</th>
+                                                        <th className="px-3 py-1.5 text-right">Costo</th>
+                                                        <th className="px-3 py-1.5 text-right">% total DM</th>
+                                                        <th className="px-3 py-1.5 text-right">Latencia</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-50">
+                                                      {[...dmStages, ...otherStages].map((s) => (
+                                                        <tr key={s.stage} className={s.stage.startsWith("dm_") ? "" : "bg-slate-50"}>
+                                                          <td className="px-3 py-1.5 text-slate-700">
+                                                            {DM_STAGE_LABELS[s.stage] ?? s.stage}
+                                                            {!s.stage.startsWith("dm_") && (
+                                                              <span className="ml-1 text-slate-400 text-[9px]">(chat/otro)</span>
+                                                            )}
+                                                          </td>
+                                                          <td className="px-3 py-1.5 text-right tabular-nums text-slate-600">{s.calls}</td>
+                                                          <td className="px-3 py-1.5 text-right tabular-nums font-medium text-slate-800">
+                                                            {fmtUSD(s.cost_usd)}
+                                                          </td>
+                                                          <td className="px-3 py-1.5 text-right tabular-nums text-slate-500">
+                                                            {dmTotal > 0 && s.stage.startsWith("dm_")
+                                                              ? `${Math.round((s.cost_usd / dmTotal) * 100)}%`
+                                                              : "—"}
+                                                          </td>
+                                                          <td className="px-3 py-1.5 text-right text-slate-400">
+                                                            {s.avg_latency_ms > 0 ? `${(s.avg_latency_ms / 1000).toFixed(1)} s` : "—"}
+                                                          </td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                    {dmStages.length > 1 && (
+                                                      <tfoot>
+                                                        <tr className="bg-slate-100 border-t border-slate-200 font-semibold">
+                                                          <td className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-500">Total DM-IA</td>
+                                                          <td className="px-3 py-1.5 text-right tabular-nums text-slate-600">
+                                                            {dmStages.reduce((a, s) => a + s.calls, 0)}
+                                                          </td>
+                                                          <td className="px-3 py-1.5 text-right tabular-nums text-slate-800">
+                                                            {fmtUSD(dmTotal)}
+                                                          </td>
+                                                          <td colSpan={2} />
+                                                        </tr>
+                                                      </tfoot>
+                                                    )}
+                                                  </table>
+                                                </div>
+                                              );
+                                            })()}
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </>
+                                  );
+                                })}
+                              </tbody>
+                              {svc.avg_actual_cost != null && (
+                                <tfoot>
+                                  <tr className="bg-slate-100 border-t border-slate-200">
+                                    <td className="px-3 py-1.5">
+                                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                        Promedio{" "}
+                                        <span className="text-slate-400 normal-case font-normal">
+                                          ({svc.count}{" "}
+                                          {svc.count === 1 ? "proyecto" : "proyectos"})
+                                        </span>
+                                        {svc.only_pilots && (
+                                          <span className="ml-1 text-amber-600">· solo pilotos</span>
+                                        )}
+                                      </span>
+                                    </td>
+                                    <td />
+                                    <td className="px-3 py-1.5 text-right tabular-nums font-bold text-slate-800">
+                                      {fmtUSD(svc.avg_actual_cost)}
+                                    </td>
+                                    <td colSpan={isDmIa ? 4 : 3} />
+                                  </tr>
+                                </tfoot>
+                              )}
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
+                      </td>
+                    </tr>
+                  );
+                })()}
               </tbody>
             );
           })}

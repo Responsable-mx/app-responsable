@@ -14,11 +14,12 @@ export type AiCostByStage = {
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
+  const { id } = await params;
   const url = new URL(req.url);
   const days = Math.min(365, Math.max(1, parseInt(url.searchParams.get("days") ?? "90")));
   const since = new Date(Date.now() - days * 86400000).toISOString();
@@ -29,7 +30,7 @@ export async function GET(
     .select(
       "workflow_stage,model,input_tokens,output_tokens,cache_read_tokens,cache_creation_tokens,latency_ms,error"
     )
-    .eq("client_id", params.id)
+    .eq("client_id", id)
     .gte("created_at", since)
     .not("workflow_stage", "is", null)
     .limit(10000);

@@ -109,6 +109,7 @@ export function BenchmarkIrosSection({
     return validatedCompanies[0]?.id ?? "";
   });
   const [showCallout, setShowCallout] = useState(true);
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   // Write empresa param to URL when active company changes
   useEffect(() => {
@@ -364,74 +365,109 @@ export function BenchmarkIrosSection({
         </div>
       )}
 
-      {/* ── Company tabs ── */}
-      <div className="flex gap-1 flex-wrap pb-1 border-b border-slate-100">
-        {validatedCompanies.map((company) => {
-          const group = groups.find((g) => g.company_id === company.id);
-          const batch = group?.batch ?? null;
-          const hasIros = (group?.iros ?? []).length > 0;
-          const isPending = batch?.status === "pending";
-          const isFailed = batch?.status === "failed";
-          const isDone = batch?.status === "done" && hasIros;
-          const isActive = activeCompanyId === company.id;
-          const MAX_TAB = 22;
-          const tabLabel = company.name.length > MAX_TAB
-            ? company.name.slice(0, MAX_TAB) + "…"
-            : company.name;
+      {/* ── Company tabs + acciones en la misma fila ── */}
+      {(() => {
+        const activeGroupLocal = groups.find((g) => g.company_id === activeCompanyId) ?? null;
+        const activeHasIros = (activeGroupLocal?.iros ?? []).length > 0;
+        const activeIsPending = activeGroupLocal?.batch?.status === "pending";
+        const activeIsGenerating = generating.has(activeCompanyId);
+        const showRegenBtn = !isFirstUse || activeHasIros;
+        const regenLabel = activeHasIros ? "↺ Regenerar" : "Generar IROs con IA";
+        const regenVariant: "primary" | "secondary" = activeHasIros ? "secondary" : "primary";
+        const hasAnyIros = groups.some((g) => g.iros.length > 0);
 
-          return (
-            <button
-              key={company.id}
-              type="button"
-              title={company.name.length > MAX_TAB ? company.name : undefined}
-              onClick={() => setActiveCompanyId(company.id)}
-              className={[
-                "px-3 py-1.5 text-xs font-medium rounded-sm border transition-colors",
-                isActive
-                  ? "bg-white border-brand-primary text-brand-primary"
-                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300",
-              ].join(" ")}
-            >
-              {tabLabel}
-              {hasIros && (
-                <span className="ml-1.5 tabular-nums text-[10px] opacity-60">
-                  [{group!.iros.length}]
-                </span>
-              )}
-              {/* ✓ done indicator */}
-              {isDone && !isActive && (
-                <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" aria-label="revisado" />
-              )}
-              {isPending && (
-                <span
-                  className="ml-1.5 inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"
-                  aria-label="generando"
-                />
-              )}
-              {isFailed && (
-                <span className="ml-1.5 text-rose-500" aria-label="falló">!</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+        return (
+          <>
+            <div className="flex gap-1 flex-wrap items-center pb-1 border-b border-slate-100">
+              {validatedCompanies.map((company) => {
+                const group = groups.find((g) => g.company_id === company.id);
+                const batch = group?.batch ?? null;
+                const hasIros = (group?.iros ?? []).length > 0;
+                const isPending = batch?.status === "pending";
+                const isFailed = batch?.status === "failed";
+                const isDone = batch?.status === "done" && hasIros;
+                const isActive = activeCompanyId === company.id;
+                const MAX_TAB = 22;
+                const tabLabel = company.name.length > MAX_TAB
+                  ? company.name.slice(0, MAX_TAB) + "…"
+                  : company.name;
 
-      {/* ── Download button ── */}
-      {groups.some((g) => g.iros.length > 0) && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => downloadCsv(groups)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-sm hover:bg-white hover:border-slate-300"
-            title="Descargar IROs de todas las empresas en Excel"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Exportar Excel
-          </button>
-        </div>
-      )}
+                return (
+                  <button
+                    key={company.id}
+                    type="button"
+                    title={company.name.length > MAX_TAB ? company.name : undefined}
+                    onClick={() => setActiveCompanyId(company.id)}
+                    className={[
+                      "px-3 py-1.5 text-xs font-medium rounded-sm border transition-colors",
+                      isActive
+                        ? "bg-white border-brand-primary text-brand-primary"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300",
+                    ].join(" ")}
+                  >
+                    {tabLabel}
+                    {hasIros && (
+                      <span className="ml-1.5 tabular-nums text-[10px] opacity-60">
+                        [{group!.iros.length}]
+                      </span>
+                    )}
+                    {isDone && !isActive && (
+                      <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" aria-label="revisado" />
+                    )}
+                    {isPending && (
+                      <span
+                        className="ml-1.5 inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"
+                        aria-label="generando"
+                      />
+                    )}
+                    {isFailed && (
+                      <span className="ml-1.5 text-rose-500" aria-label="falló">!</span>
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* Acciones alineadas al final de la fila */}
+              <div className="ml-auto flex items-center gap-2 shrink-0 pl-2">
+                {hasAnyIros && (
+                  <button
+                    type="button"
+                    onClick={() => downloadCsv(groups)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-sm hover:bg-white hover:border-slate-300"
+                    title="Descargar IROs de todas las empresas en Excel"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Exportar
+                  </button>
+                )}
+                {showRegenBtn && (
+                  <Button
+                    variant={regenVariant}
+                    size="sm"
+                    loading={activeIsGenerating || activeIsPending}
+                    onClick={() => activeHasIros ? setShowRegenConfirm(true) : void generateIros(activeCompanyId)}
+                  >
+                    {regenLabel}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* ConfirmModal para Regenerar — en el padre para acceso a generateIros */}
+            <ConfirmModal
+              open={showRegenConfirm}
+              onCancel={() => setShowRegenConfirm(false)}
+              onConfirm={() => { setShowRegenConfirm(false); void generateIros(activeCompanyId); }}
+              title="Regenerar IROs"
+              description={`¿Regenerar los IROs de ${activeCompany?.name ?? "esta empresa"}? Los actuales serán reemplazados y no se pueden recuperar.`}
+              confirmLabel="Regenerar"
+              tone="destructive"
+            />
+          </>
+        );
+      })()}
 
       {/* ── Active company panel ── */}
       {activeCompany && (
@@ -439,8 +475,6 @@ export function BenchmarkIrosSection({
           company={activeCompany}
           group={activeGroup}
           isGenerating={generating.has(activeCompanyId)}
-          onGenerate={() => void generateIros(activeCompanyId)}
-          hideGenerateBtn={isFirstUse}
         />
       )}
     </div>
@@ -464,23 +498,15 @@ function CompanyIroPanel({
   company,
   group,
   isGenerating,
-  onGenerate,
-  hideGenerateBtn = false,
 }: {
   company: BenchmarkCompany;
   group: IroGroup | null;
   isGenerating: boolean;
-  onGenerate: () => void;
-  hideGenerateBtn?: boolean;
 }) {
   const batch = group?.batch ?? null;
   const iros = useMemo(() => group?.iros ?? [], [group]);
   const isPending = batch?.status === "pending";
   const isFailed = batch?.status === "failed" && !isPending;
-  const hasDone = iros.length > 0;
-
-  // ConfirmModal state para Regenerar
-  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   // Filtros sobre la lista de IROs
   const [filterTipo, setFilterTipo] = useState<BenchmarkIroTipo | "">("");
@@ -504,17 +530,6 @@ function CompanyIroPanel({
       return true;
     });
   }, [iros, filterTipo, filterHorizonte]);
-
-  const btnLabel = hasDone ? "↺ Regenerar" : "Generar IROs con IA";
-  const btnVariant: "primary" | "secondary" | "ghost" = hasDone ? "secondary" : "primary";
-
-  const handleRegenerarClick = () => {
-    if (hasDone) {
-      setShowRegenConfirm(true);
-    } else {
-      onGenerate();
-    }
-  };
 
   // Chips presentes en los IROs actuales (para mostrar solo filtros relevantes)
   const availableTipos = useMemo(
@@ -555,29 +570,6 @@ function CompanyIroPanel({
             </a>
           )}
         </div>
-        {(!hideGenerateBtn || hasDone) && (
-          <>
-            <Button
-              variant={btnVariant}
-              size="sm"
-              loading={isGenerating || isPending}
-              onClick={handleRegenerarClick}
-              title={hasDone ? `Regenerar IROs de ${company.name}` : undefined}
-            >
-              {btnLabel}
-            </Button>
-            {/* ConfirmModal — se muestra solo al regenerar empresa con IROs existentes */}
-            <ConfirmModal
-              open={showRegenConfirm}
-              onCancel={() => setShowRegenConfirm(false)}
-              onConfirm={() => { setShowRegenConfirm(false); onGenerate(); }}
-              title="Regenerar IROs"
-              description={`¿Regenerar los IROs de ${company.name}? Los actuales serán reemplazados y no se pueden recuperar.`}
-              confirmLabel="Regenerar"
-              tone="destructive"
-            />
-          </>
-        )}
       </div>
 
       {/* Status banners */}
@@ -735,9 +727,7 @@ function CompanyIroPanel({
 
       {!isPending && !isFailed && iros.length === 0 && (
         <div className="py-8 text-center text-sm text-slate-400 border border-dashed border-slate-200 rounded">
-          {hideGenerateBtn
-            ? "Sin IROs generados. Usa el botón superior para analizar todas las empresas."
-            : "Sin IROs generados. Haz clic en \"Generar IROs con IA\" para analizar esta empresa."}
+          Sin IROs generados. Usa el botón &ldquo;Generar IROs con IA&rdquo; para analizar esta empresa.
         </div>
       )}
     </div>

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const PatchBody = z.object({
   id:           z.string().uuid(),
-  estado:       z.enum(["no_identificado", "parcial", "disponible"]).optional(),
+  estado:       z.enum(["no_identificado", "parcial", "disponible", "no_aplica"]).optional(),
   calidad_dato: z.enum(["baja", "media", "alta"]).optional(),
   accion:       z.string().max(400).nullable().optional(),
 });

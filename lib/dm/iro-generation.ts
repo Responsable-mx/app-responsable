@@ -39,7 +39,7 @@ const IroItemSchema = z.object({
   descripcion:      z.string().min(20).max(600),
   tipo:             z.enum(["impacto_positivo","impacto_negativo","riesgo","oportunidad"]),
   estado:           z.enum(["actual","potencial","emergente","en_observacion"]),
-  cadena:           z.enum(["upstream","ops_propia","downstream"]),
+  cadena:           z.enum(["upstream","ops_propia","operacion","downstream","sociedad_comunidad","clientes_consumidores","medio_ambiente"]),
   horizonte:        z.enum(["corto","mediano","largo"]),
   evidencia:        z.string().max(200).optional(),
   confianza:        z.enum(["alto","medio","bajo"]),

@@ -146,8 +146,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const admin = createAdminClient();
 
-  // Obtener contexto cuestionario + señales benchmark + horizontes + IROs de empresas de referencia
-  const [questionnaireContext, benchmarkRes, horizonsRes, validatedCompaniesRes] = await Promise.all([
+  // Obtener contexto cuestionario + señales benchmark + horizontes + IROs de empresas de referencia + marcos Etapa 2
+  const [questionnaireContext, benchmarkRes, horizonsRes, validatedCompaniesRes, referentesRes] = await Promise.all([
     getFullQuestionnaireContext(id),
     admin
       .from("dm_benchmark_results")
@@ -166,7 +166,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .select("id, name")
       .eq("client_id", id)
       .eq("validated", true),
+    admin
+      .from("dm_referentes")
+      .select("enabled_frameworks")
+      .eq("client_id", id)
+      .maybeSingle(),
   ]);
+
+  const enabledFrameworks = (referentesRes.data?.enabled_frameworks as string[] | null) ?? [];
+  const frameworksPrefix = enabledFrameworks.length > 0
+    ? `MARCOS NORMATIVOS ESG APLICABLES (validados en Etapa 2): ${enabledFrameworks.join(", ")}\n\n`
+    : "";
 
   const latestBenchmark = benchmarkRes.data?.[0] ?? null;
   const benchmarkNarrative = latestBenchmark?.narrative ?? "";
@@ -209,7 +219,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     clientName: client.name,
     sector: client.sector ?? null,
     country: (client.countries as string[] | null)?.[0] ?? null,
-    questionnaireContext,
+    questionnaireContext: frameworksPrefix + questionnaireContext,
     benchmarkNarrative,
     benchmarkCompanies,
     benchmarkCompanyIros,

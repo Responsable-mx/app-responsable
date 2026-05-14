@@ -296,8 +296,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
   }
 
-  // Contexto IA: IROs validados + brechas NIS + marcos normativos Etapa 2
-  const [irosRes, nisRes, referentesRes] = await Promise.all([
+  // Contexto IA: IROs validados + brechas NIS + marcos normativos Etapa 2 + decisiones validación Etapa 10
+  const [irosRes, nisRes, referentesRes, validacionRes] = await Promise.all([
     admin
       .from("client_iro_inventory")
       .select("n_iro, tema_esg, descripcion, tipo, cadena, horizonte, score_impacto, score_financiero, confianza")
@@ -314,17 +314,37 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .select("enabled_frameworks")
       .eq("client_id", id)
       .maybeSingle(),
+    admin
+      .from("dm_validaciones")
+      .select("iro_decisions, notas, fecha_junta")
+      .eq("client_id", id)
+      .maybeSingle(),
   ]);
 
   const clientIros = (irosRes.data ?? []) as ClientIroRow[];
   const clientNis  = (nisRes.data ?? []) as ClientNisRow[];
   const enabledFrameworks = (referentesRes.data?.enabled_frameworks as string[] | null) ?? [];
+  const validacion = validacionRes.data;
 
-  // Incluir marcos normativos de Etapa 2 como trazabilidad normativa del reporte
+  // Decisiones de la junta de validación (Etapa 10) como contexto de compromisos del cliente
+  const validacionSection = validacion
+    ? (() => {
+        const decisions = validacion.iro_decisions as Record<string, { decision?: string; justificacion?: string }> | null;
+        if (!decisions || Object.keys(decisions).length === 0) return "";
+        const lines = Object.entries(decisions)
+          .map(([iroId, d]) => `  IRO ${iroId}: ${d.decision ?? "sin decisión"}${d.justificacion ? ` — ${d.justificacion}` : ""}`)
+          .join("\n");
+        const notasLine = validacion.notas ? `\nNotas de junta: ${validacion.notas}` : "";
+        return `\n\nDECISIONES DE VALIDACIÓN CON CLIENTE (Etapa 10 — ${validacion.fecha_junta ?? "fecha pendiente"}):\n${lines}${notasLine}`;
+      })()
+    : "";
+
+  // Incluir marcos normativos de Etapa 2 + compromisos validación como trazabilidad del reporte
   const clientContext = buildClientContext(client) +
     (enabledFrameworks.length > 0
       ? `\n\nMarcos normativos ESG aplicables: ${enabledFrameworks.join(", ")}`
-      : "");
+      : "") +
+    validacionSection;
   const prompt = await buildReportPrompt(
     client,
     clientContext,

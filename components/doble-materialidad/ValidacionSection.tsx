@@ -368,7 +368,7 @@ export function ValidacionSection({ clientId, iros }: Props) {
                             {cuadrante}
                           </span>
                           <p className="text-[10px] text-slate-400 mt-0.5 tabular-nums">
-                            I:{scoreImpacto}/3 · F:{scoreFinanciero}/3
+                            I:{scoreImpacto}/5 · F:{scoreFinanciero}/5
                           </p>
                         </td>
                         <td className="px-3 py-2">

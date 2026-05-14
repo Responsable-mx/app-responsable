@@ -191,7 +191,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   // Brechas NIS relevantes para el resumen (excluye "no_aplica" y "disponible" con calidad alta)
   const nisBrechas = (nisRaw.data ?? [])
-    .filter((n) => n.estado !== "no_aplica" && !(n.estado === "disponible" && n.calidad_dato === "alto"))
+    .filter((n) => n.estado !== "no_aplica" && !(n.estado === "disponible" && n.calidad_dato === "alta"))
     .map((n) => `- ${n.ibso_label} [${n.categoria}]: ${n.estado}, calidad ${n.calidad_dato}${n.accion ? ` → ${n.accion}` : ""}`)
     .join("\n");
   const nisBrechasSection = nisBrechas

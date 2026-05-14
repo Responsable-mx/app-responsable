@@ -200,7 +200,7 @@ export default async function MonitoreoIaPage() {
     ? s.total_cache_read_tokens / (s.total_input_tokens + s.total_cache_read_tokens) : 0;
   const voyageActive    = voyageCalls > 0;
   const rerankActive    = (s?.by_stage ?? []).some(st => st.stage === "rerank");
-  const dmReportActive  = (s?.by_stage ?? []).some(st => st.stage === "dm_report" && st.calls > 0);
+  const _dmReportActive = (s?.by_stage ?? []).some(st => st.stage === "dm_report" && st.calls > 0);
   const benchmarkCalls  = (s?.by_stage ?? []).filter(st => st.stage.startsWith("dm_benchmark")).reduce((sum, st) => sum + st.calls, 0);
   const benchmarkActive = benchmarkCalls >= THRESHOLDS.benchmarkMin;
   const auroraRole      = s?.by_role.find(r => r.role === "aurora");

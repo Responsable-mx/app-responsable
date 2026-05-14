@@ -12,7 +12,7 @@ export type NisItem = {
   ibso_key: string;
   ibso_label: string;
   categoria: "ambiental" | "social" | "gobernanza";
-  estado: "no_identificado" | "parcial" | "disponible";
+  estado: "no_identificado" | "parcial" | "disponible" | "no_aplica";
   calidad_dato: "baja" | "media" | "alta";
   accion: string | null;
   sort_order: number;
@@ -24,12 +24,14 @@ const ESTADO_LABEL: Record<NisItem["estado"], string> = {
   no_identificado: "No identificado",
   parcial:         "Parcial",
   disponible:      "Disponible",
+  no_aplica:       "No aplica",
 };
 
 const ESTADO_COLOR: Record<NisItem["estado"], string> = {
   no_identificado: "bg-slate-100 text-slate-500",
   parcial:         "bg-amber-50 text-amber-700",
   disponible:      "bg-emerald-50 text-emerald-700",
+  no_aplica:       "bg-slate-50 text-slate-400",
 };
 
 const CALIDAD_LABEL: Record<NisItem["calidad_dato"], string> = {
@@ -225,7 +227,7 @@ export function NisSection({
                         disabled={isSaving}
                         value={row.estado}
                         onChange={(v) => void patchNis(row.id, { estado: v as NisItem["estado"] })}
-                        options={(["no_identificado", "parcial", "disponible"] as NisItem["estado"][]).map((v) => ({ value: v, label: ESTADO_LABEL[v] }))}
+                        options={(["no_identificado", "parcial", "disponible", "no_aplica"] as NisItem["estado"][]).map((v) => ({ value: v, label: ESTADO_LABEL[v] }))}
                         className={`text-[11px] font-semibold ${ESTADO_COLOR[row.estado]}`}
                       />
                     </td>

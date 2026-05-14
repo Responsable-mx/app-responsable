@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 // Idempotente: si Voyage falla a mitad, próximo ciclo retoma desde último NULL.
 
 const BATCH_LIMIT = 50;
+const INTER_BATCH_DELAY_MS = 200; // pausa entre batches Voyage para no saturar rate limit
 
 export async function GET(req: Request) {
   // Vercel cron envía Authorization: Bearer <CRON_SECRET>
@@ -72,8 +73,16 @@ export async function GET(req: Request) {
 
   const chunks = pendingChunks ?? [];
   if (chunks.length > 0) {
+    const BATCH_SIZE = 32;
     const texts = chunks.map((c) => c.content as string);
-    const embeddings = await generateEmbeddingsBatch(texts);
+    // Sub-batches con pausa entre calls Voyage para no saturar rate limit
+    const allEmbeddings: (number[] | null)[] = [];
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      if (i > 0) await new Promise<void>((r) => setTimeout(r, INTER_BATCH_DELAY_MS));
+      const slice = await generateEmbeddingsBatch(texts.slice(i, i + BATCH_SIZE));
+      allEmbeddings.push(...slice);
+    }
+    const embeddings = allEmbeddings;
     const embModel = process.env.VOYAGE_MODEL ?? "voyage-2";
     const embeddedAt = new Date().toISOString();
 

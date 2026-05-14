@@ -17,6 +17,7 @@ import {
   IconActivity,
   IconBarChart,
   IconSettings,
+  IconCoins,
 } from "@/components/ui/Icons";
 
 type TabItem = { href: string; label: string; Icon: React.ComponentType<{ className?: string }> };
@@ -44,6 +45,7 @@ const GROUPS: Group[] = [
   {
     title: "Sistema",
     items: [
+      { href: "/configuracion/costos",      label: "Costos",         Icon: IconCoins },
       { href: "/configuracion/uso-ia",      label: "Uso IA",         Icon: IconTarget },
       { href: "/configuracion/auditoria-ia",label: "Auditoría IA",   Icon: IconBarChart },
       { href: "/configuracion/auto-update", label: "Actualizaciones",Icon: IconSliders },

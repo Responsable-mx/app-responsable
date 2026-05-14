@@ -13,11 +13,16 @@ import { ServiceEditor } from "./ServiceEditor";
 import { useToast } from "@/components/ui/Toast";
 import type { ServiceStage, StageActivity } from "@/lib/stages";
 import type { QuickPatch } from "./QuickActionPopover";
+import type { ClientService } from "@/lib/client-services";
 
 type ServiceRow = {
   id: string;
   service: string;
   data: Record<string, unknown>;
+  is_pilot: boolean;
+  actual_cost: number | null;
+  sale_price: number | null;
+  cost_notes: string | null;
   updated_at: string;
 };
 
@@ -347,7 +352,13 @@ export function ClientCronogramaTab({
 
       {editingService && (
         <ServiceEditor
-          mode={{ kind: "edit", serviceId: editingService.id, initialService: editingService.service as import("@/lib/services/service-schemas").ServiceKey, initialData: editingService.data }}
+          mode={{
+            kind: "edit",
+            serviceId: editingService.id,
+            initialService: editingService.service as import("@/lib/services/service-schemas").ServiceKey,
+            initialData: editingService.data,
+            initialClientService: editingService as unknown as ClientService,
+          }}
           onClose={() => setEditingService(null)}
           onSaved={() => { setEditingService(null); void mutateServices(); }}
         />

@@ -55,6 +55,8 @@
 
 - [A] ✅ **DM-IA Etapa 4: IROs por empresa benchmark** — Por cada empresa del benchmark, la IA extrae (o interpreta) sus IROs desde su informe de sustentabilidad. Tabla tabulada (1 pestaña/empresa) con 8 columnas: ID IRO · descripción causa-consecuencia · clasificación (impacto+/−/riesgo/oportunidad) · dónde ocurre (operación/upstream/downstream/sociedad/clientes/medio ambiente) · horizonte (corto/mediano/largo) · tema asociado · fuente (reporte/sitio web/interpretación IA) · nivel de confianza IA (alto=evidencia explícita/medio=inferencia/bajo=suposición). Nueva tabla `dm_benchmark_company_iros` (enum `cadena` ampliado a 6 valores). API Batch + polling. `BenchmarkIrosSection.tsx` como sub-sección dentro de la etapa Benchmark. Cache `revalidate: 3600`. may-2026
 
+- [B] ✅ **Módulo costos/pricing** — `service_pricing_config` (costo base maduro por tipo de servicio), `client_services.{is_pilot,actual_cost,sale_price,cost_notes}` (costo real por entrega). Admin configura precios base en `/configuracion/costos`. Cada servicio en cronograma muestra `ProjectCostCard` con toggle piloto · costo real · precio venta · margen · desviación vs. referencia. API `GET/POST /api/service-pricing` · `PATCH /api/client-services/[id]` extendido. Migración `0093`. may-2026.
+
 ## En desarrollo (may-2026)
 
 - [A] 🔄 Templates de servicio + visión global proyectos — `/configuracion/servicios` (CRUD plantillas etapas/actividades/duraciones), aplicar plantilla a cliente, vista global en `/equipo`. 15 archivos, migración 0033. Semáforo 🟢.

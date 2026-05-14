@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
+import { ProjectCostCard } from "@/components/pricing/ProjectCostCard";
+import type { ClientService } from "@/lib/client-services";
 
 type AvailableTemplate = {
   id: string;
@@ -23,7 +25,13 @@ type AvailableTemplate = {
 
 type Mode =
   | { kind: "create"; clientId: string }
-  | { kind: "edit"; serviceId: string; initialService: ServiceKey; initialData: Record<string, unknown> };
+  | {
+      kind: "edit";
+      serviceId: string;
+      initialService: ServiceKey;
+      initialData: Record<string, unknown>;
+      initialClientService?: ClientService;
+    };
 
 export function ServiceEditor({
   mode,
@@ -171,6 +179,12 @@ export function ServiceEditor({
             />
           ))}
         </div>
+
+        {mode.kind === "edit" && mode.initialClientService && (
+          <div className="border-t border-slate-100 pt-4">
+            <ProjectCostCard service={mode.initialClientService} />
+          </div>
+        )}
 
         {error && (
           <div

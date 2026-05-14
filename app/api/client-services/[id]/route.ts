@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireUser, requireAdmin } from "@/lib/auth";
 import {
   updateClientService,
+  updateClientServicePricing,
   deleteClientService,
   getClientService,
 } from "@/lib/client-services";
@@ -12,6 +13,10 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const PatchSchema = z.object({
   data: z.record(z.string(), z.unknown()).optional(),
+  is_pilot: z.boolean().optional(),
+  actual_cost: z.number().nonnegative().nullable().optional(),
+  sale_price: z.number().nonnegative().nullable().optional(),
+  cost_notes: z.string().max(500).nullable().optional(),
 });
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
@@ -45,20 +50,57 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
   try {
-    const updated = await updateClientService(
-      id,
-      { data: parsed.data.data ?? {} },
-      user
-    );
-    // D-36: audit log en mutaciones de servicios
-    void logChange({
-      actorEmail: user,
-      entityType: "client_services",
-      entityId: id,
-      action: "update",
-      before: { service: before.service, client_id: before.client_id },
-      after: { service: updated.service, client_id: updated.client_id },
-    });
+    const hasPricingFields =
+      parsed.data.is_pilot !== undefined ||
+      parsed.data.actual_cost !== undefined ||
+      parsed.data.sale_price !== undefined ||
+      parsed.data.cost_notes !== undefined;
+
+    let updated = before;
+
+    if (parsed.data.data !== undefined) {
+      updated = await updateClientService(id, { data: parsed.data.data }, user);
+    }
+
+    if (hasPricingFields) {
+      updated = await updateClientServicePricing(
+        id,
+        {
+          is_pilot: parsed.data.is_pilot,
+          actual_cost: parsed.data.actual_cost,
+          sale_price: parsed.data.sale_price,
+          cost_notes: parsed.data.cost_notes,
+        },
+        user
+      );
+      void logChange({
+        actorEmail: user,
+        entityType: "client_service_pricing",
+        entityId: id,
+        action: "update",
+        before: {
+          is_pilot: before.is_pilot,
+          actual_cost: before.actual_cost,
+          sale_price: before.sale_price,
+        },
+        after: {
+          is_pilot: updated.is_pilot,
+          actual_cost: updated.actual_cost,
+          sale_price: updated.sale_price,
+        },
+      });
+    } else {
+      // D-36: audit log en mutaciones de datos del servicio
+      void logChange({
+        actorEmail: user,
+        entityType: "client_services",
+        entityId: id,
+        action: "update",
+        before: { service: before.service, client_id: before.client_id },
+        after: { service: updated.service, client_id: updated.client_id },
+      });
+    }
+
     return NextResponse.json({ data: updated });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al actualizar";

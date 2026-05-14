@@ -208,3 +208,15 @@ export function IconBarChart(p: Props) {
     </svg>
   );
 }
+
+export function IconCoins(p: Props) {
+  return (
+    <svg {...base(p.className, p.strokeWidth)}>
+      <circle cx="8" cy="15" r="5" />
+      <path d="M10.85 4.49A6 6 0 0 1 20 9" />
+      <path d="M14 9a6 6 0 0 1-1.15 9.51" />
+      <path d="M5 6v4" />
+      <path d="M3 8h4" />
+    </svg>
+  );
+}

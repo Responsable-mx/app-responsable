@@ -8,10 +8,21 @@ export type ClientService = {
   client_id: string;
   service: ServiceKey;
   data: Record<string, unknown>;
+  is_pilot: boolean;
+  actual_cost: number | null;
+  sale_price: number | null;
+  cost_notes: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ClientServicePricingPatch = {
+  is_pilot?: boolean;
+  actual_cost?: number | null;
+  sale_price?: number | null;
+  cost_notes?: string | null;
 };
 
 // ─── Dev-mode fake store (in-memory) ──────────────────────
@@ -28,6 +39,10 @@ function seedDevStore() {
       id: "dev-svc-1",
       client_id: "dev-heineken",
       service: "doble_materialidad",
+      is_pilot: false,
+      actual_cost: null,
+      sale_price: null,
+      cost_notes: null,
       data: {
         año_estudio: 2024,
         tipo: "Simple (no doble aún)",
@@ -48,6 +63,10 @@ function seedDevStore() {
       id: "dev-svc-2",
       client_id: "dev-heineken",
       service: "esr",
+      is_pilot: false,
+      actual_cost: null,
+      sale_price: null,
+      cost_notes: null,
       data: {
         año_aplicacion: 2024,
         años_consecutivos: 5,
@@ -75,6 +94,10 @@ function seedDevStore() {
       id: "dev-svc-3",
       client_id: "dev-heineken",
       service: "informe_sostenibilidad",
+      is_pilot: false,
+      actual_cost: null,
+      sale_price: null,
+      cost_notes: null,
       data: {
         año_cobertura: 2023,
         marco_principal: "gri",
@@ -100,6 +123,10 @@ function seedDevStore() {
       id: "dev-svc-4",
       client_id: "dev-ikea",
       service: "esr",
+      is_pilot: false,
+      actual_cost: null,
+      sale_price: null,
+      cost_notes: null,
       data: {
         año_aplicacion: 2025,
         años_consecutivos: 1,
@@ -181,6 +208,10 @@ export async function createClientService(
       client_id: input.client_id,
       service: input.service,
       data: input.data,
+      is_pilot: false,
+      actual_cost: null,
+      sale_price: null,
+      cost_notes: null,
       created_by: createdBy,
       updated_by: createdBy,
       created_at: new Date().toISOString(),
@@ -242,6 +273,45 @@ export async function updateClientService(
     .select("*")
     .single();
   if (error) throw new Error(`updateClientService: ${error.message}`);
+  return data as ClientService;
+}
+
+export async function updateClientServicePricing(
+  id: string,
+  patch: ClientServicePricingPatch,
+  updatedBy: string
+): Promise<ClientService> {
+  if (isDevMode()) {
+    seedDevStore();
+    for (const [clientId, list] of DEV_STORE.entries()) {
+      const idx = list.findIndex((s) => s.id === id);
+      if (idx >= 0) {
+        const updated: ClientService = {
+          ...list[idx]!,
+          ...patch,
+          updated_by: updatedBy,
+          updated_at: new Date().toISOString(),
+        };
+        const newList = [...list];
+        newList[idx] = updated;
+        DEV_STORE.set(clientId, newList);
+        return updated;
+      }
+    }
+    throw new Error("Servicio no encontrado (dev mode)");
+  }
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("client_services")
+    .update({
+      ...patch,
+      updated_by: updatedBy,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw new Error(`updateClientServicePricing: ${error.message}`);
   return data as ClientService;
 }
 

@@ -121,8 +121,9 @@ Categoría de catálogo: `seniority_levels` en `catalog_items`. Al agregar una c
 | Reporte PDF DM generado por IA | On-demand — solo al regenerar | sin caché — guardar en `client_documents` kind=`dm_report`, regenerar solo al click "Generar reporte" |
 | `dm_iro_config` (definiciones ESRS E1–G1 editables por admin) | Casi nunca — admin edita rarísimo | `revalidate: 7200` (2h, in-memory cache en lib/dm/iros.ts) |
 | `dm_benchmark_company_iros` (IROs por empresa benchmark — generados 1 vez, rarísimo regenerar) | Poco — semanas/meses | `revalidate: 3600` (SWR con `revalidateOnFocus: false`) |
-| `service_pricing_config` (costo base por tipo de servicio — admin edita rarísimo) | Casi nunca | `revalidate: 3600` (página config) · `Cache-Control: private max-age=3600` (API GET) |
+| `service_pricing_config` (costo base por tipo de servicio — admin edita rarísimo) | Casi nunca | página costos ahora `force-dynamic` (combina config + stats live) · API GET: `private max-age=3600` |
 | `client_services.{is_pilot,actual_cost,sale_price}` (costo real por proyecto) | Todo el tiempo | sin caché — SWR fresco (mismo patrón que datos del cliente) |
+| `service_pricing_stats` (promedio real + detalle proyectos por servicio — derivado de client_services) | Todo el tiempo | `force-dynamic` en página costos · API stats: `private, no-store` |
 
 ### Aplicar migraciones
 - Helper: `node scripts/apply-sql.mjs` (modo paranoico, 17 patrones bloqueados)

@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { listServicePricingConfigs } from "@/lib/pricing/config";
+import { getServicePricingStats } from "@/lib/pricing/stats";
 import { PricingConfigTable } from "@/components/pricing/PricingConfigTable";
 
 export const metadata: Metadata = {
   title: "Costos · Configuración · App ResponSable",
 };
 
-export const revalidate = 3600;
+// force-dynamic: la página muestra costos reales de proyectos (client_services),
+// que cambian con frecuencia — no cachear para que admin siempre vea datos frescos.
+export const dynamic = "force-dynamic";
 
-// Etiquetas legibles para las claves del catálogo de servicios
 const SERVICE_LABELS: Record<string, string> = {
   doble_materialidad_ia:  "Doble materialidad por IA",
   doble_materialidad:     "Doble materialidad",
@@ -17,9 +19,11 @@ const SERVICE_LABELS: Record<string, string> = {
 };
 
 export default async function CostosPage() {
-  const configs = await listServicePricingConfigs();
+  const [configs, stats] = await Promise.all([
+    listServicePricingConfigs(),
+    getServicePricingStats(),
+  ]);
 
-  // Armar filas para todos los servicios conocidos, con o sin config guardada
   const rows = Object.entries(SERVICE_LABELS).map(([key, label]) => {
     const saved = configs.find((c) => c.service_key === key);
     return {
@@ -33,7 +37,7 @@ export default async function CostosPage() {
   });
 
   return (
-    <div className="px-8 py-6 max-w-3xl">
+    <div className="px-8 py-6 max-w-5xl">
       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
         Costos base por servicio
       </p>
@@ -48,7 +52,7 @@ export default async function CostosPage() {
         sección Servicios.
       </p>
 
-      <PricingConfigTable rows={rows} />
+      <PricingConfigTable rows={rows} stats={stats} />
     </div>
   );
 }

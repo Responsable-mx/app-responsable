@@ -146,8 +146,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const admin = createAdminClient();
 
-  // Obtener contexto cuestionario + señales benchmark + horizontes configurados
-  const [questionnaireContext, benchmarkRes, horizonsRes] = await Promise.all([
+  // Obtener contexto cuestionario + señales benchmark + horizontes + IROs de empresas de referencia
+  const [questionnaireContext, benchmarkRes, horizonsRes, validatedCompaniesRes] = await Promise.all([
     getFullQuestionnaireContext(id),
     admin
       .from("dm_benchmark_results")
@@ -161,6 +161,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .select("dm_horizons")
       .eq("id", id)
       .single(),
+    admin
+      .from("dm_benchmark_companies")
+      .select("id, name")
+      .eq("client_id", id)
+      .eq("validated", true),
   ]);
 
   const latestBenchmark = benchmarkRes.data?.[0] ?? null;
@@ -172,6 +177,34 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const horizons = horizonsRes.data?.dm_horizons as { corto_year?: number; mediano_year?: number; largo_year?: number } | null ?? {};
 
+  // Cargar IROs de empresas de referencia (Etapa 5) para alimentar la generación (Etapa 6)
+  const validatedCompanyIds = (validatedCompaniesRes.data ?? []).map((c) => c.id);
+  let benchmarkCompanyIros = "";
+  if (validatedCompanyIds.length > 0) {
+    const companyIrosRes = await admin
+      .from("dm_benchmark_company_iros")
+      .select("benchmark_company_id, descripcion, tipo, horizonte, tema_asociado")
+      .eq("client_id", id)
+      .in("benchmark_company_id", validatedCompanyIds);
+
+    if (companyIrosRes.data && companyIrosRes.data.length > 0) {
+      const nameMap = new Map((validatedCompaniesRes.data ?? []).map((c) => [c.id, c.name]));
+      const groups = new Map<string, typeof companyIrosRes.data>();
+      for (const iro of companyIrosRes.data) {
+        if (!groups.has(iro.benchmark_company_id)) groups.set(iro.benchmark_company_id, []);
+        groups.get(iro.benchmark_company_id)!.push(iro);
+      }
+      const lines: string[] = [];
+      for (const [companyId, iros] of groups) {
+        lines.push(`${nameMap.get(companyId) ?? "Empresa"}:`);
+        for (const iro of iros) {
+          lines.push(`  - [${iro.tipo}] ${iro.descripcion}${iro.tema_asociado ? ` (tema: ${iro.tema_asociado})` : ""} — horizonte: ${iro.horizonte}`);
+        }
+      }
+      benchmarkCompanyIros = lines.join("\n");
+    }
+  }
+
   const prompt = await buildIroGenerationPrompt({
     clientName: client.name,
     sector: client.sector ?? null,
@@ -179,6 +212,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     questionnaireContext,
     benchmarkNarrative,
     benchmarkCompanies,
+    benchmarkCompanyIros,
     horizonCorto:   horizons.corto_year   ?? 2027,
     horizonMediano: horizons.mediano_year ?? 2030,
     horizonLargo:   horizons.largo_year   ?? 2040,

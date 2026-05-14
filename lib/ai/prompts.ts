@@ -42,7 +42,7 @@ export const PROMPT_DESCRIPTIONS: Record<PromptKey, string> = {
   "dm.benchmark_propose":
     "Propone empresas para benchmark DM. Variables: {{client_name}}, {{sector}}, {{countries}}.",
   "dm.iro_generation":
-    "Genera el inventario de IROs via Batch API (Sonnet). Variables: {{client_name}}, {{sector}}, {{country}}, {{questionnaire_context}}, {{benchmark_companies}}, {{benchmark_narrative}}, {{esrs_reference}}.",
+    "Genera el inventario de IROs via Batch API (Sonnet). Variables: {{client_name}}, {{sector}}, {{country}}, {{questionnaire_context}}, {{benchmark_companies}}, {{benchmark_narrative}}, {{benchmark_company_iros}}, {{esrs_reference}}.",
   "dm.report":
     "Genera el reporte narrativo ejecutivo de DM via Batch API (Opus). Variables: {{client_name}}, {{client_context}}, {{esrs_context}}, {{iro_inventory}}, {{nis_brechas}}, {{benchmark_data}}.",
   "system.app_navigation":
@@ -316,6 +316,9 @@ CONTEXTO DEL CUESTIONARIO (datos del cliente):
 SEÑALES DEL BENCHMARK (sector y competidores):
   Empresas analizadas: {{benchmark_companies}}
   Narrativa del analista: {{benchmark_narrative}}
+
+IROs DE EMPRESAS DE REFERENCIA (Etapa 5 — usar como señal comparativa, NO copiar literalmente):
+{{benchmark_company_iros}}
 
 MARCOS DE REFERENCIA ESRS:
 {{esrs_reference}}

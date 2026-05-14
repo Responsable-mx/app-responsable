@@ -93,13 +93,14 @@ export async function buildIroGenerationPrompt(params: {
   questionnaireContext: string;
   benchmarkNarrative: string;
   benchmarkCompanies: string;
+  benchmarkCompanyIros?: string;
   horizonCorto?: number;
   horizonMediano?: number;
   horizonLargo?: number;
 }): Promise<string> {
   const {
     clientName, sector, country, questionnaireContext,
-    benchmarkNarrative, benchmarkCompanies,
+    benchmarkNarrative, benchmarkCompanies, benchmarkCompanyIros = "",
     horizonCorto = 2027, horizonMediano = 2030, horizonLargo = 2040,
   } = params;
 
@@ -119,6 +120,7 @@ export async function buildIroGenerationPrompt(params: {
     .replaceAll("{{questionnaire_context}}", questionnaireContext || "  (Sin datos del cuestionario disponibles)")
     .replaceAll("{{benchmark_companies}}", benchmarkCompanies || "No disponible")
     .replaceAll("{{benchmark_narrative}}", benchmarkNarrative || "No disponible")
+    .replaceAll("{{benchmark_company_iros}}", benchmarkCompanyIros || "(Sin IROs de empresas de referencia disponibles)")
     .replaceAll("{{esrs_reference}}", esrsRef)
     .replaceAll("{{horizon_corto}}", String(horizonCorto))
     .replaceAll("{{horizon_mediano}}", String(horizonMediano))

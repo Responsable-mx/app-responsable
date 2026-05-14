@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 type Tab = "salud" | "metricas";
@@ -12,13 +12,12 @@ export function MonitoreoIaTabs({
   salud: ReactNode;
   metricas: ReactNode;
 }) {
-  const [active, setActive] = useState<Tab>("salud");
-
-  // Leer tab inicial desde URL (ej. ?tab=metricas)
-  useEffect(() => {
-    const tab = new URLSearchParams(window.location.search).get("tab");
-    if (tab === "metricas") setActive("metricas");
-  }, []);
+  const [active, setActive] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "salud";
+    return new URLSearchParams(window.location.search).get("tab") === "metricas"
+      ? "metricas"
+      : "salud";
+  });
 
   const switchTab = (tab: Tab) => {
     setActive(tab);

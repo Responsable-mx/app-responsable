@@ -392,11 +392,12 @@ export function DoubleMaterialidadTab({
     ? "pending"
     : "locked";
 
-  // stage6 = Matriz (visualización IROs scored) — auto-done cuando IROs están validados
+  // stage6 = Matriz (visualización IROs scored) — done solo cuando ≥3 IROs tienen score
+  // (hasIros = batch done, pero sin scores la matriz no muestra nada útil)
   const scoredIros = iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length;
-  const stage6Status: StageStatus = hasIros
+  const stage6Status: StageStatus = scoredIros >= 3
     ? "done"
-    : scoredIros >= 3
+    : hasIros
       ? "active"
       : iros.length > 0
         ? "pending"

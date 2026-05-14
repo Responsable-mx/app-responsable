@@ -156,15 +156,30 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 
-  // Cargar IROs incluidos ordenados por score consolidado desc
-  const { data: irosRaw } = await admin
-    .from("client_iro_inventory")
-    .select("n_iro, tema_esg, descripcion, tipo, horizonte, score_impacto, score_financiero")
-    .eq("client_id", id)
-    .eq("incluido", true)
-    .order("score_impacto", { ascending: false });
+  // Cargar IROs, benchmark y brechas NIS en paralelo
+  const [irosRaw2, benchmarkRow, nisRaw] = await Promise.all([
+    admin
+      .from("client_iro_inventory")
+      .select("n_iro, tema_esg, descripcion, tipo, horizonte, score_impacto, score_financiero")
+      .eq("client_id", id)
+      .eq("incluido", true)
+      .order("score_impacto", { ascending: false }),
+    admin
+      .from("dm_benchmark_results")
+      .select("narrative")
+      .eq("client_id", id)
+      .eq("status", "done")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("client_nis_assessment")
+      .select("ibso_label, categoria, estado, calidad_dato, accion")
+      .eq("client_id", id)
+      .order("sort_order", { ascending: true }),
+  ]);
 
-  const iros = ((irosRaw ?? []) as IroRow[])
+  const iros = ((irosRaw2.data ?? []) as IroRow[])
     .sort((a, b) => {
       const scoreA = (a.score_impacto ?? 0) + (a.score_financiero ?? 0);
       const scoreB = (b.score_impacto ?? 0) + (b.score_financiero ?? 0);
@@ -172,17 +187,16 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     })
     .slice(0, 15);
 
-  // Cargar narrativa benchmark más reciente
-  const { data: benchmarkRow } = await admin
-    .from("dm_benchmark_results")
-    .select("narrative")
-    .eq("client_id", id)
-    .eq("status", "done")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+  const benchmarkNarrative = benchmarkRow.data?.narrative ?? "Sin datos de benchmark disponibles para este cliente.";
 
-  const benchmarkNarrative = benchmarkRow?.narrative ?? "Sin datos de benchmark disponibles para este cliente.";
+  // Brechas NIS relevantes para el resumen (excluye "no_aplica" y "disponible" con calidad alta)
+  const nisBrechas = (nisRaw.data ?? [])
+    .filter((n) => n.estado !== "no_aplica" && !(n.estado === "disponible" && n.calidad_dato === "alto"))
+    .map((n) => `- ${n.ibso_label} [${n.categoria}]: ${n.estado}, calidad ${n.calidad_dato}${n.accion ? ` → ${n.accion}` : ""}`)
+    .join("\n");
+  const nisBrechasSection = nisBrechas
+    ? `\nBRECHAS DE INFORMACIÓN (NIS/IBSO — áreas sin datos de calidad suficiente):\n${nisBrechas}`
+    : "";
 
   // Construir lista de IROs para el prompt
   const irosList = iros.length
@@ -200,7 +214,7 @@ CONTEXTO BENCHMARK:
 ${benchmarkNarrative}
 
 INVENTARIO DE IROs MATERIALES (ordenados por score consolidado):
-${irosList}
+${irosList}${nisBrechasSection}
 
 Genera el resumen ejecutivo con esta estructura EXACTA en Markdown:
 

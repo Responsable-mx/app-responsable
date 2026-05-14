@@ -9,6 +9,17 @@ import { lookupComparisonValue, abbrevCompanyName } from "./benchmark-helpers";
 
 const cats = ["E", "S", "G"] as const;
 const catLabel: Record<string, string> = { E: "Ambiental", S: "Social", G: "Gobernanza" };
+
+// Misma lógica que ExpandableCell.detectScore — reutilizable sin importar el componente cliente
+function detectScore(text: string): "sólido" | "parcial" | "brecha" | null {
+  if (!text || text === "—" || /^sin datos/i.test(text)) return null;
+  const t = text.toLowerCase();
+  if (/ausencia|brecha|carece|sin reporte|sin meta|no publica|no mide|no tiene|no cuenta/.test(t)) return "brecha";
+  if (/parcial|limitad|sólo |básic|en proceso/.test(t)) return "parcial";
+  if (/iso |certif|ecovadis|gri |scope [12]|mide |sólid|verific|reporta/.test(t)) return "sólido";
+  return null;
+}
+
 const CAT_BADGE: Record<string, { label: string; cls: string }> = {
   E: { label: "Amb", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   S: { label: "Soc", cls: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -69,6 +80,18 @@ export function BenchmarkComparisonTable({
 
   const allFields = latestResult.fields_snapshot;
   const allCompanies = latestResult.companies_snapshot;
+
+  // Scorecard: posición de Nuvoil en TODAS las dimensiones (sin filtro aplicado)
+  const scorecardAll = allFields.reduce(
+    (acc, f) => {
+      const t = lookupComparisonValue(latestResult.comparison, f.key, clientName);
+      const score = detectScore(t);
+      if (score) acc[score]++;
+      else if (t && t !== "—" && !/^sin datos/i.test(t)) acc.otros++;
+      return acc;
+    },
+    { sólido: 0, parcial: 0, brecha: 0, otros: 0 }
+  );
 
   const isBrechaText = (t: string) =>
     /ausencia|brecha|carece|sin reporte|sin meta|no publica|no mide|no tiene|no cuenta/.test(t.toLowerCase());
@@ -255,12 +278,36 @@ export function BenchmarkComparisonTable({
                   <ExpandableCell text={clientText} defaultExpanded={onlyBrechas} />
                   {clientText && clientText !== "—" && !/^sin datos/i.test(clientText) && (() => {
                     const src = sourceHref(clientName, field.label);
+                    const isClientData = src.label === "⌕ buscar";
                     return (
                       <a href={src.href} target="_blank" rel="noopener noreferrer"
+                        title={isClientData ? "Información generada por IA — verificar con el cliente" : undefined}
                         className={`inline-flex items-center text-[9px] mt-0.5 ${src.cls}`}>
-                        {src.label}
+                        {isClientData ? "⌕ buscar (IA)" : src.label}
                       </a>
                     );
+                  })()}
+                  {(() => {
+                    const clientScore = detectScore(clientText);
+                    if (!clientScore) return null;
+                    const peerBrechas = allCompanies.filter((c) =>
+                      detectScore(lookupComparisonValue(latestResult.comparison, field.key, c.name)) === "brecha"
+                    ).length;
+                    if (clientScore === "sólido" && peerBrechas >= 2) {
+                      return (
+                        <p className="text-[9px] text-emerald-600 mt-0.5" title="Ventaja diferencial frente a referencias">
+                          {peerBrechas}/{allCompanies.length} referencias con brecha ↑
+                        </p>
+                      );
+                    }
+                    if (clientScore === "brecha" && peerBrechas >= 3) {
+                      return (
+                        <p className="text-[9px] text-slate-400 mt-0.5" title="Brecha extendida en el sector">
+                          {peerBrechas}/{allCompanies.length} también con brecha (sectorial)
+                        </p>
+                      );
+                    }
+                    return null;
                   })()}
                 </td>
                 {visibleCompanies.map((company) => {
@@ -294,8 +341,39 @@ export function BenchmarkComparisonTable({
     </p>
   );
 
+  // Scorecard items para render
+  const scorecardItems = [
+    { key: "sólido" as const, cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "●" },
+    { key: "parcial" as const, cls: "bg-amber-50 text-amber-700 border-amber-200",   icon: "◑" },
+    { key: "brecha"  as const, cls: "bg-rose-50 text-rose-600 border-rose-200",       icon: "○" },
+  ] as const;
+
   return (
     <div className="mt-2">
+      {/* Scorecard: posición global de Nuvoil */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-3 px-0.5">
+        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
+          {clientName}:
+        </span>
+        {scorecardItems.map(({ key, cls, icon }) =>
+          scorecardAll[key] > 0 ? (
+            <span
+              key={key}
+              title={`${scorecardAll[key]} de ${allFields.length} dimensiones con posición "${key}"`}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-medium border cursor-default ${cls}`}
+            >
+              <span aria-hidden="true">{icon}</span>
+              {scorecardAll[key]}/{allFields.length} {key}
+            </span>
+          ) : null
+        )}
+        {scorecardAll.otros > 0 && (
+          <span className="text-[10px] text-slate-400 border border-slate-200 px-2 py-0.5 rounded-sm">
+            {scorecardAll.otros} sin clasificar
+          </span>
+        )}
+      </div>
+
       {/* Header: título + filtros + acciones */}
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -327,6 +405,11 @@ export function BenchmarkComparisonTable({
       </div>
 
       {/* Tabla — scroll horizontal modo normal */}
+      {visibleCompanies.length > 3 && (
+        <p className="text-[10px] text-slate-400 mb-1 text-right">
+          → {visibleCompanies.length - 1} empresas más — desliza para ver todas
+        </p>
+      )}
       <div className="relative">
         <div ref={scrollRef} className="overflow-x-auto">
           {tableElement}

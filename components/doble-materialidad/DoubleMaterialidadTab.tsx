@@ -534,28 +534,38 @@ export function DoubleMaterialidadTab({
   }, []);
 
   // Datos del stepper — extraído del IIFE (D-150 sesión 30)
-  const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null; count?: string }> = [
+  const stagesData: Array<{ label: string; status: StageStatus; sectionId: string; doneDate?: string | null; count?: string; lockedReason?: string }> = [
     { label: "Contexto",       status: stage1Status,  sectionId: "dm-sec-contexto" },
     { label: "Referentes",     status: stage2Status,  sectionId: "dm-sec-referentes",
+      lockedReason: "Completa el Cuestionario de Contexto para habilitar esta etapa",
       count: (referentesRec?.enabled_frameworks ?? []).length > 0
         ? `${(referentesRec?.enabled_frameworks ?? []).length} ref.`
         : undefined },
     { label: "Emp. ref.",      status: stage3Status,  sectionId: "dm-sec-benchmark-empresas",
+      lockedReason: "Completa los Referentes de Sostenibilidad primero",
       count: (benchmarkEmpresasRec?.enabled_companies ?? []).length > 0
         ? `${(benchmarkEmpresasRec?.enabled_companies ?? []).length} emp.`
         : undefined },
     { label: "Benchmark",      status: stage4Status,  sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at,
+      lockedReason: "Selecciona y valida empresas de referencia en la etapa anterior",
       count: validatedCompanies > 0 ? `${validatedCompanies} val.` : undefined },
     { label: "IROs ref.",      status: stage4bStatus, sectionId: "dm-sec-benchmark-iros",
+      lockedReason: "Ejecuta el Benchmark competitivo primero",
       count: benchmarkIrosDoneCount > 0 ? `${benchmarkIrosDoneCount}/${validatedCompanies} emp.` : undefined },
     { label: "IROs",           status: stage5Status,  sectionId: "dm-sec-iros",
+      lockedReason: "Extrae los IROs de las empresas de referencia (etapa anterior) primero",
       count: iros.length > 0 ? `${iros.length} IROs` : undefined },
     { label: "Matriz",         status: stage6Status,  sectionId: "dm-sec-matriz",
+      lockedReason: "Genera y califica al menos 3 IROs del cliente para visualizar la Matriz",
       count: quadrantCounts.doble_material > 0 ? `${quadrantCounts.doble_material} DM` : undefined },
-    { label: "NIS/IBSO",       status: stage7Status,  sectionId: "dm-sec-nis" },
-    { label: "Resumen IA",     status: stage8Status,  sectionId: "dm-sec-resumen" },
-    { label: "Validación",     status: stage9Status,  sectionId: "dm-sec-validacion" },
-    { label: "Reporte",        status: stage10Status, sectionId: "dm-sec-reporte", doneDate: latestReport?.created_at },
+    { label: "NIS/IBSO",       status: stage7Status,  sectionId: "dm-sec-nis",
+      lockedReason: "Genera los IROs del cliente primero" },
+    { label: "Resumen IA",     status: stage8Status,  sectionId: "dm-sec-resumen",
+      lockedReason: "Genera y califica los IROs del cliente primero" },
+    { label: "Validación",     status: stage9Status,  sectionId: "dm-sec-validacion",
+      lockedReason: "Genera el Resumen Ejecutivo IA primero" },
+    { label: "Reporte",        status: stage10Status, sectionId: "dm-sec-reporte", doneDate: latestReport?.created_at,
+      lockedReason: "Requiere Benchmark + IROs calificados + Resumen IA completados" },
   ];
 
   if (loadingBenchmark) {
@@ -625,7 +635,11 @@ export function DoubleMaterialidadTab({
                     className="flex-1"
                     subtitle={subtitle}
                     sectionId={s.sectionId}
-                    title={`${s.label} — ${subtitle}`}
+                    title={
+                      s.status === "locked" && s.lockedReason
+                        ? `🔒 ${s.lockedReason}`
+                        : `${s.label} — ${subtitle}`
+                    }
                   />
                   {idx < stagesData.length - 1 && (
                     <div

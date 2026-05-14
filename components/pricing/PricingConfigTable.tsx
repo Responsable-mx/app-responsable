@@ -45,12 +45,13 @@ type SavedConfig = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtMXN(n: number | null | undefined): string | null {
+function fmtUSD(n: number | null | undefined): string | null {
   if (n == null) return null;
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
-    maximumFractionDigits: 0,
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
 }
 
@@ -213,7 +214,7 @@ export function PricingConfigTable({
                           setDraft((d) => ({ ...d, base_cost: e.target.value }))
                         }
                         placeholder="0"
-                        aria-label="Costo base MXN"
+                        aria-label="Costo base USD"
                         className="max-w-[140px]"
                       />
                     </td>
@@ -292,7 +293,7 @@ export function PricingConfigTable({
                       {svc?.avg_actual_cost != null ? (
                         <div className="inline-flex flex-col items-end gap-0.5">
                           <span className="tabular-nums font-semibold text-slate-800">
-                            {fmtMXN(svc.avg_actual_cost)}
+                            {fmtUSD(svc.avg_actual_cost)}
                           </span>
                           {svc.only_pilots && (
                             <span className="text-[10px] text-amber-600">
@@ -309,7 +310,7 @@ export function PricingConfigTable({
                     <td className="px-4 py-2.5 text-right">
                       {row.base_cost != null ? (
                         <span className="tabular-nums font-medium text-slate-600">
-                          {fmtMXN(row.base_cost)}
+                          {fmtUSD(row.base_cost)}
                         </span>
                       ) : (
                         <span className="text-slate-400 italic">Sin definir</span>
@@ -400,12 +401,12 @@ export function PricingConfigTable({
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-800">
-                                      {fmtMXN(p.actual_cost) ?? (
+                                      {fmtUSD(p.actual_cost) ?? (
                                         <span className="text-slate-300">—</span>
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums text-slate-600">
-                                      {fmtMXN(p.sale_price) ?? (
+                                      {fmtUSD(p.sale_price) ?? (
                                         <span className="text-slate-300">—</span>
                                       )}
                                     </td>
@@ -456,7 +457,7 @@ export function PricingConfigTable({
                                   </td>
                                   <td />
                                   <td className="px-3 py-1.5 text-right tabular-nums font-bold text-slate-800">
-                                    {fmtMXN(svc.avg_actual_cost)}
+                                    {fmtUSD(svc.avg_actual_cost)}
                                   </td>
                                   <td colSpan={3} />
                                 </tr>

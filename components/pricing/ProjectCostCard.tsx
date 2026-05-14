@@ -12,12 +12,13 @@ type Props = {
   onSaved?: (updated: ClientService) => void;
 };
 
-function fmtMXN(n: number | null | undefined) {
+function fmtUSD(n: number | null | undefined) {
   if (n == null) return null;
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
-    maximumFractionDigits: 0,
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
 }
 
@@ -138,30 +139,30 @@ export function ProjectCostCard({ service, baseCost, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                Costo real (MXN)
+                Costo real (USD)
               </label>
               <Input
                 type="number"
                 min={0}
-                step={500}
+                step={1}
                 value={draft.actual_cost}
                 onChange={(e) => setDraft((d) => ({ ...d, actual_cost: e.target.value }))}
-                placeholder="0"
-                aria-label="Costo real MXN"
+                placeholder="0.00"
+                aria-label="Costo real USD"
               />
             </div>
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                Precio de venta (MXN)
+                Precio de venta (USD)
               </label>
               <Input
                 type="number"
                 min={0}
-                step={500}
+                step={1}
                 value={draft.sale_price}
                 onChange={(e) => setDraft((d) => ({ ...d, sale_price: e.target.value }))}
-                placeholder="0"
-                aria-label="Precio de venta MXN"
+                placeholder="0.00"
+                aria-label="Precio de venta USD"
               />
             </div>
           </div>
@@ -205,7 +206,7 @@ export function ProjectCostCard({ service, baseCost, onSaved }: Props) {
                   Costo real
                 </p>
                 <p className="tabular-nums text-slate-800 font-medium">
-                  {fmtMXN(current.actual_cost) ?? <span className="text-slate-400 italic text-xs">—</span>}
+                  {fmtUSD(current.actual_cost) ?? <span className="text-slate-400 italic text-xs">—</span>}
                 </p>
               </div>
               <div>
@@ -213,7 +214,7 @@ export function ProjectCostCard({ service, baseCost, onSaved }: Props) {
                   Precio de venta
                 </p>
                 <p className="tabular-nums text-slate-800 font-medium">
-                  {fmtMXN(current.sale_price) ?? <span className="text-slate-400 italic text-xs">—</span>}
+                  {fmtUSD(current.sale_price) ?? <span className="text-slate-400 italic text-xs">—</span>}
                   {marginStr && (
                     <span
                       className={`ml-2 text-xs font-bold ${
@@ -232,7 +233,7 @@ export function ProjectCostCard({ service, baseCost, onSaved }: Props) {
                     vs. costo base del servicio
                   </p>
                   <p className="text-xs text-slate-600">
-                    <span className="tabular-nums font-medium">{fmtMXN(baseCost)}</span>
+                    <span className="tabular-nums font-medium">{fmtUSD(baseCost)}</span>
                     {deviation !== null && (
                       <span
                         className={`ml-2 font-bold ${

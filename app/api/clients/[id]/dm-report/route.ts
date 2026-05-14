@@ -296,8 +296,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
   }
 
-  // Contexto IA: IROs validados + brechas NIS del cliente
-  const [irosRes, nisRes] = await Promise.all([
+  // Contexto IA: IROs validados + brechas NIS + marcos normativos Etapa 2
+  const [irosRes, nisRes, referentesRes] = await Promise.all([
     admin
       .from("client_iro_inventory")
       .select("n_iro, tema_esg, descripcion, tipo, cadena, horizonte, score_impacto, score_financiero, confianza")
@@ -309,12 +309,22 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .select("ibso_label, categoria, estado, calidad_dato, accion")
       .eq("client_id", id)
       .order("sort_order", { ascending: true }),
+    admin
+      .from("dm_referentes")
+      .select("enabled_frameworks")
+      .eq("client_id", id)
+      .maybeSingle(),
   ]);
 
   const clientIros = (irosRes.data ?? []) as ClientIroRow[];
   const clientNis  = (nisRes.data ?? []) as ClientNisRow[];
+  const enabledFrameworks = (referentesRes.data?.enabled_frameworks as string[] | null) ?? [];
 
-  const clientContext = buildClientContext(client);
+  // Incluir marcos normativos de Etapa 2 como trazabilidad normativa del reporte
+  const clientContext = buildClientContext(client) +
+    (enabledFrameworks.length > 0
+      ? `\n\nMarcos normativos ESG aplicables: ${enabledFrameworks.join(", ")}`
+      : "");
   const prompt = await buildReportPrompt(
     client,
     clientContext,

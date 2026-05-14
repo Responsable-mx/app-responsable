@@ -692,10 +692,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // 50% descuento en tokens vs llamada síncrona.
   const model = getModelConfig("aurora").model;
 
-  // Cargar IROs activos y construir prompt + fields_snapshot
-  const iros = await listActiveIros();
+  // Cargar IROs activos + marcos normativos de Etapa 2 en paralelo
+  const [iros, referentesRes] = await Promise.all([
+    listActiveIros(),
+    admin.from("dm_referentes").select("enabled_frameworks").eq("client_id", id).maybeSingle(),
+  ]);
+  const enabledFrameworks = (referentesRes.data?.enabled_frameworks as string[] | null) ?? [];
+
   const fieldsSnapshot = irosToBenchmarkFields(iros);
-  const { irosCacheBlock, dynamicPrompt } = await buildComparePrompt(
+  const { irosCacheBlock, dynamicPrompt: rawDynamic } = await buildComparePrompt(
     id,
     client.name,
     client.sector ?? null,
@@ -703,6 +708,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     companies,
     iros,
   );
+
+  // Anteponer marcos normativos validados en Etapa 2 como base del análisis
+  const frameworksLine = enabledFrameworks.length > 0
+    ? `MARCOS NORMATIVOS ESG APLICABLES AL CLIENTE (validados en Etapa 2): ${enabledFrameworks.join(", ")}\n\n`
+    : "";
+  const dynamicPrompt = frameworksLine + rawDynamic;
 
   // Crear fila pending primero para obtener ID como custom_id del batch
   const { data: resultRow, error: insertResultErr } = await admin

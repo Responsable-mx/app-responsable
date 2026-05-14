@@ -426,7 +426,9 @@ export function DoubleMaterialidadTab({
   const allIrosDecided =
     includedIros.length > 0 &&
     includedIros.every((i) => validacionRec?.iro_decisions?.[i.id]?.decision);
-  const stage9Status: StageStatus = allIrosDecided
+  // Si hay IROs pero todos excluidos por el consultor, no hay nada que validar → done
+  const noIncludedIros = hasIros && includedIros.length === 0;
+  const stage9Status: StageStatus = allIrosDecided || noIncludedIros
     ? "done"
     : hasResumen
     ? "active"

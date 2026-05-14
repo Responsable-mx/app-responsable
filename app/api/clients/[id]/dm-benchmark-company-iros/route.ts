@@ -289,7 +289,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Verificar que la empresa pertenece a este cliente y está validada
   const { data: companyRow } = await admin
     .from("dm_benchmark_companies")
-    .select("id, name, sector, sustainability_report_url")
+    .select("id, name, sector, country, sustainability_report_url")
     .eq("id", company_id)
     .eq("client_id", id)
     .eq("validated", true)
@@ -323,7 +323,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const prompt = buildPrompt({
     companyName: companyRow.name as string,
     sector:      (companyRow.sector as string | null) ?? null,
-    country:     null,
+    country:     (companyRow.country as string | null) ?? null,
     clientSector: client.sector ?? null,
     reportChunks,
     reportUrl:   (companyRow.sustainability_report_url as string | null) ?? null,

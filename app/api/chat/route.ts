@@ -124,12 +124,34 @@ export async function POST(req: NextRequest) {
   // invalidar los 2 bloques cacheados (contexto cliente + reglas del rol).
   // Skip la query completa si no hay rechazos activos (caso más común en piloto)
   const feedbackCount = await countActiveFeedback({ role, clientId: clientId || null }).catch(() => 0);
-  const feedbackText = feedbackCount > 0
-    ? await buildFeedbackMemoryBlock({ role, clientId: clientId || null }).catch(() => "")
-    : "";
-  const systemBlocks = feedbackText
-    ? [...baseSystemBlocks, { type: "text" as const, text: feedbackText, cache_control: { type: "ephemeral" as const } }]
-    : baseSystemBlocks;
+  const [feedbackText, docChunksText] = await Promise.all([
+    feedbackCount > 0
+      ? buildFeedbackMemoryBlock({ role, clientId: clientId || null }).catch(() => "")
+      : Promise.resolve(""),
+    // Búsqueda semántica de chunks relevantes del informe del cliente.
+    // Fail-open: si Voyage falla o no hay docs, el chat continúa sin chunks.
+    clientId && process.env.VOYAGE_API_KEY && lastUserText.length > 10
+      ? (async () => {
+          try {
+            const { searchSimilarChunks, rerankChunks } = await import("@/lib/documents/embeddings");
+            const matches = await searchSimilarChunks({ query: lastUserText, clientId, limit: 20 });
+            if (!matches || matches.length === 0) return "";
+            const chunks = matches.length >= 3
+              ? await rerankChunks({ query: lastUserText, chunks: matches.map((m) => m.content), topK: 8, meta: { userEmail: user, clientId } })
+              : matches.map((m) => m.content);
+            return `FRAGMENTOS RELEVANTES DEL INFORME DEL CLIENTE:\n${chunks.join("\n\n---\n\n")}`;
+          } catch {
+            return "";
+          }
+        })()
+      : Promise.resolve(""),
+  ]);
+
+  const systemBlocks = [
+    ...baseSystemBlocks,
+    ...(docChunksText ? [{ type: "text" as const, text: docChunksText }] : []),
+    ...(feedbackText ? [{ type: "text" as const, text: feedbackText }] : []),
+  ];
 
   // Circuit breaker: rechazar inmediatamente si Anthropic está en cascada de fallos
   if (anthropicBreaker.isOpen) {

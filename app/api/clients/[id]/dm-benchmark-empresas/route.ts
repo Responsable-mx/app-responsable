@@ -262,7 +262,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const industry  = (client as Record<string, unknown>).industry as string | null ?? null;
     const countries = (client.countries as string[] | null)?.join(", ") ?? "México";
     const size      = (client as Record<string, unknown>).size as string | null ?? null;
-    const userContent = buildGenerateUserContent(client.name, sector, industry, countries, size);
+
+    // Cargar marcos normativos validados en Etapa 2 para priorizar empresas que los usan
+    const { data: referentesRow } = await admin
+      .from("dm_referentes")
+      .select("enabled_frameworks")
+      .eq("client_id", id)
+      .maybeSingle();
+    const enabledFrameworks = (referentesRow?.enabled_frameworks as string[] | null) ?? [];
+
+    let userContent = buildGenerateUserContent(client.name, sector, industry, countries, size);
+    if (enabledFrameworks.length > 0) {
+      userContent += `\n\nMARCOS NORMATIVOS ESG DEL CLIENTE (validados en Etapa 2): ${enabledFrameworks.join(", ")}\nPriorizar empresas que reporten bajo estos marcos cuando sea posible.`;
+    }
 
     const { model } = getModelConfig("aurora");
     const anthropic  = createAnthropicClient();

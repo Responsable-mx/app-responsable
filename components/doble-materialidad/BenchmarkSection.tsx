@@ -383,6 +383,31 @@ export function BenchmarkSection({
     latestResult!.fields_snapshot?.length > 0 &&
     Object.keys(latestResult!.comparison ?? {}).length > 0;
 
+  // Scorecard precomputado para mostrar arriba de BenchmarkVisuals
+  const scorecardData = hasComparisonData && latestResult ? (() => {
+    const fields = latestResult.fields_snapshot;
+    const comps = latestResult.companies_snapshot;
+    const counts = fields.reduce(
+      (acc, f) => {
+        const t = lookupComparisonValue(latestResult.comparison, f.key, clientName);
+        const s = detectScore(t);
+        if (s === "sólido") acc.sólido++;
+        else if (s === "parcial") acc.parcial++;
+        else if (s === "brecha") acc.brecha++;
+        else if (t && t !== "—" && !/^sin datos/i.test(t)) acc.otros++;
+        return acc;
+      },
+      { sólido: 0, parcial: 0, brecha: 0, otros: 0 }
+    );
+    const peerAvgSolido = comps.length > 0
+      ? Math.round(comps.reduce((sum, co) =>
+          sum + fields.filter((f) =>
+            detectScore(lookupComparisonValue(latestResult.comparison, f.key, co.name)) === "sólido"
+          ).length, 0) / comps.length)
+      : 0;
+    return { counts, peerAvgSolido, totalFields: fields.length, peerCount: comps.length };
+  })() : null;
+
   return (
     <div className="space-y-4">
       {/* ── Configuración: colapsada cuando hay resultado ── */}
@@ -764,9 +789,57 @@ export function BenchmarkSection({
         />
       )}
 
+      {/* ── Scorecard: posición global del cliente (encima de las visualizaciones) ── */}
+      {scorecardData && (() => {
+        const { counts, peerAvgSolido, totalFields, peerCount } = scorecardData;
+        const scorecardItems = [
+          { key: "sólido" as const, cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "●" },
+          { key: "parcial" as const, cls: "bg-amber-50 text-amber-700 border-amber-200",   icon: "◑" },
+          { key: "brecha"  as const, cls: "bg-rose-50 text-rose-600 border-rose-200",       icon: "○" },
+        ] as const;
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap px-0.5">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
+              {clientName}:
+            </span>
+            {scorecardItems.map(({ key, cls, icon }) =>
+              counts[key] > 0 ? (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setOnlyBrechas(key === "brecha")}
+                  title={`${counts[key]} de ${totalFields} dimensiones — clic para filtrar tabla`}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-medium border cursor-pointer hover:opacity-75 transition-opacity ${cls}${onlyBrechas && key === "brecha" ? " ring-1 ring-rose-300" : ""}`}
+                >
+                  <span aria-hidden="true">{icon}</span>
+                  {counts[key]}/{totalFields} {key}
+                </button>
+              ) : null
+            )}
+            {counts.otros > 0 && (
+              <span className="text-[10px] text-slate-400 border border-slate-200 px-2 py-0.5 rounded-sm">
+                {counts.otros} sin clasificar
+              </span>
+            )}
+            {peerCount > 0 && (
+              <span
+                title={`Media de dimensiones sólidas entre las ${peerCount} empresas de referencia`}
+                className="text-[10px] text-indigo-500 border border-indigo-100 bg-indigo-50 px-2 py-0.5 rounded-sm ml-1"
+              >
+                Ref: ~{peerAvgSolido}/{totalFields} sólido
+              </span>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ── Visualizaciones ESG ── */}
       {hasComparisonData && (
-        <BenchmarkVisuals latestResult={latestResult!} clientName={clientName} />
+        <BenchmarkVisuals
+          latestResult={latestResult!}
+          clientName={clientName}
+          onCatFilter={setTableFilter}
+        />
       )}
 
       {/* ── Tabla comparativa ── */}
@@ -781,6 +854,10 @@ export function BenchmarkSection({
               { reportUrl: c.sustainability_report_url ?? null, websiteUrl: c.website ?? null },
             ])
           )}
+          tableFilter={tableFilter}
+          onTableFilterChange={setTableFilter}
+          onlyBrechas={onlyBrechas}
+          onOnlyBrechasChange={setOnlyBrechas}
         />
       )}
 

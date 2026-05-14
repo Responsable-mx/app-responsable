@@ -82,8 +82,11 @@ export default async function AuditoriaIaPage() {
   const voyageActive    = voyageCalls > 100;
   // Rerank activo: detectado automáticamente cuando alguna llamada usa workflowStage="rerank"
   const rerankActive    = (usage?.by_stage ?? []).some(s => s.stage === "rerank");
-  // Benchmark activo: hay llamadas dm_benchmark en los últimos 30 días
-  const benchmarkActive = (usage?.by_stage ?? []).some(s => s.stage.startsWith("dm_benchmark"));
+  // Benchmark: volumen real (≥5 estudios en ventana justifica implementar caché)
+  const benchmarkCalls  = (usage?.by_stage ?? [])
+    .filter(s => s.stage.startsWith("dm_benchmark"))
+    .reduce((sum, s) => sum + s.calls, 0);
+  const benchmarkActive = benchmarkCalls >= 5;
   const latenciaMs      = usage?.avg_latency_ms ?? 0;
   const costoMes        = usage?.cost_usd_estimate_max ?? 0;
 
@@ -133,7 +136,7 @@ export default async function AuditoriaIaPage() {
 
   if (usage) {
     // Error rate crítico — con diagnóstico automático por rol
-    if (errorRate > 0.05 && llmCalls > 10) {
+    if (errorRate > 0.10 && llmCalls > 30) {
       const llmRolesWithErrors = usage.by_role
         .filter(r => r.role !== "embeddings" && r.errors > 0)
         .sort((a, b) => b.errors - a.errors);
@@ -220,12 +223,12 @@ export default async function AuditoriaIaPage() {
     });
 
     // Opus overuse
-    if (opusPct > 20 && llmCalls > 20) {
+    if (opusPct > 35 && llmCalls > 30) {
       decisions.push({
         prioridad: "conveniente",
         titulo: `La IA de máxima capacidad se usa más de lo recomendado (${opusPct}%)`,
         queMejora: "Reasignar algunas tareas a una IA de menor costo sin pérdida visible de calidad.",
-        porQueImporta: `La IA de máxima capacidad (que usa Elena y el Reporte PDF) cuesta 5 veces más que la IA estándar. Debería usarse solo en tareas estratégicas — si representa más del 20% del volumen, hay tareas de revisión o análisis básico que podrían usar una IA más económica.`,
+        porQueImporta: `La IA de máxima capacidad (que usa Elena y el Reporte PDF) cuesta 5 veces más que la IA estándar. Debería usarse solo en tareas estratégicas — con ${opusPct}% del volumen siendo Opus, hay tareas de revisión o análisis básico que podrían resolverse igual con una IA más económica.`,
         ejemplo: "Si los consultores abren Elena para tareas de revisión rápida que Aurora resolvería igual de bien, el costo sube sin beneficio real.",
         necesita: "Revisar con el equipo de consultores qué tareas usan qué rol — 1 hora de conversación.",
         recomendacion: "revisar",
@@ -257,7 +260,7 @@ export default async function AuditoriaIaPage() {
     });
 
     // Caché bajo — < 20% con volumen real
-    if (cacheRatio < 0.2 && llmCalls > 20) {
+    if (cacheRatio < 0.2 && llmCalls > 50) {
       decisions.push({
         prioridad: "conveniente",
         titulo: `El caché de IA está poco aprovechado — ahorra hasta el doble (hoy: ${Math.round(cacheRatio * 100)}%)`,
@@ -271,7 +274,7 @@ export default async function AuditoriaIaPage() {
 
     // Extracción económica (Gemini Flash)
     const sonnetModel = usage.by_model.find(m => m.family === "sonnet");
-    if (costoMes > 5 && (sonnetModel?.calls ?? 0) > 10) {
+    if (costoMes > 20 && (sonnetModel?.calls ?? 0) > 30) {
       decisions.push({
         prioridad: "conveniente",
         titulo: "Reducir el costo del llenado automático del cuestionario",
@@ -284,7 +287,7 @@ export default async function AuditoriaIaPage() {
     }
 
     // Feedback negativo
-    if (usage.feedback_total_down > 5) {
+    if (usage.feedback_total_down > 15) {
       const topReason = usage.feedback_top_reasons[0];
       decisions.push({
         prioridad: usage.feedback_total_down > 20 ? "importante" : "conveniente",

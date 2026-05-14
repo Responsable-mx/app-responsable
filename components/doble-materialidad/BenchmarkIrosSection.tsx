@@ -200,7 +200,7 @@ export function BenchmarkIrosSection({
         if (match) return match.id;
       }
     }
-    return validatedCompanies[0]?.id ?? "";
+    return SYNTHESIS_TAB_ID;
   });
   const [showCallout, setShowCallout] = useState(true);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);

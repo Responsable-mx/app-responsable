@@ -605,6 +605,107 @@ export function DoubleMaterialidadTab({
           </p>
         </div>
       )}
+      {/* ── Panel maestro: síntesis ejecutiva del estudio ── */}
+      {dmDoneCount > 0 && (() => {
+        const nextStage = stagesData.find((s) => s.status === "active" || s.status === "pending");
+        const pct = Math.round((dmDoneCount / 11) * 100);
+        return (
+          <div className="border border-slate-200 rounded bg-white shadow-sm overflow-hidden">
+            <div className="grid grid-cols-3 divide-x divide-slate-100">
+              {/* Col 1 — Progreso global */}
+              <div className="px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Progreso del estudio</p>
+                <div className="flex items-end gap-2 mb-1.5">
+                  <span className="text-2xl font-bold tabular-nums text-slate-700 leading-none">{dmDoneCount}</span>
+                  <span className="text-xs text-slate-400 mb-0.5">/ 11 etapas</span>
+                  <span className="ml-auto text-xs font-bold tabular-nums text-brand-primary">{pct}%</span>
+                </div>
+                <div className="h-1 bg-slate-100 overflow-hidden">
+                  <div className="h-full bg-brand-primary transition-all duration-500" style={{ width: `${pct}%` }} />
+                </div>
+                {/* Mini pipeline de etapas */}
+                <div className="flex gap-px mt-2" aria-hidden="true">
+                  {stageStatuses.map((s, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 h-0.5 rounded-sm ${s === "done" ? "bg-brand-primary" : s === "active" || s === "pending" ? "bg-amber-400" : "bg-slate-200"}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Col 2 — KPIs críticos */}
+              <div className="px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Hallazgos clave</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                      Temas doble material
+                    </span>
+                    <span className={`tabular-nums text-sm font-bold ${quadrantCounts.doble_material > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                      {quadrantCounts.doble_material > 0 ? quadrantCounts.doble_material : "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      IROs calificados
+                    </span>
+                    <span className={`tabular-nums text-sm font-bold ${iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length > 0 ? "text-amber-600" : "text-slate-300"}`}>
+                      {iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length > 0
+                        ? `${iros.filter(i => i.incluido && i.score_impacto && i.score_financiero).length}/${iros.filter(i => i.incluido).length}`
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-rose-300 shrink-0" />
+                      Brechas de datos críticas
+                    </span>
+                    <span className={`tabular-nums text-sm font-bold ${quadrantCounts.brechas_criticas > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                      {quadrantCounts.brechas_criticas > 0 ? quadrantCounts.brechas_criticas : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Col 3 — Siguiente paso */}
+              <div className="px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  {nextStage ? "Siguiente paso" : "Estado del estudio"}
+                </p>
+                {nextStage ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${nextStage.status === "active" ? "bg-brand-primary" : "bg-amber-400"}`} />
+                      <span className="text-xs font-semibold text-slate-700 leading-snug">{nextStage.label}</span>
+                    </div>
+                    {nextStage.lockedReason && nextStage.status !== "active" && (
+                      <p className="text-[10px] text-slate-400 leading-snug">{nextStage.lockedReason}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => navigateTo(nextStage.sectionId)}
+                      className="mt-1 text-[11px] font-semibold text-brand-primary hover:text-brand-primary-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm"
+                    >
+                      Ir a {nextStage.label} →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-xs font-semibold text-emerald-700">Estudio completo</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Sentinel: IntersectionObserver lo monitorea — al salir de viewport, stepper queda pinned */}
       <div ref={stepperSentinelRef} className="h-px -mb-px" aria-hidden="true" />
       {/* ── Stepper V3 — card con pill bar + progress + chips ── */}
@@ -779,6 +880,7 @@ export function DoubleMaterialidadTab({
           referentCompanies={(benchmarkEmpresasRec?.proposed_companies ?? []).filter(
             (c) => (benchmarkEmpresasRec?.enabled_companies ?? []).includes(c.id)
           )}
+          onGoToIros={() => navigateTo("dm-sec-iros")}
         />
 
       </CollapsibleStageSection>
@@ -930,7 +1032,7 @@ export function DoubleMaterialidadTab({
         isActive={activeStageId === "dm-sec-validacion"}
         isNextLocked={stage10Status === "locked"}
         lockReason="Genera el resumen ejecutivo (Etapa 9) para iniciar la sesión de validación con el cliente."
-        subtitle="Decisiones del cliente sobre cada IRO incluido — aprobación, ajuste o descarte"
+        subtitle="Decisiones del cliente sobre cada IRO incluido — aprobación, ajuste o descarte · paralela al Reporte (no bloquea)"
         headerRight={
           includedIros.length > 0 ? (
             <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
@@ -956,6 +1058,10 @@ export function DoubleMaterialidadTab({
           hasReport ? (
             <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-sm font-bold whitespace-nowrap">
               Listo para descarga
+            </span>
+          ) : stage10Status === "active" && stage9Status !== "done" ? (
+            <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-sm whitespace-nowrap italic">
+              Validación cliente: opcional
             </span>
           ) : null
         }

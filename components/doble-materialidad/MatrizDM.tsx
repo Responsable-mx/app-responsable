@@ -431,6 +431,16 @@ export function MatrizDM({ iros, onGoToIros }: Props) {
             <rect x={plotX0} y={midYPx} width={midXPx - plotX0} height={plotY1 - midYPx}
               fill="#64748b" opacity={0.04} />
 
+            {/* Etiquetas de cuadrante — esquinas, estilo McKinsey/BCG */}
+            <text x={midXPx + 6} y={plotY0 + 12} fontSize={7} fill="#f43f5e" opacity={0.6} fontWeight={700} letterSpacing="0.08em">DOBLE MATERIAL</text>
+            <text x={midXPx + 6} y={plotY0 + 22} fontSize={6.5} fill="#f43f5e" opacity={0.38}>Acción prioritaria</text>
+            <text x={plotX0 + 4} y={plotY0 + 12} fontSize={7} fill="#d97706" opacity={0.6} fontWeight={700} letterSpacing="0.08em">SOLO IMPACTO</text>
+            <text x={plotX0 + 4} y={plotY0 + 22} fontSize={6.5} fill="#d97706" opacity={0.38}>Gestión activa</text>
+            <text x={midXPx + 6} y={plotY1 - 14} fontSize={7} fill="#0d9488" opacity={0.6} fontWeight={700} letterSpacing="0.08em">SOLO FINANCIERO</text>
+            <text x={midXPx + 6} y={plotY1 - 4} fontSize={6.5} fill="#0d9488" opacity={0.38}>Monitoreo</text>
+            <text x={plotX0 + 4} y={plotY1 - 14} fontSize={7} fill="#64748b" opacity={0.6} fontWeight={700} letterSpacing="0.08em">EN SEGUIMIENTO</text>
+            <text x={plotX0 + 4} y={plotY1 - 4} fontSize={6.5} fill="#64748b" opacity={0.38}>Vigilancia</text>
+
             {/* Grid lines */}
             {tickPositions.map((v) => (
               <g key={`grid-${v}`}>

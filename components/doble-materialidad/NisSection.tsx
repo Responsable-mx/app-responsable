@@ -191,10 +191,45 @@ export function NisSection({
       </div>
 
       {nisRows.length === 0 ? (
-        <div className="border-l-4 border-l-slate-300 pl-4 py-2">
-          <p className="text-xs text-slate-500">
-            Haz clic en &ldquo;Auto-completar&rdquo; para pre-llenar el mapa de brechas basado en el cuestionario del cliente.
-          </p>
+        <div className="border border-slate-200 rounded bg-slate-50/60 p-4 space-y-3">
+          {/* Explicación pedagógica de NIS/IBSO */}
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-8 h-8 rounded bg-amber-100 flex items-center justify-center mt-0.5">
+              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-700 mb-0.5">¿Qué son los indicadores NIS/IBSO?</p>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Son los <strong className="text-slate-600">datos concretos</strong> que el cliente necesita recopilar para reportar cada IRO material — por ejemplo, toneladas de CO₂, horas de capacitación, porcentaje de paridad salarial. Este mapa identifica cuáles datos ya existen, cuáles están incompletos y cuáles aún no se han medido.
+              </p>
+            </div>
+          </div>
+
+          {/* Qué esperar */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            {[
+              { label: "Disponible", desc: "El cliente ya tiene este dato documentado", color: "bg-emerald-100 text-emerald-700" },
+              { label: "Parcial", desc: "Existe información pero incompleta o desactualizada", color: "bg-amber-100 text-amber-700" },
+              { label: "No identificado", desc: "No se ha medido este indicador — requiere acción", color: "bg-slate-100 text-slate-500" },
+            ].map((item) => (
+              <div key={item.label} className="space-y-1">
+                <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${item.color}`}>{item.label}</span>
+                <p className="text-[10px] text-slate-400 leading-snug">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
+            <svg className="w-3.5 h-3.5 text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <p className="text-[11px] text-slate-500">
+              Haz clic en <strong className="text-slate-600">"Auto-completar desde cuestionario"</strong> para que la IA pre-llene el mapa con los indicadores más relevantes para el sector del cliente.
+              {!hasBenchmark && <span className="text-amber-600 ml-1">Completa el benchmark primero.</span>}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="overflow-x-auto border border-slate-200 rounded">

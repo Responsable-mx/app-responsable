@@ -85,7 +85,7 @@ function parseSynthesis(text: string): SynthesisSection[] | null {
 // Regex con todos los marcadores — extrae texto previo al primer marcador
 const FIRST_MARKER_RE = /[Ss]us fortalezas son[:\s]|[Ff]ortalezas[:\s]|[Ll]as brechas críticas son[:\s]|[Bb]rechas críticas[:\s]|[Pp]rioridad(?:es)? inmediata[:\s]|[Pp]rioridad[:\s]/;
 
-function SynthesisBlock({ narrative, createdAt }: { narrative: string; createdAt: string }) {
+function SynthesisBlock({ narrative, createdAt, onGoToIros }: { narrative: string; createdAt: string; onGoToIros?: () => void }) {
   const sections = parseSynthesis(narrative);
 
   // Extraer párrafo de apertura (antes del primer marcador)
@@ -118,6 +118,18 @@ function SynthesisBlock({ narrative, createdAt }: { narrative: string; createdAt
                 {s.label}
               </span>
               <p className="text-sm text-slate-700 leading-relaxed">{s.text}</p>
+              {s.label === "Brechas críticas" && onGoToIros && (
+                <button
+                  type="button"
+                  onClick={onGoToIros}
+                  className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-primary hover:text-brand-primary-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 rounded-sm"
+                >
+                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Ver Inventario de IROs del cliente →
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -144,6 +156,7 @@ export function BenchmarkSection({
   isPolling,
   onStartPolling,
   referentCompanies = [],
+  onGoToIros,
 }: {
   clientId: string;
   clientName: string;
@@ -154,6 +167,8 @@ export function BenchmarkSection({
   onStartPolling: () => void;
   /** Empresas validadas en Etapa 3 (Empresas de referencia). Cuando presente, oculta "Proponer con IA". */
   referentCompanies?: BenchmarkEmpresa[];
+  /** Navega al inventario de IROs del cliente (Etapa 6) desde brechas críticas */
+  onGoToIros?: () => void;
 }) {
   const { push } = useToast();
   const { data: irosData } = useSWR<{ data: DmIroConfig[] }>("/api/iros", fetcher);
@@ -786,6 +801,7 @@ export function BenchmarkSection({
         <SynthesisBlock
           narrative={latestResult!.narrative}
           createdAt={latestResult!.created_at}
+          onGoToIros={onGoToIros}
         />
       )}
 

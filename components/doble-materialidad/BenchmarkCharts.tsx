@@ -84,7 +84,8 @@ export function RankingChart({
               fontWeight={co.isClient ? "700" : "400"}
               fill={co.isClient ? "#0f766e" : "#475569"}
             >
-              {truncate(co.name, 14)}
+              {co.name.length > 17 && <title>{co.name}</title>}
+              {truncate(co.name, 17)}
             </text>
             {wSol > 0 && <rect x={LABEL_W} y={barY} width={wSol} height={barH} fill="#10b981" rx="1" />}
             {wPar > 0 && <rect x={LABEL_W + wSol} y={barY} width={wPar} height={barH} fill="#f59e0b" rx="1" />}
@@ -258,7 +259,8 @@ export function BrechaUrgencyChart({ items }: { items: BrechaItem[] }) {
         return (
           <g key={item.label}>
             <text x={BLW - 4} y={y + BHR / 2 + 3.5} textAnchor="end" fontSize="8" fill="#334155">
-              {truncate(item.label, 18)}
+              {item.label.length > 22 && <title>{item.label}</title>}
+              {truncate(item.label, 22)}
             </text>
             <rect x={BLW} y={barY} width={barW} height={barH} fill={color} fillOpacity="0.8" rx="1" />
             <text x={BLW + barW + 4} y={y + BHR / 2 + 3.5} fontSize="7" fill={color}>

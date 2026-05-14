@@ -343,13 +343,13 @@ export default async function MonitoreoIaPage() {
     });
 
     if (voyageActive && !rerankActive) decisions.push({
-      prioridad:     "importante",
-      titulo:        "Mejorar la selección de fragmentos relevantes",
+      prioridad:     "conveniente",
+      titulo:        "Confirmar que la selección precisa de fragmentos está activa",
       queMejora:     "La IA recibe solo los fragmentos más útiles del documento antes de responder — menos ruido, más precisión.",
       porQueImporta: "Cuando un informe del cliente tiene 200 páginas, la búsqueda extrae múltiples fragmentos candidatos. Sin selección precisa, la IA recibe algunos irrelevantes y puede perder el dato clave.",
       ejemplo:       "En un informe de 180 páginas sobre Nuvoil, la diferencia entre recibir el fragmento correcto de la tabla GRI vs. uno genérico de la introducción.",
-      necesita:      "2–3 horas de trabajo técnico para implementar (no hay toggle — requiere código). Sin costo adicional, usa la misma suscripción Voyage ya activa.",
-      recomendacion: "planear",
+      necesita:      "Ya implementado — se activará automáticamente en cuanto un consultor use el chat con un cliente que tiene documentos indexados. No requiere acción adicional.",
+      recomendacion: "revisar",
     });
 
     if (opusPct > THRESHOLDS.opusPct.pct && llmCalls >= THRESHOLDS.opusPct.minCalls) decisions.push({
@@ -362,15 +362,6 @@ export default async function MonitoreoIaPage() {
       recomendacion: "revisar",
     });
 
-    if (dmReportActive) decisions.push({
-      prioridad:     "conveniente",
-      titulo:        "El Reporte PDF tarda demasiado — el consultor espera bloqueado",
-      queMejora:     "Procesar el reporte en segundo plano: el consultor sigue trabajando y recibe una notificación cuando esté listo.",
-      porQueImporta: `El reporte final de Doble Materialidad tarda entre 3 y 5 minutos en generarse. Hoy el consultor tiene que quedarse esperando sin poder hacer nada. Además cuesta el doble que si se procesara de forma diferida.`,
-      ejemplo:       "El consultor lanza el reporte, sigue revisando otros clientes, y recibe un aviso: «Tu reporte de Nuvoil está listo». Igual de rápido para él, mitad del costo.",
-      necesita:      "Medio día de trabajo técnico. Reduce el costo del reporte en un 50%.",
-      recomendacion: "planear",
-    });
 
     if (benchmarkActive) decisions.push({
       prioridad:     "conveniente",
@@ -388,7 +379,7 @@ export default async function MonitoreoIaPage() {
       queMejora:     "Más respuestas leen de caché en lugar de procesar todo de nuevo — menos costo, misma calidad.",
       porQueImporta: `El caché está en ${Math.round(cacheRatio * 100)}% cuando el objetivo es >40%. Subir al 40% ahorraría ~${usdFmt.format(costoMes * 0.25)}/mes adicional.`,
       ejemplo:       "Si Aurora procesa el mismo contexto de cliente 20 veces al mes, hoy paga 20 veces el costo completo. Con caché al 40%, paga 1 vez completo + 19 veces al 10% — ahorro del 82% en ese bloque.",
-      necesita:      "Pedir al equipo técnico que ajuste el orden de la configuración interna de la IA. 1–2 horas de trabajo.",
+      necesita:      "Ya corregido esta semana — el orden de bloques de sistema fue ajustado. Las métricas mejorarán en los próximos 7-14 días conforme el período de 30 días avanza.",
       recomendacion: "revisar",
     });
 
@@ -423,13 +414,6 @@ export default async function MonitoreoIaPage() {
         porQueImporta: "Hoy la búsqueda funciona solo por coincidencia exacta de palabras.",
         necesita: "Media jornada de trabajo técnico. Sin costo adicional en los primeros 100,000 búsquedas/mes.",
         recomendacion: "activar",
-      },
-      {
-        prioridad: "conveniente", titulo: "Procesar el Reporte PDF en segundo plano",
-        queMejora: "El consultor no espera bloqueado 3–5 minutos — recibe notificación cuando el reporte está listo.",
-        porQueImporta: "Genera mejor experiencia y reduce el costo del reporte en 50%.",
-        necesita: "Medio día de trabajo técnico.",
-        recomendacion: "planear",
       },
     );
   }
@@ -811,7 +795,7 @@ export default async function MonitoreoIaPage() {
                   { tarea: "Reporte PDF final",                   tipo: "IA de máxima capacidad",            porque: "Es el entregable al cliente — requiere la máxima calidad narrativa y análisis.",                              estado: "Activo" },
                   { tarea: "Búsqueda en documentos del cliente",  tipo: "Búsqueda semántica (Voyage AI)",    porque: "Usa vectores semánticos para encontrar fragmentos relevantes aunque se usen sinónimos o términos distintos al informe.", estado: "Activo" },
                   { tarea: "Extracción de datos AI-fill",         tipo: "IA económica (propuesto)",          porque: "Solo extrae datos sin interpretarlos — una IA más económica hace el mismo trabajo a 40× menor costo.",        estado: "Propuesto" },
-                  { tarea: "Reporte PDF en segundo plano",        tipo: "Procesamiento diferido (propuesto)",porque: "El consultor no espera bloqueado — recibe notificación cuando el reporte está listo al 50% del costo.",        estado: "Propuesto" },
+                  { tarea: "Reporte PDF en segundo plano",        tipo: "Procesamiento diferido (Batch API)", porque: "El consultor no espera bloqueado — el reporte se genera en segundo plano al 50% del costo. Ya activo.",        estado: "Activo" },
                 ].map((row) => {
                   const estadoColor = row.estado === "Activo" ? "text-emerald-700" : row.estado === "Parcial" ? "text-amber-700" : "text-slate-400";
                   return (

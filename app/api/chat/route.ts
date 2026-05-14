@@ -14,10 +14,11 @@ import { ChatRequestSchema } from "@/lib/validation";
 import type { ChatStreamEvent } from "@/lib/ai/stream-types";
 import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
-// AbortSignal 45s (margen ~30% vs maxDuration 60s).
-const STREAM_TIMEOUT_MS = 45_000;
+// AbortSignal 100s (margen ~17% vs maxDuration 120s).
+// Aurora puede tardar 80-90s con contexto extenso — 45s era demasiado corto.
+const STREAM_TIMEOUT_MS = 100_000;
 const OVERLOADED_RETRY_DELAY_MS = 2_000;
 
 // Rate limit: 30 mensajes / 5 min por email. Evita que un loop accidental

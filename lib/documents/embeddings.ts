@@ -33,7 +33,10 @@ type VoyageRerankResponse = {
 
 type VoyageMeta = { userEmail?: string; clientId?: string | null };
 
-/** Voyage API — 1 o N inputs en una sola llamada HTTP. */
+const VOYAGE_MAX_RETRIES = 3;
+const VOYAGE_RETRY_BASE_MS = 500; // 500ms → 1s → 2s
+
+/** Voyage API — 1 o N inputs en una sola llamada HTTP. Reintenta ante 429/5xx con backoff. */
 async function callVoyageRaw(
   inputs: string[],
   inputType: "document" | "query",
@@ -44,32 +47,48 @@ async function callVoyageRaw(
   const model = process.env.VOYAGE_MODEL || "voyage-2";
   const cap = inputType === "document" ? 30_000 : 4_000;
   const startedAt = Date.now();
-  try {
-    const res = await fetch("https://api.voyageai.com/v1/embeddings", {
-      method: "POST",
-      signal: AbortSignal.timeout(30_000),
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        input: inputs.map((s) => s.slice(0, cap)),
-        model,
-        input_type: inputType,
-      }),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[embeddings] voyage error:", res.status, errText);
-      void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: `voyage ${res.status}: ${errText.slice(0, 200)}`, workflowStage: "embeddings" });
-      return null;
+  const body = JSON.stringify({
+    input: inputs.map((s) => s.slice(0, cap)),
+    model,
+    input_type: inputType,
+  });
+
+  let lastErrText = "";
+  let lastStatus = 0;
+
+  for (let attempt = 0; attempt <= VOYAGE_MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, VOYAGE_RETRY_BASE_MS * Math.pow(2, attempt - 1)));
     }
-    const json = (await res.json()) as VoyageResponse;
-    const tokens = json.usage?.total_tokens ?? 0;
-    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model: json.model ?? model, inputTokens: tokens, outputTokens: 0, latencyMs: Date.now() - startedAt, error: null , workflowStage: "embeddings" });
-    return json.data?.map((d) => d.embedding) ?? null;
-  } catch (e) {
-    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: e instanceof Error ? e.message : "Voyage fetch failed" , workflowStage: "embeddings" });
-    console.error("[embeddings] voyage fetch failed:", e);
-    return null;
+    try {
+      const res = await fetch("https://api.voyageai.com/v1/embeddings", {
+        method: "POST",
+        signal: AbortSignal.timeout(30_000),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body,
+      });
+      if (res.ok) {
+        const json = (await res.json()) as VoyageResponse;
+        const tokens = json.usage?.total_tokens ?? 0;
+        void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model: json.model ?? model, inputTokens: tokens, outputTokens: 0, latencyMs: Date.now() - startedAt, error: null, workflowStage: "embeddings" });
+        return json.data?.map((d) => d.embedding) ?? null;
+      }
+      lastStatus  = res.status;
+      lastErrText = (await res.text()).slice(0, 200);
+      // Reintentable: rate limit (429) o error de servidor (5xx)
+      if (res.status === 429 || res.status >= 500) continue;
+      // No reintentable: 4xx distinto de 429 (clave inválida, input malformado, etc.)
+      break;
+    } catch (e) {
+      lastErrText = e instanceof Error ? e.message : "Voyage fetch failed";
+      lastStatus  = 0;
+      // Timeouts y errores de red son reintentables
+    }
   }
+
+  console.error("[embeddings] voyage error after retries:", lastStatus, lastErrText);
+  void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: `voyage ${lastStatus}: ${lastErrText}`, workflowStage: "embeddings" });
+  return null;
 }
 
 async function callVoyage(input: string, inputType: "document" | "query", meta?: VoyageMeta): Promise<number[] | null> {

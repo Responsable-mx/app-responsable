@@ -19,6 +19,10 @@ type HandlerResult = {
   status: "ok" | "partial" | "failed";
   summary?: Record<string, unknown>;
   error?: string;
+  /** Costo estimado de esta ejecución (USD) */
+  cost_usd?: number;
+  /** Ahorro estimado: trabajo manual o llamadas IA evitadas (USD) */
+  savings_usd?: number;
 };
 
 async function handleCompetitorReports(staleAfterDays: number): Promise<HandlerResult> {
@@ -67,9 +71,17 @@ async function handleCompetitorReports(staleAfterDays: number): Promise<HandlerR
     else failed++;
   }
 
+  // Costo: ~$0.02/doc (LlamaParse parse + embed). Ahorro: ~15 min trabajo manual
+  // del consultor para encontrar, descargar y verificar frescura del PDF.
+  // Valor consultor: ~$0.30/min (18USD/h), así que 15min ≈ $4.50/doc.
+  const cost_usd = Number((refreshed * 0.02).toFixed(4));
+  const savings_usd = Number((refreshed * 4.5).toFixed(2));
+
   return {
     status: failed === 0 ? "ok" : refreshed > 0 ? "partial" : "failed",
     summary: { stale_found: stale.length, refreshed, failed },
+    cost_usd,
+    savings_usd,
   };
 }
 
@@ -103,7 +115,12 @@ async function handleEmbeddingsRecompute(staleAfterDays: number): Promise<Handle
     .select("id")
     .limit(50);
   if (error) return { status: "failed", error: error.message };
-  return { status: "ok", summary: { reset_for_reembed: data?.length ?? 0 } };
+  const resetCount = data?.length ?? 0;
+  // Costo: $0.001/chunk en Voyage. Ahorro: respuestas IA con contexto desactualizado
+  // evitado — estimado $0.10/chunk en llamadas de retrieval que habrían fallado.
+  const cost_usd   = Number((resetCount * 0.001).toFixed(4));
+  const savings_usd = Number((resetCount * 0.10).toFixed(4));
+  return { status: "ok", summary: { reset_for_reembed: resetCount }, cost_usd, savings_usd };
 }
 
 async function handleClientDocumentsReparse(_staleAfterDays: number): Promise<HandlerResult> {
@@ -162,13 +179,27 @@ export async function GET(req: Request) {
 
     try {
       const handlerResult = await handler(freqDays);
+      const runCost    = handlerResult.cost_usd    ?? 0;
+      const runSavings = handlerResult.savings_usd ?? 0;
+      // Fetch current totals to increment (Supabase no soporta UPDATE … SET col = col + N)
+      const { data: cur } = await admin
+        .from("auto_update_config")
+        .select("total_cost_usd,total_savings_usd")
+        .eq("resource_key", resourceKey)
+        .maybeSingle();
+      const newTotalCost    = Number(((cur?.total_cost_usd    as number | null) ?? 0) + runCost).toFixed(4);
+      const newTotalSavings = Number(((cur?.total_savings_usd as number | null) ?? 0) + runSavings).toFixed(4);
       await admin
         .from("auto_update_config")
         .update({
-          last_run_at: new Date().toISOString(),
-          last_status: handlerResult.status,
-          last_error: handlerResult.error ?? null,
-          last_run_summary: handlerResult.summary ?? null,
+          last_run_at:       new Date().toISOString(),
+          last_status:       handlerResult.status,
+          last_error:        handlerResult.error ?? null,
+          last_run_summary:  handlerResult.summary ?? null,
+          last_run_cost_usd:    runCost > 0    ? runCost    : null,
+          last_run_savings_usd: runSavings > 0 ? runSavings : null,
+          total_cost_usd:    newTotalCost,
+          total_savings_usd: newTotalSavings,
         })
         .eq("resource_key", resourceKey);
       results.push({ resource_key: resourceKey, ran: true, status: handlerResult.status, summary: handlerResult.summary });

@@ -58,15 +58,15 @@ async function callVoyageRaw(
     if (!res.ok) {
       const errText = await res.text();
       console.error("[embeddings] voyage error:", res.status, errText);
-      void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: `voyage ${res.status}: ${errText.slice(0, 200)}` });
+      void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: `voyage ${res.status}: ${errText.slice(0, 200)}`, workflowStage: "embeddings" });
       return null;
     }
     const json = (await res.json()) as VoyageResponse;
     const tokens = json.usage?.total_tokens ?? 0;
-    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model: json.model ?? model, inputTokens: tokens, outputTokens: 0, latencyMs: Date.now() - startedAt, error: null });
+    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model: json.model ?? model, inputTokens: tokens, outputTokens: 0, latencyMs: Date.now() - startedAt, error: null , workflowStage: "embeddings" });
     return json.data?.map((d) => d.embedding) ?? null;
   } catch (e) {
-    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: e instanceof Error ? e.message : "Voyage fetch failed" });
+    void logAiCall({ userEmail: meta?.userEmail ?? "cron@embeddings", role: "embeddings", clientId: meta?.clientId ?? null, model, inputTokens: 0, outputTokens: 0, latencyMs: Date.now() - startedAt, error: e instanceof Error ? e.message : "Voyage fetch failed" , workflowStage: "embeddings" });
     console.error("[embeddings] voyage fetch failed:", e);
     return null;
   }
@@ -236,6 +236,7 @@ export async function rerankChunks(opts: {
         outputTokens: 0,
         latencyMs: Date.now() - startedAt,
         error: `rerank ${res.status}: ${errText.slice(0, 200)}`,
+        workflowStage: "embeddings",
       });
       return opts.chunks; // fallback silencioso
     }
@@ -250,6 +251,7 @@ export async function rerankChunks(opts: {
       outputTokens: 0,
       latencyMs: Date.now() - startedAt,
       error: null,
+      workflowStage: "embeddings",
     });
     if (!json.data || json.data.length === 0) return opts.chunks;
     // Voyage devuelve items ya ordenados por relevance_score desc
@@ -267,6 +269,7 @@ export async function rerankChunks(opts: {
       outputTokens: 0,
       latencyMs: Date.now() - startedAt,
       error: e instanceof Error ? e.message : "rerank fetch failed",
+      workflowStage: "embeddings",
     });
     return opts.chunks; // fallback: orden original
   }

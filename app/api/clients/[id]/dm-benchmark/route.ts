@@ -464,11 +464,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     } catch (e) {
       anthropicBreaker.recordFailure();
       const msg = e instanceof Error ? e.message : "Error Anthropic";
-      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg });
+      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: msg, workflowStage: "dm_benchmark" });
       return NextResponse.json({ error: msg }, { status: 500 });
     }
 
-    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
+    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null, workflowStage: "dm_benchmark" });
 
     const jsonText = extractJsonObject(textOut);
     if (!jsonText) return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });

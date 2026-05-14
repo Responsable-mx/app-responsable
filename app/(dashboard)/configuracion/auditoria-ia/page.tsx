@@ -642,6 +642,75 @@ export default async function AuditoriaIaPage() {
         </div>
       )}
 
+      {/* ── Costo por etapa del flujo ──────────────────────────────────────── */}
+      {usage && usage.by_stage.length > 0 && (
+        <div className="mb-8">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+            Costo y velocidad por etapa — últimos 30 días
+          </p>
+          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+            Cuánto costó y cuánto tardó cada etapa del flujo de trabajo. Útil para detectar qué partes del proceso consumen más presupuesto.
+          </p>
+          <div className="bg-white border border-slate-200 rounded overflow-hidden">
+            <div className="overflow-x-auto">
+            <table className="min-w-full w-max text-xs">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
+                  <th className="px-4 py-2.5 text-left">Etapa</th>
+                  <th className="px-4 py-2.5 text-right">Llamadas</th>
+                  <th className="px-4 py-2.5 text-right">Costo total</th>
+                  <th className="px-4 py-2.5 text-right">Velocidad promedio</th>
+                  <th className="px-4 py-2.5 text-right">Fallas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {usage.by_stage.map((s) => {
+                  const errRate = s.calls > 0 ? s.errors / s.calls : 0;
+                  const stageLabel: Record<string, string> = {
+                    chat:                      "Chat con los 4 roles",
+                    dm_referentes:             "DM — Referentes ESG",
+                    dm_benchmark_empresas:     "DM — Propuesta de empresas",
+                    dm_benchmark:              "DM — Comparativa benchmark",
+                    dm_benchmark_company_iros: "DM — IROs por empresa",
+                    dm_iros:                   "DM — IROs del cliente",
+                    dm_resumen:                "DM — Resumen ejecutivo",
+                    dm_report:                 "DM — Reporte PDF",
+                    ai_fill:                   "Cuestionario — AI-fill",
+                    doc_fill:                  "Cuestionario — Doc-fill",
+                    research_reports:          "Búsqueda de informes",
+                    extract_profile:           "Extracción de perfil",
+                    embeddings:                "Indexación de documentos",
+                  };
+                  return (
+                    <tr key={s.stage} className="hover:bg-slate-50">
+                      <td className="px-4 py-2.5 font-semibold text-slate-800">
+                        {stageLabel[s.stage] ?? s.stage}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                        {numFmt.format(s.calls)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">
+                        {usdFmt.format(s.cost_usd)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">
+                        {s.avg_latency_ms > 0 ? latenciaLabel(s.avg_latency_ms) : "—"}
+                      </td>
+                      <td className={`px-4 py-2.5 text-right font-medium ${errRate > 0.05 ? "text-rose-600" : "text-slate-400"}`}>
+                        {s.errors > 0 ? `${s.errors} (${Math.round(errRate * 100)}%)` : "Ninguna"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-2">
+            Solo se muestran etapas con actividad en los últimos 30 días. Las etapas nuevas aparecerán aquí una vez que el sistema registre sus primeras llamadas.
+          </p>
+        </div>
+      )}
+
       {/* ── Qué IA se usa en cada tarea ─────────────────────────────────────── */}
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">

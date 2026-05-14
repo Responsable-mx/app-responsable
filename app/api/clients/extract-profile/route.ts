@@ -55,12 +55,12 @@ export async function POST(req: NextRequest) {
     const result = await extractProfileFromUrl(parsed.data.url);
     if (!result.cached) {
       const model = getTaskConfig("extract").model;
-      void logAiCall({ userEmail: user, role: "aurora", clientId: null, model, inputTokens: result.inputTokens ?? 0, outputTokens: result.outputTokens ?? 0, cacheCreationTokens: result.cacheCreationTokens ?? 0, cacheReadTokens: result.cacheReadTokens ?? 0, latencyMs: Date.now() - startedAt, error: null });
+      void logAiCall({ userEmail: user, role: "aurora", clientId: null, model, inputTokens: result.inputTokens ?? 0, outputTokens: result.outputTokens ?? 0, cacheCreationTokens: result.cacheCreationTokens ?? 0, cacheReadTokens: result.cacheReadTokens ?? 0, latencyMs: Date.now() - startedAt, error: null, workflowStage: "extract_profile" });
     }
     return NextResponse.json({ data: result });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error desconocido";
-    void logAiCall({ userEmail: user, role: "aurora", clientId: null, model: getTaskConfig("extract").model, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, latencyMs: Date.now() - startedAt, error: msg });
+    void logAiCall({ userEmail: user, role: "aurora", clientId: null, model: getTaskConfig("extract").model, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, latencyMs: Date.now() - startedAt, error: msg, workflowStage: "extract_profile" });
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

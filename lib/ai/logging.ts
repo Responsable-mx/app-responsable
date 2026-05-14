@@ -19,6 +19,10 @@ export type AiCallLog = {
   stopReason?: string | null;
   latencyMs: number;
   error?: string | null;
+  /** Etiqueta semántica del flujo: "chat", "dm_referentes", "dm_benchmark",
+   *  "dm_benchmark_company_iros", "dm_iros", "dm_resumen", "dm_report",
+   *  "ai_fill", "doc_fill", "extract_profile", "research_reports", "embeddings" */
+  workflowStage?: string | null;
 };
 
 /**
@@ -41,6 +45,7 @@ export async function logAiCall(call: AiCallLog): Promise<void> {
       stop_reason: call.stopReason ?? null,
       latency_ms: call.latencyMs,
       error: call.error ?? null,
+      workflow_stage: call.workflowStage ?? null,
     });
   } catch (e) {
     console.error("[ai/logging] failed to log call:", e);

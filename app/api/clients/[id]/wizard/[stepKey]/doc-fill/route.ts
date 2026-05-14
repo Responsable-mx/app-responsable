@@ -198,7 +198,7 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
     void logAiCall({
       userEmail: user, role: "aurora", clientId: id, model: modelCfg.model,
       inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens,
-      stopReason, latencyMs: Date.now() - startedAt, error: errorMsg,
+      stopReason, latencyMs: Date.now() - startedAt, error: errorMsg, workflowStage: "doc_fill",
     });
     return NextResponse.json({ error: errorMsg }, { status: isTimeout ? 504 : 500 });
   }
@@ -206,7 +206,7 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
   void logAiCall({
     userEmail: user, role: "aurora", clientId: id, model: modelCfg.model,
     inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens,
-    stopReason, latencyMs: Date.now() - startedAt, error: null,
+    stopReason, latencyMs: Date.now() - startedAt, error: null, workflowStage: "doc_fill",
   });
 
   const jsonText = extractJsonObject(textOut);

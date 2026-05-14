@@ -214,6 +214,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
               cacheReadTokens: ext.cacheReadTokens,
               latencyMs: Date.now() - new Date(b.created_at).getTime(),
               error: null,
+              workflowStage: "dm_benchmark_company_iros",
             });
           } else {
             await admin

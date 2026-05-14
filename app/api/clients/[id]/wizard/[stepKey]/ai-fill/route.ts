@@ -459,6 +459,7 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
       stopReason,
       latencyMs: Date.now() - startedAt,
       error: errorMsg,
+      workflowStage: "ai_fill",
     });
     return NextResponse.json({ error: errorMsg }, { status: isTimeout ? 504 : 500 });
   }
@@ -476,6 +477,7 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
     stopReason,
     latencyMs: Date.now() - startedAt,
     error: null,
+    workflowStage: "ai_fill",
   });
 
   // Output estructurado preferido (tool_use submit_responses).

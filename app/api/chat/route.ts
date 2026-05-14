@@ -178,6 +178,7 @@ export async function POST(req: NextRequest) {
           stopReason,
           latencyMs: Date.now() - startedAt,
           error,
+          workflowStage: "chat",
         });
       };
 

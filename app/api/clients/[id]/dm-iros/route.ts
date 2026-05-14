@@ -100,7 +100,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
             userEmail: latestBatch.created_by, role: "aurora", clientId: id,
             model: getModelConfig("aurora").model,
             inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens,
-            latencyMs: 0, error: null,
+            latencyMs: 0, error: null, workflowStage: "dm_iros",
           });
           return NextResponse.json({
             data: { status: "done", iros: (inserted ?? []) as IroInventoryItem[] },

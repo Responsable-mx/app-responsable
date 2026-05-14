@@ -48,6 +48,14 @@ export type UsageByRole = {
   errors: number;
 };
 
+export type UsageByStage = {
+  stage: string;
+  calls: number;
+  cost_usd: number;
+  avg_latency_ms: number;
+  errors: number;
+};
+
 export type UsageSummary = {
   window_days: number;
   total_calls: number;
@@ -60,6 +68,8 @@ export type UsageSummary = {
   by_model: UsageByModel[];
   /** Wave 5a: agregado por rol (Aurora/Rebeca/Elena/Valeria) en la ventana */
   by_role: UsageByRole[];
+  /** Sub-sprint 1: agregado por etapa de workflow (dm_referentes, chat, ai_fill…) */
+  by_stage: UsageByStage[];
   by_day_role: UsageRow[];
   top_users: Array<{ user_email: string; calls: number }>;
   top_clients: Array<{ client_id: string; calls: number; client_name: string | null }>;
@@ -84,6 +94,7 @@ export async function getUsageSummary(
     cost_usd_estimate_max: 0,
     by_model: [],
     by_role: [],
+    by_stage: [],
     by_day_role: [],
     top_users: [],
     top_clients: [],
@@ -110,7 +121,7 @@ export async function getUsageSummary(
   const { data: rows } = await admin
     .from("ai_calls")
     .select(
-      "user_email,client_id,role,model,input_tokens,output_tokens,cache_read_tokens,error,latency_ms"
+      "user_email,client_id,role,model,input_tokens,output_tokens,cache_read_tokens,error,latency_ms,workflow_stage"
     )
     .gte("created_at", since)
     .limit(20000);
@@ -190,6 +201,34 @@ export async function getUsageSummary(
   const costUsd = Number((inputUsd + outputUsd + cacheUsd).toFixed(3));
   const byModel: UsageByModel[] = Array.from(byModelMap.values())
     .map((m) => ({ ...m, cost_usd: Number(m.cost_usd.toFixed(3)) }))
+    .sort((a, b) => b.cost_usd - a.cost_usd);
+
+  // Sub-sprint 1: agregado por workflow_stage
+  type StageAcc = { calls: number; cost_usd: number; errors: number; latency_sum: number; latency_count: number };
+  const byStageMap = new Map<string, StageAcc>();
+  for (const r of calls) {
+    const stage = (r as Record<string, unknown>).workflow_stage as string | null;
+    if (!stage) continue;
+    const acc = byStageMap.get(stage) ?? { calls: 0, cost_usd: 0, errors: 0, latency_sum: 0, latency_count: 0 };
+    acc.calls += 1;
+    if (r.error) acc.errors += 1;
+    if (typeof r.latency_ms === "number") { acc.latency_sum += r.latency_ms; acc.latency_count += 1; }
+    // approximate cost per call using avg across all models for that call
+    const m2 = ((r.model as string | null) ?? "").toLowerCase();
+    const iIn2  = m2.includes("voyage") ? 0.10 : m2.includes("haiku") ? 0.25 : m2.includes("opus") ? 5 : 3;
+    const iOut2 = m2.includes("voyage") ? 0 : m2.includes("haiku") ? 1.25 : m2.includes("opus") ? 25 : 15;
+    const iCr2  = m2.includes("voyage") ? 0 : m2.includes("haiku") ? 0.03 : m2.includes("opus") ? 0.5 : 0.3;
+    acc.cost_usd += ((r.input_tokens ?? 0) * iIn2 + (r.output_tokens ?? 0) * iOut2 + (r.cache_read_tokens ?? 0) * iCr2) / 1_000_000;
+    byStageMap.set(stage, acc);
+  }
+  const byStage: UsageByStage[] = Array.from(byStageMap.entries())
+    .map(([stage, acc]) => ({
+      stage,
+      calls: acc.calls,
+      cost_usd: Number(acc.cost_usd.toFixed(4)),
+      avg_latency_ms: acc.latency_count > 0 ? Math.round(acc.latency_sum / acc.latency_count) : 0,
+      errors: acc.errors,
+    }))
     .sort((a, b) => b.cost_usd - a.cost_usd);
 
   const byRole: UsageByRole[] = Array.from(byRoleMap.values())
@@ -306,6 +345,7 @@ export async function getUsageSummary(
     cost_usd_estimate_max: costUsd,
     by_model: byModel,
     by_role: byRole,
+    by_stage: byStage,
     by_day_role: (byDayRole ?? []) as UsageRow[],
     top_users: topUsers,
     top_clients: topClients,

@@ -20,6 +20,11 @@ export type AutoUpdateConfigRow = {
   last_run_summary: Record<string, unknown> | null;
   updated_by: string | null;
   updated_at: string;
+  /** ROI tracking — poblado por el cron al ejecutar cada handler */
+  last_run_cost_usd:    number | null;
+  last_run_savings_usd: number | null;
+  total_cost_usd:       number | null;
+  total_savings_usd:    number | null;
 };
 
 const PatchSchema = z.object({

@@ -185,6 +185,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           cacheReadTokens,
           latencyMs: 0,
           error: batchError,
+          workflowStage: "dm_report",
         });
 
         if (narrative) {

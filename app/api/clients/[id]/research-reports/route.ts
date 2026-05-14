@@ -154,7 +154,7 @@ Busca el ${reportLabel} más reciente y devuelve hasta 5 candidatos como JSON.`;
     void logAiCall({
       userEmail: user, role: "aurora", clientId: id, model: modelCfg.model,
       inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens,
-      stopReason, latencyMs: Date.now() - startedAt, error: errorMsg,
+      stopReason, latencyMs: Date.now() - startedAt, error: errorMsg, workflowStage: "research_reports",
     });
     return NextResponse.json({ error: errorMsg }, { status: isTimeout ? 504 : 500 });
   }
@@ -162,7 +162,7 @@ Busca el ${reportLabel} más reciente y devuelve hasta 5 candidatos como JSON.`;
   void logAiCall({
     userEmail: user, role: "aurora", clientId: id, model: modelCfg.model,
     inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens,
-    stopReason, latencyMs: Date.now() - startedAt, error: null,
+    stopReason, latencyMs: Date.now() - startedAt, error: null, workflowStage: "research_reports",
   });
 
   const jsonText = extractJsonObject(textOut);

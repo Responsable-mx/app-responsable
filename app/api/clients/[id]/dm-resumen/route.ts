@@ -295,6 +295,7 @@ Responde SOLO en español (es-MX). Sin preámbulos.`;
     cacheReadTokens,
     latencyMs,
     error: callError,
+    workflowStage: "dm_resumen",
   });
 
   if (callError || !content) {

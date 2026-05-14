@@ -246,12 +246,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     } catch (e) {
       anthropicBreaker.recordFailure();
       const errMsg = e instanceof Error ? e.message : "Error Anthropic";
-      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: errMsg });
+      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: errMsg, workflowStage: "dm_referentes" });
       await admin.from("dm_referentes").upsert({ client_id: id, frameworks_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
       return NextResponse.json({ error: errMsg }, { status: 500 });
     }
 
-    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
+    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null, workflowStage: "dm_referentes" });
 
     const jsonText   = extractJsonObject(textOut);
     if (!jsonText) {
@@ -325,12 +325,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     } catch (e) {
       anthropicBreaker.recordFailure();
       const errMsg = e instanceof Error ? e.message : "Error Anthropic";
-      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: errMsg });
+      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: errMsg, workflowStage: "dm_referentes" });
       await admin.from("dm_referentes").upsert({ client_id: id, topics_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
       return NextResponse.json({ error: errMsg }, { status: 500 });
     }
 
-    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null });
+    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null, workflowStage: "dm_referentes" });
 
     const jsonText  = extractJsonObject(textOut);
     if (!jsonText) {

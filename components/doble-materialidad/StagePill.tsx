@@ -102,6 +102,11 @@ export function StagePill({
     return (
       <button
         type="button"
+        role="tab"
+        id={`tab-${sectionId}`}
+        aria-selected={selected}
+        aria-controls={sectionId}
+        tabIndex={selected ? 0 : -1}
         onClick={() => scrollToDmSection(sectionId)}
         aria-label={`Ir a ${label}`}
         title={title}

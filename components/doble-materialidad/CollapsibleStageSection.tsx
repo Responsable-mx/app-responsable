@@ -50,9 +50,11 @@ export function CollapsibleStageSection({
   return (
     <section
       id={id}
-      aria-labelledby={`stage-lbl-${id}`}
+      role="tabpanel"
+      aria-labelledby={`tab-${id}`}
+      tabIndex={0}
       key={id}
-      className="motion-safe:animate-[dmFadeIn_0.14s_ease-out]"
+      className="motion-safe:animate-[dmFadeIn_0.14s_ease-out] focus:outline-none"
     >
       <div className={`bg-white border border-slate-200 rounded shadow-sm border-l-4 ${accent}`}>
         {/* Header — H2 + subtitle + chips estado (mockup-v7 pattern) */}

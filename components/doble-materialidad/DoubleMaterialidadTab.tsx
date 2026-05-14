@@ -571,7 +571,11 @@ export function DoubleMaterialidadTab({
       <div className={`bg-white border border-slate-200 rounded shadow-sm sticky top-[96px] z-20 transition-all ${stepperCompact ? "shadow-none border-x-0 border-t-0 rounded-none" : ""}`}>
         <div className={`flex items-center gap-2 px-4 transition-all ${stepperCompact ? "py-1" : "py-2"}`}>
           {/* Pills — ancho completo distribuido. overflow-x-auto como fallback en mobile */}
-          <div className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            role="tablist"
+            aria-label="Etapas del estudio de Doble Materialidad"
+            className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             {stagesData.map((s, idx) => {
               const isSel = s.sectionId === activeStageId;
               let base: string;

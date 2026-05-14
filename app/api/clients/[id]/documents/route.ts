@@ -223,6 +223,41 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       after: { client_id: id, file_name: doc.file_name, kind: doc.kind, size_bytes: doc.size_bytes, service_ids: serviceIds },
     });
 
+    // Generar embeddings inline para que el chat semántico los use inmediatamente.
+    // Fire-and-forget: el cron 6:30 AM como red de seguridad para cualquier fallo.
+    if (doc.parse_status === "ok" && doc.markdown_content && process.env.VOYAGE_API_KEY) {
+      void (async () => {
+        try {
+          const { persistDocumentChunks, generateEmbeddingsBatch } = await import("@/lib/documents/embeddings");
+          const result = await persistDocumentChunks({ documentId: doc.id, clientId: id, markdownContent: doc.markdown_content! });
+          if (result.inserted > 0) {
+            // Leer los chunks recién insertados para generar embeddings en batch
+            const { createAdminClient: getAdmin } = await import("@/lib/supabase/admin");
+            const sb = getAdmin();
+            const { data: freshChunks } = await sb
+              .from("document_chunks")
+              .select("id, content")
+              .eq("document_id", doc.id)
+              .is("embedding", null)
+              .limit(500);
+            if (freshChunks && freshChunks.length > 0) {
+              const embeddings = await generateEmbeddingsBatch(
+                freshChunks.map((c) => c.content),
+                { userEmail: user, clientId: id }
+              );
+              for (let i = 0; i < freshChunks.length; i++) {
+                if (!embeddings[i]) continue;
+                const vec = `[${embeddings[i]!.join(",")}]`;
+                await sb.from("document_chunks").update({ embedding: vec }).eq("id", freshChunks[i]!.id);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[documents] inline embed failed:", e instanceof Error ? e.message : e);
+        }
+      })();
+    }
+
     return NextResponse.json({
       data: {
         id: doc.id,

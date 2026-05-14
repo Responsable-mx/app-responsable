@@ -162,6 +162,10 @@ export async function POST(req: NextRequest) {
   // invalidar los 2 bloques cacheados (contexto cliente + reglas del rol).
   // Skip la query completa si no hay rechazos activos (caso más común en piloto)
   const feedbackCount = await countActiveFeedback({ role, clientId: clientId || null }).catch(() => 0);
+
+  // Metadata para el evento SSE "sources" (transparencia hacia el consultor).
+  let sourceMeta: { chunksUsed: number; pages: number[] } | null = null;
+
   const [feedbackText, docChunksText] = await Promise.all([
     feedbackCount > 0
       ? buildFeedbackMemoryBlock({ role, clientId: clientId || null }).catch(() => "")
@@ -183,6 +187,11 @@ export async function POST(req: NextRequest) {
               const page = pageByContent.get(c);
               return page != null ? `[Página ${page}]\n${c}` : c;
             });
+            // Capturar metadata para evento SSE sources
+            const pages = [...new Set(
+              matches.map((m) => m.page_number).filter((p): p is number => p != null)
+            )].sort((a, b) => a - b);
+            sourceMeta = { chunksUsed: chunks.length, pages };
             return `FRAGMENTOS RELEVANTES DEL INFORME DEL CLIENTE:\n${chunksWithPage.join("\n\n---\n\n")}`;
           } catch {
             return "";
@@ -239,6 +248,8 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
 
+      let ttftMs: number | null = null;
+
       const logUsage = (
         usage: {
           input_tokens?: number | null;
@@ -263,10 +274,16 @@ export async function POST(req: NextRequest) {
           error,
           workflowStage: "chat",
           promptHash,
+          ttftMs,
         });
       };
 
       const runOnce = async () => {
+        // Emitir fragmentos del informe usados ANTES de iniciar el stream.
+        if (sourceMeta && sourceMeta.chunksUsed > 0) {
+          send({ type: "sources", chunks_used: sourceMeta.chunksUsed, pages: sourceMeta.pages });
+        }
+
         const response = await anthropic.messages.stream(
           {
             model: config.model,
@@ -287,6 +304,8 @@ export async function POST(req: NextRequest) {
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
+            // Capturar TTFT al llegar el primer token
+            if (ttftMs === null) ttftMs = Date.now() - startedAt;
             fullResponseText += event.delta.text;
             send({ type: "delta", text: event.delta.text });
           }

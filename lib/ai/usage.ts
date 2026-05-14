@@ -45,7 +45,16 @@ export type UsageByRole = {
   cache_read_tokens: number;
   cost_usd: number;
   avg_latency_ms: number;
+  /** TTFT promedio en ms (solo chat SSE — nulo para batch/cron) */
+  avg_ttft_ms: number;
   errors: number;
+};
+
+export type UsageByClient = {
+  client_id: string;
+  client_name: string | null;
+  calls: number;
+  cost_usd: number;
 };
 
 export type UsageByStage = {
@@ -87,6 +96,8 @@ export type UsageSummary = {
   feedback_by_client: FeedbackByClient[];
   /** Desglose de tipos de error para diagnóstico preciso en monitoreo */
   error_type_summary: ErrorTypeSummary;
+  /** Top 10 clientes por costo IA en el período */
+  by_client: UsageByClient[];
 };
 
 export async function getUsageSummary(
@@ -111,6 +122,7 @@ export async function getUsageSummary(
     feedback_total_down: 0,
     feedback_by_client: [],
     error_type_summary: { timeout: 0, overloaded: 0, rate_limit: 0, other: 0 },
+    by_client: [],
   };
   if (isDevMode()) return empty;
 
@@ -131,7 +143,7 @@ export async function getUsageSummary(
   const { data: rows } = await admin
     .from("ai_calls")
     .select(
-      "user_email,client_id,role,model,input_tokens,output_tokens,cache_read_tokens,error,latency_ms,workflow_stage"
+      "user_email,client_id,role,model,input_tokens,output_tokens,cache_read_tokens,error,latency_ms,ttft_ms,workflow_stage"
     )
     .gte("created_at", since)
     .limit(20000);
@@ -159,7 +171,7 @@ export async function getUsageSummary(
   let outputUsd = 0;
   let cacheUsd = 0;
   const byModelMap = new Map<UsageByModel["family"], UsageByModel>();
-  const byRoleMap = new Map<string, UsageByRole & { latency_sum: number; latency_count: number }>();
+  const byRoleMap = new Map<string, UsageByRole & { latency_sum: number; latency_count: number; ttft_sum: number; ttft_count: number }>();
   for (const r of calls) {
     const m = (r.model as string | null ?? "").toLowerCase();
     const isHaiku = m.includes("haiku");
@@ -194,7 +206,8 @@ export async function getUsageSummary(
     const role = (r.role as string | null) ?? "otro";
     const rAcc = byRoleMap.get(role) ?? {
       role, calls: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0,
-      cost_usd: 0, avg_latency_ms: 0, errors: 0, latency_sum: 0, latency_count: 0,
+      cost_usd: 0, avg_latency_ms: 0, avg_ttft_ms: 0, errors: 0,
+      latency_sum: 0, latency_count: 0, ttft_sum: 0, ttft_count: 0,
     };
     rAcc.calls += 1;
     rAcc.input_tokens += r.input_tokens ?? 0;
@@ -204,6 +217,11 @@ export async function getUsageSummary(
     if (typeof r.latency_ms === "number") {
       rAcc.latency_sum += r.latency_ms;
       rAcc.latency_count += 1;
+    }
+    const ttft = (r as Record<string, unknown>).ttft_ms;
+    if (typeof ttft === "number") {
+      rAcc.ttft_sum += ttft;
+      rAcc.ttft_count += 1;
     }
     if (r.error) rAcc.errors += 1;
     byRoleMap.set(role, rAcc);
@@ -250,6 +268,7 @@ export async function getUsageSummary(
       cache_read_tokens: r.cache_read_tokens,
       cost_usd: Number(r.cost_usd.toFixed(3)),
       avg_latency_ms: r.latency_count > 0 ? Math.round(r.latency_sum / r.latency_count) : 0,
+      avg_ttft_ms: r.ttft_count > 0 ? Math.round(r.ttft_sum / r.ttft_count) : 0,
       errors: r.errors,
     }))
     .sort((a, b) => b.cost_usd - a.cost_usd);
@@ -344,6 +363,35 @@ export async function getUsageSummary(
       .map(([reason_code, count]) => ({ reason_code, count })),
   }));
 
+  // Top 10 clientes por costo IA en el período
+  type ClientAcc = { cost_usd: number; calls: number };
+  const byClientMap = new Map<string, ClientAcc>();
+  for (const r of calls) {
+    if (!r.client_id) continue;
+    const m2 = ((r.model as string | null) ?? "").toLowerCase();
+    const iIn2  = m2.includes("voyage") ? 0.10 : m2.includes("haiku") ? 0.25 : m2.includes("opus") ? 5  : 3;
+    const iOut2 = m2.includes("voyage") ? 0    : m2.includes("haiku") ? 1.25 : m2.includes("opus") ? 25 : 15;
+    const iCr2  = m2.includes("voyage") ? 0    : m2.includes("haiku") ? 0.03 : m2.includes("opus") ? 0.5: 0.3;
+    const cost = ((r.input_tokens ?? 0) * iIn2 + (r.output_tokens ?? 0) * iOut2 + (r.cache_read_tokens ?? 0) * iCr2) / 1_000_000;
+    const acc = byClientMap.get(r.client_id as string) ?? { cost_usd: 0, calls: 0 };
+    acc.cost_usd += cost;
+    acc.calls += 1;
+    byClientMap.set(r.client_id as string, acc);
+  }
+  const topClientIdsByCost = Array.from(byClientMap.entries())
+    .sort((a, b) => b[1].cost_usd - a[1].cost_usd)
+    .slice(0, 10);
+  const { data: clientNameRows } = topClientIdsByCost.length
+    ? await admin.from("clients").select("id,name").in("id", topClientIdsByCost.map(([id]) => id))
+    : { data: [] };
+  const clientNameById = new Map((clientNameRows ?? []).map((c) => [c.id as string, c.name as string]));
+  const byClient: UsageByClient[] = topClientIdsByCost.map(([id, acc]) => ({
+    client_id: id,
+    client_name: clientNameById.get(id) ?? null,
+    calls: acc.calls,
+    cost_usd: Number(acc.cost_usd.toFixed(4)),
+  }));
+
   // Desglose de tipos de error — classifica errores por patrón en el texto
   const errorTypeSummary: ErrorTypeSummary = { timeout: 0, overloaded: 0, rate_limit: 0, other: 0 };
   for (const r of calls) {
@@ -379,5 +427,6 @@ export async function getUsageSummary(
     feedback_total_down: totalDown,
     feedback_by_client: feedbackByClient,
     error_type_summary: errorTypeSummary,
+    by_client: byClient,
   };
 }

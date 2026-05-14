@@ -25,6 +25,8 @@ export type AiCallLog = {
   workflowStage?: string | null;
   /** SHA-256 (16 chars) del system prompt estático — audit trail CSRD */
   promptHash?: string | null;
+  /** Tiempo al primer token del stream (ms). Solo en chat SSE. */
+  ttftMs?: number | null;
 };
 
 /**
@@ -49,6 +51,7 @@ export async function logAiCall(call: AiCallLog): Promise<void> {
       error: call.error ?? null,
       workflow_stage: call.workflowStage ?? null,
       prompt_hash: call.promptHash ?? null,
+      ttft_ms: call.ttftMs ?? null,
     });
   } catch (e) {
     console.error("[ai/logging] failed to log call:", e);

@@ -1,6 +1,6 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-14 (sesión 35 — implementación recomendaciones monitoreo-ia)
+**Fecha:** 2026-05-14 (sesión 39 — 6 mejoras IA: routing, resumen historial, citaciones, audit trail, tokens dinámicos, retry 429)
 **Calificación global:** 9.9 / 10
 
 ---

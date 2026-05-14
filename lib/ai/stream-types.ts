@@ -38,7 +38,14 @@ export type ChatStreamError = {
   error: string;
 };
 
-export type ChatStreamEvent = ChatStreamDelta | ChatStreamDone | ChatStreamError;
+/** Emitido antes del primer delta cuando el chat usa fragmentos del informe del cliente. */
+export type ChatStreamSources = {
+  type: "sources";
+  chunks_used: number;
+  pages: number[];
+};
+
+export type ChatStreamEvent = ChatStreamDelta | ChatStreamDone | ChatStreamError | ChatStreamSources;
 
 export function isChatStreamEvent(v: unknown): v is ChatStreamEvent {
   if (typeof v !== "object" || v === null) return false;
@@ -46,5 +53,5 @@ export function isChatStreamEvent(v: unknown): v is ChatStreamEvent {
   // D-21: validar también que `text` sea string en delta — evita "...undefined" en UI
   // si Anthropic cambia el formato del evento.
   if (t === "delta") return typeof (v as { text?: unknown }).text === "string";
-  return t === "done" || t === "error";
+  return t === "done" || t === "error" || t === "sources";
 }

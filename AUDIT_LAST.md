@@ -1,29 +1,38 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-05-14 (sesión 34 — fixes recomendaciones monitoreo-ia)
-**Calificación global:** 9.8 / 10
+**Fecha:** 2026-05-14 (sesión 35 — implementación recomendaciones monitoreo-ia)
+**Calificación global:** 9.9 / 10
 
 ---
 
-## Resumen ejecutivo sesión 34
+## Resumen ejecutivo sesión 35
 
-Análisis y corrección de las 4 tarjetas de recomendación en `/configuracion/monitoreo-ia`. 2 fixes técnicos + limpieza ESLint + stale comments.
+Implementación completa de las recomendaciones accionables del panel `/configuracion/monitoreo-ia`. 8 fixes + 1 feature nueva (búsqueda semántica en chat). ESLint 0/0, 357/357 tests, D-178 cerrado.
 
-## Fixes aplicados en sesión 34
+## Fixes aplicados en sesión 35
 
-### ✅ Voyage retry — `lib/documents/embeddings.ts`
-`callVoyageRaw` ahora reintenta 3 veces con backoff exponencial (500ms/1s/2s) ante 429 y 5xx. Solo loggea error después de agotar reintentos. Impacto: reduce falsos positivos en tarjeta "indexación nocturna" + permite que `rerankChunks` active la tarjeta "selección fragmentos".
+### ✅ Tarjeta "Reporte PDF" — false positive eliminado
+`monitoreo-ia/page.tsx`: trigger cambiado de `latenciaMs > THRESHOLDS.latenciaMs` → `dmReportActive` (presencia de stage `dm_report` en `by_stage`). La tarjeta solo aparece cuando se han generado reportes DM reales ese mes.
 
-### ✅ Aurora timeout — `app/api/chat/route.ts`
-`maxDuration` 60→120s, `STREAM_TIMEOUT_MS` 45→100s. Aurora promediaba 46.7s (picos a 87.8s) — el timeout era menor que la latencia promedio, causando el 12% de error rate.
+### ✅ D-178 cerrado — latencyMs real en 3 routes batch
+- `dm-iros/route.ts` — `Date.now() - new Date(latestBatch.created_at).getTime()`
+- `dm-report/route.ts` — `Date.now() - new Date(doc.created_at).getTime()`
+- `dm-benchmark/route.ts` — `Date.now() - new Date(latestResult.created_at).getTime()`
 
-### ✅ ESLint 2 problemas → 0/0
-- `MonitoreoIaTabs.tsx:20` — `setActive` en useEffect body → lazy initializer `useState(() => ...)` con `typeof window` guard.
-- `PricingConfigTable.tsx:3` — `useEffect` importado sin usar → removido del import.
+### ✅ voyageActive: `> 100` → `> 0`
+Inicio de mes con todos los chunks ya indexados generaba 0 llamadas Voyage → tarjeta "Activar búsqueda inteligente" aparecía incorrectamente aunque Voyage estuviera activo.
 
-### ✅ Stale comments
-- `lib/documents/embeddings.ts` — bloque "Hoy/Mañana" sobre activación Voyage actualizado ("activo en prod").
-- `CLAUDE.md` — header "Wave 5c → 7, pendiente activación prod" → "Wave 7 — activo en prod".
+### ✅ THRESHOLDS.latenciaMs: 10s → 30s
+Aurora promedia 46.7s → health check "Velocidad de Aurora" siempre en rojo con umbral 10s. Con 30s: verde <30s, amarillo 30-60s, rojo >60s. Realista para streaming LLM.
+
+### ✅ ESLint 0/0 — `_isGenerating` en BenchmarkIrosSection
+Prop `isGenerating` recibida pero no usada internamente → renombrada `_isGenerating`.
+
+### ✅ feat(chat): búsqueda semántica + rerank en chat
+`chat/route.ts` ahora corre `searchSimilarChunks` (top-20) + `rerankChunks` (top-8) en paralelo con feedbackMemory. Inyecta fragmentos relevantes del informe del cliente como bloque de sistema antes de cada respuesta de Aurora/Rebeca/Elena/Valeria. Fail-open. Activa la tarjeta "Selección precisa de fragmentos" en monitoreo-ia.
+
+### ✅ Orden de bloques de sistema — cache preservado
+`feedbackText` (semi-estático, cacheable) antes de `docChunksText` (dinámico por query, no cacheable). Restaurado `cache_control: ephemeral` en feedbackText. Sin esto, docChunks invalidaba el cache de feedback en cada mensaje.
 
 ## Tests
 
@@ -33,22 +42,23 @@ ESLint  : 0 errors, 0 warnings
 TSC     : 0 errors
 ```
 
-## Pendientes activos post-sesión 34
+## Pendientes activos post-sesión 35
 
 | ID | Sev | Descripción | Acción |
 |----|-----|-------------|--------|
-| D-178 | 🟢 | latencyMs=0 en logAiCall IROs batch | Calcular desde `submitted_at` columna existente |
 | D-04 | ⏸ | Metodología ResponSable no definida | Bloqueo de negocio, no técnico |
 
 ---
 
-## Score sesión 34
+## Score sesión 35
 
-| Dimensión | Post-33 | Post-34 | Delta |
+| Dimensión | Post-34 | Post-35 | Delta |
 |-----------|---------|---------|-------|
-| Confiabilidad | 9.8 | 9.9 (retry Voyage + timeout Aurora) | ↑ |
-| Calidad de código | 9.9 | 9.9 (ESLint 0/0, stale comments limpios) | = |
-| **Global** | **9.8** | **9.8** | = |
+| Confiabilidad | 9.9 | 9.9 | = |
+| Observabilidad | 9.6 | 9.8 (D-178 cerrado, latencyMs reales en 3 routes) | ↑ |
+| Rendimiento | 9.4 | 9.6 (chat con retrieval semántico, cache order correcto) | ↑ |
+| Calidad de código | 9.9 | 9.9 (ESLint 0/0) | = |
+| **Global** | **9.8** | **9.9** | ↑ |
 
 ---
 

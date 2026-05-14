@@ -147,10 +147,14 @@ export async function POST(req: NextRequest) {
       : Promise.resolve(""),
   ]);
 
+  // Orden de bloques optimizado para caché:
+  // 1+2. baseSystemBlocks (context + role) — cacheados con ephemeral
+  // 3. feedbackText — semi-estático (cambia solo con feedback nuevo) → cacheable
+  // 4. docChunksText — dinámico por query → NO cacheable, va al final
   const systemBlocks = [
     ...baseSystemBlocks,
+    ...(feedbackText ? [{ type: "text" as const, text: feedbackText, cache_control: { type: "ephemeral" as const } }] : []),
     ...(docChunksText ? [{ type: "text" as const, text: docChunksText }] : []),
-    ...(feedbackText ? [{ type: "text" as const, text: feedbackText }] : []),
   ];
 
   // Circuit breaker: rechazar inmediatamente si Anthropic está en cascada de fallos

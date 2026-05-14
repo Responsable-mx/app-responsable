@@ -38,7 +38,7 @@ const THRESHOLDS = {
   cacheRatio:   { max: 0.20, minCalls: 50 },
   costoAiFill:  { usd: 20,   minCalls: 30 },
   feedbackDown: 15,
-  latenciaMs:   10_000,
+  latenciaMs:   30_000,
 } as const;
 
 const COST_ALERT_THRESHOLD_USD    = Number(process.env.IA_COST_ALERT_USD    ?? 150);
@@ -185,7 +185,7 @@ export default async function MonitoreoIaPage() {
   const opusPct     = pct(opusModel?.calls ?? 0, llmCalls);
   const cacheRatio  = s && (s.total_input_tokens + s.total_cache_read_tokens) > 0
     ? s.total_cache_read_tokens / (s.total_input_tokens + s.total_cache_read_tokens) : 0;
-  const voyageActive    = voyageCalls > 100;
+  const voyageActive    = voyageCalls > 0;
   const rerankActive    = (s?.by_stage ?? []).some(st => st.stage === "rerank");
   const dmReportActive  = (s?.by_stage ?? []).some(st => st.stage === "dm_report" && st.calls > 0);
   const benchmarkCalls  = (s?.by_stage ?? []).filter(st => st.stage.startsWith("dm_benchmark")).reduce((sum, st) => sum + st.calls, 0);

@@ -102,6 +102,18 @@ async function checkQStash(): Promise<ToolHealth> {
   }
 }
 
+// Voyage Rerank usa la misma VOYAGE_API_KEY — health check comparte resultado con Voyage embeddings.
+// Si el embedding ping pasó, rerank también está disponible (mismo servicio, misma clave).
+function checkVoyageRerank(voyageHealth: ToolHealth): ToolHealth {
+  return voyageHealth;
+}
+
+// Batch API usa la misma ANTHROPIC_API_KEY — si existe, el endpoint está disponible.
+// No hacemos ping extra para no generar costos innecesarios.
+function checkBatchApi(): ToolHealth {
+  return process.env.ANTHROPIC_API_KEY ? { status: "ok" } : { status: "inactive" };
+}
+
 // ── Herramientas propuestas (sin health check — pendientes de activar) ─────────
 
 type ProposedTool = {
@@ -118,20 +130,6 @@ type ProposedTool = {
 };
 
 const PROPOSED_TOOLS: ProposedTool[] = [
-  {
-    name: "Voyage Rerank — Mejor selección de fragmentos",
-    tagline: "Elige los fragmentos más relevantes antes de enviárselos a la IA.",
-    whatItDoes:
-      "Después de buscar fragmentos de documentos, Voyage Rerank los reordena según cuál es realmente más útil para la pregunta específica. El paso de búsqueda encuentra candidatos; el reranking elige los mejores.",
-    whatYouGain:
-      "Aurora, Rebeca, Elena y Valeria reciben fragmentos más precisos del informe del cliente → respuestas más exactas y menos alucinaciones. Se estima +25% de precisión vs. búsqueda simple.",
-    cost: "$0 (incluido con Voyage AI)",
-    freeTier: "1,000,000 llamadas / mes gratis",
-    usedIn: "Chat IA — paso de recuperación de contexto",
-    setupUrl: "https://www.voyageai.com",
-    setupLabel: "voyageai.com",
-    envKey: "VOYAGE_API_KEY (ya configurada)",
-  },
   {
     name: "Upstash Redis — Caché de respuestas repetidas",
     tagline: "Evita llamar a la IA cuando la respuesta ya existe.",
@@ -159,20 +157,6 @@ const PROPOSED_TOOLS: ProposedTool[] = [
     setupUrl: "https://console.cloud.google.com",
     setupLabel: "Google AI Studio",
     envKey: "GOOGLE_AI_API_KEY",
-  },
-  {
-    name: "Anthropic Batch API — Reportes en segundo plano",
-    tagline: "Genera reportes largos al 50% del costo, sin bloquear al consultor.",
-    whatItDoes:
-      "En lugar de esperar 3-5 minutos a que Opus genere el reporte PDF en tiempo real, se encola como trabajo en segundo plano. Anthropic lo procesa en los próximos minutos y notifica cuando está listo.",
-    whatYouGain:
-      "50% de descuento automático en el reporte DM (hoy el costo más alto de la app). El consultor puede seguir trabajando mientras el reporte se genera. Aplica también a la generación masiva de IROs.",
-    cost: "50% del costo normal (Opus $2.50 vs $5 / 1M tokens)",
-    freeTier: "No aplica (es el precio regular con descuento)",
-    usedIn: "DM-IA etapa 7 (Reporte PDF) + etapa 4 (IROs propios masivos)",
-    setupUrl: "https://docs.anthropic.com/en/docs/build-with-claude/message-batches",
-    setupLabel: "docs.anthropic.com",
-    envKey: "ANTHROPIC_API_KEY (ya configurada)",
   },
 ];
 
@@ -209,6 +193,9 @@ export default async function HerramientasPage() {
   const [voyageHealth, llamaHealth, mistralHealth, qstashHealth] =
     await Promise.all([checkVoyage(), checkLlamaParse(), checkMistralOcr(), checkQStash()]);
 
+  const rerankHealth = checkVoyageRerank(voyageHealth);
+  const batchHealth = checkBatchApi();
+
   const TOOLS: Tool[] = [
     {
       name: "Voyage AI — Búsqueda semántica",
@@ -221,6 +208,18 @@ export default async function HerramientasPage() {
       setupUrl: "https://www.voyageai.com",
       setupLabel: "voyageai.com",
       health: voyageHealth,
+    },
+    {
+      name: "Voyage Rerank — Selección precisa de fragmentos",
+      envKey: "VOYAGE_API_KEY",
+      tagline: "Elige los fragmentos más relevantes del informe antes de enviárselos a la IA.",
+      whatItDoes:
+        "Después de buscar los 20 fragmentos más cercanos, Voyage Rerank los reordena según cuál es realmente más útil para la pregunta específica. El chat aplica este reranking a los 8 mejores antes de construir el contexto.",
+      whatYouGain:
+        "Aurora, Rebeca, Elena y Valeria reciben fragmentos más precisos del informe del cliente → respuestas más exactas, menos alucinaciones. Sin costo adicional — incluido con la misma API key de Voyage.",
+      setupUrl: "https://www.voyageai.com",
+      setupLabel: "voyageai.com",
+      health: rerankHealth,
     },
     {
       name: "LlamaParse — Lectura de PDFs complejos",
@@ -257,6 +256,18 @@ export default async function HerramientasPage() {
       setupUrl: "https://console.upstash.com",
       setupLabel: "console.upstash.com",
       health: qstashHealth,
+    },
+    {
+      name: "Anthropic Batch API — Generación en segundo plano",
+      envKey: "ANTHROPIC_API_KEY",
+      tagline: "Genera reportes y bloques largos al 50% del costo, sin bloquear al consultor.",
+      whatItDoes:
+        "En lugar de esperar a que Opus genere el reporte PDF o los IROs en tiempo real, la tarea se encola como trabajo en segundo plano. Anthropic lo procesa de forma asíncrona y la app recupera el resultado cuando está listo.",
+      whatYouGain:
+        "50% de descuento automático en los pasos más costosos: Reporte DM (etapa 7) e IROs por empresa (etapa 4). El consultor puede seguir trabajando mientras se genera. Sin variable adicional — usa la misma API key.",
+      setupUrl: "https://docs.anthropic.com/en/docs/build-with-claude/message-batches",
+      setupLabel: "docs.anthropic.com",
+      health: batchHealth,
     },
   ];
 

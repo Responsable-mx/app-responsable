@@ -547,12 +547,9 @@ export default async function MonitoreoIaPage() {
         <p className="text-sm text-slate-600 mb-4 leading-relaxed">
           Cada tarjeta describe una mejora concreta: qué cambia, por qué importa y qué se necesita para activarla.
           Están ordenadas por prioridad basada en los datos de los últimos 30 días.{" "}
-          <button
-            data-switch-tab="metricas"
-            className="text-brand-primary text-xs hover:underline underline-offset-2 cursor-pointer"
-          >
+          <a href="?tab=metricas" className="text-brand-primary text-xs hover:underline underline-offset-2">
             Ver métricas detalladas →
-          </button>
+          </a>
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1080,16 +1077,19 @@ export default async function MonitoreoIaPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {s.by_day_role.map((r, i) => (
-                      <tr key={i}>
-                        <td className="py-1.5 pr-3 text-slate-600">{new Date(r.day).toLocaleDateString("es-MX", { month: "short", day: "numeric" })}</td>
-                        <td className="py-1.5 pr-3 font-medium text-slate-800">{r.role.charAt(0).toUpperCase() + r.role.slice(1)}</td>
-                        <td className="py-1.5 pr-3 text-right">{numFmt.format(r.calls)}</td>
-                        <td className="py-1.5 pr-3 text-right text-brand-primary-hover">{numFmt.format(r.total_cache_hits)}</td>
-                        <td className="py-1.5 pr-3 text-right text-slate-600">{(r.avg_latency_ms / 1000).toFixed(1)} s</td>
-                        <td className={`py-1.5 pr-3 text-right ${r.errors > 0 ? "text-red-700" : "text-slate-600"}`}>{r.errors}</td>
-                      </tr>
-                    ))}
+                    {s.by_day_role.map((r, i) => {
+                      const isEmbed = r.role === "embeddings";
+                      return (
+                        <tr key={i} className={isEmbed ? "opacity-60" : ""}>
+                          <td className="py-1.5 pr-3 text-slate-600">{new Date(r.day).toLocaleDateString("es-MX", { month: "short", day: "numeric" })}</td>
+                          <td className="py-1.5 pr-3 font-medium text-slate-800">{r.role.charAt(0).toUpperCase() + r.role.slice(1)}</td>
+                          <td className="py-1.5 pr-3 text-right">{numFmt.format(r.calls)}</td>
+                          <td className="py-1.5 pr-3 text-right text-brand-primary-hover">{numFmt.format(r.total_cache_hits)}</td>
+                          <td className="py-1.5 pr-3 text-right text-slate-600">{(r.avg_latency_ms / 1000).toFixed(1)} s</td>
+                          <td className={`py-1.5 pr-3 text-right ${r.errors > 0 && !isEmbed ? "text-red-700" : "text-slate-600"}`}>{r.errors}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

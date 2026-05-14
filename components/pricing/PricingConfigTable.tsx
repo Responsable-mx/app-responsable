@@ -186,7 +186,7 @@ export function PricingConfigTable({
     }
   }
 
-  const COLS = 7;
+  const COLS = 6;
 
   return (
     <div className="border border-slate-200 rounded overflow-hidden">
@@ -198,7 +198,6 @@ export function PricingConfigTable({
               <th className="px-4 py-2.5 text-right">Proyectos</th>
               <th className="px-4 py-2.5 text-right">Promedio real</th>
               <th className="px-4 py-2.5 text-right">Costo base</th>
-              <th className="px-4 py-2.5 text-left min-w-[180px]">Notas</th>
               <th className="px-4 py-2.5 text-right">Actualizado</th>
               <th className="px-4 py-2.5" />
             </tr>
@@ -234,10 +233,8 @@ export function PricingConfigTable({
                         aria-label="Costo base USD"
                         className="max-w-[140px]"
                       />
-                    </td>
-                    <td className="px-4 py-2.5">
                       <textarea
-                        className="font-sans w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-none min-w-[160px]"
+                        className="font-sans mt-1.5 w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 resize-none max-w-[220px]"
                         rows={2}
                         maxLength={500}
                         value={draft.notes}
@@ -336,17 +333,6 @@ export function PricingConfigTable({
                         >
                           Definir costo →
                         </button>
-                      )}
-                    </td>
-
-                    {/* Notas */}
-                    <td className="px-4 py-2.5 text-slate-500 max-w-[220px]">
-                      {row.notes ? (
-                        <span className="line-clamp-2 leading-relaxed">
-                          {row.notes}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
                       )}
                     </td>
 

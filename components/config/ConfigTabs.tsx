@@ -8,7 +8,6 @@ import {
   IconSliders,
   IconBrain,
   IconUsers,
-  IconTarget,
   IconGrid,
   IconShield,
   IconClipboard,
@@ -45,12 +44,11 @@ const GROUPS: Group[] = [
   {
     title: "Sistema",
     items: [
-      { href: "/configuracion/costos",      label: "Costos",         Icon: IconCoins },
-      { href: "/configuracion/uso-ia",      label: "Uso IA",         Icon: IconTarget },
-      { href: "/configuracion/auditoria-ia",label: "Auditoría IA",   Icon: IconBarChart },
-      { href: "/configuracion/auto-update", label: "Actualizaciones",Icon: IconSliders },
-      { href: "/configuracion/auditoria",   label: "Historial",            Icon: IconClipboard },
-      { href: "/configuracion/preferencias",label: "Preferencias",         Icon: IconSettings },
+      { href: "/configuracion/costos",       label: "Costos",         Icon: IconCoins    },
+      { href: "/configuracion/monitoreo-ia", label: "Monitoreo IA",   Icon: IconBarChart },
+      { href: "/configuracion/auto-update",  label: "Actualizaciones",Icon: IconSliders  },
+      { href: "/configuracion/auditoria",    label: "Historial",      Icon: IconClipboard},
+      { href: "/configuracion/preferencias", label: "Preferencias",   Icon: IconSettings },
     ],
   },
 ];

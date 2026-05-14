@@ -53,8 +53,8 @@ export default async function CostosPage() {
       </p>
       <p className="text-xs text-slate-400 mb-6">
         El costo de uso de IA (API Anthropic) se lleva por separado →{" "}
-        <a href="/configuracion/uso-ia" className="text-brand-primary hover:underline underline-offset-2">
-          Uso IA
+        <a href="/configuracion/monitoreo-ia?tab=metricas" className="text-brand-primary hover:underline underline-offset-2">
+          Monitoreo IA
         </a>
       </p>
 

@@ -64,31 +64,54 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   const admin = createAdminClient();
 
-  // Obtener cuestionario para pattern-matching
-  const { data: qData } = await admin
-    .from("questionnaire_responses")
-    .select("responses")
-    .eq("client_id", id)
-    .eq("service_key", "doble-materialidad")
-    .maybeSingle();
+  // Cuestionario + IROs materiales del cliente (Etapa 6) en paralelo
+  const [qRes, irosRes] = await Promise.all([
+    admin
+      .from("questionnaire_responses")
+      .select("responses")
+      .eq("client_id", id)
+      .eq("service_key", "doble-materialidad")
+      .maybeSingle(),
+    admin
+      .from("client_iro_inventory")
+      .select("tema_esg")
+      .eq("client_id", id)
+      .eq("incluido", true),
+  ]);
 
-  const questText = qData?.responses
-    ? JSON.stringify(qData.responses).toLowerCase()
+  const questText = qRes.data?.responses
+    ? JSON.stringify(qRes.data.responses).toLowerCase()
     : "";
+
+  // Texto plano con todos los temas ESG identificados como materiales (Etapa 6).
+  // Permite elevar calidad_dato cuando el análisis DM ya confirmó la relevancia.
+  const iroTopicsText = (irosRes.data ?? [])
+    .map((r) => r.tema_esg.toLowerCase())
+    .join(" ");
 
   // Indicadores relevantes según sector
   const ibsos = getIbsoForSector(client.sector);
 
   const rows = ibsos.map((ibso) => {
     const keywords = INDICATOR_KEYWORDS[ibso.key] ?? [];
-    const hasEvidence = keywords.some((kw) => questText.includes(kw));
+    const hasEvidence   = keywords.some((kw) => questText.includes(kw));
+    const confirmedByIro = keywords.some((kw) => iroTopicsText.includes(kw));
+
+    // IRO confirmado (materialidad ya analizada) = señal más fuerte que solo cuestionario.
+    const estado: "no_identificado" | "parcial" | "disponible" =
+      confirmedByIro || hasEvidence ? "parcial" : "no_identificado";
+    const calidad_dato: "baja" | "media" | "alta" =
+      confirmedByIro && hasEvidence ? "alta"
+      : confirmedByIro || hasEvidence ? "media"
+      : "baja";
+
     return {
       client_id:    id,
       ibso_key:     ibso.key,
       ibso_label:   ibso.label,
       categoria:    ibso.categoria,
-      estado:       hasEvidence ? "parcial" : "no_identificado",
-      calidad_dato: hasEvidence ? "media" : "baja",
+      estado,
+      calidad_dato,
       accion:       null as string | null,
       sort_order:   ibso.sort_order,
     };

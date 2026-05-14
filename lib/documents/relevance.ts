@@ -127,6 +127,59 @@ function positionMultiplier(chunk: string, index: number): number {
 }
 
 /**
+ * Divide markdown largo en partes de máximo maxCharsPerPart caracteres.
+ * Corta preferiblemente en límites de heading (# ## ###) para no partir secciones.
+ * Hard-cap en párrafo vacío más cercano si no hay heading próximo.
+ * Útil para auto-split de PDFs grandes (>200 páginas) antes de guardar en DB.
+ */
+export function splitMarkdownAtBoundaries(
+  markdown: string,
+  maxCharsPerPart = 50_000
+): string[] {
+  if (markdown.length <= maxCharsPerPart) return [markdown];
+
+  const lines = markdown.split("\n");
+  const parts: string[] = [];
+  let current: string[] = [];
+  let currentLen = 0;
+
+  const flush = () => {
+    const part = current.join("\n").trimEnd();
+    if (part.trim().length > 0) parts.push(part);
+    current = [];
+    currentLen = 0;
+  };
+
+  for (const line of lines) {
+    const isHeading = /^#{1,3}\s/.test(line);
+
+    // Cortar en heading cuando el bloque actual supera 60% del límite
+    if (isHeading && currentLen >= maxCharsPerPart * 0.6 && current.length > 0) {
+      flush();
+    }
+
+    current.push(line);
+    currentLen += line.length + 1;
+
+    // Hard cap: cortar en el párrafo (línea vacía) más cercano al final del buffer
+    if (currentLen >= maxCharsPerPart) {
+      const searchFrom = Math.floor(current.length * 0.8);
+      let cutIdx = current.length - 1;
+      for (let i = current.length - 1; i >= searchFrom; i--) {
+        if (current[i]?.trim() === "") { cutIdx = i; break; }
+      }
+      const head = current.slice(0, cutIdx + 1).join("\n").trimEnd();
+      if (head.trim().length > 0) parts.push(head);
+      current = current.slice(cutIdx + 1);
+      currentLen = current.reduce((acc, l) => acc + l.length + 1, 0);
+    }
+  }
+  flush();
+
+  return parts.filter((p) => p.trim().length > 0);
+}
+
+/**
  * Top N chunks por relevancia al query, respetando un budget de chars total.
  * Devuelve preservando el orden original del documento (para continuidad).
  */

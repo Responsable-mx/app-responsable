@@ -180,25 +180,35 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     after: { client_id: id, kind: doc.kind, source_url: url, file_name: doc.file_name },
   });
 
-  // Advertencia si el documento es muy largo — Aurora puede tardar >40s
-  // (timeout serverless 270s) en documentos de >200 páginas (~5MB PDF).
-  const LARGE_DOC_BYTES = 5 * 1024 * 1024;
-  const largeDocWarning =
-    doc.parse_status === "ok" && doc.size_bytes > LARGE_DOC_BYTES
-      ? `Documento grande (${(doc.size_bytes / 1024 / 1024).toFixed(1)} MB). Si tiene más de 200 páginas, la IA puede tardar más de lo normal. Considera dividirlo en secciones para mejores resultados.`
-      : null;
+  // Auto-split: si el markdown supera 60K chars (≈50 páginas), dividir en sub-docs
+  // para mejor retrieval semántico y chunks más manejables por la IA.
+  const SPLIT_THRESHOLD = 60_000;
+  let splitParts = 1;
+  if (doc.parse_status === "ok" && doc.markdown_content && doc.markdown_content.length > SPLIT_THRESHOLD) {
+    try {
+      const { splitMarkdownAtBoundaries } = await import("@/lib/documents/relevance");
+      const { insertDocumentParts } = await import("@/lib/documents/queries");
+      const parts = splitMarkdownAtBoundaries(doc.markdown_content, 50_000);
+      if (parts.length > 1) {
+        splitParts = await insertDocumentParts({ parent: doc, parts });
+      }
+    } catch (e) {
+      // Non-fatal: el doc original sigue guardado completo
+      console.error("[ingest-report] auto-split failed:", e);
+    }
+  }
 
   return NextResponse.json({
     data: {
       doc_id: doc.id,
-      file_name: doc.file_name,
+      file_name: splitParts > 1 ? doc.file_name.replace(/\s*\(Parte \d+\/\d+\)$/, "") + ` (Parte 1/${splitParts})` : doc.file_name,
       file_type: doc.file_type,
       kind: doc.kind,
       size_bytes: doc.size_bytes,
       parse_status: doc.parse_status,
       parse_error: doc.parse_error,
       source_url: url,
+      split_parts: splitParts,
     },
-    ...(largeDocWarning ? { warning: largeDocWarning } : {}),
   });
 }

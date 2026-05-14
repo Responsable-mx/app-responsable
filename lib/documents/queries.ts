@@ -305,6 +305,84 @@ export async function processStoredDocument(opts: ProcessStoredDocOpts): Promise
   return data as ClientDocument;
 }
 
+/**
+ * Auto-split de documento grande en sub-documentos virtuales.
+ *
+ * Actualiza el doc original a "Parte 1/N" y crea N-1 filas adicionales en
+ * client_documents con `storage_path` sintéticos (ningún archivo en Storage).
+ * Los virtual splits son transparentes para ai-fill, embed-chunks y el cron —
+ * los leen como documentos normales. deleteDocument() ya maneja Storage-miss
+ * con graceful no-op.
+ *
+ * @param parent  — fila original ya guardada (returned by uploadAndParseDocument)
+ * @param parts   — partes de markdown (parts[0] ya está en parent.markdown_content)
+ */
+export async function insertDocumentParts(opts: {
+  parent: ClientDocument;
+  parts: string[];
+}): Promise<number> {
+  const { parts, parent } = opts;
+  if (parts.length <= 1) return 1;
+
+  const sb = createAdminClient();
+  const total = parts.length;
+  const baseName = parent.file_name
+    .replace(/\s*\(Parte \d+\/\d+\)$/, "")
+    .trim();
+
+  // Actualizar el doc original a "Parte 1/N" con chunks recomputados sobre su slice
+  const part1Chunks = chunkMarkdown(parts[0]!, { chunkSize: 1200, overlap: 150 });
+  const { error: updateErr } = await sb
+    .from("client_documents")
+    .update({
+      markdown_content: parts[0],
+      file_name: `${baseName} (Parte 1/${total})`,
+      chunks_cache: part1Chunks,
+      chunks_computed_at: new Date().toISOString(),
+    })
+    .eq("id", parent.id);
+  if (updateErr) {
+    console.error("[documents] insertDocumentParts — update parent failed:", updateErr.message);
+    return 1; // abortar: no crear splits si el parent falló
+  }
+
+  // Insertar filas para Parte 2..N con storage_path sintético (sin archivo real)
+  const rows = parts.slice(1).map((content, i) => {
+    const partN = i + 2;
+    const partChunks = chunkMarkdown(content, { chunkSize: 1200, overlap: 150 });
+    return {
+      client_id: parent.client_id,
+      uploaded_by: parent.uploaded_by,
+      kind: parent.kind,
+      file_name: `${baseName} (Parte ${partN}/${total})`,
+      file_type: parent.file_type,
+      mime_type: parent.mime_type,
+      // Tamaño aproximado en bytes del contenido de esta parte
+      size_bytes: Buffer.byteLength(content, "utf8"),
+      // Path sintético — no existe en Storage. deleteDocument() falla soft con .catch()
+      storage_path: `${parent.client_id}/virtual-split-${randomUUID()}-part${partN}`,
+      markdown_content: content,
+      source_url: parent.source_url,
+      parse_status: "ok" as const,
+      parse_error: null,
+      service_ids: parent.service_ids,
+      content_hash: null, // splits virtuales no tienen hash del archivo original
+      chunks_cache: partChunks,
+      chunks_computed_at: new Date().toISOString(),
+      benchmark_company_id: null,
+    };
+  });
+
+  const { error: insertErr } = await sb.from("client_documents").insert(rows);
+  if (insertErr) {
+    console.error("[documents] insertDocumentParts — insert splits failed:", insertErr.message);
+    // Non-fatal: el doc original ya está correcto como Parte 1
+    return 1;
+  }
+
+  return total;
+}
+
 export async function getSignedUrl(storagePath: string, expiresInSec = 600): Promise<string | null> {
   const sb = createAdminClient();
   const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(storagePath, expiresInSec);

@@ -20,7 +20,6 @@ export function ReportIaButton({
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
-  const [docWarning, setDocWarning] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -88,7 +87,6 @@ export function ReportIaButton({
     setIngesting(true);
     setError(null);
     setOk(null);
-    setDocWarning(null);
     const ac = new AbortController();
     abortRef.current = ac;
     try {
@@ -103,8 +101,8 @@ export function ReportIaButton({
       onUrlChange(url);
       setCandidates(null);
       const status = j.data.parse_status === "ok" ? "guardado y convertido" : "guardado (parse falló)";
-      setOk(`✓ ${status}: ${j.data.file_name}`);
-      if (j.warning) setDocWarning(j.warning as string);
+      const splitNote = (j.data.split_parts as number) > 1 ? ` · dividido en ${j.data.split_parts as number} partes` : "";
+      setOk(`✓ ${status}: ${j.data.file_name}${splitNote}`);
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
         setError("Descarga cancelada.");
@@ -168,11 +166,6 @@ export function ReportIaButton({
       )}
       {error && <p className="text-[10px] text-rose-600 mt-1">{error}</p>}
       {ok && <p className="text-[10px] text-emerald-700 mt-1">{ok}</p>}
-      {docWarning && (
-        <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">
-          ⚠ {docWarning}
-        </p>
-      )}
       {candidates && candidates.length > 0 && (
         <div className="mt-2 space-y-1.5 border-t border-slate-200 pt-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">

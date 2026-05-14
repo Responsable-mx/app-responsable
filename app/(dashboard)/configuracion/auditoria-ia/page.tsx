@@ -28,9 +28,22 @@ function latenciaLabel(ms: number) {
   return `Muy lenta (${s.toFixed(1)} s)`;
 }
 
+// ── Umbrales de auditoría — ajustar aquí sin tocar lógica ───────────────────
+
+const THRESHOLDS = {
+  errorRate:    { rate: 0.10, minCalls: 30 },   // >10% con ≥30 llamadas
+  opusPct:      { pct: 35,   minCalls: 30 },    // >35% del volumen con ≥30 llamadas
+  benchmarkMin: 5,                               // ≥5 estudios DM para mostrar tarjeta caché
+  cacheRatio:   { max: 0.20, minCalls: 50 },    // <20% con ≥50 llamadas
+  costoAiFill:  { usd: 20,   minCalls: 30 },    // >$20/mes con ≥30 llamadas Sonnet
+  feedbackDown: 15,                              // >15 rechazos en 30 días
+  latenciaMs:   10_000,                          // >10s promedio
+} as const;
+
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 type Prioridad = "urgente" | "importante" | "conveniente";
+type HealthStatus = "verde" | "amarillo" | "rojo" | "neutral";
 
 type Decision = {
   prioridad: Prioridad;
@@ -40,6 +53,21 @@ type Decision = {
   ejemplo?: string;
   necesita: string;
   recomendacion: "activar" | "revisar" | "planear" | "investigar";
+};
+
+type HealthCheck = {
+  label: string;
+  status: HealthStatus;
+  valor: string;
+  meta?: string;
+};
+
+// Mapa estático de estilos por estado de salud
+const HEALTH_STYLE: Record<HealthStatus, { dot: string; badge: string; label: string }> = {
+  verde:    { dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700 border-emerald-200",  label: "OK"       },
+  amarillo: { dot: "bg-amber-400",   badge: "bg-amber-50   text-amber-700   border-amber-200",    label: "Revisar"  },
+  rojo:     { dot: "bg-rose-500",    badge: "bg-rose-50    text-rose-700    border-rose-200",      label: "Atención" },
+  neutral:  { dot: "bg-slate-200",   badge: "bg-slate-50   text-slate-400   border-slate-200",    label: "N/A"      },
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -86,7 +114,7 @@ export default async function AuditoriaIaPage() {
   const benchmarkCalls  = (usage?.by_stage ?? [])
     .filter(s => s.stage.startsWith("dm_benchmark"))
     .reduce((sum, s) => sum + s.calls, 0);
-  const benchmarkActive = benchmarkCalls >= 5;
+  const benchmarkActive = benchmarkCalls >= THRESHOLDS.benchmarkMin;
   const latenciaMs      = usage?.avg_latency_ms ?? 0;
   const costoMes        = usage?.cost_usd_estimate_max ?? 0;
 
@@ -136,7 +164,7 @@ export default async function AuditoriaIaPage() {
 
   if (usage) {
     // Error rate crítico — con diagnóstico automático por rol
-    if (errorRate > 0.10 && llmCalls > 30) {
+    if (errorRate > THRESHOLDS.errorRate.rate && llmCalls >= THRESHOLDS.errorRate.minCalls) {
       const llmRolesWithErrors = usage.by_role
         .filter(r => r.role !== "embeddings" && r.errors > 0)
         .sort((a, b) => b.errors - a.errors);
@@ -223,7 +251,7 @@ export default async function AuditoriaIaPage() {
     });
 
     // Opus overuse
-    if (opusPct > 35 && llmCalls > 30) {
+    if (opusPct > THRESHOLDS.opusPct.pct && llmCalls >= THRESHOLDS.opusPct.minCalls) {
       decisions.push({
         prioridad: "conveniente",
         titulo: `La IA de máxima capacidad se usa más de lo recomendado (${opusPct}%)`,
@@ -236,7 +264,7 @@ export default async function AuditoriaIaPage() {
     }
 
     // Alta latencia
-    if (latenciaMs > 10_000) {
+    if (latenciaMs > THRESHOLDS.latenciaMs) {
       decisions.push({
         prioridad: "conveniente",
         titulo: "El Reporte PDF tarda demasiado — el consultor espera bloqueado",
@@ -260,7 +288,7 @@ export default async function AuditoriaIaPage() {
     });
 
     // Caché bajo — < 20% con volumen real
-    if (cacheRatio < 0.2 && llmCalls > 50) {
+    if (cacheRatio < THRESHOLDS.cacheRatio.max && llmCalls >= THRESHOLDS.cacheRatio.minCalls) {
       decisions.push({
         prioridad: "conveniente",
         titulo: `El caché de IA está poco aprovechado — ahorra hasta el doble (hoy: ${Math.round(cacheRatio * 100)}%)`,
@@ -274,7 +302,7 @@ export default async function AuditoriaIaPage() {
 
     // Extracción económica (Gemini Flash)
     const sonnetModel = usage.by_model.find(m => m.family === "sonnet");
-    if (costoMes > 20 && (sonnetModel?.calls ?? 0) > 30) {
+    if (costoMes > THRESHOLDS.costoAiFill.usd && (sonnetModel?.calls ?? 0) >= THRESHOLDS.costoAiFill.minCalls) {
       decisions.push({
         prioridad: "conveniente",
         titulo: "Reducir el costo del llenado automático del cuestionario",
@@ -287,7 +315,7 @@ export default async function AuditoriaIaPage() {
     }
 
     // Feedback negativo
-    if (usage.feedback_total_down > 15) {
+    if (usage.feedback_total_down > THRESHOLDS.feedbackDown) {
       const topReason = usage.feedback_top_reasons[0];
       decisions.push({
         prioridad: usage.feedback_total_down > 20 ? "importante" : "conveniente",
@@ -348,6 +376,74 @@ export default async function AuditoriaIaPage() {
       });
     }
   }
+
+  // ── Health checklist — siempre visible, uno por indicador ──────────────────
+  const healthChecks: HealthCheck[] = usage ? [
+    {
+      label: "Respuestas exitosas",
+      status: errorRate > THRESHOLDS.errorRate.rate && llmCalls >= THRESHOLDS.errorRate.minCalls ? "rojo"
+            : errorRate > 0.05 && llmCalls > 10 ? "amarillo"
+            : llmCalls === 0 ? "neutral"
+            : "verde",
+      valor: llmCalls > 0 ? `${successRate}% (${llmErrors} fallas de ${numFmt.format(llmCalls)})` : "Sin actividad",
+      meta: "Objetivo: >95%",
+    },
+    {
+      label: "Búsqueda semántica en documentos",
+      status: voyageActive ? "verde" : "amarillo",
+      valor: voyageActive ? `Activa — ${numFmt.format(voyageCalls)} búsquedas` : "Inactiva",
+    },
+    {
+      label: "Selección precisa de fragmentos",
+      status: !voyageActive ? "neutral" : rerankActive ? "verde" : "amarillo",
+      valor: !voyageActive ? "Requiere búsqueda semántica primero"
+           : rerankActive ? "Activa"
+           : "Pendiente — búsqueda semántica ya activa",
+    },
+    {
+      label: "Uso de IA de máxima capacidad (Elena/Reporte)",
+      status: llmCalls === 0 ? "neutral"
+            : opusPct > THRESHOLDS.opusPct.pct && llmCalls >= THRESHOLDS.opusPct.minCalls ? "amarillo"
+            : "verde",
+      valor: llmCalls > 0 ? `${opusPct}% del volumen total` : "Sin datos",
+      meta: `Objetivo: <${THRESHOLDS.opusPct.pct}%`,
+    },
+    {
+      label: "Velocidad promedio de respuesta",
+      status: latenciaMs === 0 ? "neutral"
+            : latenciaMs > THRESHOLDS.latenciaMs * 2 ? "rojo"
+            : latenciaMs > THRESHOLDS.latenciaMs ? "amarillo"
+            : "verde",
+      valor: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "Sin datos",
+      meta: `Objetivo: <${THRESHOLDS.latenciaMs / 1000}s`,
+    },
+    {
+      label: "Caché de benchmarks sectoriales",
+      status: benchmarkCalls === 0 ? "neutral"
+            : benchmarkCalls >= THRESHOLDS.benchmarkMin ? "amarillo"
+            : "neutral",
+      valor: benchmarkCalls === 0 ? "Sin estudios DM este mes"
+           : `${benchmarkCalls} estudio${benchmarkCalls > 1 ? "s" : ""} — ${benchmarkCalls >= THRESHOLDS.benchmarkMin ? "caché pendiente de implementar" : "volumen aún bajo"}`,
+    },
+    {
+      label: "Eficiencia del caché IA",
+      status: llmCalls < THRESHOLDS.cacheRatio.minCalls ? "neutral"
+            : cacheRatio >= 0.40 ? "verde"
+            : cacheRatio >= THRESHOLDS.cacheRatio.max ? "amarillo"
+            : "rojo",
+      valor: cacheRatio > 0 ? `${Math.round(cacheRatio * 100)}% — ~${usdFmt.format(cacheSavingsUsd)} ahorrados` : "Sin datos",
+      meta: "Objetivo: >40%",
+    },
+    {
+      label: "Satisfacción de consultores",
+      status: usage.feedback_total_down > THRESHOLDS.feedbackDown ? "rojo"
+            : usage.feedback_total_down > 10 ? "amarillo"
+            : "verde",
+      valor: usage.feedback_total_down === 0 ? "Sin rechazos registrados"
+           : `${usage.feedback_total_down} respuesta${usage.feedback_total_down > 1 ? "s" : ""} rechazada${usage.feedback_total_down > 1 ? "s" : ""}`,
+      meta: `Objetivo: <${THRESHOLDS.feedbackDown} rechazos/mes`,
+    },
+  ] : [];
 
   // Ordenar: urgente → importante → conveniente
   const ordenPrioridad: Record<Prioridad, number> = { urgente: 0, importante: 1, conveniente: 2 };
@@ -483,6 +579,45 @@ export default async function AuditoriaIaPage() {
               <p className={`text-[10px] mt-0.5 ${kpi.red ? "text-rose-500" : "text-slate-400"}`}>{kpi.sub}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Health checklist — siempre visible ────────────────────────────── */}
+      {healthChecks.length > 0 && (
+        <div className="mb-8">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
+            Qué vigila la auditoría
+          </p>
+          <div className="bg-white border border-slate-200 rounded overflow-hidden">
+            <table className="min-w-full w-max text-xs">
+              <tbody className="divide-y divide-slate-50">
+                {healthChecks.map((h) => {
+                  const hs = HEALTH_STYLE[h.status];
+                  return (
+                    <tr key={h.label} className="hover:bg-slate-50">
+                      <td className="px-4 py-2.5 w-5">
+                        <span className={`inline-block w-2 h-2 rounded-full ${hs.dot}`} />
+                      </td>
+                      <td className="px-2 py-2.5 font-semibold text-slate-700 whitespace-nowrap">
+                        {h.label}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-500 tabular-nums">
+                        {h.valor}
+                        {h.meta && (
+                          <span className="ml-2 text-[10px] text-slate-400 italic">{h.meta}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className={`inline-block text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border ${hs.badge}`}>
+                          {hs.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

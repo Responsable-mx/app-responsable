@@ -13,6 +13,7 @@ import type { FieldDef } from "@/lib/clients/narrative-schemas";
 
 export type ServiceKey =
   | "doble_materialidad"
+  | "doble_materialidad_ia"
   | "esr"
   | "informe_sostenibilidad";
 
@@ -262,8 +263,20 @@ export const SERVICE_SCHEMAS: ServiceSchema[] = [
   INFORME_SOSTENIBILIDAD,
 ];
 
+const DOBLE_MATERIALIDAD_IA: ServiceSchema = {
+  key: "doble_materialidad_ia",
+  label: "Doble materialidad IA",
+  icon: "🤖",
+  color: "bg-teal-50 border-teal-200 text-teal-900",
+  description:
+    "Estudio de doble materialidad asistido por IA. El flujo completo vive en la pestaña DM-IA del cliente.",
+  summary: () => "Doble materialidad IA",
+  fields: [],
+};
+
 export const SERVICE_BY_KEY: Record<ServiceKey, ServiceSchema> = {
   doble_materialidad: DOBLE_MATERIALIDAD,
+  doble_materialidad_ia: DOBLE_MATERIALIDAD_IA,
   esr: ESR,
   informe_sostenibilidad: INFORME_SOSTENIBILIDAD,
 };

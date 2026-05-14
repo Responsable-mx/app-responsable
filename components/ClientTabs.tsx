@@ -886,6 +886,7 @@ export function ClientTabs({
               clientSector={client.sector}
               clientSize={client.size}
               clientFrameworks={client.frameworks}
+              isAdmin={isAdmin}
             />
           </TabErrorBoundary>
         </div>

@@ -11,7 +11,7 @@ import {
   type FieldResponse,
   type WizardStep,
 } from "@/lib/questionnaires/types";
-import { getModelConfig } from "@/lib/ai/models";
+import { getModelConfig, getTaskConfig } from "@/lib/ai/models";
 import { logAiCall } from "@/lib/ai/logging";
 import { validateAiResponse, type ValidationWarning } from "@/lib/ai/response-validator";
 import { extractJsonObject } from "@/lib/ai/extract-json";
@@ -330,138 +330,195 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
   let cacheReadTokens = 0;
   let stopReason: string | null = null;
   const startedAt = Date.now();
+  let usedModel = modelCfg.model;
 
+  // Tool compartido entre fast path y full path
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const submitResponsesTool: any = {
+    name: "submit_responses",
+    description: "Envía las respuestas finales por campo del paso del cuestionario. Llamar UNA SOLA VEZ al terminar la investigación.",
+    input_schema: {
+      type: "object",
+      properties: {
+        responses: {
+          type: "object",
+          description: "Mapa de field_key → {value, source_type, sources[]}. Una entrada por cada campo del paso.",
+          additionalProperties: {
+            type: "object",
+            properties: {
+              value: { type: ["string", "number", "null"], description: "Contenido del campo (string máx 500 chars) o null si no hay fuente." },
+              source_type: { type: "string", enum: ["public", "interpretation", "consultor_only"] },
+              sources: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    url: { type: "string" },
+                    title: { type: "string" },
+                    date: { type: "string", description: "YYYY-MM-DD o vacío" },
+                  },
+                  required: ["url", "title"],
+                },
+              },
+            },
+            required: ["value", "source_type"],
+          },
+        },
+      },
+      required: ["responses"],
+    } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+  };
+
+  // ── HAIKU FAST PATH ─────────────────────────────────────────────────────────
+  // Cuando vectorChunks proveen contexto local suficiente, intentar extracción
+  // con Haiku (~12× más barato). Fallback a Sonnet si ≥40% campos son null.
+  let skipSonnet = false;
+  if (vectorChunks && vectorChunks.length >= 3) {
+    const haikuCfg = getTaskConfig("extract");
+    try {
+      const haikuMsg = await anthropic.messages.create({
+        model: haikuCfg.model,
+        max_tokens: 4096,
+        system: "Eres un asistente de extracción de datos ESG. Lee los DOCUMENTOS DEL CLIENTE en el prompt y extrae los campos pedidos. Solo extrae datos que encuentres explícitamente — no inventes ni interpoles. Campo no encontrado: value null, source_type \"consultor_only\". Llama submit_responses con el resultado final.",
+        tools: [submitResponsesTool],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tool_choice: { type: "tool", name: "submit_responses" } as any,
+        messages: [{ role: "user", content: userPrompt }],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any, { signal: AbortSignal.timeout(45_000) });
+
+      inputTokens        = haikuMsg.usage?.input_tokens ?? 0;
+      outputTokens       = haikuMsg.usage?.output_tokens ?? 0;
+      cacheCreationTokens = (haikuMsg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
+      cacheReadTokens    = (haikuMsg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
+      stopReason         = haikuMsg.stop_reason ?? null;
+
+      for (const block of haikuMsg.content) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (block.type === "tool_use" && (block as any).name === "submit_responses") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const input = (block as any).input as { responses?: unknown } | undefined;
+          if (input?.responses && typeof input.responses === "object") {
+            toolResponses = input.responses as Record<string, unknown>;
+          }
+        }
+      }
+
+      if (toolResponses) {
+        const pr = AiResponseSchema.safeParse(toolResponses);
+        const nullCount = pr.success
+          ? step.fields.filter(f => pr.data[f.key]?.value == null).length
+          : step.fields.length;
+        if (nullCount / step.fields.length < 0.40) {
+          skipSonnet = true;
+          usedModel  = haikuCfg.model;
+          anthropicBreaker.recordSuccess();
+        } else {
+          // Demasiados nulls — Sonnet con web_search llenará los huecos
+          toolResponses       = null;
+          inputTokens         = 0;
+          outputTokens        = 0;
+          cacheCreationTokens = 0;
+          cacheReadTokens     = 0;
+        }
+      }
+    } catch {
+      // Haiku falló → usar Sonnet sin penalizar al usuario
+      toolResponses = null;
+      inputTokens   = 0;
+      outputTokens  = 0;
+    }
+  }
+
+  // ── SONNET FULL PATH (web_search + submit_responses) ────────────────────────
   // D-63: AbortSignal para evitar que Vercel mate la lambda abruptamente sin
   // dar feedback al cliente. maxDuration=300s; con 2 web_search (~90s c/u)
   // el timeout real es ~270s. AbortError se captura en el catch y retorna 504.
   const timeoutSignal = AbortSignal.timeout(270_000);
 
-  try {
-    const msg = await anthropic.messages.create({
-      model: modelCfg.model,
-      // Bump a 8192: con varios campos + sources + citations el output puede
-      // truncarse a 4096. submit_responses puede recibir hasta el cap del tool input.
-      max_tokens: 8192,
-      // System prompt como bloque cacheable (ephemeral) — system prompt es
-      // constante en todas las llamadas (8 reglas + fuentes). Hits subsequentes
-      // pagan 10% del costo input por estos tokens. Ahorro ~80-90% en bulk fill.
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-           
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      tools: [
-        {
-          // Web search tool: la IA busca fuentes públicas reales (no inventa)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
-          type: "web_search_20250305" as any,
-          name: "web_search",
-          max_uses: 2,
-        },
-        {
-          // Tool de salida estructurada — elimina parseo de JSON desde texto libre.
-          // El modelo DEBE llamar esta tool con el objeto de respuestas final.
-          name: "submit_responses",
-          description:
-            "Envía las respuestas finales por campo del paso del cuestionario. Llamar UNA SOLA VEZ al terminar la investigación.",
-          input_schema: {
-            type: "object",
-            properties: {
-              responses: {
-                type: "object",
-                description:
-                  "Mapa de field_key → {value, source_type, sources[]}. Una entrada por cada campo del paso.",
-                additionalProperties: {
-                  type: "object",
-                  properties: {
-                    value: {
-                      // JSON Schema admite union de tipos como array. Anthropic respeta.
-                      type: ["string", "number", "null"],
-                      description: "Contenido del campo (string máx 500 chars) o null si no hay fuente.",
-                    },
-                    source_type: {
-                      type: "string",
-                      enum: ["public", "interpretation", "consultor_only"],
-                    },
-                    sources: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          url: { type: "string" },
-                          title: { type: "string" },
-                          date: { type: "string", description: "YYYY-MM-DD o vacío" },
-                        },
-                        required: ["url", "title"],
-                      },
-                    },
-                  },
-                  required: ["value", "source_type"],
-                },
-              },
-            },
-            required: ["responses"],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
-          } as any,
-        },
-      ],
-      // tool_choice auto deja al modelo decidir orden (web_search primero,
-      // luego submit_responses). System prompt fuerza llamada final.
-      messages: [{ role: "user", content: userPrompt }],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
-    } as any, { signal: timeoutSignal });
-    inputTokens = msg.usage?.input_tokens ?? 0;
-    outputTokens = msg.usage?.output_tokens ?? 0;
-    cacheCreationTokens = (msg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
-    cacheReadTokens = (msg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
-    stopReason = msg.stop_reason ?? null;
-    for (const block of msg.content) {
-      if (block.type === "text") {
-        textOut += block.text;
-        // Extraer citations del bloque de texto si vienen en formato Anthropic
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
-        const citations = (block as any).citations as Array<{ url?: string; title?: string }> | undefined;
-        if (Array.isArray(citations)) {
-          for (const c of citations) {
-            if (c.url && c.title) citationsCollected.push({ url: c.url, title: c.title });
+  if (!skipSonnet) {
+    try {
+      const msg = await anthropic.messages.create({
+        model: modelCfg.model,
+        // Bump a 8192: con varios campos + sources + citations el output puede
+        // truncarse a 4096. submit_responses puede recibir hasta el cap del tool input.
+        max_tokens: 8192,
+        // System prompt como bloque cacheable (ephemeral) — system prompt es
+        // constante en todas las llamadas (8 reglas + fuentes). Hits subsequentes
+        // pagan 10% del costo input por estos tokens. Ahorro ~80-90% en bulk fill.
+        system: [
+          {
+            type: "text",
+            text: systemPrompt,
+
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        tools: [
+          {
+            // Web search tool: la IA busca fuentes públicas reales (no inventa)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta
+            type: "web_search_20250305" as any,
+            name: "web_search",
+            max_uses: 2,
+          },
+          submitResponsesTool,
+        ],
+        // tool_choice auto deja al modelo decidir orden (web_search primero,
+        // luego submit_responses). System prompt fuerza llamada final.
+        messages: [{ role: "user", content: userPrompt }],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta
+      } as any, { signal: timeoutSignal });
+      inputTokens = msg.usage?.input_tokens ?? 0;
+      outputTokens = msg.usage?.output_tokens ?? 0;
+      cacheCreationTokens = (msg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
+      cacheReadTokens = (msg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
+      stopReason = msg.stop_reason ?? null;
+      for (const block of msg.content) {
+        if (block.type === "text") {
+          textOut += block.text;
+          // Extraer citations del bloque de texto si vienen en formato Anthropic
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta
+          const citations = (block as any).citations as Array<{ url?: string; title?: string }> | undefined;
+          if (Array.isArray(citations)) {
+            for (const c of citations) {
+              if (c.url && c.title) citationsCollected.push({ url: c.url, title: c.title });
+            }
+          }
+        }
+        // Capturar input de submit_responses — output estructurado preferido.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta
+        if (block.type === "tool_use" && (block as any).name === "submit_responses") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta
+          const input = (block as any).input as { responses?: unknown } | undefined;
+          if (input && typeof input === "object" && input.responses && typeof input.responses === "object") {
+            toolResponses = input.responses as Record<string, unknown>;
           }
         }
       }
-      // Capturar input de submit_responses — output estructurado preferido.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
-      if (block.type === "tool_use" && (block as any).name === "submit_responses") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK beta — web_search tool + tool_use response blocks (citations/name/input) + cache_control
-        const input = (block as any).input as { responses?: unknown } | undefined;
-        if (input && typeof input === "object" && input.responses && typeof input.responses === "object") {
-          toolResponses = input.responses as Record<string, unknown>;
-        }
-      }
+      anthropicBreaker.recordSuccess();
+    } catch (e) {
+      anthropicBreaker.recordFailure();
+      const isTimeout = e instanceof Error && e.name === "AbortError";
+      const errorMsg = isTimeout
+        ? "La búsqueda tardó demasiado. Inténtalo de nuevo en unos segundos."
+        : e instanceof Error ? e.message : "Error Anthropic";
+      void logAiCall({
+        userEmail: user,
+        role: "aurora",
+        clientId: id,
+        model: usedModel,
+        inputTokens,
+        outputTokens,
+        cacheCreationTokens,
+        cacheReadTokens,
+        stopReason,
+        latencyMs: Date.now() - startedAt,
+        error: errorMsg,
+        workflowStage: "ai_fill",
+      });
+      return NextResponse.json({ error: errorMsg }, { status: isTimeout ? 504 : 500 });
     }
-    anthropicBreaker.recordSuccess();
-  } catch (e) {
-    anthropicBreaker.recordFailure();
-    const isTimeout = e instanceof Error && e.name === "AbortError";
-    const errorMsg = isTimeout
-      ? "La búsqueda tardó demasiado. Inténtalo de nuevo en unos segundos."
-      : e instanceof Error ? e.message : "Error Anthropic";
-    void logAiCall({
-      userEmail: user,
-      role: "aurora",
-      clientId: id,
-      model: modelCfg.model,
-      inputTokens,
-      outputTokens,
-      cacheCreationTokens,
-      cacheReadTokens,
-      stopReason,
-      latencyMs: Date.now() - startedAt,
-      error: errorMsg,
-      workflowStage: "ai_fill",
-    });
-    return NextResponse.json({ error: errorMsg }, { status: isTimeout ? 504 : 500 });
   }
 
   // Loggear uso real de tokens (visible en /configuracion/uso-ia).
@@ -469,7 +526,7 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
     userEmail: user,
     role: "aurora",
     clientId: id,
-    model: modelCfg.model,
+    model: usedModel,
     inputTokens,
     outputTokens,
     cacheCreationTokens,

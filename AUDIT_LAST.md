@@ -7,7 +7,7 @@
 
 ## Resumen ejecutivo sesión 35
 
-Implementación completa de las recomendaciones accionables del panel `/configuracion/monitoreo-ia`. 8 fixes + 1 feature nueva (búsqueda semántica en chat). ESLint 0/0, 357/357 tests, D-178 cerrado.
+Implementación completa de las recomendaciones accionables del panel `/configuracion/monitoreo-ia`. 10 fixes + 2 features nuevas (búsqueda semántica en chat + Haiku fast path ai-fill). ESLint 0/0, 357/357 tests, D-178 cerrado, D-04 eliminado.
 
 ## Fixes aplicados en sesión 35
 
@@ -45,11 +45,21 @@ ESLint  : 0 errors, 0 warnings
 TSC     : 0 errors
 ```
 
+### ✅ AI-fill Haiku fast path
+`ai-fill/route.ts`: cuando `vectorChunks.length >= 3` (contexto local suficiente), intenta extracción con Haiku (~12× más barato). Si <40% campos null → retorna sin llamar Sonnet. Si ≥40% null → fallback transparente a Sonnet + web_search. Usa `getTaskConfig("extract")` ya definido en `models.ts`.
+
+### ✅ D-04 eliminado — Metodología ResponSable
+Eliminado de DEUDA.md, project_app_responsable.md, project_dm_benchmark_ia.md. Era bloqueo de negocio, no deuda técnica. Nota en memoria: quinta KPI card (~30min código) cuando el equipo defina los pasos.
+
+### ✅ Monitoreo tarjetas limpias
+- Rerank: texto actualizado (ya implementado)
+- Reporte PDF "tarda demasiado": eliminada (Batch API activo)
+- Tabla "Reporte PDF en segundo plano": Propuesto → Activo
+- Caché: texto actualizado (ya corregido)
+
 ## Pendientes activos post-sesión 35
 
-| ID | Sev | Descripción | Acción |
-|----|-----|-------------|--------|
-| D-04 | ⏸ | Metodología ResponSable no definida | Bloqueo de negocio, no técnico |
+Sin pendientes técnicos activos.
 
 ---
 

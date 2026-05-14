@@ -328,10 +328,6 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
-### ⏸ D-04 — Metodología ResponSable: pasos no definidos (NO CONTABILIZAR — bloqueo negocio)
-- **Estado sesión 28 (2026-05-10)**: por instrucción del usuario, NO se contabiliza en scores de deuda ni aparece en próximos audits hasta que el equipo metodología defina los pasos.
-- **Cuando se defina**: agregar 5ta KPI card en `ClientTabs` (~30min código). Re-abrir como ticket de feature, no deuda.
-
 ---
 
 ### Bloque D-163–D-164 — Bugs preexistentes detectados sesión 28 (cache stale TS)
@@ -484,7 +480,7 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 **Estado post-limpieza:**
 - Cero ítems 🔴 Críticos activos
-- 4 ítems 🟡 Moderados: D-04 D-05 D-06 D-07
+- 3 ítems 🟡 Moderados: D-05 D-06 D-07
 - 3 ítems 🟢 Menores: D-08 D-09 D-10
 
 **Sesión may-2026 (seniority + equipo):**
@@ -519,4 +515,4 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 
 ---
 
-*Última auditoría: may-2026 sesión 18 — D-85/D-121/D-122/D-123/D-124 todos resueltos. Ítem activo: D-04 (metodología — decisión de negocio). Score global 8.5/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+*Última auditoría: may-2026 sesión 35 — D-04 eliminado (decisión de negocio, fuera de alcance técnico). Score global 9.9/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*

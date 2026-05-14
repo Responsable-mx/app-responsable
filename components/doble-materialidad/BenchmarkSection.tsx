@@ -82,7 +82,11 @@ function SynthesisBlock({ narrative, createdAt }: { narrative: string; createdAt
     const m = FIRST_MARKER_RE.exec(narrative);
     if (m && m.index > 20) {
       const candidate = narrative.slice(0, m.index).trim();
-      if (candidate.length > 0) intro = candidate;
+      if (candidate.length > 0) {
+        // Cortar en el último punto para evitar fragmentos colgantes ("Sus", "Estas", etc.)
+        const lastDot = candidate.lastIndexOf(".");
+        intro = lastDot > 20 ? candidate.slice(0, lastDot + 1).trim() : candidate;
+      }
     }
   }
 
@@ -92,13 +96,13 @@ function SynthesisBlock({ narrative, createdAt }: { narrative: string; createdAt
         Síntesis del benchmark
       </p>
       {sections ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {intro && (
             <p className="text-sm text-slate-600 leading-relaxed">{intro}</p>
           )}
           {sections.map((s) => (
-            <div key={s.label} className={`border-l-4 ${s.accent} pl-3 py-1.5`}>
-              <span className={`text-[10px] font-bold uppercase tracking-widest ${s.labelCls} block mb-0.5`}>
+            <div key={s.label} className={`border-l-4 ${s.accent} pl-3 py-2`}>
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${s.labelCls} block mb-1`}>
                 {s.label}
               </span>
               <p className="text-sm text-slate-700 leading-relaxed">{s.text}</p>

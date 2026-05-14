@@ -810,6 +810,7 @@ export function DoubleMaterialidadTab({
           clientId={clientId}
           companies={companies}
           clientSector={clientSector}
+          onIrosAdapted={() => void mutateIros()}
         />
       </CollapsibleStageSection>
 

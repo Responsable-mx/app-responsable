@@ -53,9 +53,13 @@ const TIPO_BADGE: Record<string, string> = {
 };
 
 const CADENA_LABEL: Record<string, string> = {
-  upstream:   "Upstream",
-  ops_propia: "Operación",
-  downstream: "Downstream",
+  upstream:              "Upstream",
+  ops_propia:            "Operación",
+  operacion:             "Operación",
+  downstream:            "Downstream",
+  sociedad_comunidad:    "Sociedad",
+  clientes_consumidores: "Clientes",
+  medio_ambiente:        "Medio ambiente",
 };
 
 function ScorePicker({
@@ -408,7 +412,14 @@ export function IroSection({
                           {TIPO_SHORT[iro.tipo] ?? iro.tipo}
                         </span>
                       </td>
-                      <td className="px-2 py-2 text-xs text-slate-600">{CADENA_LABEL[iro.cadena] ?? iro.cadena}</td>
+                      <td className="px-2 py-2 text-xs text-slate-600">
+                        {CADENA_LABEL[iro.cadena] ?? iro.cadena}
+                        {iro.fuente === "adaptado_benchmark" && (
+                          <span className="ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded-sm bg-brand-primary-light text-brand-primary border border-brand-primary/20 uppercase tracking-wide">
+                            Ref.
+                          </span>
+                        )}
+                      </td>
                       <td className="px-2 py-2 text-xs text-slate-600 capitalize">{iro.horizonte}</td>
                       <td className="px-2 py-2">
                         <div className="flex justify-center">

@@ -181,10 +181,12 @@ export function BenchmarkIrosSection({
   clientId,
   companies,
   clientSector,
+  onIrosAdapted,
 }: {
   clientId: string;
   companies: BenchmarkCompany[];
   clientSector?: string | null;
+  onIrosAdapted?: () => void;
 }) {
   const { push } = useToast();
   const validatedCompanies = companies.filter((c) => c.validated);
@@ -376,6 +378,35 @@ export function BenchmarkIrosSection({
       setShowAdaptModal(false);
     } finally {
       setIsAdapting(false);
+    }
+  };
+
+  const [isSavingToInventory, setIsSavingToInventory] = useState(false);
+
+  const saveToInventory = async () => {
+    if (!adaptResult || isSavingToInventory) return;
+    setIsSavingToInventory(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dm-client-iros`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adapted: adaptResult }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        push("error", err.error ?? "Error al guardar IROs.");
+        return;
+      }
+      const data = await res.json() as { data: { inserted: number } };
+      push("success", `${data.data.inserted} IRO${data.data.inserted !== 1 ? "s" : ""} guardados en tu inventario.`);
+      setShowAdaptModal(false);
+      setAdaptResult(null);
+      setSelectedIroIds(new Set());
+      onIrosAdapted?.();
+    } catch {
+      push("error", "Error de conexión.");
+    } finally {
+      setIsSavingToInventory(false);
     }
   };
 
@@ -673,16 +704,29 @@ export function BenchmarkIrosSection({
         size="lg"
         footer={
           adaptResult ? (
-            <button
-              type="button"
-              onClick={() => downloadAdaptedCsv(adaptResult)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-sm hover:bg-slate-50 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Descargar todos (CSV)
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => downloadAdaptedCsv(adaptResult)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-sm hover:bg-slate-50 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Descargar CSV
+              </button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={isSavingToInventory}
+                onClick={() => void saveToInventory()}
+              >
+                <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Agregar a inventario
+              </Button>
+            </div>
           ) : undefined
         }
       >

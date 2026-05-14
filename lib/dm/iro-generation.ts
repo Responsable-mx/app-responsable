@@ -14,12 +14,13 @@ export type IroInventoryItem = {
   descripcion: string;
   tipo: "impacto_positivo" | "impacto_negativo" | "riesgo" | "oportunidad";
   estado: "actual" | "potencial" | "emergente" | "en_observacion";
-  cadena: "upstream" | "ops_propia" | "downstream";
+  cadena: "upstream" | "ops_propia" | "operacion" | "downstream" | "sociedad_comunidad" | "clientes_consumidores" | "medio_ambiente";
   horizonte: "corto" | "mediano" | "largo";
   evidencia: string | null;
   confianza: "alto" | "medio" | "bajo";
   score_impacto: number | null;
   score_financiero: number | null;
+  fuente: "ia_generado" | "adaptado_benchmark" | "manual";
   // Coordenadas opcionales de matriz (0-10) — override manual desde popover.
   // Si NULL, MatrizDM deriva la coordenada del score 1-5 ((score-1)/4*10).
   pos_x: number | null;

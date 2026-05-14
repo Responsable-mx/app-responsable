@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -67,7 +68,7 @@ const HEALTH_STYLE: Record<HealthStatus, { dot: string; badge: string; label: st
   verde:    { dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700 border-emerald-200",  label: "OK"       },
   amarillo: { dot: "bg-amber-400",   badge: "bg-amber-50   text-amber-700   border-amber-200",    label: "Revisar"  },
   rojo:     { dot: "bg-rose-500",    badge: "bg-rose-50    text-rose-700    border-rose-200",      label: "Atención" },
-  neutral:  { dot: "bg-slate-200",   badge: "bg-slate-50   text-slate-400   border-slate-200",    label: "N/A"      },
+  neutral:  { dot: "bg-slate-200",   badge: "bg-slate-50   text-slate-400   border-slate-200",    label: "Sin datos" },
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -184,7 +185,7 @@ export default async function AuditoriaIaPage() {
           accion = `Revisar los documentos subidos de los clientes que usan ${rLabel}. Si tienen más de 200 páginas, fragmentarlos antes de subir.`;
         } else if (rErrRate > 50) {
           diagnostico = `${rLabel} falla en ${rErrRate}% de sus solicitudes (${topRole.errors} errores en ${topRole.calls} llamadas). Causa probable: herramienta externa caída (web_search, QStash) o prompt del sistema con error de configuración.`;
-          accion = `Verificar el estado de las herramientas en la sección Herramientas. Si están verdes, revisar logs de Vercel filtrando por "${topRole.role}" para ver el mensaje de error exacto.`;
+          accion = `Verificar el estado de las herramientas en la sección Herramientas. Si están verdes, pedir al equipo técnico que revise el registro de errores filtrando por "${topRole.role}" para ver el mensaje exacto.`;
         } else {
           diagnostico = `${rLabel} concentra el ${topRolePct}% de los errores (${topRole.errors} de ${llmErrors} totales, tasa ${rErrRate}%). El resto de roles funciona bien.`;
           accion = `Revisar si los errores de ${rLabel} ocurren con un cliente o documento específico. Eso indicaría un problema de datos, no de infraestructura.`;
@@ -202,7 +203,7 @@ export default async function AuditoriaIaPage() {
         accion = `Revisar los últimos mensajes enviados a ${rLabel} — buscar patrón común (mismo cliente, mismo documento, misma pregunta).`;
       } else {
         diagnostico = `No se identificó un rol específico como fuente de los errores.`;
-        accion = `Revisar logs de Vercel del período con más errores y buscar el mensaje exacto.`;
+        accion = `Pedir al equipo técnico que revise el registro de errores del período con más fallas para identificar el mensaje exacto.`;
       }
 
       // Rol secundario con tasa alta aunque no sea el top contributor
@@ -291,11 +292,11 @@ export default async function AuditoriaIaPage() {
     if (cacheRatio < THRESHOLDS.cacheRatio.max && llmCalls >= THRESHOLDS.cacheRatio.minCalls) {
       decisions.push({
         prioridad: "conveniente",
-        titulo: `El caché de IA está poco aprovechado — ahorra hasta el doble (hoy: ${Math.round(cacheRatio * 100)}%)`,
+        titulo: `El caché de IA está poco aprovechado (hoy: ${Math.round(cacheRatio * 100)}%)`,
         queMejora: "Más respuestas leen de caché en lugar de procesar todo de nuevo — menos costo, misma calidad.",
         porQueImporta: `El caché está en ${Math.round(cacheRatio * 100)}% cuando el objetivo es >40%. Cuando los bloques fijos del prompt — contexto del cliente, reglas del rol — se reutilizan de caché, el costo de esos tokens cae al 10%. Con el volumen actual, subir al 40% ahorraría ~${usdFmt.format(costoMes * 0.25)}/mes adicional.`,
         ejemplo: "Si Aurora procesa el mismo contexto de cliente 20 veces al mes, hoy paga 20 veces el costo completo. Con caché al 40%, paga 1 vez completo + 19 veces al 10% — ahorro del 82% en ese bloque.",
-        necesita: "Revisar el orden de los bloques en los prompts del sistema: los bloques estáticos (reglas, contexto del rol) deben ir antes que los dinámicos (pregunta del usuario). 1–2 horas de trabajo técnico.",
+        necesita: "Pedir al equipo técnico que ajuste el orden de la configuración interna de la IA. 1–2 horas de trabajo.",
         recomendacion: "revisar",
       });
     }
@@ -398,7 +399,7 @@ export default async function AuditoriaIaPage() {
       status: !voyageActive ? "neutral" : rerankActive ? "verde" : "amarillo",
       valor: !voyageActive ? "Requiere búsqueda semántica primero"
            : rerankActive ? "Activa"
-           : "Pendiente — búsqueda semántica ya activa",
+           : "Lista para activar",
     },
     {
       label: "Uso de IA de máxima capacidad (Elena/Reporte)",
@@ -456,12 +457,36 @@ export default async function AuditoriaIaPage() {
     revisar:    "/configuracion/prompts",
   };
 
-  // Etiquetas de recomendación
+  // Etiquetas de recomendación (sin emoji — usar SVG inline en render)
   const recLabel: Record<Decision["recomendacion"], string> = {
-    activar:     "✅ Activar pronto",
-    revisar:     "🔍 Revisar con el equipo",
-    planear:     "📅 Planear para siguiente ciclo",
-    investigar:  "⚠️ Investigar de inmediato",
+    activar:    "Activar pronto",
+    revisar:    "Revisar con el equipo",
+    planear:    "Planear",
+    investigar: "Ver detalle en Uso IA",
+  };
+
+  // Íconos SVG monocromo por tipo de recomendación
+  const recSvg: Record<Decision["recomendacion"], ReactNode> = {
+    activar: (
+      <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5 13l4 4L19 7" />
+      </svg>
+    ),
+    revisar: (
+      <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+      </svg>
+    ),
+    planear: (
+      <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+    ),
+    investigar: (
+      <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" /><path d="M12 8v4m0 4h.01" />
+      </svg>
+    ),
   };
 
   const prioridadStyle: Record<Prioridad, { badge: string; border: string }> = {
@@ -637,8 +662,9 @@ export default async function AuditoriaIaPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {decisions.map((d, i) => {
             const ps = prioridadStyle[d.prioridad];
+            const isLastOdd = decisions.length % 2 !== 0 && i === decisions.length - 1;
             return (
-              <div key={i} className={`bg-white border border-l-4 ${ps.border} border-slate-200 rounded-lg p-5`}>
+              <div key={i} className={`bg-white border border-l-4 ${ps.border} border-slate-200 rounded-lg p-5${isLastOdd ? " lg:col-span-2" : ""}`}>
                 {/* Header */}
                 <div className="flex flex-wrap items-start gap-2 mb-3">
                   <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${ps.badge}`}>
@@ -672,12 +698,14 @@ export default async function AuditoriaIaPage() {
                   {recLinks[d.recomendacion] ? (
                     <a
                       href={recLinks[d.recomendacion]}
-                      className="text-[11px] font-semibold text-brand-primary bg-brand-primary-light border border-brand-primary/20 px-2 py-1 rounded-sm whitespace-nowrap hover:underline underline-offset-2"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-primary bg-brand-primary-light border border-brand-primary/20 px-2 py-1 rounded-sm whitespace-nowrap hover:underline underline-offset-2"
                     >
-                      {recLabel[d.recomendacion]} →
+                      {recSvg[d.recomendacion]}
+                      {recLabel[d.recomendacion]}
                     </a>
                   ) : (
-                    <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-sm whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-sm whitespace-nowrap">
+                      {recSvg[d.recomendacion]}
                       {recLabel[d.recomendacion]}
                     </span>
                   )}

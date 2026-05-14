@@ -29,6 +29,36 @@ type IroGroup = {
   iros: BenchmarkCompanyIro[];
 };
 
+function downloadCsv(groups: IroGroup[]) {
+  const header = ["Empresa", "# IRO", "Descripción", "Tipo", "Cadena de valor", "Horizonte", "Tema asociado", "Fuente", "Confianza"];
+  const rows: string[][] = [];
+  for (const g of groups) {
+    for (const iro of g.iros) {
+      rows.push([
+        g.company_name,
+        String(iro.n_iro),
+        iro.descripcion,
+        TIPO_LABELS[iro.tipo],
+        CADENA_LABELS[iro.cadena],
+        HORIZONTE_LABELS[iro.horizonte],
+        iro.tema_asociado ?? "",
+        FUENTE_LABELS[iro.fuente_tipo],
+        CONFIANZA_LABELS[iro.confianza],
+      ]);
+    }
+  }
+  const csv = [header, ...rows]
+    .map((r) => r.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "IROs-empresas-referencia.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function BenchmarkIrosSection({
   clientId,
   companies,
@@ -131,6 +161,8 @@ export function BenchmarkIrosSection({
     }
   };
 
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+
   if (validatedCompanies.length === 0) {
     return (
       <div className="py-6 text-center text-sm text-slate-400 border border-dashed border-slate-200 rounded">
@@ -148,12 +180,10 @@ export function BenchmarkIrosSection({
     const status = group?.batch?.status;
     return status !== "done" && status !== "pending" && !generating.has(c.id);
   });
-  const [bulkGenerating, setBulkGenerating] = useState(false);
 
   // Primer uso = datos cargados y NINGUNA empresa tiene IROs aún
   const dataLoaded = !loadingIros && resp !== undefined;
   const isFirstUse = dataLoaded && pendingGeneration.length === validatedCompanies.length;
-  const allDone = dataLoaded && pendingGeneration.length === 0;
 
   const generateAll = async () => {
     if (bulkGenerating || pendingGeneration.length === 0) return;
@@ -248,6 +278,23 @@ export function BenchmarkIrosSection({
         })}
       </div>
 
+      {/* ── Download button ── */}
+      {groups.some((g) => g.iros.length > 0) && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => downloadCsv(groups)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-sm hover:bg-white hover:border-slate-300"
+            title="Descargar IROs de todas las empresas en Excel"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Exportar Excel
+          </button>
+        </div>
+      )}
+
       {/* ── Active company panel ── */}
       {activeCompany && (
         <CompanyIroPanel
@@ -256,7 +303,6 @@ export function BenchmarkIrosSection({
           isGenerating={generating.has(activeCompanyId)}
           onGenerate={() => void generateIros(activeCompanyId)}
           hideGenerateBtn={isFirstUse}
-          allDone={allDone}
         />
       )}
     </div>
@@ -269,7 +315,6 @@ function CompanyIroPanel({
   isGenerating,
   onGenerate,
   hideGenerateBtn = false,
-  allDone = false,
 }: {
   company: BenchmarkCompany;
   group: IroGroup | null;
@@ -277,8 +322,6 @@ function CompanyIroPanel({
   onGenerate: () => void;
   /** Primer uso: banner es el CTA principal, ocultar botón individual */
   hideGenerateBtn?: boolean;
-  /** Todas las empresas ya generadas: botón cambia a "↺ Regenerar" */
-  allDone?: boolean;
 }) {
   const batch = group?.batch ?? null;
   const iros = group?.iros ?? [];

@@ -84,6 +84,8 @@ type LatestReport = {
   batch_id?: string | null;
 } | null;
 
+type BenchmarkCompanyIrosGroup = { company_id: string; batch: { status: string } | null; iros: unknown[] };
+
 type Props = {
   clientId: string;
   clientName: string;
@@ -112,6 +114,7 @@ export const DM_STAGES_META = [
   { id: "dm-sec-referentes",         label: "Referentes"     },
   { id: "dm-sec-benchmark-empresas", label: "Emp. referencia"},
   { id: "dm-sec-benchmark",          label: "Benchmark"      },
+  { id: "dm-sec-benchmark-iros",     label: "IROs ref."      },
   { id: "dm-sec-iros",               label: "IROs"           },
   { id: "dm-sec-matriz",             label: "Matriz"         },
   { id: "dm-sec-nis",                label: "NIS/IBSO"       },
@@ -198,6 +201,7 @@ export function DoubleMaterialidadTab({
   const reportKey      = `/api/clients/${clientId}/dm-report`;
   const resumenKey     = `/api/clients/${clientId}/dm-resumen`;
   const validacionKey  = `/api/clients/${clientId}/dm-validacion`;
+  const benchmarkCompanyIrosKey = `/api/clients/${clientId}/dm-benchmark-company-iros`;
 
   const { push } = useToast();
   const [isPolling, setIsPolling] = useState(false);
@@ -271,6 +275,10 @@ export function DoubleMaterialidadTab({
     revalidateOnFocus: false,
     refreshInterval: isIroPolling ? 5_000 : 0,
   });
+
+  const { data: benchmarkCompanyIrosResp } = useSWR<{ data: { groups: BenchmarkCompanyIrosGroup[] } }>(
+    benchmarkCompanyIrosKey, fetcher, { revalidateOnFocus: false }
+  );
 
   const { data: nisResp, mutate: mutateNis } = useSWR<{
     data: NisItem[];
@@ -358,10 +366,27 @@ export function DoubleMaterialidadTab({
     ? "pending"
     : "locked";
 
-  // stage5 = IROs
+  // stage4b = IROs de empresas de referencia — activo cuando Benchmark done
+  const benchmarkCompanyIrosGroups = benchmarkCompanyIrosResp?.data?.groups ?? [];
+  const validatedCompanyIds = companies.filter((c) => c.validated).map((c) => c.id);
+  const benchmarkIrosDoneCount = validatedCompanyIds.filter((id) => {
+    const g = benchmarkCompanyIrosGroups.find((grp) => grp.company_id === id);
+    return g?.batch?.status === "done";
+  }).length;
+  const hasBenchmarkIros = validatedCompanyIds.length > 0 && benchmarkIrosDoneCount === validatedCompanyIds.length;
+  const stage4bHasContent = benchmarkCompanyIrosGroups.some((g) => g.iros.length > 0);
+  const stage4bStatus: StageStatus = hasBenchmarkIros
+    ? "done"
+    : stage4Status === "done"
+    ? "active"
+    : stage4bHasContent
+    ? "pending"
+    : "locked";
+
+  // stage5 = IROs del cliente — activo cuando IROs de empresas de referencia done
   const stage5Status: StageStatus = hasIros
     ? "done"
-    : hasBenchmark
+    : hasBenchmarkIros
     ? "active"
     : iros.length > 0
     ? "pending"
@@ -434,12 +459,12 @@ export function DoubleMaterialidadTab({
 
   // Badge [N/10] — notifica al padre cuántas etapas están completas
   const stageStatuses: StageStatus[] = [
-    stage1Status, stage2Status, stage3Status, stage4Status,
+    stage1Status, stage2Status, stage3Status, stage4Status, stage4bStatus,
     stage5Status, stage6Status, stage7Status, stage8Status, stage9Status, stage10Status,
   ];
   const dmDoneCount = stageStatuses.filter((s) => s === "done").length;
   useEffect(() => {
-    onStagesProgress?.(dmDoneCount, 10);
+    onStagesProgress?.(dmDoneCount, 11);
   }, [dmDoneCount, onStagesProgress]);
 
   // Smart-jump al primer pendiente — solo en mount inicial y sin hash en URL.
@@ -468,7 +493,7 @@ export function DoubleMaterialidadTab({
       navigateTo(DM_SECTION_IDS[firstPendingIdx]!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage1Status, stage2Status, stage3Status, stage4Status, stage5Status, stage6Status, stage7Status, stage8Status, stage9Status, stage10Status]);
+  }, [stage1Status, stage2Status, stage3Status, stage4Status, stage4bStatus, stage5Status, stage6Status, stage7Status, stage8Status, stage9Status, stage10Status]);
 
   // Navegación por teclado ← → entre etapas (Ruta B — cambia panel activo)
   useEffect(() => {
@@ -518,6 +543,8 @@ export function DoubleMaterialidadTab({
         : undefined },
     { label: "Benchmark",      status: stage4Status,  sectionId: "dm-sec-benchmark", doneDate: latestResult?.created_at,
       count: validatedCompanies > 0 ? `${validatedCompanies} val.` : undefined },
+    { label: "IROs ref.",      status: stage4bStatus, sectionId: "dm-sec-benchmark-iros",
+      count: benchmarkIrosDoneCount > 0 ? `${benchmarkIrosDoneCount}/${validatedCompanies} emp.` : undefined },
     { label: "IROs",           status: stage5Status,  sectionId: "dm-sec-iros",
       count: iros.length > 0 ? `${iros.length} IROs` : undefined },
     { label: "Matriz",         status: stage6Status,  sectionId: "dm-sec-matriz",
@@ -712,7 +739,7 @@ export function DoubleMaterialidadTab({
         status={stage4Status}
         accent="border-l-blue-600"
         isActive={activeStageId === "dm-sec-benchmark"}
-        isNextLocked={stage5Status === "locked"}
+        isNextLocked={stage4bStatus === "locked"}
         lockReason="Valida las empresas de referencia (Etapa 3) para ejecutar el benchmark competitivo ESG. Las empresas del benchmark deben estar confirmadas antes de comparar desempeño."
         subtitle="Compara el desempeño ESG contra las empresas de referencia seleccionadas en Etapa 3"
         headerRight={null}
@@ -737,31 +764,47 @@ export function DoubleMaterialidadTab({
           )}
         />
 
-        {/* IROs de empresas de referencia — solo si hay al menos 1 validada */}
-        {validatedCompanies > 0 && (
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <p className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-3">
-              IROs por empresa de referencia
-              <span className="ml-1.5 normal-case text-slate-300">({validatedCompanies})</span>
-            </p>
-            <BenchmarkIrosSection
-              clientId={clientId}
-              companies={companies}
-            />
-          </div>
-        )}
       </CollapsibleStageSection>
 
-      {/* ── Etapa 5 — IROs del cliente ── */}
+      {/* ── Etapa 5 — IROs de empresas de referencia ── */}
+      <CollapsibleStageSection
+        id="dm-sec-benchmark-iros"
+        stageNum={5}
+        label="IROs de empresas de referencia"
+        status={stage4bStatus}
+        accent="border-l-indigo-600"
+        isActive={activeStageId === "dm-sec-benchmark-iros"}
+        isNextLocked={stage5Status === "locked"}
+        lockReason="Ejecuta el benchmark competitivo (Etapa 4) para analizar los IROs de las empresas de referencia."
+        subtitle="Impactos, Riesgos y Oportunidades identificados en las empresas del benchmark · base comparativa para el inventario del cliente"
+        headerRight={
+          hasBenchmarkIros ? (
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
+              {validatedCompanies} completadas
+            </span>
+          ) : benchmarkIrosDoneCount > 0 ? (
+            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-sm font-bold whitespace-nowrap tabular-nums">
+              {benchmarkIrosDoneCount}/{validatedCompanies} generadas
+            </span>
+          ) : null
+        }
+      >
+        <BenchmarkIrosSection
+          clientId={clientId}
+          companies={companies}
+        />
+      </CollapsibleStageSection>
+
+      {/* ── Etapa 6 — IROs del cliente ── */}
       <CollapsibleStageSection
         id="dm-sec-iros"
-        stageNum={5}
+        stageNum={6}
         label="Inventario de IROs"
         status={stage5Status}
         accent="border-l-violet-600"
         isActive={activeStageId === "dm-sec-iros"}
         isNextLocked={stage6Status === "locked"}
-        lockReason="Ejecuta el benchmark competitivo (Etapa 4) para identificar y calificar los Impactos, Riesgos y Oportunidades del cliente."
+        lockReason="Completa los IROs de las empresas de referencia (Etapa 5) para identificar y calificar los Impactos, Riesgos y Oportunidades del cliente."
         subtitle="Impactos, Riesgos y Oportunidades identificados y calificados para inclusión en el estudio"
         headerRight={
           iros.length > 0 ? (
@@ -785,10 +828,10 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 6 — Matriz de Doble Materialidad ── */}
+      {/* ── Etapa 7 — Matriz de Doble Materialidad ── */}
       <CollapsibleStageSection
         id="dm-sec-matriz"
-        stageNum={6}
+        stageNum={7}
         label="Matriz de Doble Materialidad"
         status={stage6Status}
         accent="border-l-brand-primary"
@@ -815,16 +858,16 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 7 — NIS / IBSO ── */}
+      {/* ── Etapa 8 — NIS / IBSO ── */}
       <CollapsibleStageSection
         id="dm-sec-nis"
-        stageNum={7}
+        stageNum={8}
         label="Brechas de información por área material"
         status={stage7Status}
         accent="border-l-amber-600"
         isActive={activeStageId === "dm-sec-nis"}
         isNextLocked={stage8Status === "locked"}
-        lockReason="Completa el inventario de IROs (Etapa 5) para analizar las brechas de información por área material."
+        lockReason="Completa el inventario de IROs (Etapa 6) para analizar las brechas de información por área material."
         subtitle="NIS/IBSO (Normas de Información de Sostenibilidad · Indicadores de Brechas) — disponibilidad y calidad por IRO material"
         headerRight={
           quadrantCounts.brechas_criticas > 0 ? (
@@ -843,31 +886,31 @@ export function DoubleMaterialidadTab({
         />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 8 — Resumen ejecutivo IA ── */}
+      {/* ── Etapa 9 — Resumen ejecutivo IA ── */}
       <CollapsibleStageSection
         id="dm-sec-resumen"
-        stageNum={8}
+        stageNum={9}
         label="Resumen Ejecutivo (IA)"
         status={stage8Status}
         accent="border-l-sky-600"
         isActive={activeStageId === "dm-sec-resumen"}
         isNextLocked={stage9Status === "locked"}
-        lockReason="Completa el inventario de IROs (Etapa 5) para generar el resumen ejecutivo con IA."
+        lockReason="Completa el inventario de IROs (Etapa 6) para generar el resumen ejecutivo con IA."
         subtitle="Narrativa generada por IA con insights, trade-offs y recomendaciones estratégicas"
       >
         <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 9 — Validación con el cliente ── */}
+      {/* ── Etapa 10 — Validación con el cliente ── */}
       <CollapsibleStageSection
         id="dm-sec-validacion"
-        stageNum={9}
+        stageNum={10}
         label="Validación con el cliente"
         status={stage9Status}
         accent="border-l-amber-500"
         isActive={activeStageId === "dm-sec-validacion"}
         isNextLocked={stage10Status === "locked"}
-        lockReason="Genera el resumen ejecutivo (Etapa 8) para iniciar la sesión de validación con el cliente."
+        lockReason="Genera el resumen ejecutivo (Etapa 9) para iniciar la sesión de validación con el cliente."
         subtitle="Decisiones del cliente sobre cada IRO incluido — aprobación, ajuste o descarte"
         headerRight={
           includedIros.length > 0 ? (
@@ -880,15 +923,15 @@ export function DoubleMaterialidadTab({
         <ValidacionSection clientId={clientId} iros={iros} />
       </CollapsibleStageSection>
 
-      {/* ── Etapa 10 — Reporte (etapa final) ── */}
+      {/* ── Etapa 11 — Reporte (etapa final) ── */}
       <CollapsibleStageSection
         id="dm-sec-reporte"
-        stageNum={10}
+        stageNum={11}
         label="Reporte de Doble Materialidad"
         status={stage10Status}
         accent="border-l-emerald-600"
         isActive={activeStageId === "dm-sec-reporte"}
-        lockReason="Completa el benchmark (Etapa 4), el inventario de IROs (Etapa 5) y el resumen ejecutivo (Etapa 8) para generar el reporte final de doble materialidad."
+        lockReason="Completa el benchmark (Etapa 4), los IROs de empresas de referencia (Etapa 5), el inventario de IROs del cliente (Etapa 6) y el resumen ejecutivo (Etapa 9) para generar el reporte final de doble materialidad."
         subtitle="Documento final consolidado · benchmark + IROs + matriz + validación cliente"
         headerRight={
           hasReport ? (

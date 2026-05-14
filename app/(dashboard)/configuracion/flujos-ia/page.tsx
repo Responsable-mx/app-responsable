@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   title: "Flujos IA · Configuración · App ResponSable",
 };
 
-export const revalidate = 86400;
+export const revalidate = 3600;
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -83,11 +83,11 @@ const DOC_STEPS: FlowStep[] = [
   {
     n: 4,
     label: "Embeddings semánticos",
-    desc: "Voyage AI vectoriza cada fragmento para búsqueda por significado, no solo palabras exactas. El cron corre cada noche a las 6:30 AM.",
-    tool: "Voyage AI — cron nocturno",
-    timing: "Nocturno",
-    lane: "C",
-    warn: "Gap actual: entre la subida y el cron nocturno solo la búsqueda básica está activa (puede tardar horas). Chat IA y AI-fill ya funcionan con búsqueda básica — el semántico mejorará la precisión cuando esté listo. Fix pendiente: activar el procesamiento semántico inmediatamente tras la subida, sin esperar al cron.",
+    desc: "Voyage AI vectoriza cada fragmento para búsqueda por significado, no solo palabras exactas. El procesamiento ocurre al instante al subir el archivo. El cron nocturno (6:30 AM) actúa como red de seguridad para casos de fallo.",
+    tool: "Voyage AI — inline al subir + cron nocturno (red de seguridad)",
+    timing: "<30 s (al subir) · Nocturno (cron)",
+    lane: "A",
+    note: "Embeddings listos el mismo momento en que el documento queda parseado. Chat IA y AI-fill acceden a búsqueda semántica inmediatamente.",
   },
 ];
 
@@ -131,7 +131,7 @@ const CHAT_STEPS: ChatStep[] = [
   {
     n: 2, label: "Recuperación de contexto",
     desc: "Busca en los documentos del cliente los fragmentos más relevantes para la pregunta.",
-    tool: "BM25 (activo) → Voyage embeddings (pendiente prod)",
+    tool: "BM25 + Voyage embeddings + Voyage Rerank (activos)",
     timing: "<1 s",
   },
   {
@@ -180,7 +180,7 @@ const DM_STEPS: FlowStep[] = [
   {
     n: 4, label: "IROs propios",
     desc: "Genera el inventario de Impactos, Riesgos y Oportunidades del cliente con scores de impacto y financiero.",
-    tool: "Sonnet · Batch API (propuesto → −50% costo)",
+    tool: "Sonnet · Anthropic Batch API (−50% costo)",
     timing: "2–5 min", lane: "B", model: "Sonnet",
   },
   {
@@ -349,7 +349,7 @@ export default function FlujoIaPage() {
         </p>
 
         <div className="flex flex-wrap gap-2 mb-5">
-          {(["A", "C"] as Lane[]).map((lane) => (
+          {(["A"] as Lane[]).map((lane) => (
             <LaneBadge key={lane} lane={lane} />
           ))}
         </div>
@@ -526,9 +526,9 @@ export default function FlujoIaPage() {
                 { tool: "QStash",                where: "Benchmark — 1 trabajo por empresa en paralelo",                   status: "Activo" },
                 { tool: "BM25 (keywords)",       where: "Chat + AI-fill — recuperación de contexto del cliente",            status: "Activo" },
                 { tool: "Voyage AI embeddings",  where: "Chat + AI-fill — búsqueda semántica (669/669 chunks en prod)",   status: "Activo" },
-                { tool: "Voyage Rerank",         where: "Chat — selección fina de fragmentos",                              status: "Propuesto" },
+                { tool: "Voyage Rerank",         where: "Chat — selección fina de fragmentos (top-20 → rerank → top-8)",   status: "Activo" },
+                { tool: "Anthropic Batch API",   where: "IROs propios · Reporte PDF · Benchmark (−50% costo)",             status: "Activo" },
                 { tool: "Upstash Redis",         where: "Caché benchmarks sectoriales repetidos",                           status: "Propuesto" },
-                { tool: "Anthropic Batch API",   where: "Reporte PDF · IROs masivos (−50% costo)",                         status: "Propuesto" },
                 { tool: "Gemini Flash",          where: "AI-fill extracción pura (−40× costo vs Sonnet)",                  status: "Propuesto" },
               ].map((row) => {
                 const statusColor =
@@ -569,7 +569,7 @@ export default function FlujoIaPage() {
           Detalle de activación y costo:{" "}
           <a href="/configuracion/herramientas" className="text-brand-primary underline underline-offset-2">Herramientas →</a>
           {" · "}Decisiones de optimización:{" "}
-          <a href="/configuracion/auditoria-ia" className="text-brand-primary underline underline-offset-2">Auditoría IA →</a>
+          <a href="/configuracion/monitoreo-ia" className="text-brand-primary underline underline-offset-2">Monitoreo IA →</a>
         </p>
       </div>
     </div>

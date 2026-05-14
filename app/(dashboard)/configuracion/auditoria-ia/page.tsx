@@ -170,6 +170,16 @@ export default async function AuditoriaIaPage() {
         accion = `Revisar logs de Vercel del período con más errores y buscar el mensaje exacto.`;
       }
 
+      // Rol secundario con tasa alta aunque no sea el top contributor
+      const highRateSecondary = llmRolesWithErrors.find(r =>
+        r !== topRole && r.calls >= 5 && (r.errors / r.calls) > 0.2
+      );
+      if (highRateSecondary && isConcentrated) {
+        const rLabelSec = roleLabel[highRateSecondary.role.toLowerCase()] ?? highRateSecondary.role;
+        const rRateSec  = Math.round((highRateSecondary.errors / highRateSecondary.calls) * 100);
+        diagnostico += ` Además, ${rLabelSec} tiene una tasa de falla del ${rRateSec}% (${highRateSecondary.errors}/${highRateSecondary.calls} llamadas) — monitorear aunque el volumen sea bajo.`;
+      }
+
       decisions.push({
         prioridad: errorRate > 0.2 ? "urgente" : "importante",
         titulo: "La IA está fallando con frecuencia",
@@ -204,7 +214,7 @@ export default async function AuditoriaIaPage() {
       porQueImporta: "Cuando un informe del cliente tiene 200 páginas, la búsqueda extrae múltiples fragmentos candidatos. Sin selección precisa, la IA recibe algunos irrelevantes y puede perder el dato clave. Con esta mejora, se filtran los mejores antes de enviárselos.",
       ejemplo: "En un informe de 180 páginas sobre Nuvoil, la diferencia entre recibir el fragmento correcto de la tabla GRI vs. uno genérico de la introducción.",
       necesita: voyageActive
-        ? "1 hora de trabajo técnico. Sin costo adicional (usa la misma suscripción ya activa)."
+        ? "2–3 horas de trabajo técnico. Sin costo adicional (usa la misma suscripción Voyage ya activa)."
         : "Se activa inmediatamente después de la búsqueda inteligente, sin trabajo extra.",
       recomendacion: "activar",
     });
@@ -245,6 +255,19 @@ export default async function AuditoriaIaPage() {
       necesita: "Medio día de trabajo técnico. Sin costo: usamos la cuenta de infraestructura que ya tenemos.",
       recomendacion: "planear",
     });
+
+    // Caché bajo — < 20% con volumen real
+    if (cacheRatio < 0.2 && llmCalls > 20) {
+      decisions.push({
+        prioridad: "conveniente",
+        titulo: `El caché de IA está poco aprovechado — ahorra hasta el doble (hoy: ${Math.round(cacheRatio * 100)}%)`,
+        queMejora: "Más respuestas leen de caché en lugar de procesar todo de nuevo — menos costo, misma calidad.",
+        porQueImporta: `El caché está en ${Math.round(cacheRatio * 100)}% cuando el objetivo es >40%. Cuando los bloques fijos del prompt — contexto del cliente, reglas del rol — se reutilizan de caché, el costo de esos tokens cae al 10%. Con el volumen actual, subir al 40% ahorraría ~${usdFmt.format(costoMes * 0.25)}/mes adicional.`,
+        ejemplo: "Si Aurora procesa el mismo contexto de cliente 20 veces al mes, hoy paga 20 veces el costo completo. Con caché al 40%, paga 1 vez completo + 19 veces al 10% — ahorro del 82% en ese bloque.",
+        necesita: "Revisar el orden de los bloques en los prompts del sistema: los bloques estáticos (reglas, contexto del rol) deben ir antes que los dinámicos (pregunta del usuario). 1–2 horas de trabajo técnico.",
+        recomendacion: "revisar",
+      });
+    }
 
     // Extracción económica (Gemini Flash)
     const sonnetModel = usage.by_model.find(m => m.family === "sonnet");
@@ -350,6 +373,16 @@ export default async function AuditoriaIaPage() {
 
   return (
     <div className="px-8 py-6 max-w-4xl">
+
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <div className="mb-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
+          Auditoría IA
+        </p>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Salud del sistema, costos y decisiones concretas de mejora — basado en los últimos 30 días de uso real.
+        </p>
+      </div>
 
       {/* ── Estado general ─────────────────────────────────────────────────── */}
       <div className={`flex items-start gap-3 border ${sc.border} ${sc.bg} rounded-lg px-4 py-3 mb-6`}>
@@ -527,7 +560,8 @@ export default async function AuditoriaIaPage() {
             Cuántas veces usó el equipo cada asistente, qué tan rápido respondió y si hubo fallas.
           </p>
           <div className="bg-white border border-slate-200 rounded overflow-hidden">
-            <table className="w-full text-xs">
+            <div className="overflow-x-auto">
+            <table className="min-w-full w-max text-xs">
               <thead>
                 <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
                   <th className="px-4 py-2.5 text-left">Rol</th>
@@ -603,6 +637,7 @@ export default async function AuditoriaIaPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -616,7 +651,8 @@ export default async function AuditoriaIaPage() {
           Cada tarea usa el tipo de IA adecuado a su complejidad — no siempre la más potente es la mejor opción.
         </p>
         <div className="bg-white border border-slate-200 rounded overflow-hidden">
-          <table className="w-full text-xs">
+          <div className="overflow-x-auto">
+          <table className="min-w-full w-max text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">
                 <th className="px-4 py-2.5 text-left">Tarea</th>
@@ -636,7 +672,7 @@ export default async function AuditoriaIaPage() {
                 { tarea: "IROs — inventario de impactos",     tipo: "IA estándar",            porque: "Análisis ESG con scores de impacto financiero y de negocio.",                                                        estado: "Activo" },
                 { tarea: "Resumen ejecutivo",                 tipo: "IA estándar",            porque: "El consultor necesita el resultado de inmediato — no puede esperar un procesamiento en segundo plano.",              estado: "Activo" },
                 { tarea: "Reporte PDF final",                 tipo: "IA de máxima capacidad", porque: "Es el entregable al cliente — requiere la máxima calidad narrativa y análisis.",                                      estado: "Activo" },
-                { tarea: "Búsqueda en documentos del cliente",tipo: "Búsqueda básica → semántica (pendiente)", porque: "Hoy busca por palabras exactas. Activar búsqueda semántica mejora +25% la precisión.",              estado: "Parcial" },
+                { tarea: "Búsqueda en documentos del cliente",tipo: "Búsqueda semántica (Voyage AI)", porque: "Usa vectores semánticos para encontrar fragmentos relevantes aunque se usen sinónimos o términos distintos al informe del cliente.",              estado: "Activo" },
                 { tarea: "Extracción de datos AI-fill",       tipo: "IA económica (propuesto)", porque: "Solo extrae datos sin interpretarlos — una IA más económica hace el mismo trabajo a 40× menor costo.",             estado: "Propuesto" },
                 { tarea: "Reporte PDF en segundo plano",      tipo: "Procesamiento diferido (propuesto)", porque: "El consultor no espera bloqueado — recibe notificación cuando el reporte está listo al 50% del costo.",  estado: "Propuesto" },
               ].map((row) => {
@@ -655,6 +691,7 @@ export default async function AuditoriaIaPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
         <p className="text-[10px] text-slate-400 mt-3">
           Para el detalle técnico de cada configuración:{" "}

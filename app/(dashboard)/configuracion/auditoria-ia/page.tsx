@@ -79,9 +79,13 @@ export default async function AuditoriaIaPage() {
   const opusPct      = pct(opusModel?.calls ?? 0, llmCalls);
   const cacheRatio   = usage && (usage.total_input_tokens + usage.total_cache_read_tokens) > 0
     ? usage.total_cache_read_tokens / (usage.total_input_tokens + usage.total_cache_read_tokens) : 0;
-  const voyageActive = voyageCalls > 100;
-  const latenciaMs   = usage?.avg_latency_ms ?? 0;
-  const costoMes     = usage?.cost_usd_estimate_max ?? 0;
+  const voyageActive    = voyageCalls > 100;
+  // Rerank activo: detectado automáticamente cuando alguna llamada usa workflowStage="rerank"
+  const rerankActive    = (usage?.by_stage ?? []).some(s => s.stage === "rerank");
+  // Benchmark activo: hay llamadas dm_benchmark en los últimos 30 días
+  const benchmarkActive = (usage?.by_stage ?? []).some(s => s.stage.startsWith("dm_benchmark"));
+  const latenciaMs      = usage?.avg_latency_ms ?? 0;
+  const costoMes        = usage?.cost_usd_estimate_max ?? 0;
 
   // Semáforo de salud general
   const semaforo: "verde" | "amarillo" | "rojo" =
@@ -204,18 +208,14 @@ export default async function AuditoriaIaPage() {
       });
     }
 
-    // Voyage Rerank (después de embeddings)
-    decisions.push({
-      prioridad: voyageActive ? "importante" : "conveniente",
-      titulo: voyageActive
-        ? "Mejorar la selección de fragmentos relevantes"
-        : "Activar selección precisa de fragmentos (siguiente paso tras búsqueda inteligente)",
+    // Voyage Rerank: solo si voyage activo Y aún no se ha usado rerank en producción
+    if (voyageActive && !rerankActive) decisions.push({
+      prioridad: "importante",
+      titulo: "Mejorar la selección de fragmentos relevantes",
       queMejora: "La IA recibe solo los fragmentos más útiles del documento antes de responder — menos ruido, más precisión.",
       porQueImporta: "Cuando un informe del cliente tiene 200 páginas, la búsqueda extrae múltiples fragmentos candidatos. Sin selección precisa, la IA recibe algunos irrelevantes y puede perder el dato clave. Con esta mejora, se filtran los mejores antes de enviárselos.",
       ejemplo: "En un informe de 180 páginas sobre Nuvoil, la diferencia entre recibir el fragmento correcto de la tabla GRI vs. uno genérico de la introducción.",
-      necesita: voyageActive
-        ? "2–3 horas de trabajo técnico. Sin costo adicional (usa la misma suscripción Voyage ya activa)."
-        : "Se activa inmediatamente después de la búsqueda inteligente, sin trabajo extra.",
+      necesita: "2–3 horas de trabajo técnico. Sin costo adicional (usa la misma suscripción Voyage ya activa).",
       recomendacion: "activar",
     });
 
@@ -245,8 +245,8 @@ export default async function AuditoriaIaPage() {
       });
     }
 
-    // Caché de benchmarks
-    decisions.push({
+    // Caché de benchmarks: solo si hay actividad de benchmark en la ventana
+    if (benchmarkActive) decisions.push({
       prioridad: "conveniente",
       titulo: "Evitar pagar dos veces por la misma información de benchmark",
       queMejora: "Si dos consultores consultan datos del mismo sector (p. ej. energía, manufactura), la segunda respuesta se reutiliza sin cobrar.",

@@ -236,7 +236,7 @@ export async function rerankChunks(opts: {
         outputTokens: 0,
         latencyMs: Date.now() - startedAt,
         error: `rerank ${res.status}: ${errText.slice(0, 200)}`,
-        workflowStage: "embeddings",
+        workflowStage: "rerank",
       });
       return opts.chunks; // fallback silencioso
     }
@@ -251,7 +251,7 @@ export async function rerankChunks(opts: {
       outputTokens: 0,
       latencyMs: Date.now() - startedAt,
       error: null,
-      workflowStage: "embeddings",
+      workflowStage: "rerank",
     });
     if (!json.data || json.data.length === 0) return opts.chunks;
     // Voyage devuelve items ya ordenados por relevance_score desc
@@ -269,7 +269,7 @@ export async function rerankChunks(opts: {
       outputTokens: 0,
       latencyMs: Date.now() - startedAt,
       error: e instanceof Error ? e.message : "rerank fetch failed",
-      workflowStage: "embeddings",
+      workflowStage: "rerank",
     });
     return opts.chunks; // fallback: orden original
   }

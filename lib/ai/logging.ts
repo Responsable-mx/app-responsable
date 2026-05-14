@@ -23,6 +23,8 @@ export type AiCallLog = {
    *  "dm_benchmark_company_iros", "dm_iros", "dm_resumen", "dm_report",
    *  "ai_fill", "doc_fill", "extract_profile", "research_reports", "embeddings" */
   workflowStage?: string | null;
+  /** SHA-256 (16 chars) del system prompt estático — audit trail CSRD */
+  promptHash?: string | null;
 };
 
 /**
@@ -46,6 +48,7 @@ export async function logAiCall(call: AiCallLog): Promise<void> {
       latency_ms: call.latencyMs,
       error: call.error ?? null,
       workflow_stage: call.workflowStage ?? null,
+      prompt_hash: call.promptHash ?? null,
     });
   } catch (e) {
     console.error("[ai/logging] failed to log call:", e);

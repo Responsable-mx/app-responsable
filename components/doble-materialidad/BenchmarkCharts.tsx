@@ -262,7 +262,9 @@ export function BrechaUrgencyChart({ items }: { items: BrechaItem[] }) {
             </text>
             <rect x={BLW} y={barY} width={barW} height={barH} fill={color} fillOpacity="0.8" rx="1" />
             <text x={BLW + barW + 4} y={y + BHR / 2 + 3.5} fontSize="7" fill={color}>
-              {label} ({item.peerBrechas}/{item.totalPeers})
+              {item.peerBrechas === 0
+                ? "Exclusiva — ninguna referencia la reporta"
+                : `${label} (${item.peerBrechas}/${item.totalPeers})`}
             </text>
           </g>
         );

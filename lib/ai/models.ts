@@ -25,13 +25,13 @@ type ModelConfig = {
 export const MODEL_CONFIG: Record<RoleId, ModelConfig> = {
   aurora: {
     model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6",
-    maxTokens: 2000,
+    maxTokens: 3000, // borradores narrativos completos — subido de 2000
     useCache: true,
     description: "Aurora — Autor. Construye borrador alineado a metodología.",
   },
   rebeca: {
     model: process.env.ANTHROPIC_MODEL_SONNET || "claude-sonnet-4-6",
-    maxTokens: 2000,
+    maxTokens: 1200, // checklists estructurados — no necesita más
     useCache: true,
     description: "Rebeca — Revisor. Detecta fallas, omisiones, riesgos.",
   },
@@ -45,15 +45,14 @@ export const MODEL_CONFIG: Record<RoleId, ModelConfig> = {
   },
   valeria: {
     model: process.env.ANTHROPIC_MODEL_HAIKU || "claude-haiku-4-5-20251001",
-    maxTokens: 1500,
+    maxTokens: 700, // validación de criterios — reducido de 1500
     useCache: true,
     description: "Valeria — Validador. DoD, consistencia, evidencia.",
   },
 };
 
-/** Elena routing heuristic: Opus para mensajes complejos (>80 palabras o
- *  palabras clave estratégicas), Sonnet para mensajes cortos/seguimiento.
- *  -$50-80/mes estimado al escalar a >20 usuarios.
+/** Elena routing: Opus para mensajes complejos (>80 palabras o keywords estratégicas),
+ *  Sonnet para seguimiento breve. -$50-80/mes estimado al escalar a >20 usuarios.
  */
 function elenaModel(userMessage?: string): string {
   if (!userMessage) return MODEL_CONFIG.elena.model;
@@ -65,9 +64,27 @@ function elenaModel(userMessage?: string): string {
   return MODEL_CONFIG.elena.model;
 }
 
-export function getModelConfig(role: RoleId, userMessage?: string): ModelConfig {
+/** Aurora routing: Haiku para preguntas de seguimiento muy cortas (clarificaciones
+ *  factuales, <12 palabras, sin imperativo), Sonnet para todo lo demás.
+ *  Conservador: solo aplica en mensajes de seguimiento (historyTurns > 1).
+ *  B2B enterprise — umbral bajo para no sacrificar percepción de calidad.
+ */
+function auroraModel(userMessage?: string, historyTurns = 0): string {
+  if (!userMessage || historyTurns < 2) return MODEL_CONFIG.aurora.model;
+  const words = userMessage.trim().split(/\s+/).length;
+  const hasAction = /redact|escrib|analiz|compar|elabor|desarroll|sintetiz|propone|evalú|identific|diseñ|plantea|desarrolla|genera|crea|lista|resume\s/i.test(userMessage);
+  const isShortQuestion = words <= 12 && /[¿?]/.test(userMessage) && !hasAction;
+  return isShortQuestion
+    ? process.env.ANTHROPIC_MODEL_HAIKU || "claude-haiku-4-5-20251001"
+    : MODEL_CONFIG.aurora.model;
+}
+
+export function getModelConfig(role: RoleId, userMessage?: string, historyTurns = 0): ModelConfig {
   if (role === "elena" && userMessage !== undefined) {
     return { ...MODEL_CONFIG.elena, model: elenaModel(userMessage) };
+  }
+  if (role === "aurora" && userMessage !== undefined) {
+    return { ...MODEL_CONFIG.aurora, model: auroraModel(userMessage, historyTurns) };
   }
   return MODEL_CONFIG[role];
 }

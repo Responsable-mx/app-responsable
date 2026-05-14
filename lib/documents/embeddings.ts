@@ -147,6 +147,7 @@ export type ChunkRow = {
   chunk_index: number;
   content: string;
   content_hash: string;
+  page_number?: number | null;
 };
 
 /**
@@ -154,6 +155,19 @@ export type ChunkRow = {
  * (document_id, chunk_index) unique constraint + content_hash dedupe.
  * embedding queda NULL — cron lo populará si VOYAGE_API_KEY existe.
  */
+/** Extrae el número de página de un chunk buscando el marcador <!-- page: N -->
+ *  más cercano antes de la posición del chunk en el markdown original. */
+function extractPageNumber(markdown: string, chunkContent: string): number | null {
+  const probe = chunkContent.slice(0, 120);
+  const idx = markdown.indexOf(probe);
+  if (idx === -1) return null;
+  const prefix = markdown.slice(0, idx);
+  const matches = [...prefix.matchAll(/<!--\s*page:\s*(\d+)\s*-->/g)];
+  if (matches.length === 0) return null;
+  const last = matches[matches.length - 1]!;
+  return parseInt(last[1]!, 10);
+}
+
 export async function persistDocumentChunks(opts: {
   documentId: string;
   clientId: string;
@@ -169,6 +183,7 @@ export async function persistDocumentChunks(opts: {
     chunk_index: i,
     content: content.slice(0, 3000),
     content_hash: sha256(content),
+    page_number: extractPageNumber(opts.markdownContent, content) ?? null,
   }));
 
   const { error } = await admin
@@ -207,7 +222,9 @@ export async function searchSimilarChunks(opts: {
 
   if (error || !data) return null;
 
-  return (data as Array<ChunkRow & { score: number }>).map(({ score: _score, ...rest }) => rest);
+  return (data as Array<ChunkRow & { score: number; page_number?: number | null }>).map(
+    ({ score: _score, ...rest }) => rest
+  );
 }
 
 /**

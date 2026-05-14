@@ -70,148 +70,6 @@ function computeData(result: BenchmarkResult, clientName: string) {
   return { catStats, peers };
 }
 
-// ── 1. Radar ESG ──────────────────────────────────────────────────────────────
-
-// E arriba (−90°), S abajo-derecha (30°), G abajo-izquierda (150°)
-const AXES = [
-  { cat: "E" as const, label: "Ambiental",   angle: -Math.PI / 2 },
-  { cat: "S" as const, label: "Social",       angle:  Math.PI / 6 },
-  { cat: "G" as const, label: "Gobernanza",   angle:  5 * Math.PI / 6 },
-];
-
-const CAT_COLOR = { E: "#059669", S: "#2563eb", G: "#7c3aed" } as const;
-
-function RadarESG({ catStats }: { catStats: CatStats[] }) {
-  const cx = 90, cy = 88, maxR = 62;
-
-  const axisPt = (i: number, r: number) => {
-    const a = AXES[i]!.angle;
-    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-  };
-
-  const toPtStr = (i: number, score: number) => {
-    if (score < 0) return `${cx},${cy}`;
-    const r = (score / 100) * maxR;
-    const a = AXES[i]!.angle;
-    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
-  };
-
-  const orderedStats = AXES.map((ax) => catStats.find((d) => d.cat === ax.cat));
-  const clientPts  = orderedStats.map((d, i) => toPtStr(i, d?.clientScore  ?? -1)).join(" ");
-  const medianPts  = orderedStats.map((d, i) => toPtStr(i, d?.medianScore  ?? -1)).join(" ");
-  const gridLevels = [25, 50, 75, 100];
-
-  return (
-    <div>
-      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Radar ESG</p>
-      <svg viewBox="0 0 180 158" className="w-full max-w-[200px]" overflow="visible">
-        {/* Cuadrículas concéntricas */}
-        {gridLevels.map((lvl) => {
-          const r = (lvl / 100) * maxR;
-          const pts = [0, 1, 2]
-            .map((i) => {
-              const p = axisPt(i, r);
-              return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
-            })
-            .join(" ");
-          return (
-            <polygon key={lvl} points={pts} fill="none" stroke="#e2e8f0" strokeWidth="0.6" />
-          );
-        })}
-
-        {/* Ejes */}
-        {[0, 1, 2].map((i) => {
-          const tip = axisPt(i, maxR);
-          return (
-            <line
-              key={i}
-              x1={cx} y1={cy}
-              x2={tip.x.toFixed(1)} y2={tip.y.toFixed(1)}
-              stroke="#e2e8f0"
-              strokeWidth="0.6"
-            />
-          );
-        })}
-
-        {/* Polígono mediana (sector) */}
-        <polygon
-          points={medianPts}
-          fill="rgba(148,163,184,0.12)"
-          stroke="#94a3b8"
-          strokeWidth="1"
-          strokeDasharray="3 2"
-        />
-
-        {/* Polígono cliente */}
-        <polygon
-          points={clientPts}
-          fill="rgba(20,184,166,0.12)"
-          stroke="var(--color-brand-primary)"
-          strokeWidth="1.8"
-        />
-
-        {/* Etiquetas en puntas de eje: letra + score */}
-        {AXES.map((ax, i) => {
-          const tip = axisPt(i, maxR + 10);
-          const stat = orderedStats[i];
-          return (
-            <g key={ax.cat}>
-              <text
-                x={tip.x.toFixed(1)}
-                y={(tip.y + 3).toFixed(1)}
-                textAnchor="middle"
-                fontSize="9"
-                fontWeight="700"
-                fill={CAT_COLOR[ax.cat]}
-                fontFamily="inherit"
-              >
-                {ax.cat}
-              </text>
-              {stat && stat.clientScore >= 0 && (
-                <text
-                  x={tip.x.toFixed(1)}
-                  y={(tip.y + 12).toFixed(1)}
-                  textAnchor="middle"
-                  fontSize="7.5"
-                  fontWeight="600"
-                  fill="var(--color-brand-primary)"
-                  fontFamily="inherit"
-                >
-                  {stat.clientScore}%
-                </text>
-              )}
-            </g>
-          );
-        })}
-
-        {/* Leyenda */}
-        <g>
-          <rect x="4" y="146" width="12" height="2" fill="var(--color-brand-primary)" rx="0.5" />
-          <text x="18" y="149" fontSize="6.5" fill="#475569" fontFamily="inherit">Cliente</text>
-          <line x1="60" y1="147" x2="72" y2="147" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2 1.5" />
-          <text x="76" y="149" fontSize="6.5" fill="#475569" fontFamily="inherit">Mediana sector</text>
-        </g>
-      </svg>
-
-      {/* Sub-leyenda: label + score por categoría */}
-      <div className="flex gap-3 mt-1 flex-wrap">
-        {AXES.map((ax) => {
-          const stat = catStats.find((d) => d.cat === ax.cat);
-          if (!stat) return null;
-          return (
-            <span key={ax.cat} className="flex items-center gap-1 text-[8px]">
-              <span className="font-bold" style={{ color: CAT_COLOR[ax.cat] }}>{ax.label}</span>
-              <span className="text-slate-400">
-                {stat.clientScore >= 0 ? `${stat.clientScore}%` : "—"}
-              </span>
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ── 2. Barras de posición por categoría ───────────────────────────────────────
 
 const BAR_COLOR: Record<string, { bar: string; text: string }> = {
@@ -286,10 +144,12 @@ function ScoreHeatmap({
   result,
   clientName,
   peers,
+  onCatFilter,
 }: {
   result: BenchmarkResult;
   clientName: string;
   peers: { name: string; relation: string }[];
+  onCatFilter?: (cat: "E" | "S" | "G") => void;
 }) {
   const allCols = [{ name: clientName, isClient: true }, ...peers.map((p) => ({ name: p.name, isClient: false }))];
 
@@ -321,9 +181,14 @@ function ScoreHeatmap({
           </thead>
           <tbody>
             {result.fields_snapshot.map((f) => {
-              const cat = f.key.charAt(0).toUpperCase();
+              const cat = f.key.charAt(0).toUpperCase() as "E" | "S" | "G";
               return (
-                <tr key={f.key} className="group">
+                <tr
+                  key={f.key}
+                  className={`group ${onCatFilter ? "cursor-pointer hover:bg-slate-50/80" : ""}`}
+                  onClick={() => onCatFilter?.(cat)}
+                  title={onCatFilter ? `Filtrar tabla por ${cat === "E" ? "Ambiental" : cat === "S" ? "Social" : "Gobernanza"}` : undefined}
+                >
                   <td className="pr-2 py-px align-middle whitespace-nowrap">
                     <span className={`text-[7px] font-bold mr-0.5 ${CAT_CLS[cat] ?? "text-slate-400"}`}>{cat}</span>
                     <span className="text-slate-600">
@@ -369,9 +234,11 @@ function ScoreHeatmap({
 export function BenchmarkVisuals({
   latestResult,
   clientName,
+  onCatFilter,
 }: {
   latestResult: BenchmarkResult;
   clientName: string;
+  onCatFilter?: (cat: "E" | "S" | "G") => void;
 }) {
   const [open, setOpen] = useState(true);
   const { catStats, peers } = computeData(latestResult, clientName);
@@ -400,15 +267,19 @@ export function BenchmarkVisuals({
 
       {open && (
         <div className="space-y-3 pt-1">
-          {/* Fila: Radar + Barras */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border border-slate-100 rounded p-3 bg-slate-50/40">
-            <RadarESG catStats={catStats} />
+          {/* Barras por categoría */}
+          <div className="border border-slate-100 rounded p-3 bg-slate-50/40">
             <PositionBars catStats={catStats} />
           </div>
 
           {/* Heatmap */}
           <div className="border border-slate-100 rounded p-3 bg-slate-50/40">
-            <ScoreHeatmap result={latestResult} clientName={clientName} peers={peers} />
+            {onCatFilter && (
+              <p className="text-[8px] text-slate-400 mb-1">
+                Haz clic en una fila para filtrar la tabla por esa categoría
+              </p>
+            )}
+            <ScoreHeatmap result={latestResult} clientName={clientName} peers={peers} onCatFilter={onCatFilter} />
           </div>
         </div>
       )}

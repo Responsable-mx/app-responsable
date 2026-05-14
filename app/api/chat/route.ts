@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import crypto from "node:crypto";
 import { createAnthropicClient } from "@/lib/ai/client";
 import { requireConsultorOrAdmin } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
@@ -20,6 +21,42 @@ export const maxDuration = 120;
 // Aurora puede tardar 80-90s con contexto extenso — 45s era demasiado corto.
 const STREAM_TIMEOUT_MS = 100_000;
 const OVERLOADED_RETRY_DELAY_MS = 2_000;
+
+// Summarization: comprimir historial largo con Haiku para reducir tokens y latencia.
+// Trigger: >14 mensajes (7 turnos). Mantiene últimos 4 mensajes (2 turnos) intactos.
+const COMPRESS_TRIGGER = 14;
+const COMPRESS_KEEP_TAIL = 4;
+
+type MsgLike = { role: "user" | "assistant"; content: string | unknown };
+
+async function compressConversation(
+  messages: MsgLike[],
+  anthropic: ReturnType<typeof createAnthropicClient>
+): Promise<MsgLike[]> {
+  if (messages.length <= COMPRESS_TRIGGER) return messages;
+  const toSummarize = messages.slice(0, messages.length - COMPRESS_KEEP_TAIL);
+  const tail = messages.slice(messages.length - COMPRESS_KEEP_TAIL);
+  try {
+    const haiku = process.env.ANTHROPIC_MODEL_HAIKU || "claude-haiku-4-5-20251001";
+    const resp = await anthropic.messages.create({
+      model: haiku,
+      max_tokens: 600,
+      messages: [{
+        role: "user",
+        content: `Resume esta conversación en ≤400 palabras. Preserva: decisiones, datos específicos, instrucciones del consultor, nombres de empresas o estándares mencionados. Omite: saludos, repeticiones, frases de cortesía.\n\nCONVERSACIÓN:\n${toSummarize.map((m) => `[${m.role === "user" ? "CONSULTOR" : "IA"}]: ${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`).join("\n\n")}`,
+      }],
+    }, { signal: AbortSignal.timeout(15_000) });
+    const summary = resp.content.find((b) => b.type === "text")?.text ?? "";
+    if (!summary) return messages;
+    return [
+      { role: "user" as const, content: `[RESUMEN — ${toSummarize.length} mensajes anteriores comprimidos]\n${summary}` },
+      { role: "assistant" as const, content: "Entendido, continúo con el contexto del resumen." },
+      ...tail,
+    ];
+  } catch {
+    return messages; // fail-open
+  }
+}
 
 // Rate limit: 30 mensajes / 5 min por email. Evita que un loop accidental
 // queme crédito Anthropic.
@@ -117,7 +154,8 @@ export async function POST(req: NextRequest) {
   ]);
   const lastUserMsg = messages.filter((m) => m.role === "user").pop();
   const lastUserText = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
-  const config = getModelConfig(role, lastUserText);
+  const historyTurns = Math.floor(messages.length / 2);
+  const config = getModelConfig(role, lastUserText, historyTurns);
   const baseSystemBlocks = await buildSystemBlocks(role, client, questionnaire);
   // Wave 3c (D): memoria de feedback negativo del consultor para este rol+cliente.
   // Se agrega como 3er bloque SIN cache_control — refleja feedback nuevo sin
@@ -139,7 +177,13 @@ export async function POST(req: NextRequest) {
             const chunks = matches.length >= 3
               ? await rerankChunks({ query: lastUserText, chunks: matches.map((m) => m.content), topK: 8, meta: { userEmail: user, clientId } })
               : matches.map((m) => m.content);
-            return `FRAGMENTOS RELEVANTES DEL INFORME DEL CLIENTE:\n${chunks.join("\n\n---\n\n")}`;
+            // Incluir número de página cuando disponible — habilita citations precisas
+            const pageByContent = new Map(matches.map((m) => [m.content, m.page_number ?? null]));
+            const chunksWithPage = chunks.map((c) => {
+              const page = pageByContent.get(c);
+              return page != null ? `[Página ${page}]\n${c}` : c;
+            });
+            return `FRAGMENTOS RELEVANTES DEL INFORME DEL CLIENTE:\n${chunksWithPage.join("\n\n---\n\n")}`;
           } catch {
             return "";
           }
@@ -156,6 +200,14 @@ export async function POST(req: NextRequest) {
     ...(feedbackText ? [{ type: "text" as const, text: feedbackText, cache_control: { type: "ephemeral" as const } }] : []),
     ...(docChunksText ? [{ type: "text" as const, text: docChunksText }] : []),
   ];
+
+  // Audit trail: hash del prompt estático (bloques 1+2+3, sin docChunks que cambia por query).
+  // 16 chars de SHA-256 — suficiente para detectar cambios de versión de prompt.
+  const promptHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(baseSystemBlocks) + (feedbackText ?? ""))
+    .digest("hex")
+    .slice(0, 16);
 
   // Circuit breaker: rechazar inmediatamente si Anthropic está en cascada de fallos
   if (anthropicBreaker.isOpen) {
@@ -175,6 +227,10 @@ export async function POST(req: NextRequest) {
   const anthropic = createAnthropicClient();
   const encoder = new TextEncoder();
   const startedAt = Date.now();
+
+  // Comprimir historial largo con Haiku antes de enviarlo al modelo principal.
+  // Reduce tokens y latencia en sesiones de >7 turnos. Fail-open.
+  const compressedMessages = await compressConversation(messages, anthropic);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -206,6 +262,7 @@ export async function POST(req: NextRequest) {
           latencyMs: Date.now() - startedAt,
           error,
           workflowStage: "chat",
+          promptHash,
         });
       };
 
@@ -215,9 +272,9 @@ export async function POST(req: NextRequest) {
             model: config.model,
             max_tokens: config.maxTokens,
             system: systemBlocks,
-            messages: messages.map((m) => ({
+            messages: compressedMessages.map((m) => ({
               role: m.role,
-              content: m.content,
+              content: m.content as string,
             })),
           },
           { signal: AbortSignal.timeout(STREAM_TIMEOUT_MS) }

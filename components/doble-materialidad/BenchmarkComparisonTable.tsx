@@ -40,15 +40,28 @@ export function BenchmarkComparisonTable({
   clientName,
   latestResult,
   companyUrls = {},
+  tableFilter: tableFilterProp,
+  onTableFilterChange,
+  onlyBrechas: onlyBrechasProp,
+  onOnlyBrechasChange,
 }: {
   clientId: string;
   clientName: string;
   latestResult: BenchmarkResult;
   companyUrls?: Record<string, { reportUrl: string | null; websiteUrl: string | null }>;
+  tableFilter?: "all" | "E" | "S" | "G";
+  onTableFilterChange?: (f: "all" | "E" | "S" | "G") => void;
+  onlyBrechas?: boolean;
+  onOnlyBrechasChange?: (v: boolean) => void;
 }) {
+  const [tableFilterInternal, setTableFilterInternal] = useState<"all" | "E" | "S" | "G">("all");
+  const [onlyBrechasInternal, setOnlyBrechasInternal] = useState(false);
+  const tableFilter = tableFilterProp ?? tableFilterInternal;
+  const setOnlyBrechas = onOnlyBrechasChange ?? setOnlyBrechasInternal;
+  const onlyBrechas = onlyBrechasProp ?? onlyBrechasInternal;
+  const handleTableFilterChange = onTableFilterChange ?? setTableFilterInternal;
+
   const { push } = useToast();
-  const [tableFilter, setTableFilter] = useState<"all" | "E" | "S" | "G">("all");
-  const [onlyBrechas, setOnlyBrechas] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [tableFullscreen, setTableFullscreen] = useState(false);
   const [colFilter, setColFilter] = useState<
@@ -241,7 +254,7 @@ export function BenchmarkComparisonTable({
           <button
             key={c}
             type="button"
-            onClick={() => setTableFilter(c)}
+            onClick={() => handleTableFilterChange(c)}
             className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
               tableFilter === c
                 ? "bg-brand-primary text-white border-brand-primary"
@@ -255,7 +268,7 @@ export function BenchmarkComparisonTable({
       })}
       <button
         type="button"
-        onClick={() => setOnlyBrechas((v) => !v)}
+        onClick={() => setOnlyBrechas(!onlyBrechas)}
         className={`px-2 py-0.5 rounded-sm text-[10px] font-medium border transition-colors ${
           onlyBrechas
             ? "bg-rose-50 text-rose-600 border-rose-200"
@@ -393,7 +406,7 @@ export function BenchmarkComparisonTable({
                       type="button"
                       onClick={() => scrollToDmSection("dm-sec-iros")}
                       title="Ir a IROs para registrar esta brecha como riesgo u oportunidad"
-                      className="inline-flex items-center gap-0.5 text-[9px] text-indigo-500 hover:text-indigo-700 mt-0.5 font-medium transition-colors"
+                      className="inline-flex items-center px-1.5 py-0.5 text-[10px] border border-indigo-200 rounded-sm bg-indigo-50 text-indigo-600 font-medium hover:bg-indigo-100 transition-colors mt-0.5"
                     >
                       + IRO →
                     </button>
@@ -430,49 +443,8 @@ export function BenchmarkComparisonTable({
     </p>
   );
 
-  // Scorecard items para render
-  const scorecardItems = [
-    { key: "sólido" as const, cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "●" },
-    { key: "parcial" as const, cls: "bg-amber-50 text-amber-700 border-amber-200",   icon: "◑" },
-    { key: "brecha"  as const, cls: "bg-rose-50 text-rose-600 border-rose-200",       icon: "○" },
-  ] as const;
-
   return (
     <div className="mt-2">
-      {/* Scorecard: posición global del cliente */}
-      <div className="flex items-center gap-1.5 flex-wrap mb-3 px-0.5">
-        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
-          {clientName}:
-        </span>
-        {scorecardItems.map(({ key, cls, icon }) =>
-          scorecardAll[key] > 0 ? (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setOnlyBrechas(key === "brecha")}
-              title={`${scorecardAll[key]} de ${allFields.length} dimensiones — click para filtrar tabla`}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-medium border cursor-pointer hover:opacity-75 transition-opacity ${cls}`}
-            >
-              <span aria-hidden="true">{icon}</span>
-              {scorecardAll[key]}/{allFields.length} {key}
-            </button>
-          ) : null
-        )}
-        {scorecardAll.otros > 0 && (
-          <span className="text-[10px] text-slate-400 border border-slate-200 px-2 py-0.5 rounded-sm">
-            {scorecardAll.otros} sin clasificar
-          </span>
-        )}
-        {allCompanies.length > 0 && (
-          <span
-            title={`Media de dimensiones sólidas entre las ${allCompanies.length} empresas de referencia`}
-            className="text-[10px] text-indigo-500 border border-indigo-100 bg-indigo-50 px-2 py-0.5 rounded-sm ml-1"
-          >
-            Ref: ~{peerAvgSolido}/{allFields.length} sólido
-          </span>
-        )}
-      </div>
-
       {/* Análisis visual — 3 gráficas SVG */}
       <div className="mb-4">
         <button

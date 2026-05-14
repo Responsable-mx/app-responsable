@@ -9,7 +9,7 @@ import { RELATION_LABELS, RELATION_ORDER, type CompanyRelation } from "@/lib/dm/
 import type { DmIroConfig } from "@/lib/dm/iros";
 import { ExpandableCell } from "@/components/doble-materialidad/ExpandableCell";
 import type { BenchmarkCompany, BenchmarkResult, RejectionReason } from "./benchmark-types";
-import { REJECTION_OPTIONS } from "./benchmark-helpers";
+import { REJECTION_OPTIONS, lookupComparisonValue } from "./benchmark-helpers";
 import { BenchmarkComparisonTable } from "./BenchmarkComparisonTable";
 import { BenchmarkVisuals } from "./BenchmarkVisuals";
 import type { BenchmarkEmpresa } from "@/lib/dm/benchmark-empresas-types";
@@ -20,6 +20,17 @@ const fetcher = (url: string) =>
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   });
+
+// ── Score helper (misma lógica que BenchmarkComparisonTable) ─────────────────
+
+function detectScore(text: string): "sólido" | "parcial" | "brecha" | null {
+  if (!text || text === "—" || /^sin datos/i.test(text)) return null;
+  const t = text.toLowerCase();
+  if (/ausencia|brecha|carece|sin reporte|sin meta|no publica|no mide|no tiene|no cuenta/.test(t)) return "brecha";
+  if (/parcial|limitad|sólo |básic|en proceso/.test(t)) return "parcial";
+  if (/iso |certif|ecovadis|gri |scope [12]|mide |sólid|verific|reporta/.test(t)) return "sólido";
+  return null;
+}
 
 // ── Síntesis estructurada ─────────────────────────────────────────────────────
 
@@ -156,6 +167,10 @@ export function BenchmarkSection({
   const hasReferentes = referentCompanies.length > 0;
   // Colapsar configuración por default cuando ya existe un resultado
   const [configExpanded, setConfigExpanded] = useState(() => latestResult?.status !== "done");
+
+  // Filtros compartidos entre heatmap (BenchmarkVisuals) y tabla (BenchmarkComparisonTable)
+  const [tableFilter, setTableFilter] = useState<"all" | "E" | "S" | "G">("all");
+  const [onlyBrechas, setOnlyBrechas] = useState(true);
 
   // Auto-importar silenciosamente desde Etapa 3 cuando aún no hay empresas en benchmark
   const autoImportAttempted = useRef(false);

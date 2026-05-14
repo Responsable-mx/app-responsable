@@ -69,7 +69,19 @@ async function parsePdf(buffer: Buffer): Promise<string> {
   // Último fallback: importar desde /lib directamente — el entry point de pdf-parse carga archivos
   // de test que no existen en producción (ENOENT ./test/data/05-versions-space.pdf).
   const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
-  const result = await pdfParse(buffer);
+  const pages: string[] = [];
+  const result = await pdfParse(buffer, {
+    pagerender: (pageData: { getTextContent: () => Promise<{ items: Array<{ str: string; hasEOL?: boolean }> }> }) =>
+      pageData.getTextContent().then((tc) => {
+        const text = tc.items.map((i) => i.str + (i.hasEOL ? "\n" : " ")).join("");
+        pages.push(text.trim());
+        return text;
+      }),
+  });
+  void result; // resultado global no usado — usamos pages[]
+  if (pages.length > 0) {
+    return cleanText(pages.map((p, i) => `<!-- page: ${i + 1} -->\n${p}`).join("\n\n"));
+  }
   return cleanText(result.text);
 }
 
@@ -104,7 +116,8 @@ async function parsePdfWithMistralOcr(buffer: Buffer): Promise<string | null> {
 
   const json = (await res.json()) as { pages?: Array<{ markdown?: string }> };
   if (!json.pages?.length) return null;
-  return json.pages.map((p) => p.markdown ?? "").join("\n\n");
+  // Inyectar marcadores de página — habilita citations con número de página en chunks
+  return json.pages.map((p, i) => `<!-- page: ${i + 1} -->\n${p.markdown ?? ""}`).join("\n\n");
 }
 
 /**

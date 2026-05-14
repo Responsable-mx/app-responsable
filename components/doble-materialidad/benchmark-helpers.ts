@@ -1,5 +1,14 @@
 import type { RejectionReason } from "./benchmark-types";
 
+export function detectScore(text: string): "sólido" | "parcial" | "brecha" | null {
+  if (!text || text === "—" || /^sin datos/i.test(text)) return null;
+  const t = text.toLowerCase();
+  if (/ausencia|brecha|carece|sin reporte|sin meta|no publica|no mide|no tiene|no cuenta/.test(t)) return "brecha";
+  if (/parcial|limitad|sólo |básic|en proceso/.test(t)) return "parcial";
+  if (/iso |certif|ecovadis|gri |scope [12]|mide |sólid|verific|reporta/.test(t)) return "sólido";
+  return null;
+}
+
 export const REJECTION_OPTIONS: { value: RejectionReason; label: string }[] = [
   { value: "sector_diferente",    label: "Sector diferente" },
   { value: "tamano_incomparable", label: "Tamaño incomparable" },

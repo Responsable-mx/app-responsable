@@ -180,6 +180,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     after: { client_id: id, kind: doc.kind, source_url: url, file_name: doc.file_name },
   });
 
+  // Advertencia si el documento es muy largo — Aurora puede tardar >40s
+  // (timeout serverless 270s) en documentos de >200 páginas (~5MB PDF).
+  const LARGE_DOC_BYTES = 5 * 1024 * 1024;
+  const largeDocWarning =
+    doc.parse_status === "ok" && doc.size_bytes > LARGE_DOC_BYTES
+      ? `Documento grande (${(doc.size_bytes / 1024 / 1024).toFixed(1)} MB). Si tiene más de 200 páginas, la IA puede tardar más de lo normal. Considera dividirlo en secciones para mejores resultados.`
+      : null;
+
   return NextResponse.json({
     data: {
       doc_id: doc.id,
@@ -191,5 +199,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       parse_error: doc.parse_error,
       source_url: url,
     },
+    ...(largeDocWarning ? { warning: largeDocWarning } : {}),
   });
 }

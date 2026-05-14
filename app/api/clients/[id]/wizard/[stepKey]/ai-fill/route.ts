@@ -207,10 +207,18 @@ FLUJO DE TRABAJO:
   let vectorChunks: string[] | null = null;
   if (useRelevance && process.env.VOYAGE_API_KEY) {
     try {
-      const { searchSimilarChunks } = await import("@/lib/documents/embeddings");
+      const { searchSimilarChunks, rerankChunks } = await import("@/lib/documents/embeddings");
       const matches = await searchSimilarChunks({ query: relevanceQuery, clientId: id, limit: 20 });
       if (matches && matches.length >= 3) {
-        vectorChunks = matches.map((m) => m.content);
+        const rawChunks = matches.map((m) => m.content);
+        // Rerank: de los 20 chunks semánticos, mantener top 10 más relevantes.
+        // Reduce noise y tokens sin sacrificar los mejores resultados.
+        vectorChunks = await rerankChunks({
+          query: relevanceQuery,
+          chunks: rawChunks,
+          topK: 10,
+          meta: { userEmail: user, clientId: id },
+        });
       }
     } catch (e) {
       console.error("[ai-fill] vector search failed, falling back to BM25:", e);

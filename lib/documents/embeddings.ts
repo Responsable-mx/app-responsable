@@ -26,6 +26,11 @@ type VoyageResponse = {
   model?: string;
 };
 
+type VoyageRerankResponse = {
+  data?: Array<{ index: number; relevance_score: number }>;
+  usage?: { total_tokens?: number };
+};
+
 type VoyageMeta = { userEmail?: string; clientId?: string | null };
 
 /** Voyage API — 1 o N inputs en una sola llamada HTTP. */
@@ -187,6 +192,84 @@ export async function searchSimilarChunks(opts: {
   if (error || !data) return null;
 
   return (data as Array<ChunkRow & { score: number }>).map(({ score: _score, ...rest }) => rest);
+}
+
+/**
+ * Reordena chunks por relevancia semántica via Voyage Rerank API (rerank-2).
+ * Toma hasta 20 chunks del vector search y devuelve los topK más relevantes.
+ * Fallback silencioso: si falla, retorna chunks en orden original sin interrumpir el flujo.
+ */
+export async function rerankChunks(opts: {
+  query: string;
+  chunks: string[];
+  topK?: number;
+  meta?: VoyageMeta;
+}): Promise<string[]> {
+  const apiKey = process.env.VOYAGE_API_KEY;
+  if (!apiKey || opts.chunks.length <= 1) return opts.chunks;
+
+  const topK = opts.topK ?? Math.min(opts.chunks.length, 8);
+  const model = "rerank-2";
+  const startedAt = Date.now();
+
+  try {
+    const res = await fetch("https://api.voyageai.com/v1/rerank", {
+      method: "POST",
+      signal: AbortSignal.timeout(15_000),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        query: opts.query.slice(0, 4_000),
+        documents: opts.chunks.map((c) => c.slice(0, 3_000)),
+        model,
+        top_k: topK,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[embeddings] rerank error:", res.status, errText);
+      void logAiCall({
+        userEmail: opts.meta?.userEmail ?? "system@rerank",
+        role: "embeddings",
+        clientId: opts.meta?.clientId ?? null,
+        model,
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: Date.now() - startedAt,
+        error: `rerank ${res.status}: ${errText.slice(0, 200)}`,
+      });
+      return opts.chunks; // fallback silencioso
+    }
+    const json = (await res.json()) as VoyageRerankResponse;
+    const tokens = json.usage?.total_tokens ?? 0;
+    void logAiCall({
+      userEmail: opts.meta?.userEmail ?? "system@rerank",
+      role: "embeddings",
+      clientId: opts.meta?.clientId ?? null,
+      model,
+      inputTokens: tokens,
+      outputTokens: 0,
+      latencyMs: Date.now() - startedAt,
+      error: null,
+    });
+    if (!json.data || json.data.length === 0) return opts.chunks;
+    // Voyage devuelve items ya ordenados por relevance_score desc
+    return json.data
+      .map((item) => opts.chunks[item.index])
+      .filter((c): c is string => typeof c === "string");
+  } catch (e) {
+    console.error("[embeddings] rerank failed:", e);
+    void logAiCall({
+      userEmail: opts.meta?.userEmail ?? "system@rerank",
+      role: "embeddings",
+      clientId: opts.meta?.clientId ?? null,
+      model,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - startedAt,
+      error: e instanceof Error ? e.message : "rerank fetch failed",
+    });
+    return opts.chunks; // fallback: orden original
+  }
 }
 
 /** Exportada para uso en competitor.ts — evita duplicar el algoritmo. */

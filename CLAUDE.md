@@ -346,10 +346,10 @@ Pipeline en 2 niveles, swap transparente. BM25 activo en prod; Voyage configurad
 **Estado activación (may-2026):**
 - [x] `VOYAGE_API_KEY` + `VOYAGE_MODEL=voyage-2` → en `.env.local` (local listo)
 - [x] `lib/documents/embeddings.ts` + `app/api/cron/embed-chunks/route.ts` → en repo
-- [x] `supabase/migrations/0076_document_chunks_embeddings.sql` → en repo (no aplicada aún)
-- [ ] Agregar `VOYAGE_API_KEY` + `VOYAGE_MODEL` en Vercel env vars (prod)
-- [ ] Aplicar migración 0076 a Supabase (`--confirm-destructive`)
-- [ ] `ai-fill/route.ts`: llamar `searchSimilarChunks` antes que BM25
+- [x] `supabase/migrations/0076_document_chunks_embeddings.sql` → aplicada (tabla + policy ya existen en prod)
+- [x] `VOYAGE_API_KEY` + `VOYAGE_MODEL=voyage-3` en Vercel env vars (prod) ✅
+- [x] `ai-fill/route.ts`: `searchSimilarChunks` activo antes que BM25 ✅
+- [x] `embed-chunks` cron: 669/669 chunks embeddidos en prod (6:30 AM diario) ✅ FULLY ACTIVE
 
 **`lib/documents/embeddings.ts`:**
 - `generateEmbedding(text)` y `generateQueryEmbedding(query)` (input_type "document" vs "query")

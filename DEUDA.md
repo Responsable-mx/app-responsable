@@ -21,10 +21,8 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 ### ~~🟡 D-177 — Voyage fetch sin timeout en `lib/documents/embeddings.ts`~~ ✅ RESUELTO (sesión 33)
 - `signal: AbortSignal.timeout(30_000)` añadido en `callVoyageRaw`. Lambda ya no puede hang 5min si Voyage cuelga.
 
-### 🟢 D-178 — `logAiCall` con `latencyMs: 0` en dm-benchmark-company-iros
-- `app/api/clients/[id]/dm-benchmark-company-iros/route.ts:215` — `latencyMs: 0` hardcodeado.
-- Batch API es async (submit POST → poll GET) — no hay latencia real por call, pero 0ms en dashboard impide detectar lenteadas de Anthropic.
-- Fix: calcular `Date.now() - new Date(batch.submitted_at).getTime()` al completar el batch. Columna `submitted_at` existe en `dm_benchmark_iro_batches`.
+### ~~🟢 D-178 — `logAiCall` con `latencyMs: 0` en dm-benchmark-company-iros~~ ✅ RESUELTO (sesión 34, 2026-05-13)
+- Fix: `Date.now() - new Date(b.created_at).getTime()` — columna real es `created_at` (no `submitted_at`). Resuelto en commit `3519869`.
 
 ---
 

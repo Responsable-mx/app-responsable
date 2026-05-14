@@ -795,6 +795,7 @@ export function DoubleMaterialidadTab({
         <BenchmarkIrosSection
           clientId={clientId}
           companies={companies}
+          clientSector={clientSector}
         />
       </CollapsibleStageSection>
 

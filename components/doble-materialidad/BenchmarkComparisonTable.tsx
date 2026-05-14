@@ -44,6 +44,8 @@ export function BenchmarkComparisonTable({
   onTableFilterChange,
   onlyBrechas: onlyBrechasProp,
   onOnlyBrechasChange,
+  hideScorecard = false,
+  hideCharts = false,
 }: {
   clientId: string;
   clientName: string;
@@ -53,6 +55,8 @@ export function BenchmarkComparisonTable({
   onTableFilterChange?: (f: "all" | "E" | "S" | "G") => void;
   onlyBrechas?: boolean;
   onOnlyBrechasChange?: (v: boolean) => void;
+  hideScorecard?: boolean;
+  hideCharts?: boolean;
 }) {
   const [tableFilterInternal, setTableFilterInternal] = useState<"all" | "E" | "S" | "G">("all");
   const [onlyBrechasInternal, setOnlyBrechasInternal] = useState(false);
@@ -446,7 +450,7 @@ export function BenchmarkComparisonTable({
   return (
     <div className="mt-2">
       {/* Análisis visual — 3 gráficas SVG */}
-      <div className="mb-4">
+      {!hideCharts && <div className="mb-4">
         <button
           type="button"
           onClick={() => setChartsOpen((v) => !v)}
@@ -495,7 +499,7 @@ export function BenchmarkComparisonTable({
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Header: título + filtros + acciones */}
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">

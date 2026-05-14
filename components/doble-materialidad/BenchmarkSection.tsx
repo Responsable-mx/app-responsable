@@ -9,7 +9,7 @@ import { RELATION_LABELS, RELATION_ORDER, type CompanyRelation } from "@/lib/dm/
 import type { DmIroConfig } from "@/lib/dm/iros";
 import { ExpandableCell } from "@/components/doble-materialidad/ExpandableCell";
 import type { BenchmarkCompany, BenchmarkResult, RejectionReason } from "./benchmark-types";
-import { REJECTION_OPTIONS, lookupComparisonValue } from "./benchmark-helpers";
+import { REJECTION_OPTIONS, lookupComparisonValue, detectScore } from "./benchmark-helpers";
 import { BenchmarkComparisonTable } from "./BenchmarkComparisonTable";
 import { BenchmarkVisuals } from "./BenchmarkVisuals";
 import type { BenchmarkEmpresa } from "@/lib/dm/benchmark-empresas-types";
@@ -21,16 +21,6 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
-// ── Score helper (misma lógica que BenchmarkComparisonTable) ─────────────────
-
-function detectScore(text: string): "sólido" | "parcial" | "brecha" | null {
-  if (!text || text === "—" || /^sin datos/i.test(text)) return null;
-  const t = text.toLowerCase();
-  if (/ausencia|brecha|carece|sin reporte|sin meta|no publica|no mide|no tiene|no cuenta/.test(t)) return "brecha";
-  if (/parcial|limitad|sólo |básic|en proceso/.test(t)) return "parcial";
-  if (/iso |certif|ecovadis|gri |scope [12]|mide |sólid|verific|reporta/.test(t)) return "sólido";
-  return null;
-}
 
 // ── Síntesis estructurada ─────────────────────────────────────────────────────
 
@@ -397,6 +387,22 @@ export function BenchmarkSection({
     latestResult!.companies_snapshot?.length > 0 &&
     latestResult!.fields_snapshot?.length > 0 &&
     Object.keys(latestResult!.comparison ?? {}).length > 0;
+
+  const mostUrgentBreach = hasComparisonData
+    ? (() => {
+        const peers = latestResult!.companies_snapshot;
+        const items = latestResult!.fields_snapshot
+          .filter((f) => detectScore(lookupComparisonValue(latestResult!.comparison, f.key, clientName)) === "brecha")
+          .map((f) => ({
+            label: f.label,
+            peerBrechas: peers.filter(
+              (co) => detectScore(lookupComparisonValue(latestResult!.comparison, f.key, co.name)) === "brecha"
+            ).length,
+          }))
+          .sort((a, b) => a.peerBrechas - b.peerBrechas);
+        return items[0] ?? null;
+      })()
+    : null;
 
   // Scorecard precomputado para mostrar arriba de BenchmarkVisuals
   const scorecardData = hasComparisonData && latestResult ? (() => {
@@ -845,6 +851,14 @@ export function BenchmarkSection({
                 Ref: ~{peerAvgSolido}/{totalFields} sólido
               </span>
             )}
+            {mostUrgentBreach && mostUrgentBreach.peerBrechas === 0 && (
+              <span
+                title="Brecha exclusiva — ninguna referencia la reporta. Máxima prioridad."
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-medium border bg-rose-100 text-rose-700 border-rose-300 ml-1"
+              >
+                ⚑ Exclusiva: {mostUrgentBreach.label}
+              </span>
+            )}
           </div>
         );
       })()}
@@ -874,6 +888,7 @@ export function BenchmarkSection({
           onTableFilterChange={setTableFilter}
           onlyBrechas={onlyBrechas}
           onOnlyBrechasChange={setOnlyBrechas}
+          hideCharts={true}
         />
       )}
 

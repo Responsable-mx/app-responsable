@@ -503,3 +503,17 @@ Repo vive bajo `C:\Users\…\OneDrive\…\app-responsable`. OneDrive puede conve
 Resultado: ~50% ahorro vs 1 solo breakpoint cuando el consultor cicla entre Aurora/Rebeca/Elena/Valeria sobre el mismo cliente. Si agregas un tercer breakpoint (max 4 permite Anthropic), considerar dónde corta mejor el caso de uso.
 
 **Pre-warm caché (sesión 40):** `POST /api/clients/[id]/warm-context` dispara llamada `max_tokens=1` con los system blocks del cliente. `ClientTabs` lo llama al montar (fire-and-forget). El primer mensaje del consultor paga `cache_read` (~10%) en lugar de `cache_write` (~25x más caro que read).
+
+## Herramientas conectadas — patrón catálogo unificado (may-2026)
+
+`app/(dashboard)/configuracion/herramientas/page.tsx` usa un único `TOOL_CATALOG` en lugar de dos arrays separados. La página se auto-categoriza en "Conectadas" vs "Propuestas".
+
+**Al implementar una herramienta propuesta:**
+1. Cambiar `implemented: false → true` en `TOOL_CATALOG`
+2. Añadir `healthKey` apuntando a la función en `HEALTH_CHECKS`
+3. Agregar la función de check en `HEALTH_CHECKS` si no existe aún
+
+Los health checks se dedupen automáticamente por key (Voyage Embeddings + Voyage Rerank comparten un solo ping). Si `implemented` es `true` pero no hay `healthKey`, la tarjeta muestra `inactive` — agregar siempre el check.
+
+**Herramientas activas (implemented=true):** Voyage Embeddings, Voyage Rerank, LlamaParse, Mistral OCR, QStash, Anthropic Batch API.
+**Propuestas (implemented=false):** Upstash Redis, Gemini Flash.

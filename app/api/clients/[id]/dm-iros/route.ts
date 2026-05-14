@@ -291,9 +291,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (fields.pos_x !== undefined || fields.pos_y !== undefined) {
     if (fields.pos_x !== undefined)          updatePayload.pos_x = fields.pos_x;
     if (fields.pos_y !== undefined)          updatePayload.pos_y = fields.pos_y;
+    // Reset solo si AMBOS están explícitamente presentes y son null.
+    // Si uno es undefined (no enviado), no es un reset — el otro eje sigue activo.
     const bothNull =
-      (fields.pos_x === null || fields.pos_x === undefined) &&
-      (fields.pos_y === null || fields.pos_y === undefined);
+      fields.pos_x !== undefined && fields.pos_y !== undefined &&
+      fields.pos_x === null      && fields.pos_y === null;
     updatePayload.pos_override = !bothNull;
   }
 

@@ -51,7 +51,7 @@ const INDICATOR_KEYWORDS: Record<string, string[]> = {
   cadena_suministro:      ["proveedor", "cadena suministro", "compra sostenible", "supply chain"],
   privacidad_datos:       ["datos personales", "privacidad", "ciberseguridad", "gdpr", "lfpdppp"],
   etica_anticorrupcion:   ["etica", "anticorrupcion", "soborno", "integridad", "codigo conducta", "whistleblower"],
-  gestion_riesgos_esg:    ["riesgo", "gobierno", "esg", "comite", "politica sostenibilidad", "materialidad"],
+  gestion_riesgos_esg:    ["riesgo", "gobierno", "gobernanza", "esg", "comite", "politica sostenibilidad", "materialidad", "gestion riesgo", "transparencia"],
 };
 
 export async function POST(_req: NextRequest, { params }: Ctx) {

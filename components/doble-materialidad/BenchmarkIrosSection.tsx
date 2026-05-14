@@ -203,9 +203,19 @@ export function BenchmarkIrosSection({
   const [showCallout, setShowCallout] = useState(true);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
-  // Síntesis
+  // Síntesis — carga desde DB al montar; persiste entre recargas
+  const { data: empresasData } = useSWR<{ data: { synthesis_narrative?: string | null } | null }>(
+    `/api/clients/${clientId}/dm-benchmark-empresas`,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
   const [narrative, setNarrative] = useState<string | null>(null);
   const [isGeneratingNarrative, setIsGeneratingNarrative] = useState(false);
+
+  useEffect(() => {
+    const persisted = empresasData?.data?.synthesis_narrative ?? null;
+    if (persisted && !narrative) setNarrative(persisted);
+  }, [empresasData, narrative]);
 
   // Adaptación
   const [selectedIroIds, setSelectedIroIds] = useState<Set<string>>(new Set());

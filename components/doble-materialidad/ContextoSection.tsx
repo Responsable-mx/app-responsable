@@ -173,10 +173,10 @@ export function ContextoSection({
               <p className="text-sm text-slate-400">— Completar</p>
             </button>
           )}
-          {/* Marcos */}
+          {/* Marcos del perfil del cliente (≠ marcos validados en Etapa 2 Referentes) */}
           {frameworks && frameworks.length > 0 ? (
             <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos (perfil)</p>
               <p className="text-sm font-semibold text-slate-800 leading-relaxed">
                 {frameworks.map((f) => catalogLabel("frameworks", f)).join(", ")}
               </p>
@@ -184,7 +184,7 @@ export function ContextoSection({
           ) : (
             <button type="button" onClick={onGoToCuestionario} title="Completar en Cuestionario"
               className="border border-dashed border-slate-300 rounded p-3 bg-slate-50/30 text-left hover:border-brand-primary hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Marcos (perfil)</p>
               <p className="text-sm text-slate-400">— Completar</p>
             </button>
           )}

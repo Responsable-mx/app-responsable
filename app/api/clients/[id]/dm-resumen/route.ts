@@ -157,7 +157,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   }
 
   // Cargar IROs, benchmark y brechas NIS en paralelo
-  const [irosRaw2, benchmarkRow, nisRaw] = await Promise.all([
+  const [irosRes, benchmarkRow, nisRaw] = await Promise.all([
     admin
       .from("client_iro_inventory")
       .select("n_iro, tema_esg, descripcion, tipo, horizonte, score_impacto, score_financiero")
@@ -179,7 +179,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       .order("sort_order", { ascending: true }),
   ]);
 
-  const iros = ((irosRaw2.data ?? []) as IroRow[])
+  const iros = ((irosRes.data ?? []) as IroRow[])
     .sort((a, b) => {
       const scoreA = (a.score_impacto ?? 0) + (a.score_financiero ?? 0);
       const scoreB = (b.score_impacto ?? 0) + (b.score_financiero ?? 0);

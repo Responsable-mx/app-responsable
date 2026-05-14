@@ -34,6 +34,9 @@ Prop `isGenerating` recibida pero no usada internamente → renombrada `_isGener
 ### ✅ Orden de bloques de sistema — cache preservado
 `feedbackText` (semi-estático, cacheable) antes de `docChunksText` (dinámico por query, no cacheable). Restaurado `cache_control: ephemeral` en feedbackText. Sin esto, docChunks invalidaba el cache de feedback en cada mensaje.
 
+### ✅ Tarjeta "indexación nocturna" — false positive eliminado
+`monitoreo-ia/page.tsx`: trigger cambiado de `voyageSystemErrors > 50` (errores históricos de 30 días) → `nullEmbeddings > 0` (count real de `document_chunks WHERE embedding IS NULL`). Nuevo fetcher `getNullEmbeddingsCount()`. Health check "Búsqueda semántica" actualizado igual. La tarjeta ahora refleja huecos reales, no errores pasados ya resueltos.
+
 ## Tests
 
 ```

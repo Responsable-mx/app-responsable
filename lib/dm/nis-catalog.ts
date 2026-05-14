@@ -57,7 +57,7 @@ export const NIS_CATALOG: NisCatalogItem[] = [
     key: "seguridad_laboral",
     label: "Seguridad y salud en el trabajo",
     categoria: "social",
-    sectores: ["manufactura", "retail"],
+    sectores: ["manufactura", "retail", "servicios"],
     sort_order: 6,
   },
   {
@@ -71,7 +71,7 @@ export const NIS_CATALOG: NisCatalogItem[] = [
     key: "condiciones_laborales",
     label: "Condiciones laborales y derechos",
     categoria: "social",
-    sectores: ["manufactura", "retail"],
+    sectores: ["manufactura", "retail", "servicios"],
     sort_order: 8,
   },
   {

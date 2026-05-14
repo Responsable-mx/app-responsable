@@ -6,6 +6,7 @@ import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
 import { logAiCall } from "@/lib/ai/logging";
 import { getTaskConfig } from "@/lib/ai/models";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -109,6 +110,12 @@ Estilo: directo, profesional, nivel McKinsey. Sin bullets. Sin encabezados. Solo
       error: null,
       workflowStage: "dm_iro_synthesis",
     });
+
+    // Persistir narrativa en dm_benchmark_empresas para sobrevivir recargas
+    const admin = createAdminClient();
+    void admin
+      .from("dm_benchmark_empresas")
+      .upsert({ client_id: id, synthesis_narrative: narrative, updated_at: new Date().toISOString() }, { onConflict: "client_id" });
 
     return NextResponse.json({ data: { narrative } });
   } catch (e) {

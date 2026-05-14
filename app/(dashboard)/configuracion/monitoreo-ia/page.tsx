@@ -117,6 +117,18 @@ async function getDocStats() {
   } catch { return null; }
 }
 
+async function getNullEmbeddingsCount(): Promise<number> {
+  try {
+    const sb = createAdminClient();
+    const { count, error } = await sb
+      .from("document_chunks")
+      .select("id", { count: "exact", head: true })
+      .is("embedding", null);
+    if (error) return 0;
+    return count ?? 0;
+  } catch { return 0; }
+}
+
 // ── Helpers de UI ─────────────────────────────────────────────────────────────
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -168,10 +180,11 @@ function DocStat({ label, value, tone = "neutral" }: { label: string; value: str
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default async function MonitoreoIaPage() {
-  const [s, docs, docStats] = await Promise.all([
+  const [s, docs, docStats, nullEmbeddings] = await Promise.all([
     getUsageSummary(30).catch(() => null),
     getDocumentsStats(),
     getDocStats(),
+    getNullEmbeddingsCount(),
   ]);
 
   // ── Métricas derivadas compartidas ────────────────────────────────────────
@@ -442,13 +455,13 @@ export default async function MonitoreoIaPage() {
     });
   }
 
-  if (voyageSystemErrors > 50) decisions.push({
-    prioridad:     voyageSystemErrors > 200 ? "importante" : "conveniente",
-    titulo:        `La indexación nocturna de documentos falló ${voyageSystemErrors} veces — la búsqueda puede tener huecos`,
-    queMejora:     "Confirmar que todos los fragmentos de los informes subidos están correctamente indexados para que la IA los encuentre.",
-    porQueImporta: `El proceso nocturno que convierte los documentos subidos en búsquedas inteligentes falló ${voyageSystemErrors} veces en los últimos 30 días. Cuando falla, la IA no tiene acceso a esos fragmentos — el consultor cree que Aurora busca en el documento completo pero en realidad puede tener huecos invisibles.`,
-    ejemplo:       `Si hubo un pico de errores de indexación algún día del mes, los documentos subidos ese día pueden no estar completamente disponibles para Aurora en el chat, aunque aparezcan como "subidos" en el tab Documentos.`,
-    necesita:      "Pedir al equipo técnico que revise los logs del cron de indexación (embed-chunks) y verifique que los documentos de los clientes activos estén completamente indexados.",
+  if (nullEmbeddings > 0) decisions.push({
+    prioridad:     nullEmbeddings > 100 ? "importante" : "conveniente",
+    titulo:        `${nullEmbeddings} fragmento${nullEmbeddings > 1 ? "s" : ""} de documentos sin indexar — la búsqueda puede tener huecos`,
+    queMejora:     "Cuando todos los fragmentos estén indexados, Aurora puede buscar en el documento completo del cliente.",
+    porQueImporta: `Hay ${nullEmbeddings} fragmento${nullEmbeddings > 1 ? "s" : ""} de documentos subidos que aún no se convirtieron en búsquedas inteligentes. El cron nocturno los procesa automáticamente — si llevan más de 24h pendientes, puede haber un problema en el proceso de indexación.`,
+    ejemplo:       `Si el informe GRI de un cliente tiene fragmentos sin indexar, Aurora no puede encontrar esa información en el chat aunque el documento aparezca como "subido" en el tab Documentos.`,
+    necesita:      "El cron nocturno (embed-chunks) los procesa automáticamente cada 6 horas. Si el número no baja en 24h, pedir revisión técnica.",
     recomendacion: "investigar",
   });
 
@@ -458,7 +471,7 @@ export default async function MonitoreoIaPage() {
   // ── Health checklist ──────────────────────────────────────────────────────
   const healthChecks: HealthCheck[] = s ? [
     { label: "Respuestas exitosas", status: errorRate > THRESHOLDS.errorRate.rate && llmCalls >= THRESHOLDS.errorRate.minCalls ? "rojo" : errorRate > 0.05 && llmCalls > 10 ? "amarillo" : llmCalls === 0 ? "neutral" : "verde", valor: llmCalls > 0 ? `${successRate}% (${llmErrors} fallas de ${numFmt.format(llmCalls)})` : "Sin actividad", meta: "Objetivo: >95%", trend: trendErrorRate },
-    { label: "Búsqueda semántica en documentos", status: !voyageActive ? "amarillo" : voyageSystemErrors > 100 ? "amarillo" : "verde", valor: voyageActive ? `Activa — ${numFmt.format(voyageCalls)} búsquedas${voyageSystemErrors > 50 ? ` · ${voyageSystemErrors} errores de indexación` : ""}` : "Inactiva" },
+    { label: "Búsqueda semántica en documentos", status: !voyageActive ? "amarillo" : nullEmbeddings > 0 ? "amarillo" : "verde", valor: voyageActive ? `Activa — ${numFmt.format(voyageCalls)} búsquedas${nullEmbeddings > 0 ? ` · ${nullEmbeddings} fragmentos sin indexar` : ""}` : "Inactiva" },
     { label: "Selección precisa de fragmentos", status: !voyageActive ? "neutral" : rerankActive ? "verde" : "amarillo", valor: !voyageActive ? "Requiere búsqueda semántica primero" : rerankActive ? "Activa" : "Lista para activar" },
     { label: "Uso de IA de máxima capacidad (Elena/Reporte)", status: llmCalls === 0 ? "neutral" : opusPct > THRESHOLDS.opusPct.pct && llmCalls >= THRESHOLDS.opusPct.minCalls ? "amarillo" : "verde", valor: llmCalls > 0 ? `${opusPct}% del volumen total` : "Sin datos", meta: `Objetivo: <${THRESHOLDS.opusPct.pct}%` },
     { label: "Velocidad de Aurora (rol más usado)", status: latenciaMs === 0 ? "neutral" : latenciaMs > THRESHOLDS.latenciaMs * 2 ? "rojo" : latenciaMs > THRESHOLDS.latenciaMs ? "amarillo" : "verde", valor: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "Sin datos", meta: `Objetivo: <${THRESHOLDS.latenciaMs / 1000}s` },

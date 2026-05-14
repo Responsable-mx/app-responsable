@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
@@ -427,8 +427,8 @@ export function PricingConfigTable({
                                   const isAiOpen = aiExpanded.has(p.client_id);
                                   const aiData = aiCache.get(p.client_id);
                                   return (
-                                    <>
-                                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                    <Fragment key={p.id}>
+                                      <tr className="hover:bg-slate-50 transition-colors">
                                         <td className="px-3 py-2 font-medium text-slate-700 whitespace-nowrap">
                                           {p.client_name}
                                         </td>
@@ -560,7 +560,7 @@ export function PricingConfigTable({
                                           </td>
                                         </tr>
                                       )}
-                                    </>
+                                    </Fragment>
                                   );
                                 })}
                               </tbody>

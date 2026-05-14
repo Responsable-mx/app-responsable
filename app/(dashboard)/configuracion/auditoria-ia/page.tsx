@@ -56,11 +56,14 @@ type Decision = {
   recomendacion: "activar" | "revisar" | "planear" | "investigar";
 };
 
+type TrendChip = { arrow: "↑" | "↓" | "→"; delta: string; improving: boolean };
+
 type HealthCheck = {
   label: string;
   status: HealthStatus;
   valor: string;
   meta?: string;
+  trend?: TrendChip | null;
 };
 
 // Mapa estático de estilos por estado de salud
@@ -97,7 +100,6 @@ export default async function AuditoriaIaPage() {
   const voyageModel  = usage?.by_model.find(m => m.family === "voyage");
   const voyageCalls  = voyageModel?.calls ?? 0;
   const llmCalls     = (usage?.total_calls ?? 0) - voyageCalls;
-  const llmModels    = (usage?.by_model ?? []).filter(m => m.family !== "voyage");
   // LLM-only errors: excluye embeddings/voyage para que errorRate no supere 100%
   const llmErrors    = (usage?.by_role ?? [])
     .filter(r => r.role !== "embeddings")
@@ -118,6 +120,33 @@ export default async function AuditoriaIaPage() {
   const benchmarkActive = benchmarkCalls >= THRESHOLDS.benchmarkMin;
   const latenciaMs      = usage?.avg_latency_ms ?? 0;
   const costoMes        = usage?.cost_usd_estimate_max ?? 0;
+
+  // ── Tendencia — comparar primera vs segunda mitad del período ────────────
+  const sortedDayRows = [...(usage?.by_day_role ?? [])].sort((a, b) => a.day.localeCompare(b.day));
+  const midpoint = Math.floor(sortedDayRows.length / 2);
+  function halfStats(rows: typeof sortedDayRows) {
+    const llm = rows.filter(r => r.role !== "embeddings");
+    const calls = llm.reduce((s, r) => s + r.calls, 0);
+    const errors = llm.reduce((s, r) => s + r.errors, 0);
+    const allCache = rows.reduce((s, r) => s + r.total_cache_hits, 0);
+    const allInput = rows.reduce((s, r) => s + r.total_input_tokens, 0);
+    return {
+      calls,
+      errorRate:  calls >= 15 ? errors / calls : null,
+      cacheRatio: (allInput + allCache) > 0 ? allCache / (allInput + allCache) : null,
+    };
+  }
+  const olderStats = halfStats(sortedDayRows.slice(0, midpoint));
+  const newerStats = halfStats(sortedDayRows.slice(midpoint));
+  function computeTrend(older: number | null, newer: number | null, higherIsBetter: boolean, minCalls: number): TrendChip | null {
+    if (older === null || newer === null || minCalls < 15) return null;
+    const deltaPct = Math.round((newer - older) * 100);
+    if (Math.abs(deltaPct) < 2) return { arrow: "→", delta: "estable", improving: true };
+    const goingUp = newer > older;
+    return { arrow: goingUp ? "↑" : "↓", delta: `${goingUp ? "+" : ""}${deltaPct}pp`, improving: higherIsBetter ? goingUp : !goingUp };
+  }
+  const trendErrorRate  = computeTrend(olderStats.errorRate,  newerStats.errorRate,  false, olderStats.calls);
+  const trendCacheRatio = computeTrend(olderStats.cacheRatio, newerStats.cacheRatio, true,  olderStats.calls);
 
   // Semáforo de salud general
   const semaforo: "verde" | "amarillo" | "rojo" =
@@ -388,6 +417,7 @@ export default async function AuditoriaIaPage() {
             : "verde",
       valor: llmCalls > 0 ? `${successRate}% (${llmErrors} fallas de ${numFmt.format(llmCalls)})` : "Sin actividad",
       meta: "Objetivo: >95%",
+      trend: trendErrorRate,
     },
     {
       label: "Búsqueda semántica en documentos",
@@ -434,6 +464,7 @@ export default async function AuditoriaIaPage() {
             : "rojo",
       valor: cacheRatio > 0 ? `${Math.round(cacheRatio * 100)}% — ~${usdFmt.format(cacheSavingsUsd)} ahorrados` : "Sin datos",
       meta: "Objetivo: >40%",
+      trend: trendCacheRatio,
     },
     {
       label: "Satisfacción de consultores",
@@ -517,96 +548,6 @@ export default async function AuditoriaIaPage() {
         </div>
       </div>
 
-      {/* ── Métricas clave ──────────────────────────────────────────────────── */}
-      {usage && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          {[
-            {
-              label: "Respuestas exitosas",
-              value: llmCalls > 0 ? `${successRate}%` : "—",
-              sub: llmCalls === 0
-                ? "Sin actividad en 30 días"
-                : errorRate > 0.2
-                ? `${llmErrors} fallas en ${numFmt.format(llmCalls)} consultas — ver diagnóstico`
-                : errorRate > 0.05
-                ? `${llmErrors} fallas detectadas — ver diagnóstico abajo`
-                : `${numFmt.format(llmCalls)} consultas sin interrupciones`,
-              red: errorRate > 0.05,
-              tooltip: "Porcentaje de veces que la IA respondió sin errores en los últimos 30 días. Una falla = el consultor vio respuesta vacía o mensaje de error.",
-            },
-            {
-              label: "Costo del mes",
-              value: usdFmt.format(costoMes),
-              sub: costoMes === 0
-                ? "Sin actividad registrada"
-                : costoMes < 30
-                ? `${Math.round((costoMes / 150) * 100)}% del presupuesto piloto — amplia holgura`
-                : costoMes < 100
-                ? `${Math.round((costoMes / 150) * 100)}% del presupuesto mensual ($150 límite)`
-                : costoMes < 150
-                ? `${Math.round((costoMes / 150) * 100)}% del presupuesto — monitorear de cerca`
-                : "Superó el presupuesto piloto de $150",
-              red: costoMes > 100,
-              tooltip: "Costo estimado de todas las llamadas a IA en los últimos 30 días. Presupuesto piloto definido en $150 USD/mes.",
-            },
-            {
-              label: "Velocidad de respuesta",
-              value: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "—",
-              sub: latenciaMs <= 0
-                ? "Sin datos"
-                : latenciaMs < 5_000
-                ? "Ágil — consultor no percibe espera"
-                : latenciaMs < 10_000
-                ? "Aceptable — consultor espera pero fluye"
-                : latenciaMs < 20_000
-                ? `${(latenciaMs / 1000).toFixed(0)}s interrumpe el trabajo — revisar documentos largos`
-                : `${(latenciaMs / 1000).toFixed(0)}s — posibles timeouts, ver diagnóstico`,
-              red: latenciaMs > 15_000,
-              tooltip: "Tiempo promedio que espera el consultor desde que envía su pregunta hasta que recibe la respuesta completa. Objetivo: <10s.",
-            },
-            {
-              label: "Caché activo",
-              value: cacheRatio > 0 ? `${Math.round(cacheRatio * 100)}%` : "—",
-              sub: cacheRatio <= 0
-                ? "Sin actividad registrada"
-                : cacheSavingsUsd >= 0.5
-                ? `~${usdFmt.format(cacheSavingsUsd)} ahorrados este mes${cacheRatio < 0.2 ? " — objetivo: >40%" : ""}`
-                : cacheRatio < 0.2
-                ? "Bajo — objetivo >40% para prompts repetitivos"
-                : cacheRatio < 0.4
-                ? `~${usdFmt.format(cacheSavingsUsd)} ahorrados — en rango normal`
-                : `~${usdFmt.format(cacheSavingsUsd)} ahorrados — rendimiento óptimo`,
-              red: false,
-              tooltip: "Porcentaje de tokens que la IA leyó de caché en lugar de procesarlos de nuevo. Más alto = menos costo. Objetivo: >40% en uso regular.",
-              /** Progress bar hacia el 40% objetivo */
-              barPct: cacheRatio > 0 ? Math.min(100, Math.round((cacheRatio * 100 / 40) * 100)) : 0,
-              barOptimal: cacheRatio >= 0.4,
-            },
-          ].map((kpi) => (
-            <div key={kpi.label} className="bg-white border border-slate-200 rounded px-3 py-2.5" title={kpi.tooltip}>
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold leading-snug">{kpi.label}</p>
-              <p className={`text-2xl font-bold mt-1 tabular-nums ${kpi.red ? "text-rose-700" : "text-slate-900"}`}>
-                {kpi.value}
-              </p>
-              {"barPct" in kpi && typeof kpi.barPct === "number" && kpi.barPct > 0 && (
-                <div className="mt-1.5 mb-0.5">
-                  <div className="h-1 bg-slate-100 rounded-none overflow-hidden">
-                    <div
-                      className={kpi.barOptimal ? "h-1 bg-emerald-500" : "h-1 bg-brand-primary"}
-                      style={{ width: `${kpi.barPct}%` }}
-                    />
-                  </div>
-                  {!kpi.barOptimal && (
-                    <p className="text-[9px] text-slate-400 mt-0.5">Objetivo: 40%</p>
-                  )}
-                </div>
-              )}
-              <p className={`text-[10px] mt-0.5 ${kpi.red ? "text-rose-500" : "text-slate-400"}`}>{kpi.sub}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── Health checklist — siempre visible ────────────────────────────── */}
       {healthChecks.length > 0 && (
         <div className="mb-8">
@@ -628,6 +569,15 @@ export default async function AuditoriaIaPage() {
                       </td>
                       <td className="px-4 py-2.5 text-slate-500 tabular-nums">
                         {h.valor}
+                        {h.trend && (
+                          <span className={`ml-2 text-[10px] font-semibold ${
+                            h.trend.arrow === "→" ? "text-slate-400"
+                            : h.trend.improving ? "text-emerald-600"
+                            : "text-rose-600"
+                          }`}>
+                            {h.trend.arrow} {h.trend.delta}
+                          </span>
+                        )}
                         {h.meta && (
                           <span className="ml-2 text-[10px] text-slate-400 italic">{h.meta}</span>
                         )}

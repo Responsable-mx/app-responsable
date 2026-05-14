@@ -46,10 +46,16 @@ export default async function CostosPage() {
         maduro. Sirve como referencia para fijar precios y detectar cuánto se
         aleja cada proyecto real del objetivo.
       </p>
-      <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+      <p className="text-xs text-slate-400 mb-3 leading-relaxed">
         Los costos por proyecto individual (costo real, precio de venta,
         estado piloto) se registran directamente en la ficha de cada cliente →
         sección Servicios.
+      </p>
+      <p className="text-xs text-slate-400 mb-6">
+        El costo de uso de IA (API Anthropic) se lleva por separado →{" "}
+        <a href="/configuracion/uso-ia" className="text-brand-primary hover:underline underline-offset-2">
+          Uso IA
+        </a>
       </p>
 
       <PricingConfigTable rows={rows} stats={stats} />

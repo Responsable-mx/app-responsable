@@ -336,7 +336,12 @@ export function PricingConfigTable({
                           {fmtUSD(row.base_cost)}
                         </span>
                       ) : (
-                        <span className="text-slate-400 italic">Sin definir</span>
+                        <button
+                          onClick={() => startEdit(row)}
+                          className="text-[11px] text-brand-primary hover:underline underline-offset-2 italic"
+                        >
+                          Definir costo →
+                        </button>
                       )}
                     </td>
 

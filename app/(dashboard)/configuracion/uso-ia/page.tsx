@@ -215,11 +215,11 @@ export default async function UsoIaPage() {
                   sparkColor="#0891b2"
                 />
                 <Metric
-                  label="Errores IA"
+                  label="Errores de consultores"
                   value={String(llmErrors)}
                   tone={llmErrors > 0 ? "red" : "ok"}
                   hint={voyageSystemErrors > 0
-                    ? `+${voyageSystemErrors} del sistema (indexación nocturna)`
+                    ? `${voyageSystemErrors} automáticos del cron (no afectan consultores)`
                     : llmErrors === 0 ? "Sin errores en el período" : undefined}
                   spark={errorsSeries}
                   sparkColor={llmErrors > 0 ? "#be123c" : "#94a3b8"}
@@ -362,9 +362,9 @@ export default async function UsoIaPage() {
                   </tbody>
                 </table>
                 <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-                  Elena (Opus) debería tener pocas llamadas pero alto costo unitario — es la voz estratégica.
-                  Valeria (Haiku) puede tener muchas llamadas con costo bajo — verifica DoD.
-                  Aurora y Rebeca dominan volumen normal (cadena Autor → Revisor).
+                  Elena genera pocas respuestas pero costosas (análisis estratégico).
+                  Valeria genera muchas respuestas baratas (validación de listas).
+                  Aurora y Rebeca dominan el volumen — son la cadena principal de trabajo.
                 </p>
               </Panel>
             </div>
@@ -531,9 +531,7 @@ export default async function UsoIaPage() {
                       <th className="py-2 pr-3">Día</th>
                       <th className="py-2 pr-3">Rol</th>
                       <th className="py-2 pr-3 text-right">Llamadas</th>
-                      <th className="py-2 pr-3 text-right cursor-help" title="Tokens de entrada = texto enviado a la IA. 1 página de Word ≈ 700 tokens.">T. entrada ⓘ</th>
-                      <th className="py-2 pr-3 text-right cursor-help" title="Tokens de salida = respuesta generada por la IA.">T. salida ⓘ</th>
-                      <th className="py-2 pr-3 text-right">Caché</th>
+                        <th className="py-2 pr-3 text-right">Caché</th>
                       <th className="py-2 pr-3 text-right">Latencia (s)</th>
                       <th className="py-2 pr-3 text-right">Errores</th>
                     </tr>
@@ -552,12 +550,6 @@ export default async function UsoIaPage() {
                         </td>
                         <td className="py-1.5 pr-3 text-right">
                           {numFmt.format(r.calls)}
-                        </td>
-                        <td className="py-1.5 pr-3 text-right text-slate-600">
-                          {numFmt.format(r.total_input_tokens)}
-                        </td>
-                        <td className="py-1.5 pr-3 text-right text-slate-600">
-                          {numFmt.format(r.total_output_tokens)}
                         </td>
                         <td className="py-1.5 pr-3 text-right text-brand-primary-hover">
                           {numFmt.format(r.total_cache_hits)}

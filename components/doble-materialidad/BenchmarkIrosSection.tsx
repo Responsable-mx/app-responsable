@@ -211,13 +211,10 @@ export function BenchmarkIrosSection({
     fetcher,
     { revalidateOnFocus: false }
   );
-  const [narrative, setNarrative] = useState<string | null>(null);
+  const persistedNarrative = empresasData?.data?.synthesis_narrative ?? null;
+  const [userNarrative, setNarrative] = useState<string | null>(null);
+  const narrative = userNarrative ?? persistedNarrative;
   const [isGeneratingNarrative, setIsGeneratingNarrative] = useState(false);
-
-  useEffect(() => {
-    const persisted = empresasData?.data?.synthesis_narrative ?? null;
-    if (persisted && !narrative) setNarrative(persisted);
-  }, [empresasData, narrative]);
 
   // Adaptación
   const [selectedIroIds, setSelectedIroIds] = useState<Set<string>>(new Set());

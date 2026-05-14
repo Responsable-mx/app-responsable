@@ -789,7 +789,7 @@ export function BenchmarkSection({
         />
       )}
 
-      {/* ── Scorecard: posición global del cliente (encima de las visualizaciones) ── */}
+      {/* Scorecard: posición global del cliente */}
       {scorecardData && (() => {
         const { counts, peerAvgSolido, totalFields, peerCount } = scorecardData;
         const scorecardItems = [

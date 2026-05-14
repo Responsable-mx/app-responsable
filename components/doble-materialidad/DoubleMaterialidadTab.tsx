@@ -4,8 +4,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
-import { ProjectCostCard } from "@/components/pricing/ProjectCostCard";
-import type { ClientService } from "@/lib/client-services";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 // ContextoSection eager — etapa por default (primer panel visible)
@@ -97,7 +95,6 @@ type Props = {
   clientSector?: string | null;
   clientSize?: string | null;
   clientFrameworks?: string[] | null;
-  isAdmin?: boolean;
 };
 
 // ── Fetcher ──────────────────────────────────────────────────
@@ -192,7 +189,6 @@ export function DoubleMaterialidadTab({
   clientSector,
   clientSize,
   clientFrameworks,
-  isAdmin = false,
 }: Props) {
   const referentesKey       = `/api/clients/${clientId}/dm-referentes`;
   const benchmarkEmpresasKey = `/api/clients/${clientId}/dm-benchmark-empresas`;
@@ -295,12 +291,6 @@ export function DoubleMaterialidadTab({
     iro_decisions: Record<string, { decision: string | null }>;
   } | null }>(validacionKey, fetcher, { revalidateOnFocus: false });
 
-  const { data: servicesResp } = useSWR<{ data: ClientService[] }>(
-    isAdmin ? `/api/clients/${clientId}/services` : null,
-    fetcher,
-    { revalidateOnFocus: false }
-  );
-  const dmService = servicesResp?.data?.find((s) => s.service === "doble_materialidad_ia") ?? null;
 
   const referentesRec      = referentesResp?.data ?? null;
   const benchmarkEmpresasRec = benchmarkEmpresasResp?.data ?? null;
@@ -617,11 +607,6 @@ export function DoubleMaterialidadTab({
           </div>
         </div>
       </div>
-
-      {/* Costos del proyecto — solo visible para admins */}
-      {isAdmin && dmService && (
-        <ProjectCostCard service={dmService} />
-      )}
 
       {/* ── Etapa 1 ── */}
       <CollapsibleStageSection

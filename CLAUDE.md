@@ -348,6 +348,7 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 - [x] `VOYAGE_API_KEY` + `VOYAGE_MODEL=voyage-3` en Vercel env vars (prod) ✅
 - [x] `ai-fill/route.ts`: `searchSimilarChunks` activo antes que BM25 ✅
 - [x] `embed-chunks` cron: 669/669 chunks embeddidos en prod (6:30 AM diario) ✅ FULLY ACTIVE
+- [x] **Embeddings inline al subir doc** (sesión 40): `documents/route.ts` Path B dispara `persistDocumentChunks`+`generateEmbeddingsBatch` fire-and-forget post-parse. Cron = red de seguridad. Mig 0097: `ai_calls.ttft_ms`.
 
 **`lib/documents/embeddings.ts`:**
 - `generateEmbedding(text)` y `generateQueryEmbedding(query)` (input_type "document" vs "query")
@@ -500,3 +501,5 @@ Repo vive bajo `C:\Users\…\OneDrive\…\app-responsable`. OneDrive puede conve
 2. `roleBlock` (rol + reglas + navegación) — turnos subsecuentes con mismo (cliente, rol), hit.
 
 Resultado: ~50% ahorro vs 1 solo breakpoint cuando el consultor cicla entre Aurora/Rebeca/Elena/Valeria sobre el mismo cliente. Si agregas un tercer breakpoint (max 4 permite Anthropic), considerar dónde corta mejor el caso de uso.
+
+**Pre-warm caché (sesión 40):** `POST /api/clients/[id]/warm-context` dispara llamada `max_tokens=1` con los system blocks del cliente. `ClientTabs` lo llama al montar (fire-and-forget). El primer mensaje del consultor paga `cache_read` (~10%) en lugar de `cache_write` (~25x más caro que read).

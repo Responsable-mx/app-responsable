@@ -186,7 +186,8 @@ export function PricingConfigTable({
     }
   }
 
-  const COLS = 6;
+  const allUnupdated = localRows.every(r => r.updated_at === null);
+  const COLS = allUnupdated ? 6 : 7;
 
   return (
     <div className="border border-slate-200 rounded overflow-hidden">
@@ -198,7 +199,8 @@ export function PricingConfigTable({
               <th className="px-4 py-2.5 text-right">Proyectos</th>
               <th className="px-4 py-2.5 text-right">Promedio real</th>
               <th className="px-4 py-2.5 text-right">Costo base</th>
-              <th className="px-4 py-2.5 text-right">Actualizado</th>
+              <th className="px-4 py-2.5 text-right">Brecha</th>
+              {!allUnupdated && <th className="px-4 py-2.5 text-right">Actualizado</th>}
               <th className="px-4 py-2.5" />
             </tr>
           </thead>
@@ -209,6 +211,9 @@ export function PricingConfigTable({
             const hasProjects = !!svc && svc.count > 0;
             const isEven = idx % 2 === 1;
             const rowBg = isEven ? "bg-slate-50" : "bg-white";
+            const brecha = svc?.avg_actual_cost != null && row.base_cost != null
+              ? ((svc.avg_actual_cost - row.base_cost) / row.base_cost) * 100
+              : null;
 
             return (
               <tbody key={row.service_key}>
@@ -245,6 +250,7 @@ export function PricingConfigTable({
                       />
                     </td>
                     <td className="px-4 py-2.5 text-right text-slate-300">—</td>
+                    {!allUnupdated && <td className="px-4 py-2.5 text-right text-slate-300">—</td>}
                     <td className="px-4 py-2.5">
                       <div className="flex gap-1.5 justify-end">
                         <Button
@@ -336,21 +342,36 @@ export function PricingConfigTable({
                       )}
                     </td>
 
-                    {/* Actualizado */}
-                    <td className="px-4 py-2.5 text-right text-slate-400 whitespace-nowrap">
-                      {row.updated_at ? (
-                        <div className="inline-flex flex-col items-end gap-0.5">
-                          <span>{fmtDate(row.updated_at)}</span>
-                          {row.updated_by && (
-                            <span className="text-[10px] text-slate-300">
-                              {row.updated_by.split("@")[0]}
-                            </span>
-                          )}
-                        </div>
+                    {/* Brecha real vs objetivo */}
+                    <td className="px-4 py-2.5 text-right">
+                      {brecha === null ? (
+                        <span className="text-slate-300">—</span>
+                      ) : brecha <= 0 ? (
+                        <span className="text-emerald-700 font-medium text-[11px]">En objetivo ✓</span>
                       ) : (
-                        "—"
+                        <span className={`font-medium text-[11px] ${brecha > 30 ? "text-rose-600" : "text-amber-600"}`}>
+                          +{Math.round(brecha)}% sobre objetivo
+                        </span>
                       )}
                     </td>
+
+                    {/* Actualizado — solo si alguna fila tiene valor */}
+                    {!allUnupdated && (
+                      <td className="px-4 py-2.5 text-right text-slate-400 whitespace-nowrap">
+                        {row.updated_at ? (
+                          <div className="inline-flex flex-col items-end gap-0.5">
+                            <span>{fmtDate(row.updated_at)}</span>
+                            {row.updated_by && (
+                              <span className="text-[10px] text-slate-300">
+                                {row.updated_by.split("@")[0]}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    )}
 
                     {/* Acción */}
                     <td className="px-4 py-2.5">

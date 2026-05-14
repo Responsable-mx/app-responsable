@@ -492,7 +492,7 @@ export default async function MonitoreoIaPage() {
 
       {/* Encabezado */}
       <div className="mb-5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Auditoría IA</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Monitoreo IA</p>
         <p className="text-xs text-slate-600 leading-relaxed">
           Salud del sistema, costos y decisiones concretas de mejora — basado en los últimos 30 días de uso real.
         </p>
@@ -621,7 +621,12 @@ export default async function MonitoreoIaPage() {
                       <tr key={r.role} className="hover:bg-slate-50">
                         <td className="px-4 py-2.5 font-semibold text-slate-800">{label}</td>
                         <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{numFmt.format(r.calls)} veces</td>
-                        <td className="px-4 py-2.5 text-right text-slate-600">{r.avg_latency_ms > 0 ? latenciaLabel(r.avg_latency_ms) : "—"}</td>
+                        <td
+                          className="px-4 py-2.5 text-right text-slate-600"
+                          title={r.avg_latency_ms > 15_000 ? "Sonnet responde más lento en textos largos — es normal. Si supera los 30 s con frecuencia, divide los documentos del cliente en partes más pequeñas antes de subirlos." : undefined}
+                        >
+                          {r.avg_latency_ms > 0 ? latenciaLabel(r.avg_latency_ms) : "—"}
+                        </td>
                         <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{usdFmt.format(r.cost_usd)}</td>
                         <td className={`px-4 py-2.5 text-right font-medium ${roleErrRate > 0.05 ? "text-rose-600" : "text-slate-400"}`}>
                           {roleErr > 0 ? `${roleErr} (${Math.round(roleErrRate * 100)}%)` : "Ninguna"}

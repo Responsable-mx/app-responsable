@@ -183,7 +183,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           outputTokens,
           cacheCreationTokens,
           cacheReadTokens,
-          latencyMs: 0,
+          latencyMs: Date.now() - new Date(doc.created_at).getTime(),
           error: batchError,
           workflowStage: "dm_report",
         });

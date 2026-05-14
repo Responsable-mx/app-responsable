@@ -291,6 +291,22 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Retry ÚNICO ante 429 (rate limit de Anthropic — Opus tiene cuota más baja)
+        if (e.status === 429) {
+          await new Promise((r) => setTimeout(r, 4_000));
+          try {
+            await runOnce();
+            return;
+          } catch (err2) {
+            const e2 = err2 as { name?: string; message?: string; status?: number };
+            const msg2 = "El servicio de IA alcanzó el límite de velocidad. Espera unos segundos e intenta de nuevo.";
+            console.error("[/api/chat 429-retry]", e2.name, e2.status, e2.message, Date.now() - startedAt);
+            send({ type: "error", error: msg2 });
+            logUsage(null, null, `429-retry-failed: ${e2.message}`);
+            return;
+          }
+        }
+
         // 503 / timeout — registrar en breaker
         if (e.status === 503 || e.name === "AbortError" || e.name === "TimeoutError") {
           anthropicBreaker.recordFailure();

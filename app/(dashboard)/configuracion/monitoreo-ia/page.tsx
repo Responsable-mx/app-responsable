@@ -321,6 +321,18 @@ export default async function MonitoreoIaPage() {
         diagnostico += ` Además, ${rLabelSec} tiene una tasa de falla del ${rRateSec}% (${highRateSecondary.errors}/${highRateSecondary.calls} llamadas) — monitorear aunque el volumen sea bajo.`;
       }
 
+      // Agregar desglose real de tipos de error cuando hay datos suficientes
+      const et = s.error_type_summary;
+      const errorTotal = et.timeout + et.overloaded + et.rate_limit + et.other;
+      if (errorTotal >= 3) {
+        const parts: string[] = [];
+        if (et.timeout    > 0) parts.push(`${et.timeout} timeout${et.timeout > 1 ? "s" : ""}`);
+        if (et.overloaded > 0) parts.push(`${et.overloaded} por sobrecarga`);
+        if (et.rate_limit > 0) parts.push(`${et.rate_limit} por límite de velocidad`);
+        if (et.other      > 0) parts.push(`${et.other} otro${et.other > 1 ? "s" : ""}`);
+        diagnostico += ` Desglose de ${errorTotal} errores registrados: ${parts.join(", ")}.`;
+      }
+
       decisions.push({
         prioridad:     errorRate > 0.2 ? "urgente" : "importante",
         titulo:        "La IA está fallando con frecuencia",

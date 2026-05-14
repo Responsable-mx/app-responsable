@@ -56,6 +56,13 @@ export type UsageByStage = {
   errors: number;
 };
 
+export type ErrorTypeSummary = {
+  timeout: number;
+  overloaded: number;
+  rate_limit: number;
+  other: number;
+};
+
 export type UsageSummary = {
   window_days: number;
   total_calls: number;
@@ -78,6 +85,8 @@ export type UsageSummary = {
   feedback_total_down: number;
   /** Wave 6: top 5 clientes con más rechazos + top razones por cliente */
   feedback_by_client: FeedbackByClient[];
+  /** Desglose de tipos de error para diagnóstico preciso en monitoreo */
+  error_type_summary: ErrorTypeSummary;
 };
 
 export async function getUsageSummary(
@@ -101,6 +110,7 @@ export async function getUsageSummary(
     feedback_top_reasons: [],
     feedback_total_down: 0,
     feedback_by_client: [],
+    error_type_summary: { timeout: 0, overloaded: 0, rate_limit: 0, other: 0 },
   };
   if (isDevMode()) return empty;
 
@@ -334,6 +344,22 @@ export async function getUsageSummary(
       .map(([reason_code, count]) => ({ reason_code, count })),
   }));
 
+  // Desglose de tipos de error — classifica errores por patrón en el texto
+  const errorTypeSummary: ErrorTypeSummary = { timeout: 0, overloaded: 0, rate_limit: 0, other: 0 };
+  for (const r of calls) {
+    if (!r.error) continue;
+    const e = (r.error as string).toLowerCase();
+    if (e.includes("tardó") || e.includes("timeout") || e.includes("timed out") || e.includes("aborterror") || e.includes("esperado")) {
+      errorTypeSummary.timeout++;
+    } else if (e.includes("saturada") || e.includes("overloaded") || e.includes("529") || e.includes("503")) {
+      errorTypeSummary.overloaded++;
+    } else if (e.includes("429") || e.includes("rate") || e.includes("limit") || e.includes("velocidad")) {
+      errorTypeSummary.rate_limit++;
+    } else {
+      errorTypeSummary.other++;
+    }
+  }
+
   return {
     window_days: windowDays,
     total_calls: totalCalls,
@@ -352,5 +378,6 @@ export async function getUsageSummary(
     feedback_top_reasons: feedbackTopReasons,
     feedback_total_down: totalDown,
     feedback_by_client: feedbackByClient,
+    error_type_summary: errorTypeSummary,
   };
 }

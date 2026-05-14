@@ -187,6 +187,7 @@ export default async function MonitoreoIaPage() {
     ? s.total_cache_read_tokens / (s.total_input_tokens + s.total_cache_read_tokens) : 0;
   const voyageActive    = voyageCalls > 100;
   const rerankActive    = (s?.by_stage ?? []).some(st => st.stage === "rerank");
+  const dmReportActive  = (s?.by_stage ?? []).some(st => st.stage === "dm_report" && st.calls > 0);
   const benchmarkCalls  = (s?.by_stage ?? []).filter(st => st.stage.startsWith("dm_benchmark")).reduce((sum, st) => sum + st.calls, 0);
   const benchmarkActive = benchmarkCalls >= THRESHOLDS.benchmarkMin;
   const auroraRole      = s?.by_role.find(r => r.role === "aurora");
@@ -348,7 +349,7 @@ export default async function MonitoreoIaPage() {
       recomendacion: "revisar",
     });
 
-    if (latenciaMs > THRESHOLDS.latenciaMs) decisions.push({
+    if (dmReportActive) decisions.push({
       prioridad:     "conveniente",
       titulo:        "El Reporte PDF tarda demasiado — el consultor espera bloqueado",
       queMejora:     "Procesar el reporte en segundo plano: el consultor sigue trabajando y recibe una notificación cuando esté listo.",

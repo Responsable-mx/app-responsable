@@ -65,12 +65,6 @@ function fmtDate(iso: string | null): string | null {
   });
 }
 
-function marginPct(actual: number | null, sale: number | null): string | null {
-  if (actual == null || sale == null || actual === 0) return null;
-  const pct = ((sale - actual) / actual) * 100;
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`;
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PricingConfigTable({
@@ -415,15 +409,12 @@ export function PricingConfigTable({
                                   <th className="px-3 py-1.5 text-left">Cliente</th>
                                   <th className="px-3 py-1.5 text-left">Tipo</th>
                                   <th className="px-3 py-1.5 text-right">Costo real</th>
-                                  <th className="px-3 py-1.5 text-right">Precio venta</th>
-                                  <th className="px-3 py-1.5 text-right">Margen</th>
                                   <th className="px-3 py-1.5 text-left min-w-[160px]">Notas</th>
                                   {isDmIa && <th className="px-3 py-1.5 text-center">Etapas IA</th>}
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-50">
                                 {svc.projects.map((p) => {
-                                  const mg = marginPct(p.actual_cost, p.sale_price);
                                   const isAiOpen = aiExpanded.has(p.client_id);
                                   const aiData = aiCache.get(p.client_id);
                                   return (
@@ -449,20 +440,6 @@ export function PricingConfigTable({
                                             <span className="text-slate-300">—</span>
                                           )}
                                         </td>
-                                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">
-                                          {fmtUSD(p.sale_price) ?? (
-                                            <span className="text-slate-300">—</span>
-                                          )}
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                          {mg ? (
-                                            <span className={`font-bold ${parseFloat(mg) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                                              {mg}
-                                            </span>
-                                          ) : (
-                                            <span className="text-slate-300">—</span>
-                                          )}
-                                        </td>
                                         <td className="px-3 py-2 text-slate-500 max-w-[200px]">
                                           {p.cost_notes ? (
                                             <span className="line-clamp-2 leading-relaxed">{p.cost_notes}</span>
@@ -484,7 +461,7 @@ export function PricingConfigTable({
                                       {/* Expansión etapas IA */}
                                       {isDmIa && isAiOpen && (
                                         <tr key={`${p.id}-ai`}>
-                                          <td colSpan={7} className="px-4 py-3 bg-slate-100 border-t border-slate-200">
+                                          <td colSpan={5} className="px-4 py-3 bg-slate-100 border-t border-slate-200">
                                             {aiData === "loading" && (
                                               <p className="text-xs text-slate-400 italic">Cargando desglose IA…</p>
                                             )}
@@ -583,7 +560,7 @@ export function PricingConfigTable({
                                     <td className="px-3 py-1.5 text-right tabular-nums font-bold text-slate-800">
                                       {fmtUSD(svc.avg_actual_cost)}
                                     </td>
-                                    <td colSpan={isDmIa ? 4 : 3} />
+                                    <td colSpan={isDmIa ? 2 : 1} />
                                   </tr>
                                 </tfoot>
                               )}

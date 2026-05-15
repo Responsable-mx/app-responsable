@@ -57,12 +57,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     total += Math.min((d.markdown_content as string).length, CAP_PER_DOC);
   }
 
-  const globalSynonyms = await loadGlobalSynonyms();
+  // Carga términos ya guardados para excluirlos del análisis
+  const { data: existingVocab } = await sb
+    .from("client_vocabulary")
+    .select("client_term")
+    .eq("client_id", id);
+
+  const existingTermsSet = new Set(
+    (existingVocab ?? []).map((e) => e.client_term.toLowerCase().trim())
+  );
+  const existingTermsList = (existingVocab ?? []).map((e) => e.client_term);
+
+  const [globalSynonyms] = await Promise.all([loadGlobalSynonyms()]);
   const knownTerms = globalSynonyms.map((s) => s.responsable_term).join(", ");
 
   const docsText = docs
     .map((d, i) => `[Documento ${i + 1}: ${d.file_name}]\n${(d.markdown_content as string).slice(0, CAP_PER_DOC)}`)
     .join("\n\n---\n\n");
+
+  const alreadySavedBlock = existingTermsList.length > 0
+    ? `\nTérminos YA guardados para este cliente (NO repetir en tus propuestas):\n${existingTermsList.join(", ")}\n`
+    : "";
 
   const anthropic = new Anthropic();
   const model = getModelConfig("aurora"); // Sonnet — requiere comprensión contextual
@@ -79,11 +94,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
 Términos de referencia que usa ResponSable (terminología estándar):
 ${knownTerms}
-
+${alreadySavedBlock}
 Documentos:
 ${docsText}
 
-Encuentra términos que el cliente usa que son equivalentes o similares a los de la lista de referencia, pero con diferente nombre. Solo incluye términos donde hay equivalencia clara.
+Encuentra términos NUEVOS que el cliente usa y que son equivalentes o similares a los de la lista de referencia, pero con diferente nombre. Solo incluye términos donde hay equivalencia clara. No repitas términos ya guardados.
 
 Responde SOLO con JSON válido:
 {
@@ -115,7 +130,11 @@ Máximo 10 propuestas. Solo incluye las que tengas certeza razonable. confidence
   try {
     const match = raw.match(/\{[\s\S]*\}/);
     const json = match ? JSON.parse(match[0]) as { proposals?: Array<{ client_term: string; responsable_term: string; confidence: string }> } : {};
-    return NextResponse.json({ proposals: json.proposals ?? [] });
+    // Filtro server-side como red de seguridad — descarta cualquier término ya guardado
+    const proposals = (json.proposals ?? []).filter(
+      (p) => !existingTermsSet.has(p.client_term.toLowerCase().trim())
+    );
+    return NextResponse.json({ proposals });
   } catch {
     return NextResponse.json({ proposals: [] });
   }

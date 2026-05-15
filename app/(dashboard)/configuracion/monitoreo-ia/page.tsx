@@ -4,6 +4,8 @@ import { getUsageSummary } from "@/lib/ai/usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Sparkline } from "@/components/Sparkline";
 import { MonitoreoIaTabs } from "@/components/config/MonitoreoIaTabs";
+import { getToolsHealthSummary } from "@/lib/ai/tool-health";
+import type { ToolHealthSummaryItem } from "@/lib/ai/tool-health";
 
 export const metadata: Metadata = {
   title: "Monitoreo IA · Configuración · App ResponSable",
@@ -180,11 +182,12 @@ function DocStat({ label, value, tone = "neutral" }: { label: string; value: str
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default async function MonitoreoIaPage() {
-  const [s, docs, docStats, nullEmbeddings] = await Promise.all([
+  const [s, docs, docStats, nullEmbeddings, toolsHealth] = await Promise.all([
     getUsageSummary(30).catch(() => null),
     getDocumentsStats(),
     getDocStats(),
     getNullEmbeddingsCount(),
+    getToolsHealthSummary().catch(() => [] as ToolHealthSummaryItem[]),
   ]);
 
   // ── Métricas derivadas compartidas ────────────────────────────────────────
@@ -1140,29 +1143,40 @@ export default async function MonitoreoIaPage() {
         </>
       )}
 
-      {/* Herramientas externas */}
+      {/* Herramientas conectadas — widget en vivo */}
       <div className="mt-8 mb-6">
-        <Panel title="Costo de herramientas conectadas">
-          <p className="text-[11px] text-slate-600 mb-3 leading-relaxed">Servicios externos que procesan documentos. Se cobran por uso — no por mes.</p>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-                <th className="pb-1.5 text-left">Herramienta</th>
-                <th className="pb-1.5 text-left">Qué cobra</th>
-                <th className="pb-1.5 text-right">Precio</th>
-                <th className="pb-1.5 text-right">Free tier</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <tr><td className="py-1.5 font-semibold text-indigo-700">Voyage AI</td><td className="py-1.5 text-slate-600">Por millón de tokens (fragmentos de documentos)</td><td className="py-1.5 text-right text-slate-900 tabular-nums">$0.10 / 1M tokens</td><td className="py-1.5 text-right text-emerald-700 tabular-nums">200M tokens/mes</td></tr>
-              <tr><td className="py-1.5 font-semibold text-amber-700">LlamaParse</td><td className="py-1.5 text-slate-600">Por página de PDF procesada (1 vez por informe)</td><td className="py-1.5 text-right text-slate-900 tabular-nums">$3.00 / 1k páginas</td><td className="py-1.5 text-right text-emerald-700 tabular-nums">10,000 páginas</td></tr>
-              <tr><td className="py-1.5 font-semibold text-rose-700">Mistral OCR</td><td className="py-1.5 text-slate-600">Por página (fallback de LlamaParse, batch más barato)</td><td className="py-1.5 text-right text-slate-900 tabular-nums">$1.00 / 1k páginas</td><td className="py-1.5 text-right text-slate-400 tabular-nums">Sin free tier</td></tr>
-              <tr><td className="py-1.5 font-semibold text-teal-700">QStash</td><td className="py-1.5 text-slate-600">Por mensaje despachado (1 empresa = 1 mensaje/día)</td><td className="py-1.5 text-right text-slate-900 tabular-nums">$1.00 / 100k msgs</td><td className="py-1.5 text-right text-emerald-700 tabular-nums">1,000 msgs/día</td></tr>
-            </tbody>
-          </table>
-          <p className="text-[10px] text-slate-500 mt-3 leading-relaxed">
-            Estimado piloto (10 clientes, 8 competidoras c/u, reportes ~100 pág): LlamaParse ~8,000 páginas = <span className="font-semibold text-slate-700">gratis</span> · QStash ~80 msgs/día = <span className="font-semibold text-slate-700">gratis</span> · Voyage AI = <span className="font-semibold text-slate-700">gratis</span>. Costo variable total estimado: <span className="font-semibold text-slate-700">$0 en el piloto</span>.
-          </p>
+        <Panel title="Estado de herramientas conectadas">
+          <div className="flex flex-wrap items-center gap-3">
+            {toolsHealth.map((t) => {
+              const dot =
+                t.status === "ok"       ? "bg-emerald-400" :
+                t.status === "error"    ? "bg-rose-500"    :
+                                          "bg-slate-300";
+              const label =
+                t.status === "ok"       ? "text-slate-700" :
+                t.status === "error"    ? "text-rose-700 font-semibold" :
+                                          "text-slate-400";
+              return (
+                <span key={t.key} className={`inline-flex items-center gap-1.5 text-xs ${label}`}>
+                  <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                  {t.name}
+                </span>
+              );
+            })}
+            <a
+              href="/configuracion/herramientas"
+              className="ml-auto text-[11px] text-brand-primary hover:underline whitespace-nowrap"
+            >
+              Ver detalles →
+            </a>
+          </div>
+          {toolsHealth.some((t) => t.status === "error") && (
+            <p className="text-[11px] text-rose-700 mt-2 leading-relaxed">
+              Una o más herramientas tienen error. Revisa{" "}
+              <a href="/configuracion/herramientas" className="underline">Herramientas conectadas</a>{" "}
+              para ver el detalle y cómo resolverlo.
+            </p>
+          )}
         </Panel>
       </div>
 

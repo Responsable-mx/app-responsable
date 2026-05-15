@@ -337,6 +337,14 @@ export default function FlujoIaPage() {
   return (
     <div className="px-8 py-6 max-w-4xl">
 
+      {/* Última revisión */}
+      <p className="text-[10px] text-slate-400 mb-6 text-right tracking-wide">
+        Última revisión manual:{" "}
+        <span className="font-semibold text-slate-500">14 may 2026</span>
+        {" · "}
+        <a href="/configuracion/herramientas" className="hover:underline">Ver estado de herramientas →</a>
+      </p>
+
       {/* ══════════════════════════════════════════════════════════════════════
           FLUJO BASE — DOCUMENTOS
       ══════════════════════════════════════════════════════════════════════ */}

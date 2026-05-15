@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { TOOL_HEALTH_CHECKS } from "@/lib/ai/tool-health";
+import type { ToolHealth } from "@/lib/ai/tool-health";
 
 export const metadata: Metadata = {
   title: "Herramientas conectadas · Configuración · App ResponSable",
@@ -9,7 +11,6 @@ export const revalidate = 300; // refresca health checks cada 5 min
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 type HealthStatus = "ok" | "error" | "inactive";
-type ToolHealth = { status: HealthStatus; message?: string };
 
 /**
  * Catálogo unificado de herramientas.
@@ -45,119 +46,9 @@ type CatalogEntry = {
 };
 
 // ── Health checks ─────────────────────────────────────────────────────────────
-// Agrega aquí la función cuando implementes una herramienta nueva.
-// La clave debe coincidir con `healthKey` en TOOL_CATALOG.
-
-const HEALTH_CHECKS: Record<string, () => Promise<ToolHealth>> = {
-  voyage: async () => {
-    const key = process.env.VOYAGE_API_KEY;
-    if (!key) return { status: "inactive" };
-    try {
-      const res = await fetch("https://api.voyageai.com/v1/embeddings", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: process.env.VOYAGE_MODEL ?? "voyage-3", input: ["ping"], input_type: "document" }),
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) return { status: "ok" };
-      if (res.status === 401) return { status: "error", message: "API key inválida o revocada" };
-      if (res.status === 429) return { status: "error", message: "Cuota agotada — límite de requests alcanzado" };
-      return { status: "error", message: `Error inesperado del servicio (HTTP ${res.status})` };
-    } catch {
-      return { status: "error", message: "No se pudo contactar Voyage AI — revisa conexión o estado del servicio" };
-    }
-  },
-
-  llama: async () => {
-    const key = process.env.LLAMA_CLOUD_API_KEY;
-    if (!key) return { status: "inactive" };
-    try {
-      const res = await fetch("https://api.cloud.llamaindex.ai/api/parsing/usage", {
-        headers: { Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok || res.status === 404) return { status: "ok" }; // 404 = auth OK, endpoint distinto
-      if (res.status === 401 || res.status === 403) return { status: "error", message: "API key inválida o créditos agotados" };
-      if (res.status === 402) return { status: "error", message: "Créditos agotados — recarga en cloud.llamaindex.ai" };
-      return { status: "error", message: `Error del servicio (HTTP ${res.status})` };
-    } catch {
-      return { status: "error", message: "No se pudo contactar LlamaParse — revisa conexión o estado del servicio" };
-    }
-  },
-
-  mistral: async () => {
-    const key = process.env.MISTRAL_API_KEY;
-    if (!key) return { status: "inactive" };
-    try {
-      const res = await fetch("https://api.mistral.ai/v1/models", {
-        headers: { Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) return { status: "ok" };
-      if (res.status === 401) return { status: "error", message: "API key inválida o revocada" };
-      if (res.status === 429) return { status: "error", message: "Cuota de requests agotada" };
-      return { status: "error", message: `Error del servicio (HTTP ${res.status})` };
-    } catch {
-      return { status: "error", message: "No se pudo contactar Mistral — revisa conexión o estado del servicio" };
-    }
-  },
-
-  qstash: async () => {
-    const token = process.env.QSTASH_TOKEN;
-    if (!token) return { status: "inactive" };
-    try {
-      const base = (process.env.QSTASH_URL ?? "https://qstash.upstash.io").replace(/\/$/, "");
-      const res = await fetch(`${base}/v2/schedules`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) return { status: "ok" };
-      if (res.status === 401) return { status: "error", message: "Token inválido o revocado" };
-      if (res.status === 403) return { status: "error", message: "Sin permisos — verifica el token en console.upstash.com" };
-      return { status: "error", message: `Error del servicio (HTTP ${res.status})` };
-    } catch {
-      return { status: "error", message: "No se pudo contactar QStash — revisa conexión o estado del servicio" };
-    }
-  },
-
-  // Batch API usa la misma ANTHROPIC_API_KEY. Sin ping adicional para no generar costo.
-  batch: async () =>
-    process.env.ANTHROPIC_API_KEY ? { status: "ok" } : { status: "inactive" },
-
-  gemini: async () => {
-    const key = process.env.GOOGLE_AI_API_KEY;
-    if (!key) return { status: "inactive" };
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash?key=${key}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      if (res.ok) return { status: "ok" };
-      if (res.status === 400 || res.status === 403) return { status: "error", message: "API key inválida o sin acceso a Gemini" };
-      if (res.status === 429) return { status: "error", message: "Cuota agotada" };
-      return { status: "error", message: `Error del servicio (HTTP ${res.status})` };
-    } catch {
-      return { status: "error", message: "No se pudo contactar Google AI — revisa la key" };
-    }
-  },
-
-  redis: async () => {
-    const url   = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-    if (!url || !token) return { status: "inactive" };
-    try {
-      const res = await fetch(`${url}/ping`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) return { status: "ok" };
-      if (res.status === 401) return { status: "error", message: "Token inválido o revocado" };
-      return { status: "error", message: `Error del servicio (HTTP ${res.status})` };
-    } catch {
-      return { status: "error", message: "No se pudo contactar Upstash Redis — revisa la URL o el token" };
-    }
-  },
-};
+// Las funciones viven en lib/ai/tool-health.ts (fuente única).
+// La clave de cada check debe coincidir con `healthKey` en TOOL_CATALOG.
+const HEALTH_CHECKS = TOOL_HEALTH_CHECKS;
 
 // ── Catálogo unificado ────────────────────────────────────────────────────────
 // Para promover una propuesta a activa: implemented: false → true + healthKey.

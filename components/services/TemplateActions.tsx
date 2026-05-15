@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SelectField } from "@/components/ui/SelectField";
 import { useToast } from "@/components/ui/Toast";
 
 type Template = {
@@ -313,19 +314,15 @@ function ApplyTemplateModal({
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Plantilla
                 </label>
-                <select
+                <SelectField
                   value={selectedId}
-                  onChange={(e) => setSelectedId(e.target.value)}
-                  className="font-sans w-full text-sm border border-slate-200 rounded px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                >
-                  <option value="">— Selecciona una plantilla —</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {t.service ? ` · ${t.service}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedId}
+                  options={templates.map((t) => ({
+                    value: t.id,
+                    label: t.name + (t.service ? ` · ${t.service}` : ""),
+                  }))}
+                  placeholder="— Selecciona una plantilla —"
+                />
               </div>
 
               {selected && (

@@ -60,7 +60,7 @@
 
 ## En desarrollo (may-2026)
 
-- [A] 🔄 Templates de servicio + visión global proyectos — `/configuracion/servicios` (CRUD plantillas etapas/actividades/duraciones), aplicar plantilla a cliente, vista global en `/equipo`. 15 archivos, migración 0033. Semáforo 🟢.
+- [A] ✅ Templates de servicio + visión global proyectos — `/configuracion/plantillas` (CRUD + estructura + crear desde cero), `TemplateActions` en cronograma de cliente (guardar / aplicar + fecha base), vista global en `/equipo` (4 vistas: por consultor, por proyecto, timeline, Gantt). 15+ archivos, migraciones 0032–0035. may-2026
 
 ## Futuro (Fase 3)
 

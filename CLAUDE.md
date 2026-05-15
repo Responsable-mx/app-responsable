@@ -515,5 +515,10 @@ Resultado: ~50% ahorro vs 1 solo breakpoint cuando el consultor cicla entre Auro
 
 Los health checks se dedupen automáticamente por key (Voyage Embeddings + Voyage Rerank comparten un solo ping). Si `implemented` es `true` pero no hay `healthKey`, la tarjeta muestra `inactive` — agregar siempre el check.
 
-**Herramientas activas (implemented=true):** Voyage Embeddings, Voyage Rerank, LlamaParse, Mistral OCR, QStash, Anthropic Batch API.
-**Propuestas (implemented=false):** Upstash Redis, Gemini Flash.
+**Herramientas activas (implemented=true):** Voyage Embeddings, Voyage Rerank, LlamaParse, Mistral OCR, QStash, Anthropic Batch API, Upstash Redis.
+**Propuestas (implemented=false):** Gemini Flash.
+
+**Upstash Redis (may-2026):** `lib/cache/redis.ts` — cliente singleton fail-open. Caché activo en:
+- `dm-benchmark/route.ts` POST compare: verifica cache antes de Batch API. GET: escribe cache cuando batch→done. TTL 14d.
+- `dm-referentes/route.ts` generate_topics: verifica cache antes de Sonnet. Escribe tras DB store. TTL 30d.
+- Env vars necesarias: `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (misma cuenta que QStash).

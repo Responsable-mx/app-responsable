@@ -123,6 +123,23 @@ const HEALTH_CHECKS: Record<string, () => Promise<ToolHealth>> = {
   // Batch API usa la misma ANTHROPIC_API_KEY. Sin ping adicional para no generar costo.
   batch: async () =>
     process.env.ANTHROPIC_API_KEY ? { status: "ok" } : { status: "inactive" },
+
+  redis: async () => {
+    const url   = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !token) return { status: "inactive" };
+    try {
+      const res = await fetch(`${url}/ping`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) return { status: "ok" };
+      if (res.status === 401) return { status: "error", message: "Token inválido o revocado" };
+      return { status: "error", message: `Error del servicio (HTTP ${res.status})` };
+    } catch {
+      return { status: "error", message: "No se pudo contactar Upstash Redis — revisa la URL o el token" };
+    }
+  },
 };
 
 // ── Catálogo unificado ────────────────────────────────────────────────────────
@@ -223,17 +240,14 @@ const TOOL_CATALOG: CatalogEntry[] = [
     name: "Upstash Redis — Caché de respuestas repetidas",
     tagline: "Evita llamar a la IA cuando la respuesta ya existe.",
     whatItDoes:
-      "Guarda en memoria las respuestas a preguntas frecuentes (marcos ESG como GRI o ESRS, benchmarks sectoriales) durante horas. Si otro consultor hace la misma pregunta, responde al instante sin cobrar tokens.",
+      "Guarda en memoria las respuestas de la IA (benchmark de empresas, tabla de temas DM) durante días. Si el consultor ejecuta la misma análisis dos veces con los mismos datos, responde al instante sin cobrar tokens.",
     whatYouGain:
-      "Ahorro estimado del 30-50% en llamadas a la IA para benchmarks sectoriales repetidos. Respuesta en <10 ms vs. 3-10 segundos. Ya tenemos cuenta de Upstash vía QStash.",
-    implemented: false,
-    healthKey: null,
+      "Re-run del benchmark: de 2-10 minutos y $0.35-0.60 a <1 segundo y $0. Re-run de tabla de temas: de 40-60 segundos y $0.22 a <1 segundo y $0. Ya tenemos cuenta de Upstash vía QStash.",
+    implemented: true,
+    healthKey: "redis",
     envKey: "UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN",
     setupUrl: "https://console.upstash.com",
     setupLabel: "console.upstash.com",
-    cost: "$0 con free tier",
-    freeTier: "256 MB de caché gratuita",
-    usedIn: "Benchmark de empresas — consultas de frameworks ESG recurrentes",
   },
   {
     id: "gemini-flash",

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
@@ -15,7 +16,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { RELATION_LABELS, irosToBenchmarkFields } from "@/lib/dm/fields";
 import { listActiveIros, getIroQuestionnaireContext, type DmIroConfig } from "@/lib/dm/iros";
 import { logChange } from "@/lib/audit-log";
+import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import type { BenchmarkEmpresa } from "@/lib/dm/benchmark-empresas-types";
+
+const BM_CACHE_TTL = 14 * 24 * 3600; // 14 días
+
+function benchmarkCacheKey(clientId: string, companyIds: string[]): string {
+  const hash = createHash("sha256").update([...companyIds].sort().join(",")).digest("hex").slice(0, 16);
+  return `dm:bm:compare:${clientId}:${hash}`;
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -287,6 +296,16 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
             ...(batchError ? { error_message: batchError } : {}),
           })
           .eq("id", latestResult.id);
+
+        // Guardar en caché cuando el resultado esté listo — evita re-run con mismas empresas
+        if (newStatus === "done") {
+          const snapshotIds = (latestResult.companies_snapshot as Array<{ id?: string }> ?? [])
+            .map((c) => c.id)
+            .filter((x): x is string => !!x);
+          if (snapshotIds.length > 0) {
+            void cacheSet(benchmarkCacheKey(id, snapshotIds), { result_id: latestResult.id }, BM_CACHE_TTL);
+          }
+        }
 
         void logAiCall({
           userEmail: user,
@@ -678,6 +697,20 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   if (fetchErr || !companies?.length) {
     return NextResponse.json({ error: "Empresas no encontradas" }, { status: 404 });
+  }
+
+  // Caché Redis: si ya existe un resultado "done" con las mismas empresas, devolverlo
+  // directamente sin gastar $0.35-0.60 en Batch API.
+  const cachedBm = await cacheGet<{ result_id: string }>(benchmarkCacheKey(id, company_ids));
+  if (cachedBm?.result_id) {
+    const { data: existingRow } = await admin
+      .from("dm_benchmark_results")
+      .select("id, status")
+      .eq("id", cachedBm.result_id)
+      .maybeSingle();
+    if (existingRow?.status === "done") {
+      return NextResponse.json({ data: { result_id: existingRow.id, status: "done" } });
+    }
   }
 
   // Marcar como validated=true las empresas que el consultor seleccionó para comparar.

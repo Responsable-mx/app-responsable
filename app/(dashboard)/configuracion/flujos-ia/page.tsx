@@ -528,7 +528,7 @@ export default function FlujoIaPage() {
                 { tool: "Voyage AI embeddings",  where: "Chat + AI-fill — búsqueda semántica (669/669 chunks en prod)",   status: "Activo" },
                 { tool: "Voyage Rerank",         where: "Chat — selección fina de fragmentos (top-20 → rerank → top-8)",   status: "Activo" },
                 { tool: "Anthropic Batch API",   where: "IROs propios · Reporte PDF · Benchmark (−50% costo)",             status: "Activo" },
-                { tool: "Upstash Redis",         where: "Caché benchmarks sectoriales repetidos",                           status: "Propuesto" },
+                { tool: "Upstash Redis",         where: "Caché benchmark + temas DM (re-run gratis en 14-30 días)",        status: "Activo" },
                 { tool: "Gemini Flash",          where: "AI-fill extracción pura (−40× costo vs Sonnet)",                  status: "Propuesto" },
               ].map((row) => {
                 const statusColor =

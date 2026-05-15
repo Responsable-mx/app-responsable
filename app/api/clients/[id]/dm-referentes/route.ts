@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { createAnthropicClient } from "@/lib/ai/client";
 import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
@@ -10,7 +11,10 @@ import { getModelConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicHttpUrl } from "@/lib/documents/ssrf";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
+import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import type { ReferentesData, ReferenteFramework, TopicRaw, TopicGrouped } from "@/lib/dm/referentes-types";
+
+const TOPICS_CACHE_TTL = 30 * 24 * 3600; // 30 días
 
 export const runtime    = "nodejs";
 export const maxDuration = 180;
@@ -331,6 +335,33 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "Valida al menos un referente antes de generar la tabla" }, { status: 400 });
     }
 
+    // Caché Redis: mismos referentes + mismo sector → mismo resultado (~$0.22 y 40-60s ahorrados)
+    const topicsCacheKey = `dm:ref:topics:${id}:${
+      createHash("sha256")
+        .update((client.sector ?? "") + active.map((f) => f.id).sort().join(","))
+        .digest("hex")
+        .slice(0, 16)
+    }`;
+    const cachedTopics = await cacheGet<{
+      coverage_score: number;
+      coverage_note: string;
+      topics_raw: TopicRaw[];
+      topics_grouped: TopicGrouped[];
+    }>(topicsCacheKey);
+    if (cachedTopics) {
+      // Actualizar DB con datos cacheados y retornar inmediatamente
+      await admin.from("dm_referentes").upsert({
+        client_id: id,
+        coverage_score:  cachedTopics.coverage_score,
+        coverage_note:   cachedTopics.coverage_note,
+        topics_raw:      cachedTopics.topics_raw as TopicRaw[],
+        topics_grouped:  cachedTopics.topics_grouped as TopicGrouped[],
+        topics_status: "done",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "client_id" });
+      return NextResponse.json({ data: cachedTopics });
+    }
+
     await admin.from("dm_referentes").upsert({
       client_id: id,
       topics_status: "generating",
@@ -390,6 +421,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       topics_status: "done",
       updated_at: new Date().toISOString(),
     }, { onConflict: "client_id" });
+
+    void cacheSet(topicsCacheKey, { coverage_score, coverage_note, topics_raw, topics_grouped }, TOPICS_CACHE_TTL);
 
     return NextResponse.json({ data: { coverage_score, coverage_note, topics_raw, topics_grouped } });
   }

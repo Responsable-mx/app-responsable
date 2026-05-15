@@ -963,13 +963,13 @@ export function DoubleMaterialidadTab({
         subtitle="Visualización X/Y de IROs · Impacto vs Materialidad financiera · Ejes 0–10"
         narrativeTitle={
           scoredIncluded.length > 0
-            ? `${scoredIncluded.length} analizado${scoredIncluded.length !== 1 ? "s" : ""} · ${quadrantCounts.doble_material} doble material${quadrantCounts.doble_material > 0 ? " · acción prioritaria" : ""}`
+            ? `${scoredIncluded.length} analizado${scoredIncluded.length !== 1 ? "s" : ""} · ${quadrantCounts.doble_material} IROs doble mat.${quadrantCounts.doble_material > 0 ? " · acción prioritaria" : ""}`
             : undefined
         }
         headerRight={
           quadrantCounts.doble_material > 0 ? (
             <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-1 rounded-sm font-bold whitespace-nowrap">
-              {quadrantCounts.doble_material} doble material
+              {quadrantCounts.doble_material} IROs doble mat.
             </span>
           ) : null
         }

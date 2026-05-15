@@ -273,7 +273,7 @@ export function BenchmarkVisuals({
   onCatFilter?: (cat: "all" | "E" | "S" | "G") => void;
 }) {
   const [open, setOpen] = useState(true);
-  const [heatmapOpen, setHeatmapOpen] = useState(false);
+  const [heatmapOpen, setHeatmapOpen] = useState(true);
   const { catStats, peers, companyRanking, catScores, brechaUrgency, peerAvgSolido } =
     computeData(latestResult, clientName);
 

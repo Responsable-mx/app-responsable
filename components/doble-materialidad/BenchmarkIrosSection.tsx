@@ -915,6 +915,37 @@ function SynthesisPanel({
         </div>
       )}
 
+      {/* NP9 — Brechas: temas sectoriales no cubiertos en el inventario del cliente */}
+      {clientIroTopics && clientIroTopics.length > 0 && temaFreq.length > 0 && (() => {
+        const gaps = temaFreq.filter(({ tema }) =>
+          !clientIroTopics.some((t) => {
+            const a = t.toLowerCase(); const b = tema.toLowerCase();
+            return a.includes(b) || b.includes(a);
+          })
+        );
+        if (gaps.length === 0) return null;
+        return (
+          <div className="border-l-4 border-l-amber-400 pl-3 py-2 bg-amber-50/40 rounded-r">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1.5">
+              {gaps.length} tema{gaps.length !== 1 ? "s" : ""} sectorial{gaps.length !== 1 ? "es" : ""} no {gaps.length !== 1 ? "están" : "está"} en tu inventario
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {gaps.slice(0, 8).map(({ tema }) => (
+                <span key={tema} className="text-[10px] px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 border border-amber-200">
+                  {tema}
+                </span>
+              ))}
+              {gaps.length > 8 && (
+                <span className="text-[10px] text-amber-500 self-center">+{gaps.length - 8} más</span>
+              )}
+            </div>
+            <p className="text-[10px] text-amber-600/70 mt-1">
+              Considera agregarlos en la Etapa 6 — Inventario de IROs.
+            </p>
+          </div>
+        );
+      })()}
+
       {/* Top temas */}
       <div>
         <span className="uppercase tracking-widest text-[10px] font-bold text-slate-400 block mb-3">

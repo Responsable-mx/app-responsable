@@ -16,6 +16,13 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error) {
     console.error("[ErrorBoundary]", error);
     Sentry.captureException(error);
+    const isChunkError =
+      error.name === "ChunkLoadError" ||
+      error.message.includes("Loading chunk") ||
+      error.message.includes("Failed to fetch dynamically imported module");
+    if (isChunkError && typeof window !== "undefined") {
+      window.location.reload();
+    }
   }
 
   render() {

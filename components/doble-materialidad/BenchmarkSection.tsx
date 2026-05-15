@@ -873,6 +873,15 @@ export function BenchmarkSection({
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-medium border bg-rose-100 text-rose-700 border-rose-300 ml-1"
               >
                 ⚑ Exclusiva: {mostUrgentBreach.label}
+                {onGoToIros && (
+                  <button
+                    type="button"
+                    onClick={onGoToIros}
+                    className="ml-1 underline font-semibold hover:text-rose-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rose-400 rounded-sm"
+                  >
+                    ver IROs →
+                  </button>
+                )}
               </span>
             )}
           </div>

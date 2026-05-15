@@ -32,7 +32,7 @@ export function ImportDocsModal({ onClose, onSelectFile, onDiscover, onPaste, ca
         </svg>
       ),
       label: "Subir archivo",
-      description: "PDF, DOCX, XLSX, PPTX, ZIP — hasta 25 MB",
+      description: "PDF, DOCX, XLSX, PPTX hasta 25 MB · ZIP hasta 100 MB",
       onClick: () => pick(onSelectFile),
     },
     {

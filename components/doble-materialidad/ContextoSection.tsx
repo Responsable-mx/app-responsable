@@ -217,6 +217,52 @@ export function ContextoSection({
         </div>
       )}
 
+      {/* P10 — Ficha de posicionamiento ESG de partida */}
+      {(sector || (frameworks && frameworks.length > 0)) && (() => {
+        // Exposición sectorial — heurística: sectores de alta materialidad ambiental
+        const highEnvSectors = ["energia", "manufactura", "mineria", "transporte", "petroleo", "quimico", "agro", "construccion"];
+        const highSocSectors = ["retail", "servicios", "salud", "educacion", "financiero", "tecnologia", "banca"];
+        const sectorLow = (sector ?? "").toLowerCase();
+        const envLevel = highEnvSectors.some((s) => sectorLow.includes(s)) ? "alta" : "media";
+        const socLevel = highSocSectors.some((s) => sectorLow.includes(s)) ? "alta" : "media";
+        const govLevel = (frameworks?.length ?? 0) >= 2 ? "alta" : "media";
+
+        const levelCls = (l: string) =>
+          l === "alta"
+            ? "bg-rose-50 text-rose-700 border-rose-200"
+            : "bg-amber-50 text-amber-700 border-amber-200";
+
+        const fwCount = frameworks?.length ?? 0;
+        const fwObligation =
+          fwCount === 0
+            ? "Sin marcos declarados — riesgo de reporte voluntario sin estructura"
+            : fwCount === 1
+            ? "1 marco de reporte — cumplimiento básico"
+            : `${fwCount} marcos de reporte — cumplimiento estructurado`;
+
+        return (
+          <div className="mb-3 border border-slate-200 rounded p-3 bg-slate-50/60 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Posicionamiento ESG de partida</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { cat: "E", label: "Ambiental", level: envLevel, hint: envLevel === "alta" ? "Sector con alta materialidad ambiental — esperar temas E1-E4 relevantes" : "Exposición ambiental estándar" },
+                { cat: "S", label: "Social",    level: socLevel, hint: socLevel === "alta" ? "Sector con alta materialidad social — S1-S4 prioritarios" : "Exposición social estándar" },
+                { cat: "G", label: "Gobernanza",level: govLevel, hint: govLevel === "alta" ? "Múltiples marcos activos — G1 y políticas de compliance son obligatorios" : "Gobernanza básica esperada" },
+              ].map(({ cat, label, level, hint }) => (
+                <div key={cat} className={`border rounded px-2.5 py-2 ${levelCls(level)}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] font-bold uppercase tracking-widest">{cat} · {label}</span>
+                    <span className="text-[9px] font-bold uppercase">{level}</span>
+                  </div>
+                  <p className="text-[10px] leading-snug opacity-80">{hint}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 border-t border-slate-200 pt-1.5">{fwObligation}</p>
+          </div>
+        );
+      })()}
+
       {/* Barra de progreso */}
       {progress ? (
         <div className="mb-3">

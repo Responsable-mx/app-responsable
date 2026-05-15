@@ -392,12 +392,17 @@ export async function getUsageSummary(
     cost_usd: Number(acc.cost_usd.toFixed(4)),
   }));
 
-  // Desglose de tipos de error — classifica errores por patrón en el texto
+  // Desglose de tipos de error — solo errores LLM (excluye Voyage/embeddings).
+  // Los errores de embedding son fallos silenciosos del cron, no afectan al consultor.
   const errorTypeSummary: ErrorTypeSummary = { timeout: 0, overloaded: 0, rate_limit: 0, other: 0 };
   for (const r of calls) {
     if (!r.error) continue;
+    const model = ((r.model as string | null) ?? "").toLowerCase();
+    if (model.includes("voyage")) continue; // skip embedding model errors
+    const role = ((r.role as string | null) ?? "").toLowerCase();
+    if (role === "embeddings" || role === "rerank") continue; // skip non-LLM roles
     const e = (r.error as string).toLowerCase();
-    if (e.includes("tardó") || e.includes("timeout") || e.includes("timed out") || e.includes("aborterror") || e.includes("esperado")) {
+    if (e.includes("tard") || e.includes("timeout") || e.includes("timed out") || e.includes("abort") || e.includes("esperado") || e.includes("lent")) {
       errorTypeSummary.timeout++;
     } else if (e.includes("saturada") || e.includes("overloaded") || e.includes("529") || e.includes("503")) {
       errorTypeSummary.overloaded++;

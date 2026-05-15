@@ -308,6 +308,24 @@ export function BenchmarkVisuals({
                 Cobertura por dimensión E/S/G
               </p>
               <RadarEsgChart catScores={catScores} />
+              {/* P4 — interpretación radar */}
+              {catScores.length >= 3 && (() => {
+                const sorted = [...catScores].sort((a, b) => b.client - a.client);
+                const best = sorted[0];
+                const worst = sorted[sorted.length - 1];
+                const aboveAvg = catScores.filter((c) => c.client >= c.peerAvg);
+                const labels: Record<string, string> = { E: "Ambiental", S: "Social", G: "Gobernanza" };
+                return (
+                  <p className="text-[10px] text-slate-500 mt-2 leading-relaxed border-t border-slate-100 pt-2">
+                    <span className="font-semibold text-teal-700">{labels[best?.cat ?? "E"]}</span> es la dimensión más sólida ({Math.round(best?.client ?? 0)}%).{" "}
+                    {worst && worst.client < (worst.peerAvg ?? 0) - 10 ? (
+                      <><span className="font-semibold text-rose-600">{labels[worst.cat]}</span> queda {Math.round((worst.peerAvg ?? 0) - worst.client)}% por debajo de la media de referencia — brecha prioritaria.</>
+                    ) : (
+                      <>El cliente {aboveAvg.length >= 2 ? "supera la media en " + aboveAvg.length + " dimensiones" : "está alineado con la media sectorial"}.</>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
             <PositionBars catStats={catStats} />
           </div>
@@ -323,6 +341,29 @@ export function BenchmarkVisuals({
                 totalFields={latestResult.fields_snapshot.length}
                 peerAvgSolido={peerAvgSolido}
               />
+              {/* P4 — interpretación ranking */}
+              {(() => {
+                const client = companyRanking.find((c) => c.isClient);
+                const peers = companyRanking.filter((c) => !c.isClient);
+                if (!client || peers.length === 0) return null;
+                const sorted = [...companyRanking].sort((a, b) => b.sólido - a.sólido);
+                const rank = sorted.findIndex((c) => c.isClient) + 1;
+                const total = sorted.length;
+                const above = peers.filter((p) => p.sólido > client.sólido).length;
+                return (
+                  <p className="text-[10px] text-slate-500 mt-2 leading-relaxed border-t border-slate-100 pt-2">
+                    {rank === 1 ? (
+                      <span className="font-semibold text-emerald-700">Posición líder</span>
+                    ) : rank <= Math.ceil(total / 2) ? (
+                      <span className="font-semibold text-teal-700">Posición {rank}/{total}</span>
+                    ) : (
+                      <span className="font-semibold text-amber-700">Posición {rank}/{total}</span>
+                    )}{" "}
+                    — {above} empresa{above !== 1 ? "s" : ""} de referencia con más campos sólidos que el cliente ({client.sólido} vs. media {Math.round(peers.reduce((s, p) => s + p.sólido, 0) / peers.length)}).
+                    {client.brecha > 0 && <> {client.brecha} campo{client.brecha !== 1 ? "s" : ""} en brecha pendiente de cierre.</>}
+                  </p>
+                );
+              })()}
             </div>
           )}
 
@@ -336,6 +377,23 @@ export function BenchmarkVisuals({
                 Barra más larga = brecha exclusiva del cliente = más urgente de atender
               </p>
               <BrechaUrgencyChart items={brechaUrgency} />
+              {/* P4 — interpretación brechas */}
+              {(() => {
+                const exclusivas = brechaUrgency.filter((b) => b.peerBrechas === 0);
+                const sectoriales = brechaUrgency.filter((b) => b.peerBrechas >= b.totalPeers * 0.5);
+                return (
+                  <p className="text-[10px] text-slate-500 mt-2 leading-relaxed border-t border-slate-100 pt-2">
+                    {exclusivas.length > 0 ? (
+                      <><span className="font-semibold text-rose-600">{exclusivas.length} brecha{exclusivas.length !== 1 ? "s" : ""} exclusiva{exclusivas.length !== 1 ? "s" : ""}</span>: ninguna referencia las reporta — mayor urgencia de cierre.{" "}</>
+                    ) : null}
+                    {sectoriales.length > 0 ? (
+                      <><span className="font-semibold text-slate-600">{sectoriales.length} brecha{sectoriales.length !== 1 ? "s" : ""} sectorial{sectoriales.length !== 1 ? "es" : ""}</span>: compartida{sectoriales.length !== 1 ? "s" : ""} por más del 50% de referencias — menor urgencia diferencial pero obligación de reporte.</>
+                    ) : exclusivas.length === 0 ? (
+                      "Todas las brechas son compartidas con al menos una referencia — posición alineada al sector."
+                    ) : null}
+                  </p>
+                );
+              })()}
             </div>
           )}
 

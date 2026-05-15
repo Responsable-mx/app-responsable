@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { classifyEsg, ESG_BADGE, extractEsrsCode } from "@/lib/dm/esg-classify";
@@ -260,8 +260,53 @@ export function IroSection({
   }
 
   // status === "done"
+  // P2 — distribución ESG de IROs incluidos
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const esgDist = useMemo(() => {
+    const counts = { E: 0, S: 0, G: 0, "?": 0 };
+    for (const iro of iros) {
+      if (!iro.incluido) continue;
+      const cat = classifyEsg(iro.tema_esg);
+      counts[cat] = (counts[cat] ?? 0) + 1;
+    }
+    const total = counts.E + counts.S + counts.G + counts["?"];
+    return { counts, total };
+  }, [iros]);
+
   return (
     <div className="space-y-3">
+      {/* P2 — Distribución ESG de IROs incluidos */}
+      {esgDist.total > 0 && (
+        <div className="flex items-center gap-3 flex-wrap px-3 py-2 bg-slate-50 border border-slate-200 rounded">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 shrink-0">Distribución ESG</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {(["E", "S", "G"] as const).map((cat) => {
+              const n = esgDist.counts[cat];
+              if (n === 0) return null;
+              const cls = ESG_BADGE[cat];
+              const label = cat === "E" ? "Ambiental" : cat === "S" ? "Social" : "Gobernanza";
+              return (
+                <span key={cat} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold border ${cls}`}>
+                  {cat} <span className="tabular-nums">{n}</span>
+                  <span className="font-normal opacity-70">{label}</span>
+                </span>
+              );
+            })}
+          </div>
+          {/* Stacked bar */}
+          <div className="flex h-2 flex-1 min-w-[80px] rounded-sm overflow-hidden gap-px">
+            {(["E", "S", "G"] as const).map((cat) => {
+              const n = esgDist.counts[cat];
+              if (n === 0) return null;
+              const pct = (n / esgDist.total) * 100;
+              const bg = cat === "E" ? "bg-emerald-400" : cat === "S" ? "bg-violet-400" : "bg-slate-400";
+              return <div key={cat} className={`h-full ${bg}`} style={{ width: `${pct}%` }} title={`${cat}: ${n}`} />;
+            })}
+          </div>
+          <span className="text-[10px] text-slate-400 tabular-nums shrink-0">{esgDist.total} incluidos</span>
+        </div>
+      )}
+
       {/* Slider umbral materialidad — filtra tabla en vivo (mockup-v7 pattern) */}
       <div className="flex items-center gap-3 flex-wrap p-3 bg-slate-50 border border-slate-200 rounded">
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">

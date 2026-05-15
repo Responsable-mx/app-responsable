@@ -161,10 +161,64 @@ export function ValidacionSection({ clientId, iros }: Props) {
     [patch]
   );
 
+  // ── P8 — Stats de decisiones ──────────────────────────────────────────────
+  const decisionStats = useMemo(() => {
+    const counts = { aceptar: 0, ajustar: 0, excluir: 0 };
+    for (const iro of includedIros) {
+      const d = decisions[iro.id]?.decision;
+      if (d) counts[d]++;
+    }
+    return counts;
+  }, [includedIros, decisions]);
+
+  const totalDecided = decisionStats.aceptar + decisionStats.ajustar + decisionStats.excluir;
+  // Estimación: ~5 min por IRO para preparar la junta de validación
+  const minEstimate = Math.round(includedIros.length * 5);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
+      {/* P8 — Barra de estadísticas de validación */}
+      {includedIros.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap px-5 py-3 bg-slate-50 border-b border-slate-200">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 shrink-0">Decisiones</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {(["aceptar", "ajustar", "excluir"] as Decision[]).map((d) => {
+              const meta = DECISION_META[d];
+              const count = decisionStats[d];
+              return (
+                <span key={d} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold border ${meta.chip}`}>
+                  {meta.label} <span className="tabular-nums">{count}</span>
+                </span>
+              );
+            })}
+            {pendingCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold border bg-slate-50 border-slate-200 text-slate-500">
+                Pendiente <span className="tabular-nums">{pendingCount}</span>
+              </span>
+            )}
+          </div>
+          {/* Progress bar */}
+          {includedIros.length > 0 && (
+            <div className="flex items-center gap-2 flex-1 min-w-[100px]">
+              <div className="flex-1 h-1 bg-slate-200 overflow-hidden">
+                <div
+                  className={`h-full transition-all ${allDecided ? "bg-emerald-500" : "bg-brand-primary"}`}
+                  style={{ width: `${Math.round((totalDecided / includedIros.length) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] tabular-nums text-slate-500 shrink-0">
+                {Math.round((totalDecided / includedIros.length) * 100)}%
+              </span>
+            </div>
+          )}
+          <span className="text-[10px] text-slate-400 ml-auto shrink-0">
+            ~{minEstimate} min estimados para junta
+          </span>
+        </div>
+      )}
+
       <div className="space-y-6">
 
         {/* ── Sección 1: Junta de presentación ── */}

@@ -5,6 +5,64 @@ import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
+// P6 — Checklist post-reporte (client-only, sin persistencia)
+const POST_STEPS = [
+  { id: "compartir",  label: "Compartir PDF con Dirección General",    hint: "Via email o carpeta compartida — solicitar acuse de recibo." },
+  { id: "gri",        label: "Registrar en GRI / CSRD si aplica",       hint: "Guardar el número de referencia del reporte en el expediente del cliente." },
+  { id: "archivar",   label: "Archivar en expediente del cliente",       hint: "Carpeta: Cliente / Estudio DM / Año · Versión final." },
+  { id: "calendario", label: "Agendar revisión anual",                  hint: "La metodología GRI recomienda actualizar el estudio cada 12-24 meses." },
+  { id: "validacion", label: "Completar validación si quedó pendiente", hint: "Si algún IRO quedó sin decisión, retomar con el cliente." },
+];
+
+function PostReportChecklist() {
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const done = checked.size;
+  const total = POST_STEPS.length;
+
+  return (
+    <div className="border border-slate-200 rounded p-3 bg-slate-50/60 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pasos siguientes</p>
+        <span className={`text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-sm ${done === total ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+          {done}/{total}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {POST_STEPS.map((step) => {
+          const isChecked = checked.has(step.id);
+          return (
+            <label key={step.id} className="flex items-start gap-2 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={isChecked}
+                onChange={() => toggle(step.id)}
+                className="mt-0.5 w-3.5 h-3.5 accent-brand-primary cursor-pointer shrink-0"
+              />
+              <div>
+                <span className={`text-[11px] font-medium leading-snug ${isChecked ? "line-through text-slate-400" : "text-slate-700"}`}>
+                  {step.label}
+                </span>
+                <p className="text-[10px] text-slate-400 leading-snug">{step.hint}</p>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      {done === total && (
+        <p className="text-[10px] text-emerald-700 font-semibold border-t border-slate-200 pt-2">
+          Estudio cerrado — todas las acciones completadas.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export type LatestReport = {
   id: string;
   file_name: string;
@@ -293,48 +351,53 @@ export function ReporteSection({
 
       {/* Reporte listo */}
       {canGenerate && latestReport?.parse_status === "ok" && (
-        <div className="border-l-4 border-l-emerald-600 pl-4 py-2">
-          <p className="text-sm font-medium text-slate-800 mb-0.5">{reportDisplayName}</p>
-          <p className="text-xs text-slate-500 mb-3">
-            {new Date(latestReport.created_at).toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-          <div className="flex flex-col gap-3">
-            <div>
-              <Button size="sm" variant="primary" loading={downloading} onClick={handleDownloadPdf}>
-                <svg
-                  className="w-3.5 h-3.5 mr-1.5"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
+        <div className="border-l-4 border-l-emerald-600 pl-4 py-2 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-slate-800 mb-0.5">{reportDisplayName}</p>
+            <p className="text-xs text-slate-500 mb-3">
+              {new Date(latestReport.created_at).toLocaleDateString("es-MX", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+            <div className="flex flex-col gap-3">
+              <div>
+                <Button size="sm" variant="primary" loading={downloading} onClick={handleDownloadPdf}>
+                  <svg
+                    className="w-3.5 h-3.5 mr-1.5"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" />
+                  </svg>
+                  Descargar PDF
+                </Button>
+              </div>
+              {/* Regenerar — destructivo, separado visualmente */}
+              <div className="pt-2 border-t border-slate-100">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={generating}
+                  onClick={() => setConfirmRegenerate(true)}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" />
-                </svg>
-                Descargar PDF
-              </Button>
-            </div>
-            {/* Regenerar — destructivo, separado visualmente */}
-            <div className="pt-2 border-t border-slate-100">
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={generating}
-                onClick={() => setConfirmRegenerate(true)}
-              >
-                <svg className="w-3 h-3 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 4a4 4 0 11-7.9 1" />
-                  <path d="M2 2v3h3" />
-                </svg>
-                Regenerar reporte
-              </Button>
+                  <svg className="w-3 h-3 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 4a4 4 0 11-7.9 1" />
+                    <path d="M2 2v3h3" />
+                  </svg>
+                  Regenerar reporte
+                </Button>
+              </div>
             </div>
           </div>
+
+          {/* P6 — Checklist pasos siguientes */}
+          <PostReportChecklist />
         </div>
       )}
 

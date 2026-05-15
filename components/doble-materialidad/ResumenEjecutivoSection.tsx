@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -429,28 +429,63 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
-            <svg
-              className="w-8 h-8 text-slate-300"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <p className="text-sm font-medium text-slate-600">
-              Sin resumen ejecutivo
-            </p>
-            <p className="text-xs text-slate-400 max-w-xs">
-              Genera el resumen una vez que los IROs materiales estén validados.
-              Aurora redactará un análisis ejecutivo listo para Dirección General.
-            </p>
+          /* P5 — Empty state estructurado: preview de lo que contendrá el resumen */
+          <div className="space-y-4 py-2">
+            <div className="flex items-start gap-3 pb-3 border-b border-slate-100">
+              <div className="shrink-0 w-8 h-8 rounded bg-brand-primary/10 flex items-center justify-center">
+                <svg className="w-4 h-4 text-brand-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-0.5">El resumen ejecutivo incluirá:</p>
+                <p className="text-xs text-slate-500">Aurora (Claude Sonnet) redactará un documento listo para Dirección General en ~30 segundos.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  icon: "1",
+                  label: "Narrativa para DG",
+                  desc: "Contexto ejecutivo del estudio — sector, marcos, período y metodología.",
+                  cls: "border-l-brand-primary",
+                },
+                {
+                  icon: "2",
+                  label: "Top 5 IROs materiales",
+                  desc: "Los temas con mayor doble materialidad priorizados por score.",
+                  cls: "border-l-rose-500",
+                },
+                {
+                  icon: "3",
+                  label: "Brechas críticas",
+                  desc: "Áreas donde el cliente está por debajo del benchmark sectorial.",
+                  cls: "border-l-amber-500",
+                },
+                {
+                  icon: "4",
+                  label: "Posición competitiva",
+                  desc: "Comparativa vs. empresas de referencia en el benchmark.",
+                  cls: "border-l-slate-400",
+                },
+              ].map((item) => (
+                <div key={item.icon} className={`border border-slate-200 border-l-4 ${item.cls} rounded p-2.5 space-y-1`}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm">{item.icon}</span>
+                    <span className="text-[10px] font-bold text-slate-700">{item.label}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-snug">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+              <svg className="w-3.5 h-3.5 text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <p className="text-[11px] text-slate-500">
+                Completa la validación de IROs y usa <strong className="text-slate-600">"Generar resumen"</strong> para que Aurora redacte el análisis.
+              </p>
+            </div>
           </div>
         )}
       </div>

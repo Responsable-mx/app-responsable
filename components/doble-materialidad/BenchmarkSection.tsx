@@ -102,6 +102,23 @@ function SynthesisBlock({ narrative, createdAt, onGoToIros }: { narrative: strin
           {intro && (
             <p className="text-sm text-slate-600 leading-relaxed">{intro}</p>
           )}
+          {/* P3 — Semáforo ejecutivo: primera oración por sección */}
+          <div className="grid grid-cols-3 gap-2">
+            {sections.map((s) => {
+              const firstSentence = s.text.split(/[.!?]/)[0]?.trim() ?? s.text;
+              const truncated = firstSentence.length > 90 ? firstSentence.slice(0, 90) + "…" : firstSentence;
+              const dot = s.label === "Fortalezas" ? "bg-emerald-500" : s.label === "Brechas críticas" ? "bg-rose-500" : "bg-amber-500";
+              return (
+                <div key={s.label} className={`border ${s.accent.replace("border-l-4", "border")} rounded p-2.5 space-y-1`}>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                    <span className={`text-[9px] font-bold uppercase tracking-widest ${s.labelCls}`}>{s.label}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">{truncated}.</p>
+                </div>
+              );
+            })}
+          </div>
           {sections.map((s) => (
             <div key={s.label} className={`border-l-4 ${s.accent} pl-3 py-2`}>
               <span className={`text-[10px] font-bold uppercase tracking-widest ${s.labelCls} block mb-1`}>

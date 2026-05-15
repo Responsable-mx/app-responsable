@@ -625,6 +625,52 @@ export function MatrizDM({ iros, onGoToIros }: Props) {
           ),
         )}
       </div>
+
+      {/* P1 — Interpretación IA determinística de la matriz */}
+      {points.length > 0 && (() => {
+        const byQ = {
+          doble_material:   points.filter((p) => p.quadrant === "doble_material"),
+          solo_impacto:     points.filter((p) => p.quadrant === "solo_impacto"),
+          solo_financiero:  points.filter((p) => p.quadrant === "solo_financiero"),
+          en_seguimiento:   points.filter((p) => p.quadrant === "en_seguimiento"),
+        };
+        const dmCount = byQ.doble_material.length;
+        const topDm = byQ.doble_material.sort((a, b) => b.score_consolidado - a.score_consolidado)[0] ?? null;
+        const topRiesgo = byQ.solo_financiero.sort((a, b) => b.score_consolidado - a.score_consolidado)[0] ?? null;
+        const concPct = Math.round((dmCount / points.length) * 100);
+
+        const obs: { icon: string; text: string; cls: string }[] = [];
+
+        if (dmCount === 0) {
+          obs.push({ icon: "◆", text: "Ningún tema alcanza materialidad doble. El estudio muestra riesgo bajo — confirma que los umbrales de calificación son representativos.", cls: "text-slate-500" });
+        } else if (concPct >= 50) {
+          obs.push({ icon: "●", text: `Alta concentración: ${dmCount} de ${points.length} temas (${concPct}%) son doble material. Riesgo reportable elevado — priorizar planes de acción.`, cls: "text-rose-600" });
+        } else {
+          obs.push({ icon: "●", text: `${dmCount} tema${dmCount !== 1 ? "s" : ""} doble material (${concPct}% del universo). ${topDm ? `Mayor riesgo combinado: "${topDm.tema_esg}" con score ${topDm.score_consolidado}/5.` : ""}`, cls: "text-rose-600" });
+        }
+
+        if (byQ.solo_financiero.length > 0) {
+          obs.push({ icon: "■", text: `${byQ.solo_financiero.length} tema${byQ.solo_financiero.length !== 1 ? "s" : ""} solo financiero${topRiesgo ? ` — exposición económica principal: "${topRiesgo.tema_esg}". Monitorear en informes trimestrales.` : "."}`, cls: "text-teal-600" });
+        }
+
+        if (byQ.en_seguimiento.length > byQ.doble_material.length) {
+          obs.push({ icon: "▲", text: `${byQ.en_seguimiento.length} temas en seguimiento superan en número a los materiales — posible oportunidad de elevar umbrales o enfocar el cuestionario.`, cls: "text-slate-500" });
+        }
+
+        return (
+          <div className="border border-slate-200 rounded p-3 bg-slate-50/60 space-y-2 mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Lectura de la matriz</p>
+            <div className="space-y-1.5">
+              {obs.map((o, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className={`text-[11px] font-bold shrink-0 mt-px ${o.cls}`}>{o.icon}</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">{o.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -202,7 +202,10 @@ export default async function MonitoreoIaPage() {
   const cacheRatio  = s && (s.total_input_tokens + s.total_cache_read_tokens) > 0
     ? s.total_cache_read_tokens / (s.total_input_tokens + s.total_cache_read_tokens) : 0;
   const voyageActive    = voyageCalls > 0;
-  const rerankActive    = (s?.by_stage ?? []).some(st => st.stage === "rerank");
+  // Rerank usa la misma VOYAGE_API_KEY — disponible si la key está presente, sin importar si ya se ejercitó
+  const rerankAvailable = !!process.env.VOYAGE_API_KEY;
+  const rerankUsed      = (s?.by_stage ?? []).some(st => st.stage === "rerank");
+  const rerankActive    = rerankAvailable; // activo = disponible para usar
   const _dmReportActive = (s?.by_stage ?? []).some(st => st.stage === "dm_report" && st.calls > 0);
   const benchmarkCalls  = (s?.by_stage ?? []).filter(st => st.stage.startsWith("dm_benchmark")).reduce((sum, st) => sum + st.calls, 0);
   const benchmarkActive = benchmarkCalls >= THRESHOLDS.benchmarkMin;
@@ -471,7 +474,7 @@ export default async function MonitoreoIaPage() {
   const healthChecks: HealthCheck[] = s ? [
     { label: "Respuestas exitosas", status: errorRate > THRESHOLDS.errorRate.rate && llmCalls >= THRESHOLDS.errorRate.minCalls ? "rojo" : errorRate > 0.05 && llmCalls > 10 ? "amarillo" : llmCalls === 0 ? "neutral" : "verde", valor: llmCalls > 0 ? `${successRate}% (${llmErrors} fallas de ${numFmt.format(llmCalls)})` : "Sin actividad", meta: "Objetivo: >95%", trend: trendErrorRate },
     { label: "Búsqueda semántica en documentos", status: !voyageActive ? "amarillo" : nullEmbeddings > 0 ? "amarillo" : "verde", valor: voyageActive ? `Activa — ${numFmt.format(voyageCalls)} búsquedas${nullEmbeddings > 0 ? ` · ${nullEmbeddings} fragmentos sin indexar` : ""}` : "Inactiva" },
-    { label: "Selección precisa de fragmentos", status: !voyageActive ? "neutral" : rerankActive ? "verde" : "amarillo", valor: !voyageActive ? "Requiere búsqueda semántica primero" : rerankActive ? "Activa" : "Lista para activar" },
+    { label: "Selección precisa de fragmentos", status: !voyageActive ? "neutral" : rerankActive ? "verde" : "amarillo", valor: !voyageActive ? "Requiere búsqueda semántica primero" : rerankUsed ? "Activa" : rerankActive ? "Disponible — se activa con el primer chat con docs indexados" : "Lista para activar" },
     { label: "Uso de IA de máxima capacidad (Elena/Reporte)", status: llmCalls === 0 ? "neutral" : opusPct > THRESHOLDS.opusPct.pct && llmCalls >= THRESHOLDS.opusPct.minCalls ? "amarillo" : "verde", valor: llmCalls > 0 ? `${opusPct}% del volumen total` : "Sin datos", meta: `Objetivo: <${THRESHOLDS.opusPct.pct}%` },
     { label: "Velocidad de Aurora (rol más usado)", status: latenciaMs === 0 ? "neutral" : latenciaMs > THRESHOLDS.latenciaMs * 2 ? "rojo" : latenciaMs > THRESHOLDS.latenciaMs ? "amarillo" : "verde", valor: latenciaMs > 0 ? `${(latenciaMs / 1000).toFixed(1)} s` : "Sin datos", meta: `Objetivo: <${THRESHOLDS.latenciaMs / 1000}s` },
     { label: "Caché de benchmarks sectoriales", status: benchmarkCalls === 0 ? "neutral" : benchmarkCalls >= THRESHOLDS.benchmarkMin ? "amarillo" : "neutral", valor: benchmarkCalls === 0 ? "Sin estudios DM este mes" : `${benchmarkCalls} estudio${benchmarkCalls > 1 ? "s" : ""} — ${benchmarkCalls >= THRESHOLDS.benchmarkMin ? "caché pendiente de implementar" : "volumen aún bajo"}` },

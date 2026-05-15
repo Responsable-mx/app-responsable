@@ -2,6 +2,7 @@ import "server-only";
 import type { Client } from "@/lib/clients";
 import type { RoleId } from "@/lib/ai/models";
 import { buildRoleSystemText } from "@/lib/ai/prompts";
+import { loadGlobalSynonyms, loadClientVocabulary, buildSynonymsBlock } from "@/lib/ai/synonyms";
 import { NARRATIVE_SCHEMAS } from "@/lib/clients/narrative-schemas";
 import { CATALOG_SEEDS, type CatalogCategory } from "@/lib/catalogs/seeds";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";
@@ -63,7 +64,7 @@ function buildQuestionnaireSection(questionnaire: QuestionnaireBundle | null | u
   return `\n<questionnaire_data>\nCampos del Cuestionario de Doble Materialidad ya llenados para /clientes/${clientId}:\n${lines.join("\n")}\n</questionnaire_data>\n\nInstrucción de trazabilidad: cuando cites un dato de estos campos, usa la notación [campo:key] (ej: [campo:razon_social]). El sistema convierte la cita en un link clicable para que el consultor verifique en el cuestionario. Solo usa keys listadas arriba.`;
 }
 
-export function buildClientContext(client: Client | null, questionnaire?: QuestionnaireBundle | null): string {
+export function buildClientContext(client: Client | null, questionnaire?: QuestionnaireBundle | null, synonymsBlock?: string): string {
   if (!client) {
     return `<context>
 No hay cliente seleccionado en este chat. El usuario te está preguntando
@@ -156,7 +157,7 @@ ${attrs}
 
 ${narrativeBlocks}
 </client>
-${questionnaireSection}
+${questionnaireSection}${synonymsBlock ?? ""}
 Instrucción sobre este contexto:
 - Úsalo para personalizar. No lo repitas literal en tu respuesta.
 - Los atributos estructurados (frameworks_reported, certifications,
@@ -237,7 +238,12 @@ function escapeAttr(s: string): string {
  * mismo cliente. STARTER_IA §2 + STACK.md "2 breakpoints ephemerales".
  */
 export async function buildSystemBlocks(role: RoleId, client: Client | null, questionnaire?: QuestionnaireBundle | null) {
-  const contextBlock = buildClientContext(client, questionnaire);
+  const [globalSynonyms, clientVocab] = await Promise.all([
+    loadGlobalSynonyms(),
+    client ? loadClientVocabulary(client.id) : Promise.resolve([]),
+  ]);
+  const synonymsBlock = buildSynonymsBlock(globalSynonyms, clientVocab);
+  const contextBlock = buildClientContext(client, questionnaire, synonymsBlock);
   const roleBlock = await buildRoleSystemText(role);
 
   return [

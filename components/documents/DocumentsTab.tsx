@@ -19,6 +19,7 @@ import { BulkServicesModal } from "@/components/documents/BulkServicesModal";
 import { EditServicesModal } from "@/components/documents/EditServicesModal";
 import { DiscoverModal } from "@/components/documents/DiscoverModal";
 import { ImportDocsModal } from "@/components/documents/ImportDocsModal";
+import { VocabularySection } from "@/components/documents/VocabularySection";
 
 const KIND_LABEL: Record<DocMeta["kind"], string> = {
   general: "General",
@@ -150,6 +151,7 @@ export function DocumentsTab({
   // uploadServiceIds: filtro activo de tabla + default serviceIds en staging
   const [uploadServiceIds, setUploadServiceIds] = useState<string[]>([]);
   const dragDepth = useRef(0);
+  const vocabRef = useRef<HTMLDivElement>(null);
 
   async function fetchDocContent(docId: string): Promise<string | null> {
     const res = await fetch(`/api/clients/${clientId}/documents/${docId}?mode=content`);
@@ -709,8 +711,8 @@ export function DocumentsTab({
           <Button
             variant="secondary"
             size="sm"
-            disabled
-            title="Vocabulario del cliente — próximamente"
+            onClick={() => vocabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            title="Ver vocabulario del cliente"
             aria-label="Vocabulario"
           >
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -1220,6 +1222,11 @@ export function DocumentsTab({
           onCancel={() => setBulkDeleteOpen(false)}
         />
       )}
+
+      {/* Sección vocabulario — siempre visible debajo de la tabla de docs */}
+      <div ref={vocabRef}>
+        <VocabularySection clientId={clientId} />
+      </div>
     </div>
   );
 }

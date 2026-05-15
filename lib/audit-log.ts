@@ -32,7 +32,9 @@ export type AuditEntityType =
   | "auto_update_config"
   | "client_engagement"
   | "service_pricing_config"
-  | "client_service_pricing";
+  | "client_service_pricing"
+  | "terminology_synonym"
+  | "client_vocabulary";
 
 export type AuditAction = "create" | "update" | "delete" | "restore" | "review";
 

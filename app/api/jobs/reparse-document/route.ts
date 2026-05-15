@@ -19,40 +19,45 @@ const INTER_BATCH_DELAY_MS = 200;
 type JobPayload = { docId: string };
 
 export async function POST(req: Request) {
+  const body = await req.text();
+
+  // 1. QStash signature (camino ideal)
   const signingKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
   const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
-
   if (signingKey && nextSigningKey) {
     const receiver = new Receiver({ currentSigningKey: signingKey, nextSigningKey });
-    const body = await req.text();
     const signature = req.headers.get("upstash-signature") ?? "";
     const isValid = await receiver.verify({ body, signature }).catch(() => false);
-    if (!isValid) {
-      // Firma inválida — fallback: sesión admin (para llamadas manuales desde el browser)
-      const user = await requireAdmin();
-      if (!user) {
-        return NextResponse.json({ error: "Invalid QStash signature" }, { status: 401 });
-      }
-      // Admin autenticado: parsear body que ya leímos como text
-      let payload: JobPayload;
-      try {
-        payload = JSON.parse(body) as JobPayload;
-      } catch {
-        return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
-      }
-      return processDoc(payload);
+    if (isValid) {
+      return parseAndProcess(body);
     }
-    let payload: JobPayload;
-    try {
-      payload = JSON.parse(body) as JobPayload;
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
-    }
-    return processDoc(payload);
   }
 
-  // Dev / fallback sin QStash keys
-  const payload = (await req.json()) as JobPayload;
+  // 2. CRON_SECRET en header X-Reparse-Secret (QStash lo reenvía como custom header)
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const secret = req.headers.get("x-reparse-secret");
+    if (secret === cronSecret) {
+      return parseAndProcess(body);
+    }
+  }
+
+  // 3. Sesión admin (llamadas manuales desde el browser)
+  const user = await requireAdmin();
+  if (user) {
+    return parseAndProcess(body);
+  }
+
+  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+}
+
+function parseAndProcess(body: string): Promise<NextResponse> {
+  let payload: JobPayload;
+  try {
+    payload = JSON.parse(body) as JobPayload;
+  } catch {
+    return Promise.resolve(NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 }));
+  }
   return processDoc(payload);
 }
 

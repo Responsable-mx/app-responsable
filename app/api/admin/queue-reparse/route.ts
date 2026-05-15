@@ -51,6 +51,9 @@ export async function POST() {
           url: jobUrl,
           body: { docId: doc.id },
           retries: 2,
+          headers: process.env.CRON_SECRET
+            ? { "x-reparse-secret": process.env.CRON_SECRET }
+            : undefined,
         });
         queued++;
       } catch (e) {

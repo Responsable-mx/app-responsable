@@ -15,6 +15,16 @@ export class TabErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, message: "" };
 
   static getDerivedStateFromError(error: Error): State {
+    // ChunkLoadError ocurre cuando un chunk JS expira después de un deploy nuevo.
+    // Auto-reload recupera sin mostrar error al usuario.
+    const isChunkError =
+      error.name === "ChunkLoadError" ||
+      /loading chunk|failed to fetch dynamically imported module/i.test(error.message);
+    if (isChunkError && typeof window !== "undefined") {
+      window.location.reload();
+      // Retornar estado intermedio — el reload ocurre antes del próximo render
+      return { hasError: false, message: "" };
+    }
     return { hasError: true, message: error.message };
   }
 

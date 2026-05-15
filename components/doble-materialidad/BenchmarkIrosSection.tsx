@@ -181,11 +181,14 @@ export function BenchmarkIrosSection({
   clientId,
   companies,
   clientSector,
+  clientIroTopics,
   onIrosAdapted,
 }: {
   clientId: string;
   companies: BenchmarkCompany[];
   clientSector?: string | null;
+  /** Temas ESG del inventario del cliente (incluido=true) — se usa en la síntesis para marcar qué temas del sector ya están cubiertos. */
+  clientIroTopics?: string[];
   onIrosAdapted?: () => void;
 }) {
   const { push } = useToast();
@@ -659,6 +662,7 @@ export function BenchmarkIrosSection({
           narrative={narrative}
           isGeneratingNarrative={isGeneratingNarrative}
           onGenerateNarrative={() => void generateNarrative()}
+          clientIroTopics={clientIroTopics}
         />
       ) : (
         activeCompany && (
@@ -793,11 +797,13 @@ function SynthesisPanel({
   narrative,
   isGeneratingNarrative,
   onGenerateNarrative,
+  clientIroTopics,
 }: {
   groups: IroGroup[];
   narrative: string | null;
   isGeneratingNarrative: boolean;
   onGenerateNarrative: () => void;
+  clientIroTopics?: string[];
 }) {
   const allIros = useMemo(() => groups.flatMap((g) => g.iros), [groups]);
 
@@ -927,6 +933,14 @@ function SynthesisPanel({
               <span className="text-[10px] text-slate-400 tabular-nums shrink-0 w-24 text-right">
                 {companies} emp. · {count} IROs
               </span>
+              {clientIroTopics && clientIroTopics.some((t) => {
+                const a = t.toLowerCase(); const b = tema.toLowerCase();
+                return a.includes(b) || b.includes(a);
+              }) && (
+                <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20 whitespace-nowrap">
+                  ✓ en cliente
+                </span>
+              )}
             </div>
           ))}
         </div>

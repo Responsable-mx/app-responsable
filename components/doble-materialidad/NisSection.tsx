@@ -169,14 +169,50 @@ export function NisSection({
         </div>
       )}
 
+      {/* Stats bar visual cuando hay datos */}
+      {nisRows.length > 0 && (() => {
+        const noIdCount = nisRows.filter((r) => r.estado === "no_identificado").length;
+        const noAplicaCount = nisRows.filter((r) => r.estado === "no_aplica").length;
+        const total = nisRows.length;
+        const stats = [
+          { key: "disponible",      count: disponiblesCount,                               label: "Disponible",       bg: "bg-emerald-400", text: "text-emerald-700" },
+          { key: "parcial",         count: parcialesCount,                                 label: "Parcial",          bg: "bg-amber-400",   text: "text-amber-700" },
+          { key: "no_identificado", count: noIdCount,                                      label: "No identificado",  bg: "bg-slate-300",   text: "text-slate-500" },
+          { key: "no_aplica",       count: noAplicaCount,                                  label: "No aplica",        bg: "bg-slate-100",   text: "text-slate-400" },
+        ];
+        return (
+          <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 shrink-0">
+              Estado NIS/IBSO
+            </span>
+            <div className="flex h-2 flex-1 min-w-[120px] rounded-sm overflow-hidden gap-px">
+              {stats.map(({ key, count, bg }) =>
+                count > 0 ? (
+                  <div
+                    key={key}
+                    className={`h-full ${bg}`}
+                    style={{ width: `${(count / total) * 100}%` }}
+                    title={`${key}: ${count}`}
+                  />
+                ) : null
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {stats.map(({ key, count, label, text }) =>
+                count > 0 ? (
+                  <span key={key} className={`text-[10px] tabular-nums ${text}`}>
+                    <span className="font-bold">{count}</span> {label}
+                  </span>
+                ) : null
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-xs text-slate-600">
           Mapa de brechas de información para los indicadores NIS/IBSO más relevantes del sector.
-          {nisRows.length > 0 && (
-            <span className="ml-1 text-slate-400">
-              {disponiblesCount} disponibles · {parcialesCount} parciales · {nisRows.length - disponiblesCount - parcialesCount} por identificar.
-            </span>
-          )}
         </p>
         <Button
           size="sm"

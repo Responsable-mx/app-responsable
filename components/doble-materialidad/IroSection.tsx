@@ -487,8 +487,20 @@ export function IroSection({
                           />
                         </div>
                       </td>
-                      <td className={`px-2 py-2 text-center text-[11px] tabular-nums ${pri.color}`}>
-                        {pri.label}
+                      <td className="px-2 py-2 text-center">
+                        {pri.label === "—" ? (
+                          <span className="text-[10px] text-slate-300">—</span>
+                        ) : (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold border ${
+                            pri.label === "Alta"
+                              ? "bg-rose-50 text-rose-700 border-rose-200"
+                              : pri.label === "Media"
+                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          }`}>
+                            {pri.label}
+                          </span>
+                        )}
                       </td>
                       <td className="px-2 py-2 text-center">
                         <button

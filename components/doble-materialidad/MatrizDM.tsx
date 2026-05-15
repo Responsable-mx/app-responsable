@@ -587,6 +587,7 @@ export function MatrizDM({ iros, onGoToIros }: Props) {
                     key={p.tema_esg}
                     ref={(el) => { indexRefs.current[p.tema_esg] = el; }}
                     onClick={() => handleIndexClick(p.tema_esg)}
+                    title={p.tema_esg}
                     className={[
                       "w-full text-left px-2 py-1.5 rounded-sm flex items-center gap-1.5 transition-colors",
                       dimmed

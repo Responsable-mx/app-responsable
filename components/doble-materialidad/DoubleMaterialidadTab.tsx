@@ -912,6 +912,7 @@ export function DoubleMaterialidadTab({
           clientId={clientId}
           companies={companies}
           clientSector={clientSector}
+          clientIroTopics={iros.filter((i) => i.incluido).map((i) => i.tema_esg)}
           onIrosAdapted={() => void mutateIros()}
         />
       </CollapsibleStageSection>
@@ -961,8 +962,8 @@ export function DoubleMaterialidadTab({
         lockReason="Registra y califica al menos 3 IROs con score de impacto y financiero para activar la matriz."
         subtitle="Visualización X/Y de IROs · Impacto vs Materialidad financiera · Ejes 0–10"
         narrativeTitle={
-          quadrantCounts.doble_material > 0
-            ? `${quadrantCounts.doble_material} tema${quadrantCounts.doble_material !== 1 ? "s" : ""} doble material · acción prioritaria`
+          scoredIncluded.length > 0
+            ? `${scoredIncluded.length} analizado${scoredIncluded.length !== 1 ? "s" : ""} · ${quadrantCounts.doble_material} doble material${quadrantCounts.doble_material > 0 ? " · acción prioritaria" : ""}`
             : undefined
         }
         headerRight={
@@ -1016,7 +1017,7 @@ export function DoubleMaterialidadTab({
         accent="border-l-sky-600"
         isActive={activeStageId === "dm-sec-resumen"}
         isNextLocked={stage9Status === "locked"}
-        lockReason="Completa el inventario de IROs (Etapa 6) para generar el resumen ejecutivo con IA."
+        lockReason="Genera y califica al menos 3 IROs del cliente (Etapa 6) para habilitar el resumen ejecutivo con IA."
         subtitle="Narrativa generada por IA con insights, trade-offs y recomendaciones estratégicas"
       >
         <ResumenEjecutivoSection clientId={clientId} quadrantCounts={quadrantCounts} />

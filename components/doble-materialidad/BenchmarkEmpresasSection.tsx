@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import type {
   BenchmarkEmpresasData,
   BenchmarkEmpresa,
@@ -46,10 +47,11 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
     return a !== b;
   }, [localEnabled, enabledDB]);
 
-  const [showManualForm, setShowManualForm] = useState(false);
-  const [saving, setSaving]                 = useState(false);
-  const [generating, setGenerating]         = useState(false);
-  const [searchingUrls, setSearchingUrls]   = useState(false);
+  const [showManualForm, setShowManualForm]   = useState(false);
+  const [saving, setSaving]                   = useState(false);
+  const [generating, setGenerating]           = useState(false);
+  const [searchingUrls, setSearchingUrls]     = useState(false);
+  const [confirmRegen, setConfirmRegen]       = useState(false);
 
   const noUrlCount = useMemo(
     () => proposed.filter((c) => !c.reporte_url).length,
@@ -236,7 +238,7 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
       <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100 flex-wrap">
         <button
           type="button"
-          onClick={handleGenerate}
+          onClick={() => setConfirmRegen(true)}
           disabled={generating}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
@@ -367,6 +369,16 @@ export function BenchmarkEmpresasSection({ clientId, onDataMutate }: Props) {
           </button>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmRegen}
+        onCancel={() => setConfirmRegen(false)}
+        onConfirm={() => { setConfirmRegen(false); void handleGenerate(); }}
+        title="¿Regenerar lista de empresas?"
+        description="La IA generará una nueva lista de empresas de referencia. Las empresas actuales y su selección serán reemplazadas y no podrán recuperarse."
+        confirmLabel="Regenerar"
+        tone="destructive"
+      />
     </div>
   );
 }

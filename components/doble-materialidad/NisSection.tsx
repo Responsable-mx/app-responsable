@@ -3,7 +3,6 @@
 import { useCallback, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
-import { SelectField } from "@/components/ui/SelectField";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 
 export type NisItem = {
@@ -28,10 +27,16 @@ const ESTADO_LABEL: Record<NisItem["estado"], string> = {
 };
 
 const ESTADO_COLOR: Record<NisItem["estado"], string> = {
-  no_identificado: "bg-slate-100 text-slate-500",
-  parcial:         "bg-amber-50 text-amber-700",
-  disponible:      "bg-emerald-50 text-emerald-700",
-  no_aplica:       "bg-slate-50 text-slate-400",
+  no_identificado: "bg-slate-100 text-slate-500 border-slate-200",
+  parcial:         "bg-amber-50 text-amber-700 border-amber-200",
+  disponible:      "bg-emerald-50 text-emerald-700 border-emerald-200",
+  no_aplica:       "bg-slate-50 text-slate-400 border-slate-200",
+};
+
+const CALIDAD_COLOR: Record<NisItem["calidad_dato"], string> = {
+  baja:  "bg-rose-50 text-rose-700 border-rose-200",
+  media: "bg-amber-50 text-amber-700 border-amber-200",
+  alta:  "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
 const CALIDAD_LABEL: Record<NisItem["calidad_dato"], string> = {
@@ -294,21 +299,48 @@ export function NisSection({
                       </span>
                     </td>
                     <td className="px-2 py-2">
-                      <SelectField
-                        disabled={isSaving}
-                        value={row.estado}
-                        onChange={(v) => void patchNis(row.id, { estado: v as NisItem["estado"] })}
-                        options={(["no_identificado", "parcial", "disponible", "no_aplica"] as NisItem["estado"][]).map((v) => ({ value: v, label: ESTADO_LABEL[v] }))}
-                        className={`text-[11px] font-semibold ${ESTADO_COLOR[row.estado]}`}
-                      />
+                      <div className="flex flex-col gap-0.5">
+                        {(["disponible", "parcial", "no_identificado", "no_aplica"] as NisItem["estado"][]).map((v) => {
+                          const isActive = row.estado === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() => { if (!isActive) void patchNis(row.id, { estado: v }); }}
+                              className={[
+                                "px-1.5 py-0.5 text-[9px] font-bold rounded-sm border transition-colors text-left",
+                                isActive ? ESTADO_COLOR[v] : "bg-white text-slate-300 border-slate-100 hover:border-slate-200 hover:text-slate-400",
+                                isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+                              ].join(" ")}
+                            >
+                              {ESTADO_LABEL[v]}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </td>
                     <td className="px-2 py-2">
-                      <SelectField
-                        disabled={isSaving}
-                        value={row.calidad_dato}
-                        onChange={(v) => void patchNis(row.id, { calidad_dato: v as NisItem["calidad_dato"] })}
-                        options={(["baja", "media", "alta"] as NisItem["calidad_dato"][]).map((v) => ({ value: v, label: CALIDAD_LABEL[v] }))}
-                      />
+                      <div className="flex gap-0.5 flex-wrap">
+                        {(["baja", "media", "alta"] as NisItem["calidad_dato"][]).map((v) => {
+                          const isActive = row.calidad_dato === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() => { if (!isActive) void patchNis(row.id, { calidad_dato: v }); }}
+                              className={[
+                                "px-1.5 py-0.5 text-[9px] font-bold rounded-sm border transition-colors",
+                                isActive ? CALIDAD_COLOR[v] : "bg-white text-slate-300 border-slate-100 hover:border-slate-200 hover:text-slate-400",
+                                isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+                              ].join(" ")}
+                            >
+                              {CALIDAD_LABEL[v]}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </td>
                     <td className="px-2 py-2">
                       <input

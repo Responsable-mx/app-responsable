@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { classifyEsg, ESG_BADGE, extractEsrsCode } from "@/lib/dm/esg-classify";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 import { ExpandableCell } from "@/components/doble-materialidad/ExpandableCell";
@@ -137,6 +138,7 @@ export function IroSection({
   const { push } = useToast();
   const [generating, setGenerating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [confirmRegen, setConfirmRegen] = useState(false);
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
@@ -366,7 +368,7 @@ export function IroSection({
             </svg>
             Exportar Excel
           </a>
-          <Button size="sm" variant="secondary" loading={generating} onClick={handleGenerate}>
+          <Button size="sm" variant="secondary" loading={generating} onClick={() => setConfirmRegen(true)}>
             <svg className="w-3 h-3 mr-1.5 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 4a4 4 0 11-7.9 1" />
               <path d="M2 2v3h3" />
@@ -375,6 +377,11 @@ export function IroSection({
           </Button>
         </div>
       </div>
+
+      {/* Confianza IA — arriba de la tabla para orientar al consultor */}
+      <p className="text-[10px] text-slate-400">
+        Confianza IA: <span className="text-emerald-600 font-medium">{iros.filter((i) => i.confianza === "alto").length} alta</span> · <span className="text-amber-600 font-medium">{iros.filter((i) => i.confianza === "medio").length} media</span> · <span className="text-slate-500">{iros.filter((i) => i.confianza === "bajo").length} baja</span> — Los scores son editables; ajusta según criterio del consultor.
+      </p>
 
       {/* Tabla IROs */}
       <div className="overflow-x-auto border border-slate-200 rounded">
@@ -528,10 +535,15 @@ export function IroSection({
         </table>
       </div>
 
-      <p className="text-[10px] text-slate-400">
-        Confianza IA: {iros.filter((i) => i.confianza === "alto").length} alta · {iros.filter((i) => i.confianza === "medio").length} media · {iros.filter((i) => i.confianza === "bajo").length} baja.
-        Los scores son editables — ajusta según criterio del consultor.
-      </p>
+      <ConfirmModal
+        open={confirmRegen}
+        onCancel={() => setConfirmRegen(false)}
+        onConfirm={() => { setConfirmRegen(false); void handleGenerate(); }}
+        title="¿Regenerar inventario de IROs?"
+        description="La IA generará un nuevo inventario de IROs. Los scores y la selección actual serán reemplazados y no podrán recuperarse. Esta operación puede tardar 1-3 minutos."
+        confirmLabel="Regenerar"
+        tone="destructive"
+      />
     </div>
   );
 }

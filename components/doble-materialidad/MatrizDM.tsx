@@ -305,22 +305,50 @@ export function MatrizDM({ iros, onGoToIros }: Props) {
     if ((e.target as SVGElement).tagName === "svg") setPopover(null);
   }, []);
 
+  // ── Jitter: distribuye puntos coincidentes en una cuadrícula para evitar apilamiento ──
+  // Agrupa por posición (x,y) exacta y asigna offsets en grid cols×rows con paso 13px.
+  // Reemplaza el offset (idx%3-1)*8 que solo cubre 9 posiciones → insuficiente para ≥10 IROs.
+  const pointOffsets = useMemo(() => {
+    const groups = new Map<string, TemaPoint[]>();
+    for (const p of points) {
+      const key = `${p.x},${p.y}`;
+      const arr = groups.get(key) ?? [];
+      arr.push(p);
+      groups.set(key, arr);
+    }
+    const offsets = new Map<number, { dx: number; dy: number }>();
+    for (const group of groups.values()) {
+      const n = group.length;
+      if (n === 1) { offsets.set(group[0]!.idx, { dx: 0, dy: 0 }); continue; }
+      const cols = Math.ceil(Math.sqrt(n));
+      const rows = Math.ceil(n / cols);
+      const step = 13;
+      const startX = -((cols - 1) * step) / 2;
+      const startY = -((rows - 1) * step) / 2;
+      group.forEach((p, i) => {
+        offsets.set(p.idx, {
+          dx: Math.round(startX + (i % cols) * step),
+          dy: Math.round(startY + Math.floor(i / cols) * step),
+        });
+      });
+    }
+    return offsets;
+  }, [points]);
+
   // ── Coordenadas de un punto con jitter clampado al cuadrante ──────────────
-  // Si jitter empuja el punto a través del midpoint, lo reducimos a 0 en ese eje.
-  // Garantiza que el render visual coincide con el cuadrante calculado.
+  // Si el offset empuja el punto a través del midpoint, lo zeroeamos en ese eje.
   function coords(p: TemaPoint) {
     const midX = mapX(5);
     const midY = mapY(5);
     const baseCx = mapX(p.x);
     const baseCy = mapY(p.y);
-    let offsetX = (p.idx % 3 - 1) * 8;
-    let offsetY = (Math.floor(p.idx / 3) % 3 - 1) * 8;
-    // Eje X: si baseCx ≥ midX (financiero ≥ 5), offsetX no debe hacer cx < midX, y viceversa
+    const off = pointOffsets.get(p.idx) ?? { dx: 0, dy: 0 };
+    let offsetX = off.dx;
+    let offsetY = off.dy;
     if (baseCx >= midX && baseCx + offsetX < midX) offsetX = 0;
     if (baseCx <  midX && baseCx + offsetX > midX) offsetX = 0;
-    // Eje Y: mapY invertido (y=10 → top, y=0 → bottom). midY divide top/bottom.
-    if (baseCy <= midY && baseCy + offsetY > midY) offsetY = 0; // arriba (impacto ≥ 5)
-    if (baseCy >  midY && baseCy + offsetY < midY) offsetY = 0; // abajo  (impacto < 5)
+    if (baseCy <= midY && baseCy + offsetY > midY) offsetY = 0;
+    if (baseCy >  midY && baseCy + offsetY < midY) offsetY = 0;
     return { cx: baseCx + offsetX, cy: baseCy + offsetY };
   }
 

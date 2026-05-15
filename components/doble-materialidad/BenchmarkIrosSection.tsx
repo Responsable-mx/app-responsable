@@ -976,9 +976,14 @@ function SynthesisPanel({
                 const a = t.toLowerCase(); const b = tema.toLowerCase();
                 return a.includes(b) || b.includes(a);
               }) && (
-                <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
-                  ⚠ No en inventario
-                </span>
+                <button
+                  type="button"
+                  onClick={() => { window.location.hash = "#dm-sec-iros"; }}
+                  className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap hover:bg-amber-100 transition-colors"
+                  title="Ir a inventario de IROs para agregar este tema"
+                >
+                  ⚠ No en inventario →
+                </button>
               )}
             </div>
           ))}

@@ -3,6 +3,38 @@
 import { useState, useRef } from "react";
 import type { ReferenteFramework } from "@/lib/dm/referentes-types";
 
+const FRAMEWORK_ESG: Record<string, ("E" | "S" | "G")[]> = {
+  GRI:      ["E", "S", "G"],
+  SASB:     ["E", "S", "G"],
+  CSRD:     ["E", "S", "G"],
+  ESRS:     ["E", "S", "G"],
+  TCFD:     ["E", "G"],
+  CDP:      ["E"],
+  SBTI:     ["E"],
+  IPIECA:   ["E", "S"],
+  GHG:      ["E"],
+  PRI:      ["E", "S", "G"],
+  GRESB:    ["E", "S", "G"],
+  TNFD:     ["E"],
+  SDG:      ["E", "S", "G"],
+  ISO26000: ["E", "S", "G"],
+  GCCA:     ["E", "S", "G"],
+  IIRC:     ["E", "S", "G"],
+};
+
+const ESG_CHIP: Record<"E" | "S" | "G", string> = {
+  E: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  S: "bg-violet-50 text-violet-700 border-violet-200",
+  G: "bg-slate-100 text-slate-600 border-slate-200",
+};
+
+function getFrameworkEsg(name: string): ("E" | "S" | "G")[] {
+  const key = Object.keys(FRAMEWORK_ESG).find(
+    (k) => name.toUpperCase().includes(k) || k.toLowerCase() === name.toLowerCase().split(" ")[0]
+  );
+  return key ? FRAMEWORK_ESG[key]! : [];
+}
+
 type Props = {
   framework: ReferenteFramework;
   enabled: boolean;
@@ -71,6 +103,18 @@ export function FrameworkCard({ framework, enabled, onToggle, onUrlSave }: Props
             <p className={`text-xs font-bold ${enabled ? "text-brand-primary" : "text-slate-700"}`}>
               {framework.name}
             </p>
+            {(() => {
+              const coverage = getFrameworkEsg(framework.name);
+              return coverage.length > 0 ? (
+                <div className="flex gap-0.5 mt-0.5">
+                  {coverage.map((dim) => (
+                    <span key={dim} className={`text-[8px] font-bold px-1 py-0 rounded-sm border ${ESG_CHIP[dim]}`}>
+                      {dim}
+                    </span>
+                  ))}
+                </div>
+              ) : null;
+            })()}
             {framework.sector_note && (
               <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{framework.sector_note}</p>
             )}

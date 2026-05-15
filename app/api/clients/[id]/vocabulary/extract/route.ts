@@ -85,7 +85,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const t0 = Date.now();
   const response = await anthropic.messages.create({
     model: model.model,
-    max_tokens: 1024,
+    max_tokens: 2048,
     system: [{ type: "text", text: EXTRACT_SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [
       {
@@ -107,7 +107,7 @@ Responde SOLO con JSON válido:
   ]
 }
 
-Máximo 10 propuestas. Solo incluye las que tengas certeza razonable. confidence=high si la equivalencia es obvia, medium si es inferida, low si es supuesta.`,
+Incluye todos los términos que encuentres con equivalencia clara. No hay límite de propuestas — mejor más completo que truncado. Solo incluye los que tengas certeza razonable. confidence=high si la equivalencia es obvia, medium si es inferida, low si es supuesta.`,
       },
     ],
   });

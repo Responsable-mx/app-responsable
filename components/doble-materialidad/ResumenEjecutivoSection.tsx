@@ -105,6 +105,8 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
   // UX patterns del mockup-v7: colapsable (lee 1er párrafo, expande resto) + edición inline
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  // P7 — tabs cuando hay contenido
+  const [resumenTab, setResumenTab] = useState<"narrativa" | "cuadrantes">("narrativa");
   const [draft, setDraft] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
 
@@ -359,6 +361,52 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
           </div>
         ) : hasContent ? (
           <div>
+            {/* P7 — tabs navegación */}
+            <div className="flex gap-1 mb-4 border-b border-slate-100 pb-2">
+              {(["narrativa", "cuadrantes"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setResumenTab(tab)}
+                  className={[
+                    "px-3 py-1.5 text-xs font-medium rounded-sm border transition-colors",
+                    resumenTab === tab
+                      ? "bg-white border-brand-primary text-brand-primary"
+                      : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-white hover:border-slate-300",
+                  ].join(" ")}
+                >
+                  {tab === "narrativa" ? "Narrativa" : "Cuadrantes ESG"}
+                </button>
+              ))}
+            </div>
+
+            {resumenTab === "cuadrantes" ? (
+              /* Pestaña cuadrantes — visual de distribución */
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500">Distribución de IROs por cuadrante de materialidad.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {KPI_CARDS.map((card) => {
+                    const count = quadrantCounts[card.key];
+                    const total = Object.values(quadrantCounts).reduce((a, b) => a + b, 0);
+                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    return (
+                      <div key={card.key} className={`p-3 bg-slate-50 border border-slate-200 rounded border-l-4 ${card.borderClass}`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${card.textClass} mb-1.5`}>{card.label}</p>
+                        <div className="flex items-end gap-2">
+                          <p className={`text-2xl font-bold tabular-nums ${card.countClass} leading-none`}>{count}</p>
+                          <p className="text-[11px] text-slate-400 mb-0.5">{pct}%</p>
+                        </div>
+                        <div className="h-1 bg-slate-200 mt-2 overflow-hidden">
+                          <div className={`h-full transition-all ${card.borderClass.replace("border-l-", "bg-")}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">{card.sublabel}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <>
             {resumen?.created_at && (
               <p className="text-[11px] text-slate-400 mb-4">
                 Generado el {formatDate(resumen.created_at)}
@@ -415,6 +463,8 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
                 </>
               );
             })()}
+              </>
+            )}
           </div>
         ) : resumen?.status === "failed" ? (
           <div className="rounded border-l-4 border-l-brand-berry bg-red-50 px-4 py-3">

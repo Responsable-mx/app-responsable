@@ -840,6 +840,21 @@ function SynthesisPanel({
     return Object.entries(map).sort((a, b) => (b[1] as number) - (a[1] as number)) as [BenchmarkIroCadena, number][];
   }, [allIros]);
 
+  // P9 — Distribución E/S/G de IROs del sector
+  const esgDist = useMemo(() => {
+    const counts: Record<string, number> = { E: 0, S: 0, G: 0 };
+    for (const iro of allIros) {
+      const text = (iro.tema_asociado ?? iro.descripcion ?? "").toLowerCase();
+      const cat =
+        /climat|emision|energia|agua|biodiv|resid|ambient|co2|carbono/.test(text) ? "E" :
+        /social|laboral|trabajo|emplead|comunidad|salud|derecho|diversidad|igualdad|salarial/.test(text) ? "S" :
+        /gobernanz|etica|corrupcion|transparent|director|consejo|cumplimiento|compliance/.test(text) ? "G" : "E";
+      counts[cat]!++;
+    }
+    const total = allIros.length;
+    return { counts, total };
+  }, [allIros]);
+
   if (allIros.length === 0) {
     return (
       <div className="py-8 text-center text-sm text-slate-400 border border-dashed border-slate-200 rounded">
@@ -850,6 +865,50 @@ function SynthesisPanel({
 
   return (
     <div className="space-y-6">
+      {/* P9 — Distribución E/S/G del sector */}
+      {esgDist.total > 0 && (
+        <div>
+          <span className="uppercase tracking-widest text-[10px] font-bold text-slate-400 block mb-2">
+            Distribución E/S/G del sector
+          </span>
+          <div className="flex items-center gap-3">
+            <div className="flex h-3 flex-1 rounded-sm overflow-hidden gap-px">
+              {(["E", "S", "G"] as const).map((cat) => {
+                const n = esgDist.counts[cat] ?? 0;
+                if (n === 0) return null;
+                const pct = (n / esgDist.total) * 100;
+                const bg = cat === "E" ? "bg-emerald-400" : cat === "S" ? "bg-violet-400" : "bg-slate-400";
+                return <div key={cat} className={`h-full ${bg}`} style={{ width: `${pct}%` }} title={`${cat}: ${n}`} />;
+              })}
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {(["E", "S", "G"] as const).map((cat) => {
+                const n = esgDist.counts[cat] ?? 0;
+                const pct = Math.round((n / esgDist.total) * 100);
+                const cls = cat === "E" ? "text-emerald-700 border-emerald-200 bg-emerald-50" : cat === "S" ? "text-violet-700 border-violet-200 bg-violet-50" : "text-slate-600 border-slate-200 bg-slate-50";
+                const label = cat === "E" ? "Amb." : cat === "S" ? "Social" : "Gov.";
+                return (
+                  <span key={cat} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-bold border ${cls}`}>
+                    {cat} · {label} <span className="tabular-nums font-normal">{pct}%</span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          {(() => {
+            const sorted = (["E", "S", "G"] as string[]).sort((a, b) => (esgDist.counts[b] ?? 0) - (esgDist.counts[a] ?? 0));
+            const dominant = sorted[0];
+            const labels: Record<string, string> = { E: "Ambiental", S: "Social", G: "Gobernanza" };
+            const pctDom = dominant ? Math.round(((esgDist.counts[dominant] ?? 0) / esgDist.total) * 100) : 0;
+            return (
+              <p className="text-[10px] text-slate-500 mt-1.5">
+                El sector concentra el <span className="font-semibold">{pctDom}% de los IROs en {dominant ? labels[dominant] : "—"}</span> — considera que el cliente deberá reportar más en esta dimensión.
+              </p>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Top temas */}
       <div>
         <span className="uppercase tracking-widest text-[10px] font-bold text-slate-400 block mb-3">

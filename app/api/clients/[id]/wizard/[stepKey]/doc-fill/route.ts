@@ -58,7 +58,41 @@ const AiResponseSchema = z.record(z.string(), AiFieldSchema);
 
 type Ctx = { params: Promise<{ id: string; stepKey: string }> };
 
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const submitResponsesTool: any = {
+  name: "submit_responses",
+  description: "Envía las respuestas finales por campo del paso del cuestionario. Llamar UNA SOLA VEZ al terminar la extracción.",
+  input_schema: {
+    type: "object",
+    properties: {
+      responses: {
+        type: "object",
+        description: "Mapa de field_key → {value, source_type, sources[]}. Una entrada por cada campo del paso.",
+        additionalProperties: {
+          type: "object",
+          properties: {
+            value: { anyOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }, { type: "array", items: { type: "string" } }, { type: "null" }], description: "Contenido extraído del documento o null si no está mencionado." },
+            source_type: { type: "string", enum: ["interpretation", "consultor_only"] },
+            sources: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  url: { type: "string" },
+                  title: { type: "string" },
+                  date: { type: "string" },
+                },
+                required: ["url", "title"],
+              },
+            },
+          },
+          required: ["value", "source_type"],
+        },
+      },
+    },
+    required: ["responses"],
+  } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+};
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const { id, stepKey } = await params;
@@ -141,9 +175,9 @@ REGLAS OPERATIVAS:
 6. NO busques en internet. SOLO el documento.
 7. Si el dato está en el documento pero es ambiguo, inclúyelo con nota "(sujeto a verificación del consultor)".
 
-FORMATO DE RESPUESTA — OBLIGATORIO:
-Tu mensaje final DEBE empezar con { y terminar con }. Cero texto antes o después del JSON.
-{ "campo_key": { "value": "...", "source_type": "interpretation"|"consultor_only", "sources": [...] }, ... }`;
+ENTREGA DE RESULTADOS — OBLIGATORIO:
+Cuando termines la extracción, llama la herramienta submit_responses con las respuestas por campo.
+NO escribas texto plano con el JSON. SIEMPRE usa la herramienta submit_responses para entregar el resultado.`;
 
   const userPrompt = `Cliente: ${client?.name ?? id}
 Paso del cuestionario: ${step.title} — ${step.subtitle}
@@ -163,6 +197,7 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
   const anthropic = createAnthropicClient();
 
   let textOut = "";
+  let toolResponses: Record<string, unknown> | null = null;
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheCreationTokens = 0;
@@ -183,12 +218,16 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
           {
             type: "text",
             text: systemPrompt,
-             
+
             cache_control: { type: "ephemeral" },
           },
         ],
+        tools: [submitResponsesTool],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tool_choice: { type: "tool", name: "submit_responses" } as any,
         messages: [{ role: "user", content: userPrompt }],
-      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
       { signal: timeoutSignal }
     );
     inputTokens = msg.usage?.input_tokens ?? 0;
@@ -198,6 +237,14 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
     stopReason = msg.stop_reason ?? null;
     for (const block of msg.content) {
       if (block.type === "text") textOut += block.text;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (block.type === "tool_use" && (block as any).name === "submit_responses") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const input = (block as any).input as { responses?: unknown } | undefined;
+        if (input?.responses && typeof input.responses === "object") {
+          toolResponses = input.responses as Record<string, unknown>;
+        }
+      }
     }
     anthropicBreaker.recordSuccess();
   } catch (e) {
@@ -220,15 +267,10 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
     stopReason, latencyMs: Date.now() - startedAt, error: null, workflowStage: "doc_fill",
   });
 
-  const jsonText = extractJsonObject(textOut);
-  if (!jsonText) {
-    return NextResponse.json({ error: "Respuesta IA sin JSON parseable" }, { status: 502 });
-  }
-
+  // Preferir output estructurado (tool_use) sobre parseo regex de texto.
   let aiParsed: z.infer<typeof AiResponseSchema>;
-  try {
-    const raw = JSON.parse(jsonText);
-    const result = AiResponseSchema.safeParse(raw);
+  if (toolResponses) {
+    const result = AiResponseSchema.safeParse(toolResponses);
     if (!result.success) {
       return NextResponse.json(
         { error: `Schema IA inválido: ${result.error.issues.map((i) => i.message).join("; ")}` },
@@ -236,8 +278,24 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
       );
     }
     aiParsed = result.data;
-  } catch {
-    return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
+  } else {
+    const jsonText = extractJsonObject(textOut);
+    if (!jsonText) {
+      return NextResponse.json({ error: "Respuesta IA sin JSON parseable" }, { status: 502 });
+    }
+    try {
+      const raw = JSON.parse(jsonText);
+      const result = AiResponseSchema.safeParse(raw);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: `Schema IA inválido: ${result.error.issues.map((i) => i.message).join("; ")}` },
+          { status: 502 }
+        );
+      }
+      aiParsed = result.data;
+    } catch {
+      return NextResponse.json({ error: "JSON inválido en respuesta IA" }, { status: 502 });
+    }
   }
 
   // Construir FieldResponse igual que ai-fill — solo campos del paso actual.

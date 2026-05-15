@@ -74,6 +74,9 @@ export function chunkMarkdown(text: string, opts?: ChunkOptions): string[] {
   return chunks;
 }
 
+// Siglas técnicas cortas que el filtro de longitud eliminaría incorrectamente.
+const SHORT_TERM_EXCEPTIONS = new Set(["ia", "co", "od", "rs"]);
+
 function tokenize(s: string): string[] {
   return s
     .toLowerCase()
@@ -81,7 +84,7 @@ function tokenize(s: string): string[] {
     .replace(/[̀-ͯ]/g, "") // strip accents
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
+    .filter((t) => (t.length >= 3 || SHORT_TERM_EXCEPTIONS.has(t)) && !STOP_WORDS.has(t));
 }
 
 /**

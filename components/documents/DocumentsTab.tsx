@@ -18,6 +18,7 @@ import { BulkKindModal } from "@/components/documents/BulkKindModal";
 import { BulkServicesModal } from "@/components/documents/BulkServicesModal";
 import { EditServicesModal } from "@/components/documents/EditServicesModal";
 import { DiscoverModal } from "@/components/documents/DiscoverModal";
+import { ImportDocsModal } from "@/components/documents/ImportDocsModal";
 
 const KIND_LABEL: Record<DocMeta["kind"], string> = {
   general: "General",
@@ -67,13 +68,6 @@ function IconExtLink({ className = "w-3 h-3" }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-    </svg>
-  );
-}
-function IconPaste({ className = "w-3.5 h-3.5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
     </svg>
   );
 }
@@ -140,6 +134,7 @@ export function DocumentsTab({
   const hasSteps = (questionnaireSteps?.length ?? 0) > 0;
   // Paste flow ahora vive en modal dedicado (antes panel inline colapsable).
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [extractStepKey, setExtractStepKey] = useState<string>("");
   const [extracting, setExtracting] = useState(false);
   // Docs seleccionados para extracción + bulk actions
@@ -709,46 +704,30 @@ export function DocumentsTab({
             Sin documentos. Sube PDF, DOCX, XLSX… o usa &ldquo;Buscar con IA&rdquo;.
           </span>
         )}
-        {/* ml-auto empuja CTAs a la derecha — siempre presentes para que el usuario
-            no tenga que volver a un strip vacío para subir. */}
+        {/* ml-auto empuja CTAs a la derecha */}
         <div className="ml-auto flex items-center gap-2">
-          {/* CTAs secundarios — labels colapsan a icon-only en viewports ≤lg para
-              que el strip único entre en 1 fila en 1264px. "Subir archivo"
-              mantiene label siempre (acción primaria, debe ser inmediato) */}
-          {canExtract && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPasteModalOpen(true)}
-              title="Pegar texto para extracción al cuestionario"
-              aria-label="Pegar texto"
-            >
-              <IconPaste className="w-3.5 h-3.5 lg:mr-1" />
-              <span className="hidden lg:inline">Pegar texto</span>
-            </Button>
-          )}
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setDiscoverOpen(true)}
-            title="Buscar documentos públicos del cliente con IA"
-            aria-label="Buscar con IA"
+            disabled
+            title="Vocabulario del cliente — próximamente"
+            aria-label="Vocabulario"
           >
-            <svg className="w-3.5 h-3.5 lg:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            <span className="hidden lg:inline">Buscar con IA</span>
+            Vocabulario
           </Button>
           <Button
             variant="primary"
             size="sm"
             loading={uploading}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setImportModalOpen(true)}
           >
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
             </svg>
-            Subir archivo
+            Importar
           </Button>
           <input
             ref={fileInputRef}
@@ -1183,6 +1162,17 @@ export function DocumentsTab({
           confirmLabel="Eliminar"
           onConfirm={async () => handleDelete(deleting)}
           onCancel={() => setDeleting(null)}
+        />
+      )}
+
+      {/* Modal: selector de método de importación */}
+      {importModalOpen && (
+        <ImportDocsModal
+          onClose={() => setImportModalOpen(false)}
+          onSelectFile={() => fileInputRef.current?.click()}
+          onDiscover={() => setDiscoverOpen(true)}
+          onPaste={() => setPasteModalOpen(true)}
+          canPaste={canExtract}
         />
       )}
 

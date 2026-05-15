@@ -492,6 +492,14 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
                 <p className="text-xs text-slate-500">Aurora (Claude Sonnet) redactará un documento listo para Dirección General en ~30 segundos.</p>
               </div>
             </div>
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+              <svg className="w-3.5 h-3.5 text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <p className="text-[11px] text-slate-500">
+                Completa la calificación de IROs (Etapa 6) y usa <strong className="text-slate-600">"Generar resumen"</strong> para que Aurora redacte el análisis.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {[
                 {
@@ -527,14 +535,6 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
                   <p className="text-[10px] text-slate-500 leading-snug">{item.desc}</p>
                 </div>
               ))}
-            </div>
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-              <svg className="w-3.5 h-3.5 text-brand-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <p className="text-[11px] text-slate-500">
-                Completa la validación de IROs y usa <strong className="text-slate-600">"Generar resumen"</strong> para que Aurora redacte el análisis.
-              </p>
             </div>
           </div>
         )}

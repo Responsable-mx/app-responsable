@@ -103,7 +103,7 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
   const [generating, setGenerating] = useState(false);
   const [marking, setMarking] = useState(false);
   // UX patterns del mockup-v7: colapsable (lee 1er párrafo, expande resto) + edición inline
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   // P7 — tabs cuando hay contenido
   const [resumenTab, setResumenTab] = useState<"narrativa" | "cuadrantes">("narrativa");

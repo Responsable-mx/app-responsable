@@ -720,7 +720,7 @@ export function DoubleMaterialidadTab({
             {stagesData.map((s, idx) => {
               const isSel = s.sectionId === activeStageId;
               let base: string;
-              if (isSel)                  base = s.status === "done" ? "En revisión" : "En curso";
+              if (isSel)                  base = s.status === "done" ? "Completado" : "En curso";
               else if (s.status === "done")   base = formatStageDate(s.doneDate);
               else if (s.status === "active") base = "Disponible";
               else if (s.status === "locked") base = "Bloqueada";

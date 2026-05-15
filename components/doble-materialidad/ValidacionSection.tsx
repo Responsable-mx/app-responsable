@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
-import { SelectField } from "@/components/ui/SelectField";
 import { extractEsrsCode } from "@/lib/dm/esg-classify";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 
@@ -426,13 +425,20 @@ export function ValidacionSection({ clientId, iros }: Props) {
                           </p>
                         </td>
                         <td className="px-3 py-2">
-                          <SelectField
-                            value={dec?.decision ?? ""}
-                            onChange={(v) => handleDecision(iro.id, (v as Decision) || null)}
-                            placeholder="-- Elegir --"
-                            options={(Object.entries(DECISION_META) as Array<[Decision, typeof DECISION_META[Decision]]>).map(([val, meta]) => ({ value: val, label: meta.label }))}
-                            className="w-full text-[11px]"
-                          />
+                          <div className="flex gap-1 flex-wrap">
+                            {(Object.entries(DECISION_META) as Array<[Decision, typeof DECISION_META[Decision]]>).map(([val, meta]) => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => handleDecision(iro.id, dec?.decision === val ? null : val)}
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-sm border transition-colors ${
+                                  dec?.decision === val ? meta.chip : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                                }`}
+                              >
+                                {meta.label}
+                              </button>
+                            ))}
+                          </div>
                           {dec?.decision === "ajustar" && (
                             <input
                               type="text"

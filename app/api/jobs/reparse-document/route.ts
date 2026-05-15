@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/auth";
 import { parseToMarkdown, truncateMarkdown, type FileType } from "@/lib/documents/parsers";
 import { chunkMarkdown } from "@/lib/documents/relevance";
 import { persistDocumentChunks, generateEmbeddingsBatch } from "@/lib/documents/embeddings";
@@ -27,7 +28,19 @@ export async function POST(req: Request) {
     const signature = req.headers.get("upstash-signature") ?? "";
     const isValid = await receiver.verify({ body, signature }).catch(() => false);
     if (!isValid) {
-      return NextResponse.json({ error: "Invalid QStash signature" }, { status: 401 });
+      // Firma inválida — fallback: sesión admin (para llamadas manuales desde el browser)
+      const user = await requireAdmin();
+      if (!user) {
+        return NextResponse.json({ error: "Invalid QStash signature" }, { status: 401 });
+      }
+      // Admin autenticado: parsear body que ya leímos como text
+      let payload: JobPayload;
+      try {
+        payload = JSON.parse(body) as JobPayload;
+      } catch {
+        return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+      }
+      return processDoc(payload);
     }
     let payload: JobPayload;
     try {

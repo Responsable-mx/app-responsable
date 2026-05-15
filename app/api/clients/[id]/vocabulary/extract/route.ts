@@ -19,25 +19,49 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const sb = createAdminClient();
 
-  // Carga los primeros 3 documentos parseados del cliente como fuente
-  const { data: docs } = await sb
+  // Carga TODOS los docs parseados, ordenados por relevancia de tipo:
+  // sustainability_report y dm_report primero (mayor densidad de vocabulario RSE),
+  // luego proposal, financial_report y general. Dentro de cada tipo, más reciente primero.
+  const { data: allDocs } = await sb
     .from("client_documents")
-    .select("markdown_content, file_name")
+    .select("markdown_content, file_name, kind")
     .eq("client_id", id)
     .eq("parse_status", "ok")
     .not("markdown_content", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(3);
+    .order("created_at", { ascending: false });
 
-  if (!docs || docs.length === 0) {
+  if (!allDocs || allDocs.length === 0) {
     return NextResponse.json({ error: "El cliente no tiene documentos analizados. Sube documentos primero." }, { status: 400 });
+  }
+
+  // Prioridad por tipo — el vocabulario RSE vive en informes de sustentabilidad, no en generales
+  const KIND_PRIORITY: Record<string, number> = {
+    sustainability_report: 1,
+    dm_report: 2,
+    proposal: 3,
+    financial_report: 4,
+    general: 5,
+  };
+  const sorted = [...allDocs].sort(
+    (a, b) => (KIND_PRIORITY[a.kind as string] ?? 9) - (KIND_PRIORITY[b.kind as string] ?? 9)
+  );
+
+  // Acumula hasta 80k chars totales, 10k por doc — cubre los docs relevantes sin inflar el prompt
+  const CAP_TOTAL = 80_000;
+  const CAP_PER_DOC = 10_000;
+  let total = 0;
+  const docs: typeof sorted = [];
+  for (const d of sorted) {
+    if (total >= CAP_TOTAL) break;
+    docs.push(d);
+    total += Math.min((d.markdown_content as string).length, CAP_PER_DOC);
   }
 
   const globalSynonyms = await loadGlobalSynonyms();
   const knownTerms = globalSynonyms.map((s) => s.responsable_term).join(", ");
 
   const docsText = docs
-    .map((d, i) => `[Documento ${i + 1}: ${d.file_name}]\n${(d.markdown_content as string).slice(0, 15_000)}`)
+    .map((d, i) => `[Documento ${i + 1}: ${d.file_name}]\n${(d.markdown_content as string).slice(0, CAP_PER_DOC)}`)
     .join("\n\n---\n\n");
 
   const anthropic = new Anthropic();

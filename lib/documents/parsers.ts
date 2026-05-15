@@ -52,7 +52,7 @@ async function parsePdf(buffer: Buffer): Promise<string> {
   // LlamaParse y Mistral preservan tablas GRI/ESRS multi-columna; pdf-parse las aplana.
   if (process.env.LLAMA_CLOUD_API_KEY) {
     try {
-      const md = await parsePdfWithLlamaParse(buffer);
+      const md = await parseWithLlamaParse(buffer, "application/pdf", "document.pdf");
       if (md && md.length > 200) return cleanText(md);
     } catch (e) {
       console.error("[parsers] LlamaParse failed, trying Mistral OCR:", e);
@@ -121,19 +121,19 @@ async function parsePdfWithMistralOcr(buffer: Buffer): Promise<string | null> {
 }
 
 /**
- * Parseo de PDF con LlamaParse (LlamaIndex Cloud).
- * Preserva tablas, columnas y layouts complejos de informes ESG/GRI.
+ * Parseo con LlamaParse (LlamaIndex Cloud) — soporta PDF, DOCX, PPTX y más.
+ * Usa visión para preservar tablas, imágenes, infografías y layouts complejos.
  * Flujo async: upload → poll hasta done → retornar markdown.
  * Timeout 120s — informes ESG de 100+ páginas suelen tardar 30-60s.
  */
-async function parsePdfWithLlamaParse(buffer: Buffer): Promise<string | null> {
+async function parseWithLlamaParse(buffer: Buffer, mimeType: string, fileName: string): Promise<string | null> {
   const apiKey = process.env.LLAMA_CLOUD_API_KEY!;
   const BASE = "https://api.cloud.llamaindex.ai/api/parsing";
 
-  // 1. Upload del PDF
+  // 1. Upload del archivo
   const formData = new FormData();
-  const blob = new Blob([new Uint8Array(buffer)], { type: "application/pdf" });
-  formData.append("file", blob, "document.pdf");
+  const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
+  formData.append("file", blob, fileName);
 
   const uploadRes = await fetch(`${BASE}/upload`, {
     method: "POST",
@@ -173,8 +173,19 @@ async function parsePdfWithLlamaParse(buffer: Buffer): Promise<string | null> {
 }
 
 async function parseDocx(buffer: Buffer): Promise<string> {
+  if (process.env.LLAMA_CLOUD_API_KEY) {
+    try {
+      const md = await parseWithLlamaParse(
+        buffer,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "document.docx"
+      );
+      if (md && md.length > 200) return cleanText(md);
+    } catch (e) {
+      console.error("[parsers] LlamaParse DOCX failed, falling back to mammoth:", e);
+    }
+  }
   const mammoth = await import("mammoth");
-  // Mammoth no tiene markdown nativo — convertimos a HTML y luego strip básico
   const result = await mammoth.convertToHtml({ buffer });
   return cleanText(htmlToMarkdownLite(result.value));
 }
@@ -215,6 +226,19 @@ async function parseXlsx(buffer: Buffer): Promise<string> {
 }
 
 async function parsePptx(buffer: Buffer): Promise<string> {
+  if (process.env.LLAMA_CLOUD_API_KEY) {
+    try {
+      const md = await parseWithLlamaParse(
+        buffer,
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "document.pptx"
+      );
+      if (md && md.length > 200) return cleanText(md);
+    } catch (e) {
+      console.error("[parsers] LlamaParse PPTX failed, falling back to JSZip:", e);
+    }
+  }
+  // Fallback: extrae solo texto de <a:t> — pierde imágenes/infografías.
   // PPTX = ZIP con ppt/slides/slideN.xml. Extraemos texto de cada slide.
   // Usamos JSZip que ya viene como dep transitiva de mammoth/exceljs.
   const JSZip = (await import("jszip")).default;

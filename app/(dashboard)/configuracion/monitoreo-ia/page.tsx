@@ -401,16 +401,7 @@ export default async function MonitoreoIaPage() {
       recomendacion: "revisar",
     });
 
-    const sonnetModel = s.by_model.find(m => m.family === "sonnet");
-    if (costoMes > THRESHOLDS.costoAiFill.usd && (sonnetModel?.calls ?? 0) >= THRESHOLDS.costoAiFill.minCalls) decisions.push({
-      prioridad:     "conveniente",
-      titulo:        "Reducir el costo del llenado automático del cuestionario",
-      queMejora:     "Usar una IA más económica para extraer datos del informe del cliente — sin afectar la calidad de análisis.",
-      porQueImporta: `El AI-fill tiene dos fases: extraer datos del informe (mecánico) y sintetizarlos (requiere criterio). Hoy ambas usan la misma IA cara. Separar la extracción reduce el costo de esa tarea hasta 40 veces.`,
-      ejemplo:       `Con el volumen actual (${numFmt.format(sonnetModel?.calls ?? 0)} consultas en 30 días), el ahorro estimado sería ~${usdFmt.format(costoMes * 0.15)}/mes.`,
-      necesita:      "Un día de trabajo técnico. Requiere configurar una clave de servicio adicional.",
-      recomendacion: "planear",
-    });
+    // "Reducir costo AI-fill" eliminado — Gemini Flash 2.0 ya activo desde may-2026 como fast path.
 
     if (s.feedback_total_down > THRESHOLDS.feedbackDown) {
       const topReason = s.feedback_top_reasons[0];
@@ -812,7 +803,7 @@ export default async function MonitoreoIaPage() {
                   { tarea: "Resumen ejecutivo",                   tipo: "IA estándar",                       porque: "El consultor necesita el resultado de inmediato — no puede esperar un procesamiento en segundo plano.",        estado: "Activo" },
                   { tarea: "Reporte PDF final",                   tipo: "IA de máxima capacidad",            porque: "Es el entregable al cliente — requiere la máxima calidad narrativa y análisis.",                              estado: "Activo" },
                   { tarea: "Búsqueda en documentos del cliente",  tipo: "Búsqueda semántica (Voyage AI)",    porque: "Usa vectores semánticos para encontrar fragmentos relevantes aunque se usen sinónimos o términos distintos al informe.", estado: "Activo" },
-                  { tarea: "Extracción de datos AI-fill",         tipo: "IA económica (propuesto)",          porque: "Solo extrae datos sin interpretarlos — una IA más económica hace el mismo trabajo a 40× menor costo.",        estado: "Propuesto" },
+                  { tarea: "Extracción de datos AI-fill",         tipo: "Gemini Flash 2.0 (IA económica)",   porque: "Extrae datos del informe del cliente sin interpretarlos — 3× más barato que Haiku, 40× vs Sonnet. Activo desde may-2026.", estado: "Activo" },
                   { tarea: "Reporte PDF en segundo plano",        tipo: "Procesamiento diferido (Batch API)", porque: "El consultor no espera bloqueado — el reporte se genera en segundo plano al 50% del costo. Ya activo.",        estado: "Activo" },
                 ].map((row) => {
                   const estadoColor = row.estado === "Activo" ? "text-emerald-700" : row.estado === "Parcial" ? "text-amber-700" : "text-slate-400";

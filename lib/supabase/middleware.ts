@@ -67,7 +67,8 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !pathname.startsWith("/login") &&
     !pathname.startsWith("/auth") &&
-    !pathname.startsWith("/api/auth/")
+    !pathname.startsWith("/api/auth/") &&
+    !pathname.startsWith("/api/jobs/") // QStash jobs — firma verificada en el route handler
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

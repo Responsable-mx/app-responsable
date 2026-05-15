@@ -515,8 +515,10 @@ Resultado: ~50% ahorro vs 1 solo breakpoint cuando el consultor cicla entre Auro
 
 Los health checks se dedupen automáticamente por key (Voyage Embeddings + Voyage Rerank comparten un solo ping). Si `implemented` es `true` pero no hay `healthKey`, la tarjeta muestra `inactive` — agregar siempre el check.
 
-**Herramientas activas (implemented=true):** Voyage Embeddings, Voyage Rerank, LlamaParse, Mistral OCR, QStash, Anthropic Batch API, Upstash Redis.
-**Propuestas (implemented=false):** Gemini Flash.
+**Herramientas activas (implemented=true):** Voyage Embeddings, Voyage Rerank, LlamaParse, Mistral OCR, QStash, Anthropic Batch API, Upstash Redis, Gemini Flash 2.0.
+**Propuestas (implemented=false):** (ninguna)
+
+**Gemini Flash 2.0 (may-2026):** `lib/ai/gemini.ts` — cliente singleton fail-open. Usado en ai-fill como primer fast path (antes de Haiku). JSON mode, `responseMimeType: "application/json"`. Si no hay GOOGLE_AI_API_KEY o falla → cae a Haiku → cae a Sonnet+web_search. Env var: `GOOGLE_AI_API_KEY`.
 
 **Upstash Redis (may-2026):** `lib/cache/redis.ts` — cliente singleton fail-open. Caché activo en:
 - `dm-benchmark/route.ts` POST compare: verifica cache antes de Batch API. GET: escribe cache cuando batch→done. TTL 14d.

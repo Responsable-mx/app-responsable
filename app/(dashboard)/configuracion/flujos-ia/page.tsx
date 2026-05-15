@@ -529,7 +529,7 @@ export default function FlujoIaPage() {
                 { tool: "Voyage Rerank",         where: "Chat — selección fina de fragmentos (top-20 → rerank → top-8)",   status: "Activo" },
                 { tool: "Anthropic Batch API",   where: "IROs propios · Reporte PDF · Benchmark (−50% costo)",             status: "Activo" },
                 { tool: "Upstash Redis",         where: "Caché benchmark + temas DM (re-run gratis en 14-30 días)",        status: "Activo" },
-                { tool: "Gemini Flash",          where: "AI-fill extracción pura (−40× costo vs Sonnet)",                  status: "Propuesto" },
+                { tool: "Gemini Flash 2.0",       where: "AI-fill fast path extracción docs (−3× vs Haiku, −40× vs Sonnet)", status: "Activo" },
               ].map((row) => {
                 const statusColor =
                   row.status === "Activo" ? "text-emerald-700"

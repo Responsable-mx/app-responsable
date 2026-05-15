@@ -17,6 +17,7 @@ import { validateAiResponse, type ValidationWarning } from "@/lib/ai/response-va
 import { extractJsonObject } from "@/lib/ai/extract-json";
 import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 import { anthropicBreaker } from "@/lib/ai/circuit-breaker";
+import { extractWithGemini } from "@/lib/ai/gemini";
 
 // Timeout serverless: hasta 5 min (web_search tarda ~30-90s por paso)
 export const maxDuration = 300;
@@ -369,64 +370,95 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
     } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
   };
 
-  // ── HAIKU FAST PATH ─────────────────────────────────────────────────────────
-  // Cuando vectorChunks proveen contexto local suficiente, intentar extracción
-  // con Haiku (~12× más barato). Fallback a Sonnet si ≥40% campos son null.
+  // ── GEMINI FLASH FAST PATH ───────────────────────────────────────────────────
+  // Cuando vectorChunks proveen contexto local suficiente, extraer con Gemini Flash
+  // (~40× más barato que Sonnet, ~3× más barato que Haiku). JSON mode sin tools.
+  // Fallback: Haiku si Gemini no está configurado. Fallback final: Sonnet + web_search.
   let skipSonnet = false;
   if (vectorChunks && vectorChunks.length >= 3) {
-    const haikuCfg = getTaskConfig("extract");
-    try {
-      const haikuMsg = await anthropic.messages.create({
-        model: haikuCfg.model,
-        max_tokens: 4096,
-        system: "Eres un asistente de extracción de datos ESG. Lee los DOCUMENTOS DEL CLIENTE en el prompt y extrae los campos pedidos. Solo extrae datos que encuentres explícitamente — no inventes ni interpoles. Campo no encontrado: value null, source_type \"consultor_only\". Llama submit_responses con el resultado final.",
-        tools: [submitResponsesTool],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tool_choice: { type: "tool", name: "submit_responses" } as any,
-        messages: [{ role: "user", content: userPrompt }],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any, { signal: AbortSignal.timeout(45_000) });
+    const geminiSystemPrompt = `Eres un asistente de extracción de datos ESG. Lee los documentos del cliente en el prompt y extrae solo los campos pedidos.
+REGLAS: Solo extrae datos que encuentres explícitamente — no inventes ni interpoles.
+Campo no encontrado → value: null, source_type: "consultor_only", sources: [].
+Retorna JSON con esta estructura exacta (un objeto por campo):
+{ "campo_key": { "value": "texto o null", "source_type": "public|interpretation|consultor_only", "sources": [{"url":"...","title":"...","date":"YYYY-MM-DD"}] } }`;
 
-      inputTokens        = haikuMsg.usage?.input_tokens ?? 0;
-      outputTokens       = haikuMsg.usage?.output_tokens ?? 0;
-      cacheCreationTokens = (haikuMsg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
-      cacheReadTokens    = (haikuMsg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
-      stopReason         = haikuMsg.stop_reason ?? null;
+    // 1. Intentar Gemini Flash (si GOOGLE_AI_API_KEY existe)
+    const geminiOut = await extractWithGemini({
+      systemPrompt: geminiSystemPrompt,
+      userPrompt,
+      timeoutMs: 45_000,
+    });
 
-      for (const block of haikuMsg.content) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (block.type === "tool_use" && (block as any).name === "submit_responses") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const input = (block as any).input as { responses?: unknown } | undefined;
-          if (input?.responses && typeof input.responses === "object") {
-            toolResponses = input.responses as Record<string, unknown>;
+    if (geminiOut) {
+      try {
+        const geminiParsed = AiResponseSchema.safeParse(JSON.parse(geminiOut));
+        if (geminiParsed.success) {
+          const nullCount = step.fields.filter(f => geminiParsed.data[f.key]?.value == null).length;
+          if (nullCount / step.fields.length < 0.40) {
+            toolResponses = geminiParsed.data as Record<string, unknown>;
+            skipSonnet    = true;
+            usedModel     = "gemini-2.0-flash";
           }
         }
+      } catch {
+        // JSON inválido → continuar con Haiku/Sonnet
       }
+    }
 
-      if (toolResponses) {
-        const pr = AiResponseSchema.safeParse(toolResponses);
-        const nullCount = pr.success
-          ? step.fields.filter(f => pr.data[f.key]?.value == null).length
-          : step.fields.length;
-        if (nullCount / step.fields.length < 0.40) {
-          skipSonnet = true;
-          usedModel  = haikuCfg.model;
-          anthropicBreaker.recordSuccess();
-        } else {
-          // Demasiados nulls — Sonnet con web_search llenará los huecos
-          toolResponses       = null;
-          inputTokens         = 0;
-          outputTokens        = 0;
-          cacheCreationTokens = 0;
-          cacheReadTokens     = 0;
+    // 2. Haiku como segundo fast path si Gemini no disponible o demasiados nulls
+    if (!skipSonnet) {
+      const haikuCfg = getTaskConfig("extract");
+      try {
+        const haikuMsg = await anthropic.messages.create({
+          model: haikuCfg.model,
+          max_tokens: 4096,
+          system: "Eres un asistente de extracción de datos ESG. Lee los DOCUMENTOS DEL CLIENTE en el prompt y extrae los campos pedidos. Solo extrae datos que encuentres explícitamente — no inventes ni interpoles. Campo no encontrado: value null, source_type \"consultor_only\". Llama submit_responses con el resultado final.",
+          tools: [submitResponsesTool],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tool_choice: { type: "tool", name: "submit_responses" } as any,
+          messages: [{ role: "user", content: userPrompt }],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any, { signal: AbortSignal.timeout(45_000) });
+
+        inputTokens        = haikuMsg.usage?.input_tokens ?? 0;
+        outputTokens       = haikuMsg.usage?.output_tokens ?? 0;
+        cacheCreationTokens = (haikuMsg.usage as UsageWithCache)?.cache_creation_input_tokens ?? 0;
+        cacheReadTokens    = (haikuMsg.usage as UsageWithCache)?.cache_read_input_tokens ?? 0;
+        stopReason         = haikuMsg.stop_reason ?? null;
+
+        for (const block of haikuMsg.content) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (block.type === "tool_use" && (block as any).name === "submit_responses") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const input = (block as any).input as { responses?: unknown } | undefined;
+            if (input?.responses && typeof input.responses === "object") {
+              toolResponses = input.responses as Record<string, unknown>;
+            }
+          }
         }
+
+        if (toolResponses) {
+          const pr = AiResponseSchema.safeParse(toolResponses);
+          const nullCount = pr.success
+            ? step.fields.filter(f => pr.data[f.key]?.value == null).length
+            : step.fields.length;
+          if (nullCount / step.fields.length < 0.40) {
+            skipSonnet = true;
+            usedModel  = haikuCfg.model;
+            anthropicBreaker.recordSuccess();
+          } else {
+            toolResponses       = null;
+            inputTokens         = 0;
+            outputTokens        = 0;
+            cacheCreationTokens = 0;
+            cacheReadTokens     = 0;
+          }
+        }
+      } catch {
+        toolResponses = null;
+        inputTokens   = 0;
+        outputTokens  = 0;
       }
-    } catch {
-      // Haiku falló → usar Sonnet sin penalizar al usuario
-      toolResponses = null;
-      inputTokens   = 0;
-      outputTokens  = 0;
     }
   }
 

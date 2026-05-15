@@ -124,6 +124,23 @@ const HEALTH_CHECKS: Record<string, () => Promise<ToolHealth>> = {
   batch: async () =>
     process.env.ANTHROPIC_API_KEY ? { status: "ok" } : { status: "inactive" },
 
+  gemini: async () => {
+    const key = process.env.GOOGLE_AI_API_KEY;
+    if (!key) return { status: "inactive" };
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash?key=${key}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (res.ok) return { status: "ok" };
+      if (res.status === 400 || res.status === 403) return { status: "error", message: "API key inválida o sin acceso a Gemini" };
+      if (res.status === 429) return { status: "error", message: "Cuota agotada" };
+      return { status: "error", message: `Error del servicio (HTTP ${res.status})` };
+    } catch {
+      return { status: "error", message: "No se pudo contactar Google AI — revisa la key" };
+    }
+  },
+
   redis: async () => {
     const url   = process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -252,19 +269,16 @@ const TOOL_CATALOG: CatalogEntry[] = [
   {
     id: "gemini-flash",
     name: "Gemini Flash 2.0 — Extracción económica de datos",
-    tagline: "Extrae datos de documentos a 40× menor costo que el modelo actual.",
+    tagline: "Extrae datos de documentos a 40× menor costo que el modelo anterior.",
     whatItDoes:
-      "Modelo de Google especializado en leer documentos y extraer información estructurada (nombres, números, fechas, indicadores GRI). No genera narrativa, solo extrae — y lo hace muy rápido.",
+      "Modelo de Google especializado en leer documentos y extraer información estructurada (nombres, números, fechas, indicadores GRI). No genera narrativa — solo extrae en JSON. Es el primer paso del AI-fill cuando hay documentos del cliente disponibles.",
     whatYouGain:
-      "El paso de AI-fill hoy usa Sonnet ($3/1M tokens). Migrar la extracción a Gemini Flash ($0.075/1M) reduce ese costo 40×. La narrativa y síntesis siguen en Sonnet/Opus. Ahorro estimado: $20-40/mes en volumen piloto.",
-    implemented: false,
-    healthKey: null,
+      "El fast path de AI-fill pasó de Haiku ($0.25/1M) a Gemini Flash ($0.075/1M) — 3× más barato en extracción pura. Sonnet + web_search sigue activo como fallback cuando faltan documentos. Ahorro estimado: $20-40/mes en volumen piloto.",
+    implemented: true,
+    healthKey: "gemini",
     envKey: "GOOGLE_AI_API_KEY",
-    setupUrl: "https://console.cloud.google.com",
+    setupUrl: "https://aistudio.google.com",
     setupLabel: "Google AI Studio",
-    cost: "$0.075 / 1M tokens entrada",
-    freeTier: "Sin free tier (costo muy bajo desde el primer token)",
-    usedIn: "AI-fill cuestionario — paso de extracción de datos de documentos",
   },
 ];
 

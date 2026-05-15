@@ -50,7 +50,7 @@ const AiSourceSchema = z.object({
   date: z.string().optional().default(""),
 });
 const AiFieldSchema = z.object({
-  value: z.union([z.string(), z.number(), z.null()]).optional(),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]).optional(),
   source_type: z.enum(["public", "interpretation", "consultor_only"]).optional(),
   sources: z.array(AiSourceSchema).optional(),
 });
@@ -114,8 +114,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Contexto básico del cliente para mejorar extracción.
   const client = await getClient(id).catch(() => null);
 
+  // Incluir tipo de campo y opciones válidas para que el LLM no invente valores.
   const fieldsList = step.fields
-    .map((f) => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ""}`)
+    .map((f) => {
+      const typeNote =
+        f.type === "boolean"
+          ? " [retornar: true o false]"
+          : (f.type === "select" || f.type === "multiselect") && Array.isArray(f.options) && f.options.length > 0
+          ? ` [${f.type === "multiselect" ? "array, múltiples valores" : "valor único"}: ${(f.options as Array<string | { value: string }>).map((o) => (typeof o === "string" ? o : o.value)).join(" | ")}]`
+          : (f.type === "select" || f.type === "multiselect") && f.catalog
+          ? ` [selección — catálogo: ${f.catalog}]`
+          : "";
+      return `- ${f.key}: ${f.label}${typeNote}${f.hint ? ` (${f.hint})` : ""}`;
+    })
     .join("\n");
 
   const systemPrompt = `Eres un consultor de ResponSable extrayendo información de un documento para llenar el cuestionario de Doble Materialidad de un cliente corporativo mexicano.
@@ -167,7 +178,7 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
     const msg = await anthropic.messages.create(
       {
         model: modelCfg.model,
-        max_tokens: 2000,
+        max_tokens: 4096,
         system: [
           {
             type: "text",
@@ -239,7 +250,12 @@ Extrae los valores de cada campo desde el documento. Solo usa datos presentes en
       continue;
     }
     result[field.key] = {
-      value: typeof ai.value === "string" || typeof ai.value === "number" ? ai.value : null,
+      value:
+        typeof ai.value === "string" || typeof ai.value === "number" || typeof ai.value === "boolean"
+          ? ai.value
+          : Array.isArray(ai.value)
+          ? ai.value
+          : null,
       source_type: ai.source_type ?? "consultor_only",
       sources: (ai.sources ?? []).map((s) => ({
         url: s.url, title: s.title, date: s.date || "", type: "web" as const,

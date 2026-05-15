@@ -52,7 +52,7 @@ const AiSourceSchema = z.object({
   date: z.string().optional().default(""),
 });
 const AiFieldSchema = z.object({
-  value: z.union([z.string(), z.number(), z.null()]).optional(),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]).optional(),
   source_type: z.enum(["public", "interpretation", "consultor_only"]).optional(),
   sources: z.array(AiSourceSchema).optional(),
 });
@@ -133,8 +133,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   // Construir prompt con contexto del cliente + campos a llenar.
+  // Incluir tipo de campo y opciones válidas para que el LLM no invente valores.
   const fieldsList = step.fields
-    .map((f) => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ""}`)
+    .map((f) => {
+      const typeNote =
+        f.type === "boolean"
+          ? " [retornar: true o false]"
+          : (f.type === "select" || f.type === "multiselect") && Array.isArray(f.options) && f.options.length > 0
+          ? ` [${f.type === "multiselect" ? "array, múltiples valores" : "valor único"}: ${(f.options as Array<string | { value: string }>).map((o) => (typeof o === "string" ? o : o.value)).join(" | ")}]`
+          : (f.type === "select" || f.type === "multiselect") && f.catalog
+          ? ` [selección — catálogo: ${f.catalog}]`
+          : "";
+      return `- ${f.key}: ${f.label}${typeNote}${f.hint ? ` (${f.hint})` : ""}`;
+    })
     .join("\n");
 
   const systemPrompt = `Eres un consultor de ResponSable llenando cuestionario de Doble Materialidad para cliente corporativo en México.
@@ -347,7 +358,7 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
           additionalProperties: {
             type: "object",
             properties: {
-              value: { type: ["string", "number", "null"], description: "Contenido del campo (string máx 500 chars) o null si no hay fuente." },
+              value: { anyOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }, { type: "array", items: { type: "string" } }, { type: "null" }], description: "Contenido: string, número, true/false (campos boolean), array de strings (multiselect), o null si no hay fuente." },
               source_type: { type: "string", enum: ["public", "interpretation", "consultor_only"] },
               sources: {
                 type: "array",
@@ -376,11 +387,18 @@ ${reportsContext.length > 0 ? "PRIORIDAD: usa los DOCUMENTOS DEL CLIENTE arriba 
   // Fallback: Haiku si Gemini no está configurado. Fallback final: Sonnet + web_search.
   let skipSonnet = false;
   if (vectorChunks && vectorChunks.length >= 3) {
-    const geminiSystemPrompt = `Eres un asistente de extracción de datos ESG. Lee los documentos del cliente en el prompt y extrae solo los campos pedidos.
-REGLAS: Solo extrae datos que encuentres explícitamente — no inventes ni interpoles.
-Campo no encontrado → value: null, source_type: "consultor_only", sources: [].
-Retorna JSON con esta estructura exacta (un objeto por campo):
-{ "campo_key": { "value": "texto o null", "source_type": "public|interpretation|consultor_only", "sources": [{"url":"...","title":"...","date":"YYYY-MM-DD"}] } }`;
+    const geminiSystemPrompt = `Eres un consultor de ResponSable extrayendo datos ESG de documentos corporativos.
+REGLAS OPERATIVAS:
+1. Extrae solo datos explícitos en los documentos — no inventes ni interpoles.
+2. Campo boolean [retornar: true o false]: retornar booleano true o false — NUNCA "Sí"/"No"/"si".
+3. Campo selección única [valor único: A | B | C]: retornar EXACTAMENTE uno de los valores válidos listados — nunca inventar otros.
+4. Campo selección múltiple [array, múltiples valores: A | B | C]: retornar array JSON de strings con valores válidos.
+5. Campo no encontrado → value: null, source_type: "consultor_only", sources: [].
+6. Cita URL real del documento cuando el dato proviene de un informe. Nunca inventes URLs.
+7. source_type "public" si dato explícito, "interpretation" si se infiere razonablemente.
+8. Máximo 500 chars por value string.
+ESTRUCTURA JSON EXACTA (un objeto por campo):
+{ "campo_key": { "value": "string | true | false | null | [\"opcion1\",\"opcion2\"]", "source_type": "public|interpretation|consultor_only", "sources": [{"url":"...","title":"...","date":"YYYY-MM-DD"}] } }`;
 
     // 1. Intentar Gemini Flash (si GOOGLE_AI_API_KEY existe)
     const geminiOut = await extractWithGemini({
@@ -412,7 +430,7 @@ Retorna JSON con esta estructura exacta (un objeto por campo):
         const haikuMsg = await anthropic.messages.create({
           model: haikuCfg.model,
           max_tokens: 4096,
-          system: "Eres un asistente de extracción de datos ESG. Lee los DOCUMENTOS DEL CLIENTE en el prompt y extrae los campos pedidos. Solo extrae datos que encuentres explícitamente — no inventes ni interpoles. Campo no encontrado: value null, source_type \"consultor_only\". Llama submit_responses con el resultado final.",
+          system: "Eres un consultor de ResponSable extrayendo datos ESG de documentos corporativos. REGLAS: 1) Solo extrae datos explícitos — no inventes ni interpoles. 2) Campo boolean [retornar: true o false]: retornar booleano true/false, NUNCA texto. 3) Campo selección [valor único: A|B|C]: retornar EXACTAMENTE un valor válido de la lista. 4) Campo multiselect [array]: retornar array de strings válidos. 5) Campo no encontrado: value null, source_type \"consultor_only\", sources []. 6) Máximo 500 chars por campo string. Llama submit_responses con el resultado final.",
           tools: [submitResponsesTool],
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           tool_choice: { type: "tool", name: "submit_responses" } as any,
@@ -666,7 +684,12 @@ Retorna JSON con esta estructura exacta (un objeto por campo):
       ? validateAiResponse(valueStr, { minLength: 0 }).filter((w) => w.severity !== "info")
       : [];
     result[field.key] = {
-      value: typeof ai.value === "string" || typeof ai.value === "number" ? ai.value : null,
+      value:
+        typeof ai.value === "string" || typeof ai.value === "number" || typeof ai.value === "boolean"
+          ? ai.value
+          : Array.isArray(ai.value)
+          ? ai.value
+          : null,
       source_type: sourceType,
       sources,
       validated: false,

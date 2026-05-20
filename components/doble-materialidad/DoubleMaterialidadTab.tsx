@@ -107,6 +107,16 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
+// ── Feature flag — etapas benchmark escondidas para app-responsable ──────────
+// Activar en otro proyecto: cambiar a true.
+// Archivos del bloque benchmark (reactivar copiando a nuevo proyecto):
+//   components/doble-materialidad: BenchmarkSection, BenchmarkEmpresasSection,
+//   BenchmarkIrosSection, BenchmarkComparisonTable, BenchmarkCharts, BenchmarkVisuals,
+//   EmpresaCard, ManualAddEmpresaForm, ManualAddCompanyForm, benchmark-types.ts, benchmark-helpers.ts
+//   app/api/clients/[id]: dm-benchmark/, dm-benchmark-empresas/, dm-benchmark-company-iros/
+const SHOW_BENCHMARK_STAGES = false;
+const BENCHMARK_STAGE_IDS = ["dm-sec-benchmark-empresas", "dm-sec-benchmark", "dm-sec-benchmark-iros"];
+
 // ── Navegación de panel activo (Ruta B — wizard) ─────────────
 // Catálogo canónico de etapas con id + label para prev/next
 export const DM_STAGES_META = ([
@@ -127,16 +137,6 @@ const DM_SECTION_IDS = DM_STAGES_META.map((s) => s.id) as readonly string[];
 
 // Ref module-level — el componente la registra; helpers la invocan sin estar dentro del componente
 export const _dmNavigateRef: { current: ((id: string) => void) | null } = { current: null };
-
-// ── Feature flag — etapas benchmark escondidas para app-responsable ──────────
-// Activar en otro proyecto: cambiar a true.
-// Archivos del bloque benchmark (reactivar copiando a nuevo proyecto):
-//   components/doble-materialidad: BenchmarkSection, BenchmarkEmpresasSection,
-//   BenchmarkIrosSection, BenchmarkComparisonTable, BenchmarkCharts, BenchmarkVisuals,
-//   EmpresaCard, ManualAddEmpresaForm, ManualAddCompanyForm, benchmark-types.ts, benchmark-helpers.ts
-//   app/api/clients/[id]: dm-benchmark/, dm-benchmark-empresas/, dm-benchmark-company-iros/
-const SHOW_BENCHMARK_STAGES = false;
-const BENCHMARK_STAGE_IDS = ["dm-sec-benchmark-empresas", "dm-sec-benchmark", "dm-sec-benchmark-iros"];
 
 export function scrollToDmSection(sectionId: string) {
   // Ruta B: cambiar panel activo + scroll al tope del stepper sticky

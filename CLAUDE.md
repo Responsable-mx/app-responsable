@@ -298,20 +298,32 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 - **`STATUS_INLINE`**: objetos `{bg, fill, text}` hex en lugar de Tailwind classes. Necesario para estilos dinámicos inline.
 - **Razón de no usar Tailwind**: los valores de color en Timeline dependen de datos (status/client_id) — no se pueden expresar como clases estáticas de Tailwind.
 
-### DM-IA — etapas benchmark OCULTAS (app-responsable, may-2026)
+### DM-IA — pipeline 10 etapas (app-responsable, may-2026)
 
-Etapas 3/4/5 del flujo DM-IA escondidas en **esta app** via `SHOW_BENCHMARK_STAGES = false`
-en `components/doble-materialidad/DoubleMaterialidadTab.tsx` (línea ~142).
+Solo **Benchmark competitivo** oculto via `SHOW_BENCHMARK_STAGES = false`
+en `components/doble-materialidad/DoubleMaterialidadTab.tsx` (línea ~117).
 
-Etapas ocultas:
-- Etapa 3: "Empresas de referencia" (`dm-sec-benchmark-empresas`)
-- Etapa 4: "Benchmark competitivo" (`dm-sec-benchmark`)
-- Etapa 5: "IROs de empresas de referencia" (`dm-sec-benchmark-iros`)
+**Flujo activo (10 etapas):**
+Contexto → Referentes → Emp. referencia → IROs empresas → IROs cliente → Validación → Evaluación → Matriz → Resumen IA → Reporte
 
-**Re-activar:** cambiar `SHOW_BENCHMARK_STAGES = true`. Código 100% presente.
-**Flujo sin benchmark:** Contexto → Referentes → IROs → Matriz → NIS → Resumen → Validación → Reporte (8 etapas).
-**IROs se desbloquean** desde Referentes done (no desde hasBenchmarkIros).
-**Reporte se desbloquea** desde hasIros + hasResumen (no requiere hasBenchmark).
+| # visible | ID | Visible | Status |
+|-----------|-----|---------|--------|
+| 1 | dm-sec-contexto | ✅ | Cuestionario |
+| 2 | dm-sec-referentes | ✅ | Frameworks ESG |
+| 3 | dm-sec-benchmark-empresas | ✅ | Empresas de referencia |
+| — | dm-sec-benchmark | ❌ oculto | Benchmark competitivo (código activo) |
+| 4 | dm-sec-benchmark-iros | ✅ | IROs de empresas |
+| 5 | dm-sec-iros | ✅ | IROs del cliente |
+| 6 | dm-sec-validacion | ✅ | Validación cliente |
+| 7 | dm-sec-evaluacion | ✅ | Evaluación (placeholder) |
+| 8 | dm-sec-matriz | ✅ | Matriz DM |
+| 9 | dm-sec-resumen | ✅ | Resumen ejecutivo IA |
+| 10 | dm-sec-reporte | ✅ | Reporte final |
+
+**NIS/IBSO eliminado** del flujo — `dm-sec-nis` removido de pipeline.
+**Validación** desbloquea desde `hasIros` (no desde `hasResumen` como antes).
+**Evaluación** desbloquea cuando Validación done (contenido TBD, muestra placeholder).
+**Re-activar Benchmark:** cambiar `SHOW_BENCHMARK_STAGES = true`. Código 100% presente.
 
 Archivos del bloque benchmark (activos en repo, solo no renderizados):
 - `components/doble-materialidad/`: BenchmarkSection, BenchmarkEmpresasSection, BenchmarkIrosSection,

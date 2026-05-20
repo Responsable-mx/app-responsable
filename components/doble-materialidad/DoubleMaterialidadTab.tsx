@@ -780,7 +780,7 @@ export function DoubleMaterialidadTab({
       <CollapsibleStageSection
         id="dm-sec-benchmark-iros"
         stageNum={SHOW_BENCHMARK_STAGES ? 5 : 4}
-        label="IROs de empresas de referencia"
+        label="IROs de empresas"
         status={stage4bStatus}
         accent="border-l-indigo-600"
         isActive={activeStageId === "dm-sec-benchmark-iros"}
@@ -934,7 +934,7 @@ export function DoubleMaterialidadTab({
         accent="border-l-emerald-600"
         isActive={activeStageId === "dm-sec-reporte"}
         lockReason={SHOW_BENCHMARK_STAGES
-          ? "Completa el benchmark (Etapa 4), los IROs de empresas de referencia (Etapa 5), el inventario de IROs del cliente (Etapa 6) y el resumen ejecutivo (Etapa 10) para generar el reporte final de doble materialidad."
+          ? "Completa el benchmark (Etapa 4), los IROs de empresas (Etapa 5), el inventario de IROs del cliente (Etapa 6) y el resumen ejecutivo (Etapa 10) para generar el reporte final de doble materialidad."
           : "Completa el inventario de IROs del cliente (Etapa 5) y el resumen ejecutivo (Etapa 9) para generar el reporte final de doble materialidad."}
         subtitle="Documento final consolidado · IROs + matriz + validación cliente"
         headerRight={

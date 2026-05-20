@@ -48,7 +48,7 @@ const IroItemSchema = z.object({
 });
 
 export const IroGenerationSchema = z.object({
-  iros: z.array(IroItemSchema).min(10).max(30),
+  iros: z.array(IroItemSchema).min(10).max(40),
 });
 
 export type IroGenerationResult = z.infer<typeof IroGenerationSchema>;

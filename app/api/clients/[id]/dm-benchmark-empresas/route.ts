@@ -27,14 +27,15 @@ const PatchBody = z.object({
 });
 
 const EmpresaSchema = z.object({
-  id:           z.string().min(1).max(80),
-  nombre:       z.string().min(1).max(200),
-  pais:         z.string().min(1).max(100),
-  reporte_url:  z.string().url().optional().nullable(),
-  metodologia:  z.array(z.string().min(1).max(30)).min(1).max(8),
-  criterio:     z.enum(["competidores_directos","sp_yearbook","internacionales","conglomerados","b2b"]),
-  subsector:    z.string().max(200).optional().nullable(),
-  justificacion:z.string().max(800).optional().nullable(),
+  id:                   z.string().min(1).max(80),
+  nombre:               z.string().min(1).max(200),
+  pais:                 z.string().min(1).max(100),
+  reporte_url:          z.string().url().optional().nullable(),
+  metodologia:          z.array(z.string().min(1).max(30)).min(1).max(8),
+  criterio:             z.enum(["competidores_directos","sp_yearbook","internacionales","conglomerados","b2b"]),
+  subsector:            z.string().max(200).optional().nullable(),
+  justificacion:        z.string().max(800).optional().nullable(),
+  recommendation_score: z.number().min(1).max(10).optional().nullable(),
 });
 
 const AddCompanyBody = z.object({
@@ -92,9 +93,15 @@ REGLAS:
 5. justificacion: 2-3 oraciones explicando por qué esta empresa es un referente relevante.
 6. id: slug corto único, ej. "c1_pemex", "c2_ecopetrol".
 7. Incluir en criterios_omitidos los criterios que no aplican al cliente.
-8. SOLO JSON válido, sin markdown ni texto adicional.
+8. recommendation_score: puntuación 1-10 basada en estos 4 criterios (2.5 pts c/u):
+   - Comparabilidad operativa: ¿qué tan similar es el modelo de negocio / escala al cliente?
+   - Madurez en sostenibilidad: ¿años reportando, certificaciones, metas net-zero, SBTI?
+   - Cobertura geográfica: ¿opera en la misma región / mercado que el cliente?
+   - Posición en cadena de valor: ¿comparte eslabones upstream/downstream relevantes?
+   Ejemplo: empresa con alta comparabilidad (2.5) + alta madurez (2.5) + misma región (2.0) + cadena parcial (1.5) = 8.5 → redondear a entero más cercano → 9.
+9. SOLO JSON válido, sin markdown ni texto adicional.
 
-{"companies":[{"id":"c1_ejemplo","nombre":"Empresa S.A.","pais":"México","reporte_url":null,"metodologia":["GRI","SASB"],"criterio":"competidores_directos","subsector":"...","justificacion":"..."}],"criterios_omitidos":["conglomerados"]}`;
+{"companies":[{"id":"c1_ejemplo","nombre":"Empresa S.A.","pais":"México","reporte_url":null,"metodologia":["GRI","SASB"],"criterio":"competidores_directos","subsector":"...","justificacion":"...","recommendation_score":8}],"criterios_omitidos":["conglomerados"]}`;
 
 function buildGenerateUserContent(
   clientName: string,

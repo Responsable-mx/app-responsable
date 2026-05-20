@@ -21,8 +21,19 @@ export type TopicGrouped = {
   referentes: string[];  // array of framework names
 };
 
-export type FrameworksStatus = "idle" | "generating" | "done" | "failed";
-export type TopicsStatus     = "idle" | "generating" | "done" | "failed";
+export type FrameworksStatus  = "idle" | "generating" | "done" | "failed";
+export type TopicsStatus      = "idle" | "generating" | "done" | "failed";
+export type SectorIrosStatus  = "idle" | "generating" | "done" | "failed";
+
+export type SectorIro = {
+  n_iro:        number;
+  descripcion:  string;
+  tipo:         "impacto_positivo" | "impacto_negativo" | "riesgo" | "oportunidad";
+  tema_asociado?: string | null;
+  horizonte:    "corto" | "mediano" | "largo";
+  cadena:       "upstream" | "operacion" | "downstream";
+  referentes:   string[];  // IDs de frameworks que lo respaldan
+};
 
 export type ReferentesData = {
   id?: string;
@@ -35,4 +46,6 @@ export type ReferentesData = {
   topics_grouped: TopicGrouped[];
   topics_status: TopicsStatus;
   topics_batch_id?: string | null;
+  sector_iros: SectorIro[];
+  sector_iros_status: SectorIrosStatus;
 };

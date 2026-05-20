@@ -168,7 +168,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .eq("validated", true),
     admin
       .from("dm_referentes")
-      .select("enabled_frameworks")
+      .select("enabled_frameworks, topics_grouped")
       .eq("client_id", id)
       .maybeSingle(),
   ]);
@@ -176,6 +176,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const enabledFrameworks = (referentesRes.data?.enabled_frameworks as string[] | null) ?? [];
   const frameworksPrefix = enabledFrameworks.length > 0
     ? `MARCOS NORMATIVOS ESG APLICABLES (validados en Etapa 2): ${enabledFrameworks.join(", ")}\n\n`
+    : "";
+
+  const topicsGrouped = (referentesRes.data?.topics_grouped as Array<{ tema_consolidado: string }> | null) ?? [];
+  const topicsPrefix = topicsGrouped.length > 0
+    ? `TEMAS MATERIALES DEL SECTOR (referentes Etapa 2, usar como guía temática):\n${topicsGrouped.map((t) => `  - ${t.tema_consolidado}`).join("\n")}\n\n`
     : "";
 
   const latestBenchmark = benchmarkRes.data?.[0] ?? null;
@@ -219,7 +224,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     clientName: client.name,
     sector: client.sector ?? null,
     country: (client.countries as string[] | null)?.[0] ?? null,
-    questionnaireContext: frameworksPrefix + questionnaireContext,
+    questionnaireContext: topicsPrefix + frameworksPrefix + questionnaireContext,
     benchmarkNarrative,
     benchmarkCompanies,
     benchmarkCompanyIros,

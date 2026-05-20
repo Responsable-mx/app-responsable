@@ -417,7 +417,7 @@ export function BenchmarkIrosSection({
       else next.add(iroId);
       return next;
     });
-  }, []);
+  }, [setSelectedIroIds]);
 
   if (validatedCompanies.length === 0) {
     return (
@@ -809,17 +809,22 @@ function SynthesisPanel({
 
   // Top temas por frecuencia de empresas
   const temaFreq = useMemo(() => {
-    const map = new Map<string, { companies: Set<string>; count: number }>();
+    const map = new Map<string, { companyIds: Set<string>; companyNames: string[]; count: number }>();
+    const nameById = new Map(groups.map((g) => [g.company_id, g.company_name]));
     for (const g of groups) {
       for (const iro of g.iros) {
         const tema = iro.tema_asociado?.trim() || "Sin tema";
-        if (!map.has(tema)) map.set(tema, { companies: new Set(), count: 0 });
-        map.get(tema)!.companies.add(g.company_id);
-        map.get(tema)!.count++;
+        if (!map.has(tema)) map.set(tema, { companyIds: new Set(), companyNames: [], count: 0 });
+        const entry = map.get(tema)!;
+        if (!entry.companyIds.has(g.company_id)) {
+          entry.companyIds.add(g.company_id);
+          entry.companyNames.push(nameById.get(g.company_id) ?? g.company_id);
+        }
+        entry.count++;
       }
     }
     return [...map.entries()]
-      .map(([tema, { companies, count }]) => ({ tema, companies: companies.size, count }))
+      .map(([tema, { companyIds, companyNames, count }]) => ({ tema, companies: companyIds.size, companyNames, count }))
       .sort((a, b) => b.companies - a.companies || b.count - a.count)
       .slice(0, 15);
   }, [groups]);
@@ -845,6 +850,27 @@ function SynthesisPanel({
     }
     return Object.entries(map).sort((a, b) => (b[1] as number) - (a[1] as number)) as [BenchmarkIroCadena, number][];
   }, [allIros]);
+
+  // IROs agrupados por tema ESRS — top 3 por tema para la lista comparativa
+  const esrsGrouped = useMemo(() => {
+    const map = new Map<string, { label: string; iros: Array<{ descripcion: string; company: string; tipo: BenchmarkIroTipo }> }>();
+    for (const topic of ESRS_TOPICS) {
+      map.set(topic.id, { label: topic.label, iros: [] });
+    }
+    for (const g of groups) {
+      for (const iro of g.iros) {
+        const text = iro.descripcion + " " + (iro.tema_asociado ?? "");
+        const topicId = matchEsrsTopic(text);
+        if (topicId) {
+          map.get(topicId)!.iros.push({ descripcion: iro.descripcion, company: g.company_name, tipo: iro.tipo });
+        }
+      }
+    }
+    return [...map.entries()]
+      .map(([id, { label, iros }]) => ({ id, label, iros: iros.slice(0, 3), total: iros.length }))
+      .filter(({ total }) => total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [groups]);
 
   // P9 — Distribución E/S/G de IROs del sector
   const esgDist = useMemo(() => {
@@ -951,39 +977,50 @@ function SynthesisPanel({
         <span className="uppercase tracking-widest text-[10px] font-bold text-slate-400 block mb-3">
           Temas más frecuentes del sector
         </span>
-        <div className="space-y-1.5">
-          {temaFreq.map(({ tema, companies, count }) => (
-            <div key={tema} className="flex items-center gap-2 group">
-              <span className="text-xs text-slate-600 w-44 truncate shrink-0" title={tema}>{tema}</span>
-              <div className="flex-1 h-1.5 bg-slate-100 rounded-sm overflow-hidden">
-                <div
-                  className="h-full bg-brand-primary/50 rounded-sm transition-all"
-                  style={{ width: `${(companies / maxCompanies) * 100}%` }}
-                />
-              </div>
-              <span className="text-[10px] text-slate-400 tabular-nums shrink-0 w-24 text-right">
-                {companies} emp. · {count} IROs
-              </span>
-              {clientIroTopics && clientIroTopics.some((t) => {
-                const a = t.toLowerCase(); const b = tema.toLowerCase();
-                return a.includes(b) || b.includes(a);
-              }) && (
-                <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20 whitespace-nowrap">
-                  ✓ en cliente
+        <div className="space-y-2.5">
+          {temaFreq.map(({ tema, companies, companyNames, count }) => (
+            <div key={tema} className="group">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-600 w-44 truncate shrink-0" title={tema}>{tema}</span>
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-sm overflow-hidden">
+                  <div
+                    className="h-full bg-brand-primary/50 rounded-sm transition-all"
+                    style={{ width: `${(companies / maxCompanies) * 100}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 tabular-nums shrink-0 w-24 text-right">
+                  {companies} emp. · {count} IROs
                 </span>
-              )}
-              {clientIroTopics && clientIroTopics.length > 0 && !clientIroTopics.some((t) => {
-                const a = t.toLowerCase(); const b = tema.toLowerCase();
-                return a.includes(b) || b.includes(a);
-              }) && (
-                <button
-                  type="button"
-                  onClick={() => { window.location.hash = "#dm-sec-iros"; }}
-                  className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap hover:bg-amber-100 transition-colors"
-                  title="Ir a inventario de IROs para agregar este tema"
-                >
-                  ⚠ No en inventario →
-                </button>
+                {clientIroTopics && clientIroTopics.some((t) => {
+                  const a = t.toLowerCase(); const b = tema.toLowerCase();
+                  return a.includes(b) || b.includes(a);
+                }) && (
+                  <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-brand-primary-light text-brand-primary-dark border border-brand-primary/20 whitespace-nowrap">
+                    ✓ en cliente
+                  </span>
+                )}
+                {clientIroTopics && clientIroTopics.length > 0 && !clientIroTopics.some((t) => {
+                  const a = t.toLowerCase(); const b = tema.toLowerCase();
+                  return a.includes(b) || b.includes(a);
+                }) && (
+                  <button
+                    type="button"
+                    onClick={() => { window.location.hash = "#dm-sec-iros"; }}
+                    className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap hover:bg-amber-100 transition-colors"
+                    title="Ir a inventario de IROs para agregar este tema"
+                  >
+                    ⚠ No en inventario →
+                  </button>
+                )}
+              </div>
+              {companyNames.length > 0 && (
+                <div className="ml-[11.5rem] flex flex-wrap gap-1 mt-1">
+                  {companyNames.map((name) => (
+                    <span key={name} className="text-[9px] px-1.5 py-0.5 rounded-sm bg-slate-50 text-slate-400 border border-slate-200 truncate max-w-[120px]" title={name}>
+                      {name}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           ))}
@@ -1031,6 +1068,47 @@ function SynthesisPanel({
           ))}
         </div>
       </div>
+
+      {/* IROs por tema ESRS */}
+      {esrsGrouped.length > 0 && (
+        <div>
+          <span className="uppercase tracking-widest text-[10px] font-bold text-slate-400 block mb-2">
+            IROs sectoriales por tema ESRS
+          </span>
+          <div className="space-y-2">
+            {esrsGrouped.map(({ id, label, iros, total }) => (
+              <details key={id} className="group/esrs">
+                <summary className="flex items-center gap-2 cursor-pointer list-none py-1.5 px-2 rounded-sm hover:bg-slate-50 transition-colors">
+                  <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border ${
+                    id.startsWith("E") ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                    id.startsWith("S") ? "bg-violet-50 text-violet-700 border-violet-200" :
+                    "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}>{id}</span>
+                  <span className="text-xs text-slate-600 flex-1 truncate">{label.replace(/^[A-Z]\d — /, "")}</span>
+                  <span className="shrink-0 text-[10px] text-slate-400 tabular-nums">{total} IROs</span>
+                  <svg className="w-3 h-3 text-slate-400 shrink-0 transition-transform group-open/esrs:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </summary>
+                <div className="mt-1 ml-2 space-y-1.5 pb-1">
+                  {iros.map((iro, i) => (
+                    <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-sm bg-slate-50/60 border border-slate-100">
+                      <span className={`shrink-0 mt-0.5 text-[9px] font-bold px-1 py-0.5 rounded-sm border ${TIPO_BADGE[iro.tipo]}`}>
+                        {TIPO_LABELS[iro.tipo].slice(0, 3)}
+                      </span>
+                      <span className="text-[11px] text-slate-600 leading-snug flex-1 line-clamp-2">{iro.descripcion}</span>
+                      <span className="shrink-0 text-[9px] text-slate-400 italic truncate max-w-[80px]" title={iro.company}>{iro.company}</span>
+                    </div>
+                  ))}
+                  {total > 3 && (
+                    <p className="text-[9px] text-slate-400 px-2">+{total - 3} IROs más en este tema</p>
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Narrativa ejecutiva */}
       <div>

@@ -81,6 +81,20 @@ export function EmpresaCard({ empresa, selected, onToggle, onUpdate }: Props) {
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <span className="font-semibold text-slate-800 text-sm">{empresa.nombre}</span>
               <span className="text-xs text-slate-400 font-medium">{empresa.pais}</span>
+              {empresa.recommendation_score != null && (
+                <span
+                  title="Puntuación de relevancia 1-10 (comparabilidad operativa · madurez ESG · cobertura geográfica · cadena de valor)"
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm text-[9px] font-bold border cursor-default ${
+                    empresa.recommendation_score >= 8
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : empresa.recommendation_score >= 6
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-slate-50 text-slate-500 border-slate-200"
+                  }`}
+                >
+                  {empresa.recommendation_score}/10
+                </span>
+              )}
               {empresa.reporte_url && !editingUrl && (
                 <a
                   href={empresa.reporte_url}

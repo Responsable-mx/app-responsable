@@ -32,6 +32,14 @@ const UpdateFrameworkBody = z.object({
   url:    z.union([z.string().url(), z.literal(""), z.null()]).optional(),
 });
 
+const AddFrameworkBody = z.object({
+  action:      z.literal("add_framework"),
+  name:        z.string().min(1).max(100),
+  description: z.string().min(1).max(600),
+  url:         z.union([z.string().url(), z.literal(""), z.null()]).optional(),
+  sector_note: z.string().max(300).optional().nullable(),
+});
+
 const FrameworkSchema = z.object({
   id:          z.string().min(1).max(50),
   name:        z.string().min(1).max(100),
@@ -204,6 +212,44 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "Error de base de datos" }, { status: 500 });
     }
     return NextResponse.json({ ok: true });
+  }
+
+  // ── Action: add_framework (agregar referente manualmente) ──────────────────
+  if (body.action === "add_framework") {
+    const parsed = AddFrameworkBody.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    const { name, description, url, sector_note } = parsed.data;
+
+    const { data: rec } = await admin
+      .from("dm_referentes")
+      .select("proposed_frameworks")
+      .eq("client_id", id)
+      .maybeSingle();
+
+    const proposed = (rec?.proposed_frameworks ?? []) as ReferenteFramework[];
+
+    // Derive a stable slug id from the name, dedupe if needed
+    const baseId = name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30);
+    let fwId = baseId;
+    let n = 2;
+    while (proposed.some((f) => f.id === fwId)) { fwId = `${baseId}_${n++}`; }
+
+    const safeUrl = (url === "" || url === null || url === undefined) ? null : url;
+    const newFw: ReferenteFramework = { id: fwId, name, description, url: safeUrl, sector_note: sector_note ?? null };
+
+    const { error } = await admin.from("dm_referentes").upsert({
+      client_id: id,
+      proposed_frameworks: [...proposed, newFw],
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "client_id" });
+
+    if (error) {
+      console.error("[dm-referentes add_framework]", error);
+      return NextResponse.json({ error: "Error de base de datos" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, id: fwId });
   }
 
   const client = await getClient(id).catch(() => null);
@@ -552,6 +598,134 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }
 
     return NextResponse.json({ data: { updated, total: missing.length } });
+  }
+
+  // ── Action: generate_sector_iros ───────────────────────────────────────────
+  if (body.action === "generate_sector_iros") {
+    const rl = await checkAiRateLimit(user, { max: 3, windowMs: 5 * 60_000, errorMessage: "Demasiadas solicitudes de IROs. Espera 5 minutos." });
+    if (rl) return NextResponse.json({ error: rl.message }, { status: 429 });
+
+    const { data: rec } = await admin
+      .from("dm_referentes")
+      .select("proposed_frameworks, enabled_frameworks, topics_grouped")
+      .eq("client_id", id)
+      .maybeSingle();
+
+    const proposed     = (rec?.proposed_frameworks ?? []) as ReferenteFramework[];
+    const enabled      = (rec?.enabled_frameworks  ?? []) as string[];
+    const active       = proposed.filter((f) => enabled.includes(f.id));
+    const topicsGrouped = (rec?.topics_grouped ?? []) as TopicGrouped[];
+
+    if (active.length === 0) {
+      return NextResponse.json({ error: "Valida al menos un referente antes de generar IROs" }, { status: 400 });
+    }
+    if (topicsGrouped.length === 0) {
+      return NextResponse.json({ error: "Genera la tabla de temas agrupados antes de generar IROs del sector" }, { status: 400 });
+    }
+
+    await admin.from("dm_referentes").upsert({
+      client_id: id,
+      sector_iros_status: "generating",
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "client_id" });
+
+    const sectorIrosSystem = `Eres un experto en Doble Materialidad ESRS y análisis de sostenibilidad empresarial.
+
+TAREA: Genera una lista de 25-40 IROs (Impactos, Riesgos y Oportunidades) BASE para el sector, a partir de los marcos de referencia habilitados y los temas ya mapeados.
+
+DEFINICIONES:
+- impacto_positivo: Efecto beneficioso del negocio sobre personas/ambiente
+- impacto_negativo: Efecto perjudicial del negocio sobre personas/ambiente
+- riesgo: Amenaza financiera o reputacional para el cliente
+- oportunidad: Potencial de ganancia financiera o competitiva relacionado con sostenibilidad
+
+REGLAS:
+1. Distribuir: ~30% impactos, ~35% riesgos, ~35% oportunidades
+2. Cubrir las 3 dimensiones: Ambiental (E), Social (S), Gobernanza (G)
+3. Cada IRO en 1-2 oraciones concretas, sin jerga excesiva
+4. horizonte: "corto" (1-2 años), "mediano" (3-5 años), "largo" (>5 años)
+5. cadena: "upstream" (proveedores), "operacion" (actividades propias), "downstream" (clientes/uso)
+6. referentes: array con IDs de frameworks que respaldan el IRO
+7. Numerar desde 1. SOLO JSON válido.
+
+{"sector_iros":[{"n_iro":1,"descripcion":"...","tipo":"riesgo","tema_asociado":"Cambio climático","horizonte":"corto","cadena":"operacion","referentes":["GRI","ESRS"]}]}`;
+
+    const frameworksList = active.map((f) => `- ${f.id}: ${f.name}`).join("\n");
+    const topicsList = topicsGrouped.slice(0, 20).map((t) => `- ${t.tema_consolidado}`).join("\n");
+    const sectorIrosUser = `SECTOR: ${client.sector ?? "no especificado"}
+CLIENTE: ${client.name}
+
+MARCOS DE REFERENCIA HABILITADOS:
+${frameworksList}
+
+TEMAS MATERIALES DEL SECTOR (usar como guía temática):
+${topicsList}
+
+Genera 25-40 IROs representativos del sector, cubriendo E/S/G y los horizontes corto/mediano/largo.`;
+
+    const anthropic = createAnthropicClient();
+    let textOut = "", inputTokens = 0, outputTokens = 0, cacheCreationTokens = 0, cacheReadTokens = 0;
+    const startedAt = Date.now();
+
+    try {
+      const msg = await anthropic.messages.create({
+        model,
+        max_tokens: 8000,
+        system: [{ type: "text", text: sectorIrosSystem, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: sectorIrosUser }],
+      }, { signal: AbortSignal.timeout(150_000) });
+
+      inputTokens         = msg.usage?.input_tokens ?? 0;
+      outputTokens        = msg.usage?.output_tokens ?? 0;
+      cacheCreationTokens = msg.usage?.cache_creation_input_tokens ?? 0;
+      cacheReadTokens     = msg.usage?.cache_read_input_tokens ?? 0;
+      for (const block of msg.content) {
+        if (block.type === "text") textOut += block.text;
+      }
+      anthropicBreaker.recordSuccess();
+    } catch (e) {
+      anthropicBreaker.recordFailure();
+      const errMsg = e instanceof Error ? e.message : "Error Anthropic";
+      void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: errMsg, workflowStage: "dm_referentes" });
+      await admin.from("dm_referentes").upsert({ client_id: id, sector_iros_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
+      return NextResponse.json({ error: errMsg }, { status: 500 });
+    }
+
+    void logAiCall({ userEmail: user, role: "aurora", clientId: id, model, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens, latencyMs: Date.now() - startedAt, error: null, workflowStage: "dm_referentes" });
+
+    const jsonText = extractJsonObject(textOut);
+    if (!jsonText) {
+      await admin.from("dm_referentes").upsert({ client_id: id, sector_iros_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
+      return NextResponse.json({ error: "Respuesta IA sin JSON" }, { status: 502 });
+    }
+
+    const SectorIrosResponseSchema = z.object({
+      sector_iros: z.array(z.object({
+        n_iro:        z.number(),
+        descripcion:  z.string().min(1).max(600),
+        tipo:         z.enum(["impacto_positivo", "impacto_negativo", "riesgo", "oportunidad"]),
+        tema_asociado:z.string().max(200).optional().nullable(),
+        horizonte:    z.enum(["corto", "mediano", "largo"]),
+        cadena:       z.enum(["upstream", "operacion", "downstream"]),
+        referentes:   z.array(z.string()).min(1).max(8),
+      })).min(5).max(50),
+    });
+
+    const validated = SectorIrosResponseSchema.safeParse(JSON.parse(jsonText));
+    if (!validated.success) {
+      console.error("[dm-referentes generate_sector_iros] schema inválido:", JSON.stringify(validated.error.flatten()));
+      await admin.from("dm_referentes").upsert({ client_id: id, sector_iros_status: "failed", updated_at: new Date().toISOString() }, { onConflict: "client_id" });
+      return NextResponse.json({ error: "Schema IA inválido" }, { status: 502 });
+    }
+
+    await admin.from("dm_referentes").upsert({
+      client_id: id,
+      sector_iros:        validated.data.sector_iros,
+      sector_iros_status: "done",
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "client_id" });
+
+    return NextResponse.json({ data: { sector_iros: validated.data.sector_iros } });
   }
 
   return NextResponse.json({ error: "action no reconocido" }, { status: 400 });

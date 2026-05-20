@@ -32,6 +32,7 @@ export type BenchmarkEmpresa = {
   criterio: BenchmarkEmpresaCriterio;
   subsector?: string | null;
   justificacion?: string | null;
+  recommendation_score?: number | null; // 1-10 basado en 4 criterios de relevancia
 };
 
 export type BenchmarkEmpresasGenerationStatus = "idle" | "generating" | "done" | "failed";

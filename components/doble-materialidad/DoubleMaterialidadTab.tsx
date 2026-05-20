@@ -109,7 +109,7 @@ const fetcher = (url: string) =>
 
 // ── Navegación de panel activo (Ruta B — wizard) ─────────────
 // Catálogo canónico de etapas con id + label para prev/next
-export const DM_STAGES_META = [
+export const DM_STAGES_META = ([
   { id: "dm-sec-contexto",           label: "Contexto"       },
   { id: "dm-sec-referentes",         label: "Referentes"     },
   { id: "dm-sec-benchmark-empresas", label: "Emp. referencia"},
@@ -121,12 +121,22 @@ export const DM_STAGES_META = [
   { id: "dm-sec-resumen",            label: "Resumen IA"     },
   { id: "dm-sec-validacion",         label: "Validación"     },
   { id: "dm-sec-reporte",            label: "Reporte"        },
-] as const;
+] as const).filter(s => SHOW_BENCHMARK_STAGES || !BENCHMARK_STAGE_IDS.includes(s.id as string));
 
 const DM_SECTION_IDS = DM_STAGES_META.map((s) => s.id) as readonly string[];
 
 // Ref module-level — el componente la registra; helpers la invocan sin estar dentro del componente
 export const _dmNavigateRef: { current: ((id: string) => void) | null } = { current: null };
+
+// ── Feature flag — etapas benchmark escondidas para app-responsable ──────────
+// Activar en otro proyecto: cambiar a true.
+// Archivos del bloque benchmark (reactivar copiando a nuevo proyecto):
+//   components/doble-materialidad: BenchmarkSection, BenchmarkEmpresasSection,
+//   BenchmarkIrosSection, BenchmarkComparisonTable, BenchmarkCharts, BenchmarkVisuals,
+//   EmpresaCard, ManualAddEmpresaForm, ManualAddCompanyForm, benchmark-types.ts, benchmark-helpers.ts
+//   app/api/clients/[id]: dm-benchmark/, dm-benchmark-empresas/, dm-benchmark-company-iros/
+const SHOW_BENCHMARK_STAGES = false;
+const BENCHMARK_STAGE_IDS = ["dm-sec-benchmark-empresas", "dm-sec-benchmark", "dm-sec-benchmark-iros"];
 
 export function scrollToDmSection(sectionId: string) {
   // Ruta B: cambiar panel activo + scroll al tope del stepper sticky
@@ -383,10 +393,10 @@ export function DoubleMaterialidadTab({
     ? "pending"
     : "locked";
 
-  // stage5 = IROs del cliente — activo cuando IROs de empresas de referencia done
+  // stage5 = IROs del cliente — activo cuando benchmark done (o directamente desde Referentes si benchmark oculto)
   const stage5Status: StageStatus = hasIros
     ? "done"
-    : hasBenchmarkIros
+    : (SHOW_BENCHMARK_STAGES ? hasBenchmarkIros : stage2Status === "done")
     ? "active"
     : iros.length > 0
     ? "pending"
@@ -434,10 +444,10 @@ export function DoubleMaterialidadTab({
     ? "active"
     : "locked";
 
-  // stage10 = Reporte (etapa final — requiere benchmark + IROs + resumen IA)
+  // stage10 = Reporte (etapa final — requiere IROs + resumen IA; benchmark opcional si flag oculto)
   const stage10Status: StageStatus = hasReport
     ? "done"
-    : hasBenchmark && hasIros && hasResumen
+    : (SHOW_BENCHMARK_STAGES ? hasBenchmark && hasIros && hasResumen : hasIros && hasResumen)
     ? "active"
     : latestReport !== null
     ? "pending"
@@ -462,13 +472,15 @@ export function DoubleMaterialidadTab({
 
   // Badge [N/10] — notifica al padre cuántas etapas están completas
   const stageStatuses: StageStatus[] = [
-    stage1Status, stage2Status, stage3Status, stage4Status, stage4bStatus,
+    stage1Status, stage2Status,
+    ...(SHOW_BENCHMARK_STAGES ? [stage3Status, stage4Status, stage4bStatus] : []),
     stage5Status, stage6Status, stage7Status, stage8Status, stage9Status, stage10Status,
   ];
   const dmDoneCount = stageStatuses.filter((s) => s === "done").length;
+  const dmTotalStages = SHOW_BENCHMARK_STAGES ? 11 : 8;
   useEffect(() => {
-    onStagesProgress?.(dmDoneCount, 11);
-  }, [dmDoneCount, onStagesProgress]);
+    onStagesProgress?.(dmDoneCount, dmTotalStages);
+  }, [dmDoneCount, dmTotalStages, onStagesProgress]);
 
   // Smart-jump al primer pendiente — solo en mount inicial y sin hash en URL.
   // Permite que un usuario que regresa caiga directo en su trabajo pendiente
@@ -565,8 +577,13 @@ export function DoubleMaterialidadTab({
     { label: "Validación",     status: stage9Status,  sectionId: "dm-sec-validacion",
       lockedReason: "Genera el Resumen Ejecutivo IA primero" },
     { label: "Reporte",        status: stage10Status, sectionId: "dm-sec-reporte", doneDate: latestReport?.created_at,
-      lockedReason: "Requiere Benchmark + IROs calificados + Resumen IA completados" },
-  ];
+      lockedReason: SHOW_BENCHMARK_STAGES
+        ? "Requiere Benchmark + IROs calificados + Resumen IA completados"
+        : "Requiere IROs calificados + Resumen IA completados" },
+  ].filter(s => SHOW_BENCHMARK_STAGES || !BENCHMARK_STAGE_IDS.includes(s.sectionId));
+
+  // Número de etapa visible (reajustado cuando benchmark oculto: 6→3, 7→4, 8→5, etc.)
+  const stageN = (n: number) => (!SHOW_BENCHMARK_STAGES && n >= 6) ? n - 3 : n;
 
   if (loadingBenchmark) {
     return (
@@ -618,6 +635,7 @@ export function DoubleMaterialidadTab({
             className="flex items-center flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {stagesData.map((s, idx) => {
+              // stagesData ya está filtrado por SHOW_BENCHMARK_STAGES
               const isSel = s.sectionId === activeStageId;
               let base: string;
               if (isSel)                  base = s.status === "done" ? "Completado" : "En curso";
@@ -731,7 +749,7 @@ export function DoubleMaterialidadTab({
       </CollapsibleStageSection>
 
       {/* ── Etapa 3: Benchmark de empresas ── */}
-      <CollapsibleStageSection
+      {SHOW_BENCHMARK_STAGES && <CollapsibleStageSection
         id="dm-sec-benchmark-empresas"
         stageNum={3}
         label="Empresas de referencia"
@@ -747,10 +765,10 @@ export function DoubleMaterialidadTab({
           clientId={clientId}
           onDataMutate={() => void mutateBenchmarkEmpresas()}
         />
-      </CollapsibleStageSection>
+      </CollapsibleStageSection>}
 
       {/* ── Etapa 4: Benchmark ── */}
-      <CollapsibleStageSection
+      {SHOW_BENCHMARK_STAGES && <CollapsibleStageSection
         id="dm-sec-benchmark"
         stageNum={4}
         label="Benchmark competitivo"
@@ -783,10 +801,10 @@ export function DoubleMaterialidadTab({
           onGoToIros={() => navigateTo("dm-sec-iros")}
         />
 
-      </CollapsibleStageSection>
+      </CollapsibleStageSection>}
 
       {/* ── Etapa 5 — IROs de empresas de referencia ── */}
-      <CollapsibleStageSection
+      {SHOW_BENCHMARK_STAGES && <CollapsibleStageSection
         id="dm-sec-benchmark-iros"
         stageNum={5}
         label="IROs de empresas de referencia"
@@ -815,18 +833,20 @@ export function DoubleMaterialidadTab({
           clientIroTopics={iros.filter((i) => i.incluido).map((i) => i.tema_esg)}
           onIrosAdapted={() => void mutateIros()}
         />
-      </CollapsibleStageSection>
+      </CollapsibleStageSection>}
 
       {/* ── Etapa 6 — IROs del cliente ── */}
       <CollapsibleStageSection
         id="dm-sec-iros"
-        stageNum={6}
+        stageNum={stageN(6)}
         label="Inventario de IROs"
         status={stage5Status}
         accent="border-l-violet-600"
         isActive={activeStageId === "dm-sec-iros"}
         isNextLocked={stage6Status === "locked"}
-        lockReason="Completa los IROs de las empresas de referencia (Etapa 5) para identificar y calificar los Impactos, Riesgos y Oportunidades del cliente."
+        lockReason={SHOW_BENCHMARK_STAGES
+          ? "Completa los IROs de las empresas de referencia (Etapa 5) para identificar y calificar los Impactos, Riesgos y Oportunidades del cliente."
+          : "Completa los Referentes de Sostenibilidad (Etapa 2) para identificar y calificar los Impactos, Riesgos y Oportunidades del cliente."}
         subtitle="Impactos, Riesgos y Oportunidades identificados y calificados para inclusión en el estudio"
         headerRight={
           iros.length > 0 ? (
@@ -841,7 +861,7 @@ export function DoubleMaterialidadTab({
           iros={iros}
           status={irosStatus}
           isPolling={isIroPolling}
-          hasBenchmark={hasBenchmark}
+          hasBenchmark={SHOW_BENCHMARK_STAGES && hasBenchmark}
           onMutate={() => void mutateIros()}
           onStartPolling={() => {
             startIroPolling();
@@ -853,7 +873,7 @@ export function DoubleMaterialidadTab({
       {/* ── Etapa 7 — Matriz de Doble Materialidad ── */}
       <CollapsibleStageSection
         id="dm-sec-matriz"
-        stageNum={7}
+        stageNum={stageN(7)}
         label="Matriz de Doble Materialidad"
         status={stage6Status}
         accent="border-l-brand-primary"
@@ -883,7 +903,7 @@ export function DoubleMaterialidadTab({
       {/* ── Etapa 8 — NIS / IBSO ── */}
       <CollapsibleStageSection
         id="dm-sec-nis"
-        stageNum={8}
+        stageNum={stageN(8)}
         label="Brechas de información por área material"
         status={stage7Status}
         accent="border-l-amber-600"
@@ -903,7 +923,7 @@ export function DoubleMaterialidadTab({
           clientId={clientId}
           nisRows={nisRows}
           iros={iros}
-          hasBenchmark={hasBenchmark}
+          hasBenchmark={SHOW_BENCHMARK_STAGES && hasBenchmark}
           onMutate={() => void mutateNis()}
         />
       </CollapsibleStageSection>
@@ -911,7 +931,7 @@ export function DoubleMaterialidadTab({
       {/* ── Etapa 9 — Resumen ejecutivo IA ── */}
       <CollapsibleStageSection
         id="dm-sec-resumen"
-        stageNum={9}
+        stageNum={stageN(9)}
         label="Resumen Ejecutivo (IA)"
         status={stage8Status}
         accent="border-l-sky-600"
@@ -926,7 +946,7 @@ export function DoubleMaterialidadTab({
       {/* ── Etapa 10 — Validación con el cliente ── */}
       <CollapsibleStageSection
         id="dm-sec-validacion"
-        stageNum={10}
+        stageNum={stageN(10)}
         label="Validación con el cliente"
         status={stage9Status}
         accent="border-l-amber-500"
@@ -948,12 +968,14 @@ export function DoubleMaterialidadTab({
       {/* ── Etapa 11 — Reporte (etapa final) ── */}
       <CollapsibleStageSection
         id="dm-sec-reporte"
-        stageNum={11}
+        stageNum={stageN(11)}
         label="Reporte de Doble Materialidad"
         status={stage10Status}
         accent="border-l-emerald-600"
         isActive={activeStageId === "dm-sec-reporte"}
-        lockReason="Completa el benchmark (Etapa 4), los IROs de empresas de referencia (Etapa 5), el inventario de IROs del cliente (Etapa 6) y el resumen ejecutivo (Etapa 9) para generar el reporte final de doble materialidad."
+        lockReason={SHOW_BENCHMARK_STAGES
+          ? "Completa el benchmark (Etapa 4), los IROs de empresas de referencia (Etapa 5), el inventario de IROs del cliente (Etapa 6) y el resumen ejecutivo (Etapa 9) para generar el reporte final de doble materialidad."
+          : "Completa el inventario de IROs del cliente (Etapa 3) y el resumen ejecutivo (Etapa 6) para generar el reporte final de doble materialidad."}
         subtitle="Documento final consolidado · benchmark + IROs + matriz + validación cliente"
         headerRight={
           hasReport ? (
@@ -974,7 +996,7 @@ export function DoubleMaterialidadTab({
           latestReport={latestReport}
           readiness={{
             questionnairePct,
-            benchmarkCompanies: validatedCompanies,
+            benchmarkCompanies: SHOW_BENCHMARK_STAGES ? validatedCompanies : 0,
             irosTotal: iros.length,
             irosScored: scoredIncluded.length,
             hasMatriz: scoredIncluded.length >= 3,

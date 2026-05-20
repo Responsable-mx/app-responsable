@@ -298,7 +298,28 @@ contexto IA. Reemplazan el doc-fill solo-texto del MVP.
 - **`STATUS_INLINE`**: objetos `{bg, fill, text}` hex en lugar de Tailwind classes. Necesario para estilos dinámicos inline.
 - **Razón de no usar Tailwind**: los valores de color en Timeline dependen de datos (status/client_id) — no se pueden expresar como clases estáticas de Tailwind.
 
-### ClientTabs — lazy loading + header fusionado Tier 1+2 (may-2026)
+### DM-IA — etapas benchmark OCULTAS (app-responsable, may-2026)
+
+Etapas 3/4/5 del flujo DM-IA escondidas en **esta app** via `SHOW_BENCHMARK_STAGES = false`
+en `components/doble-materialidad/DoubleMaterialidadTab.tsx` (línea ~142).
+
+Etapas ocultas:
+- Etapa 3: "Empresas de referencia" (`dm-sec-benchmark-empresas`)
+- Etapa 4: "Benchmark competitivo" (`dm-sec-benchmark`)
+- Etapa 5: "IROs de empresas de referencia" (`dm-sec-benchmark-iros`)
+
+**Re-activar:** cambiar `SHOW_BENCHMARK_STAGES = true`. Código 100% presente.
+**Flujo sin benchmark:** Contexto → Referentes → IROs → Matriz → NIS → Resumen → Validación → Reporte (8 etapas).
+**IROs se desbloquean** desde Referentes done (no desde hasBenchmarkIros).
+**Reporte se desbloquea** desde hasIros + hasResumen (no requiere hasBenchmark).
+
+Archivos del bloque benchmark (activos en repo, solo no renderizados):
+- `components/doble-materialidad/`: BenchmarkSection, BenchmarkEmpresasSection, BenchmarkIrosSection,
+  BenchmarkComparisonTable, BenchmarkCharts, BenchmarkVisuals, EmpresaCard,
+  ManualAddEmpresaForm, ManualAddCompanyForm, benchmark-types.ts, benchmark-helpers.ts
+- `app/api/clients/[id]/`: dm-benchmark/, dm-benchmark-empresas/, dm-benchmark-company-iros/
+
+## ClientTabs — lazy loading + header fusionado Tier 1+2 (may-2026)
 
 **Tabs:** `Documentos` · `Cuestionario` · `DM-IA` (condicional) · `Equipo`.
 - 3 tabs usan `next/dynamic` con fallback `<Skeleton>`: `QuestionnaireTab`, `TeamTab`, `DocumentsTab`. `DoubleMaterialidadTab` lazy condicional (solo si `hasDmService`).

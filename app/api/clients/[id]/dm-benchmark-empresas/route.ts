@@ -270,17 +270,36 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const countries = (client.countries as string[] | null)?.join(", ") ?? "México";
     const size      = (client as Record<string, unknown>).size as string | null ?? null;
 
-    // Cargar marcos normativos validados en Etapa 2 para priorizar empresas que los usan
-    const { data: referentesRow } = await admin
-      .from("dm_referentes")
-      .select("enabled_frameworks")
-      .eq("client_id", id)
-      .maybeSingle();
+    // Cargar marcos normativos + competidores del cuestionario en paralelo
+    const [{ data: referentesRow }, { data: questionnaireRow }] = await Promise.all([
+      admin.from("dm_referentes").select("enabled_frameworks").eq("client_id", id).maybeSingle(),
+      admin.from("questionnaire_responses").select("responses").eq("client_id", id).eq("service_key", "doble-materialidad").maybeSingle(),
+    ]);
     const enabledFrameworks = (referentesRow?.enabled_frameworks as string[] | null) ?? [];
+
+    // Extraer campos de competidores del cuestionario
+    const qResponses = questionnaireRow?.responses as Record<string, Record<string, unknown>> | null ?? {};
+    const allFields: Record<string, string> = {};
+    for (const step of Object.values(qResponses)) {
+      if (typeof step !== "object" || step === null) continue;
+      for (const [k, v] of Object.entries(step)) {
+        if (v !== null && v !== undefined && v !== "") {
+          allFields[k] = Array.isArray(v) ? (v as unknown[]).filter(Boolean).join(", ") : String(v).trim();
+        }
+      }
+    }
+    const competidores         = allFields["competidores"]          ?? "";
+    const competidoresReportan = allFields["competidores_reportan"] ?? "";
 
     let userContent = buildGenerateUserContent(client.name, sector, industry, countries, size);
     if (enabledFrameworks.length > 0) {
       userContent += `\n\nMARCOS NORMATIVOS ESG DEL CLIENTE (validados en Etapa 2): ${enabledFrameworks.join(", ")}\nPriorizar empresas que reporten bajo estos marcos cuando sea posible.`;
+    }
+    if (competidores) {
+      userContent += `\n\nCOMPETIDORES CONOCIDOS DEL CLIENTE (del cuestionario): ${competidores}\nAsegurar que al menos los competidores mencionados aparezcan en competidores_directos si tienen informe de sostenibilidad. Si alguno no tiene informe, igualmente incluirlo con reporte_url: null.`;
+    }
+    if (competidoresReportan) {
+      userContent += `\n\nCOMPETIDORES QUE PUBLICAN INFORME (del cuestionario): ${competidoresReportan}\nEstas empresas son candidatos prioritarios para competidores_directos — incluir con informe confirmado.`;
     }
 
     const { model } = getModelConfig("aurora");

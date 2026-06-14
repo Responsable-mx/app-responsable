@@ -16,6 +16,7 @@
     "test:e2e:headed": "playwright test --headed",
     "pin:onedrive": "node scripts/pin-onedrive.mjs",
     "check:onedrive": "node scripts/pin-onedrive.mjs --check",
+    "check:design": "node scripts/check-design-rules.mjs",
     "predeploy": "node scripts/pin-onedrive.mjs && npx tsc --noEmit"
   },
   "dependencies": {

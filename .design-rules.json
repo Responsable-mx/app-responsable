@@ -1,0 +1,5 @@
+{
+  "scanDirs": ["app", "components"],
+  "brandHexes": [],
+  "skipFiles": []
+}

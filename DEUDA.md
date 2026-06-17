@@ -16,6 +16,28 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-179–D-181 — Gaps vs STARTERS globales (sync-starters, 2026-06-17)
+
+### 🟡 D-179 — starter: STARTER_BACKEND (tz canónico) — fechas «hoy/mes» cortan en UTC del servidor, no en TZ de México
+- `app/api/cron/delayed-activities/route.ts:25` (`new Date().toISOString().slice(0,10)` define «hoy» y compara `planned_end < today`), `lib/stages.ts:68`, `app/api/team/occupancy/route.ts:66`.
+- Un consultor en CDMX (UTC-6) ve actividades «vencidas» hasta 6h antes / un cron a las 0:00 UTC corre con la fecha del día equivocado.
+- Fix: helper único `hoyEnMéxico()` (IANA `America/Mexico_City`) y usarlo en esas rutas (`daily-qa/route.ts:93` ya usa la TZ correcta como referencia).
+- **Tipo:** Arquitectural · **Hito:** Al tocar reportes/alertas de fecha · **Complejidad:** Moderado.
+
+### 🟡 D-180 — starter: STARTER_IA (budget) — sin tope de gasto IA fail-closed + costo subreportado
+- No existe `checkDailyBudget`/`ai_daily_cap`/wrapper único; un loop o abuso quema crédito Anthropic sin freno (el rate-limit es por-mensaje, no por-dinero).
+- `lib/ai/usage.ts:191-193` ignora `cache_creation_tokens` (subreporta costo de escritura de caché). 2 llamadas hacen `new Anthropic()` directo saltándose la factory (`lib/ai/extract-profile.ts:191`, `lib/ai/extract-test.ts:212`).
+- Fix: `checkDailyBudget()` fail-closed (single-tenant: 1 tope global) + `guardedAnthropicCreate` único + incluir cache_creation en el costo.
+- **Tipo:** Arquitectural · **Hito:** Diferido · **Complejidad:** Moderado.
+
+### 🟡 D-181 — starter: STARTER_DEPLOY (env trim) — flags de env sin `.trim()` defensivo
+- `app/api/clients/[id]/wizard/[stepKey]/ai-fill/route.ts:207` (`process.env.DOC_RELEVANCE_ENABLED === "true"`), `app/api/cron/delayed-activities/route.ts:20` (`=== "on"`).
+- Un espacio accidental en el valor de Vercel apaga la feature en silencio.
+- Fix: `(process.env.X ?? "").trim().toLowerCase() === "true"`.
+- **Tipo:** Arquitectural · **Hito:** Diferido · **Complejidad:** Simple.
+
+---
+
 ### Bloque D-177–D-178 — Hallazgos auditoría sesión 33 (2026-05-12)
 
 ### ~~🟡 D-177 — Voyage fetch sin timeout en `lib/documents/embeddings.ts`~~ ✅ RESUELTO (sesión 33)

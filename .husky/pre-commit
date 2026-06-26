@@ -10,4 +10,7 @@ node scripts/pin-onedrive.mjs
 echo "[pre-commit] tsc --noEmit…"
 npx tsc --noEmit
 
+echo "[pre-commit] check:design (R1-R6)…"
+npm run check:design
+
 echo "[pre-commit] OK"

@@ -146,7 +146,7 @@ export function ContextoSection({
     <div className="py-2">
       {/* KPI cards — Sector / Tamaño / Marcos / Alcance / Período */}
       {hasKpis && (
-        <div className="grid grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           {/* Sector */}
           {sector ? (
             <div className="border border-slate-200 rounded p-3 bg-slate-50/50">
@@ -243,7 +243,7 @@ export function ContextoSection({
         return (
           <div className="mb-3 border border-slate-200 rounded p-3 bg-slate-50/60 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Posicionamiento ESG de partida</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {[
                 { cat: "E", label: "Ambiental", level: envLevel, hint: envLevel === "alta" ? "Sector con alta materialidad ambiental — esperar temas E1-E4 relevantes" : "Exposición ambiental estándar" },
                 { cat: "S", label: "Social",    level: socLevel, hint: socLevel === "alta" ? "Sector con alta materialidad social — S1-S4 prioritarios" : "Exposición social estándar" },

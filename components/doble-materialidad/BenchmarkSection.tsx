@@ -103,7 +103,7 @@ function SynthesisBlock({ narrative, createdAt, onGoToIros }: { narrative: strin
             <p className="text-sm text-slate-600 leading-relaxed">{intro}</p>
           )}
           {/* P3 — Semáforo ejecutivo: primera oración por sección */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {sections.map((s) => {
               const firstSentence = s.text.split(/[.!?]/)[0]?.trim() ?? s.text;
               const dot = s.label === "Fortalezas" ? "bg-emerald-500" : s.label === "Brechas críticas" ? "bg-rose-500" : "bg-amber-500";

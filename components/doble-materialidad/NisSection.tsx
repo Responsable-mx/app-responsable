@@ -249,7 +249,7 @@ export function NisSection({
           </div>
 
           {/* Qué esperar */}
-          <div className="grid grid-cols-3 gap-2 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
             {[
               { label: "Disponible", desc: "El cliente ya tiene este dato documentado", color: "bg-emerald-100 text-emerald-700" },
               { label: "Parcial", desc: "Existe información pero incompleta o desactualizada", color: "bg-amber-100 text-amber-700" },

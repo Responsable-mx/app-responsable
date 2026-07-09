@@ -43,9 +43,17 @@ describe("computeStatus", () => {
     ).toBe("completed");
   });
 
-  it("in_progress tiene precedencia sobre delayed (actual_start sin actual_end, planned_end pasado)", () => {
+  it("delayed tiene precedencia sobre in_progress (actual_start sin actual_end, planned_end pasado)", () => {
+    // Una actividad iniciada pero vencida debe contarse como retrasada: antes
+    // quedaba oculta como in_progress, contradiciendo el correo de alertas.
     expect(
       computeStatus({ planned_start: yesterday, planned_end: yesterday, actual_start: yesterday, actual_end: null })
+    ).toBe("delayed");
+  });
+
+  it("in_progress si actual_start y planned_end NO ha pasado", () => {
+    expect(
+      computeStatus({ planned_start: yesterday, planned_end: tomorrow, actual_start: yesterday, actual_end: null })
     ).toBe("in_progress");
   });
 });

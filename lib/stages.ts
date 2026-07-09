@@ -67,8 +67,11 @@ export function computeStatus(a: {
 }): ActivityStatus {
   const today = new Date().toISOString().slice(0, 10);
   if (a.actual_end) return "completed";
-  if (a.actual_start && !a.actual_end) return "in_progress";
+  // "Vencida" gana sobre "en curso": una actividad iniciada pero pasada de su
+  // fecha límite debe contarse como retrasada (antes quedaba oculta como
+  // in_progress, contradiciendo el correo de alertas que sí la marcaba).
   if (a.planned_end && today > a.planned_end) return "delayed";
+  if (a.actual_start) return "in_progress";
   return "pending";
 }
 

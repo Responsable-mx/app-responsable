@@ -21,7 +21,9 @@ export const dynamic = "force-dynamic";
 // Rate limit: 3 reportes DM por 5 min (Opus vía Batch — ~$0.20-0.50/call)
 
 const GenerateBody = z.object({
-  result_id: z.string().uuid(),
+  // Opcional: cuando el benchmark competitivo está oculto (SHOW_BENCHMARK_STAGES
+  // =false) el reporte se genera sin él. Requerido solo si hay benchmark.
+  result_id: z.string().uuid().optional(),
 });
 
 const ReportNarrativeSchema = z.object({
@@ -88,15 +90,17 @@ type ClientNisRow = {
   accion: string | null;
 };
 
+type BenchmarkResultRow = {
+  companies_snapshot: unknown;
+  fields_snapshot: unknown;
+  comparison: unknown;
+  narrative: string;
+};
+
 async function buildReportPrompt(
   client: Client,
   clientContext: string,
-  benchmarkResult: {
-    companies_snapshot: unknown;
-    fields_snapshot: unknown;
-    comparison: unknown;
-    narrative: string;
-  },
+  benchmarkResult: BenchmarkResultRow | null,
   clientIros: ClientIroRow[],
   clientNis: ClientNisRow[],
 ): Promise<string> {
@@ -148,10 +152,12 @@ async function buildReportPrompt(
         .join("\n")}`
     : "";
 
-  const benchmarkData = `Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
+  const benchmarkData = benchmarkResult
+    ? `Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
 Campos analizados: ${JSON.stringify(benchmarkResult.fields_snapshot, null, 2)}
 Comparación detallada: ${JSON.stringify(benchmarkResult.comparison, null, 2)}
-Síntesis del analista: ${benchmarkResult.narrative}`;
+Síntesis del analista: ${benchmarkResult.narrative}`
+    : "Sin benchmark competitivo en este estudio (etapa no incluida en el alcance).";
 
   // Leer template desde DB (con fallback al hardcoded en DEFAULT_PROMPTS)
   const template = await getPrompt("dm.report");
@@ -302,16 +308,22 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const admin = createAdminClient();
 
-  const { data: benchmarkResult, error: fetchErr } = await admin
-    .from("dm_benchmark_results")
-    .select("*")
-    .eq("id", parsed.data.result_id)
-    .eq("client_id", id)
-    .eq("status", "done")
-    .single();
+  // Benchmark competitivo opcional: solo se carga si el frontend envió result_id
+  // (etapa visible). Con la etapa oculta, el reporte se genera sin él.
+  let benchmarkResult: BenchmarkResultRow | null = null;
+  if (parsed.data.result_id) {
+    const { data, error: fetchErr } = await admin
+      .from("dm_benchmark_results")
+      .select("*")
+      .eq("id", parsed.data.result_id)
+      .eq("client_id", id)
+      .eq("status", "done")
+      .single();
 
-  if (fetchErr || !benchmarkResult) {
-    return NextResponse.json({ error: "Resultado de benchmark no encontrado o aún no completado" }, { status: 404 });
+    if (fetchErr || !data) {
+      return NextResponse.json({ error: "Resultado de benchmark no encontrado o aún no completado" }, { status: 404 });
+    }
+    benchmarkResult = data as BenchmarkResultRow;
   }
 
   if (anthropicBreaker.isOpen) {
@@ -370,12 +382,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const prompt = await buildReportPrompt(
     client,
     clientContext,
-    benchmarkResult as {
-      companies_snapshot: unknown;
-      fields_snapshot: unknown;
-      comparison: unknown;
-      narrative: string;
-    },
+    benchmarkResult,
     clientIros,
     clientNis,
   );

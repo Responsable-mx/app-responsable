@@ -158,6 +158,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (typeof filename !== "string" || !filename) {
       return NextResponse.json({ error: "Falta filename" }, { status: 400 });
     }
+    // Anti-IDOR: el storagePath debe pertenecer a ESTE cliente. Sin esto, un
+    // consultor autorizado para el cliente A podría pasar el path de otro
+    // cliente B y descargar su informe (el download usa service-role y salta
+    // RLS). El presign siempre emite `${id}/...`; rechazamos cualquier otro.
+    if (!storagePath.startsWith(`${id}/`)) {
+      return NextResponse.json({ error: "storagePath no pertenece a este cliente" }, { status: 400 });
+    }
     const mimeType = typeof rawMimeType === "string" ? rawMimeType : "application/octet-stream";
     const kindParsed = DOCUMENT_KIND_SCHEMA.safeParse(rawKind);
     const kind = kindParsed.success ? kindParsed.data : "general";

@@ -16,6 +16,67 @@ Registro de deuda técnica acumulada. Actualizar al cerrar cada sesión de audit
 
 ---
 
+### Bloque D-182–D-194 — Auditoría unificada Fable (audit-app + seguridad, 2026-07-09)
+
+Método: captura en vivo (Chrome admin, solo lectura) + fondo code-read (2 revisores Opus) + seguridad (2 revisores + 2 escépticos refutando). Detalle completo en AUDIT_LAST.md.
+
+#### Resueltos en esta sesión
+
+### ~~🔴 D-182 — Matriz DM y Resumen se contradicen (mismo IRO, 2 cuadrantes)~~ ✅ RESUELTO (2026-07-09)
+- `DoubleMaterialidadTab.tsx:437` clasificaba con `score>=2`; `MatrizDM.tsx` con eje>=5 (`score>=3`). IRO (impacto=2,financiero=2) salía "doble material" en KPI cards y "en seguimiento" en la gráfica → entregable contradictorio ante el cliente.
+- Fix: `lib/dm/materiality-quadrant.ts` nuevo — fuente única (`classifyIroByScore`, `classifyQuadrant`, `scoreToAxis`, `resolveIroAxes`). Umbral canónico = midpoint 3 (escala 1-5) / eje>=5. Consumido por el Tab (conteos KPI) y MatrizDM (elimina copias locales).
+
+### ~~🔴 D-183 — "Generar reporte" inalcanzable con benchmark oculto~~ ✅ RESUELTO (2026-07-09)
+- Con `SHOW_BENCHMARK_STAGES=false`, `ReporteSection` gate `canGenerate = latestResult?.status==="done"` (benchmark null) → sección bloqueada; `handleGenerate` hacía `if(!latestResult) return` silencioso; `dm-report`/`export-dm-pdf` exigían benchmark. La etapa final (entregable) no se podía producir.
+- Fix: benchmark ahora OPCIONAL. `result_id` opcional en `dm-report` y `export-dm-pdf` (placeholder si falta); `benchmarkRequired` prop a `ReporteSection` → `canGenerate` usa `hasMatriz` cuando el benchmark está oculto; body/query sin `result_id`; mensaje de bloqueo y checklist ajustados (items benchmark + NIS retirados cuando no aplican).
+
+### ~~🔴 D-184 — Actividad iniciada+vencida no cuenta como retrasada~~ ✅ RESUELTO (2026-07-09)
+- `lib/stages.ts:70` `in_progress` ganaba antes de evaluar `delayed`. Tabla Equipo la mostraba "En curso"/0 retrasadas, pero `cron/delayed-activities` sí la incluía en el correo → tabla y correo daban cifras distintas para "retrasada".
+- Fix: `delayed` domina sobre `in_progress` cuando `today>planned_end`. Alinea tabla + correo. Test `stages.test.ts` actualizado a la nueva regla.
+
+### ~~🟠 D-185 — IDOR: documentos cross-cliente vía storagePath~~ ✅ RESUELTO (2026-07-09)
+- `documents/route.ts` Path B confiaba en `storagePath` del body sin validar prefijo; download con service-role (salta RLS). Un consultor de A podía traerse el informe de B conociendo su UUID de path.
+- Fix: `if(!storagePath.startsWith(`${id}/`)) return 400` antes de usar el path (cubre rama ZIP e individual).
+
+#### Pendientes (priorizados)
+
+### 🟠 D-190 — IDOR rol cliente latente (7 endpoints con `requireUser`) — GATE antes de 1er cliente externo
+- `ai-costs`, `services` (GET+POST), `clients/[id]` GET, `stages` GET, `engagements` GET/POST, `consultors` GET usan `requireUser` (no discrimina rol) + service-role. Hoy inerte (solo 3 cuentas +altamira internas, sin portal cliente). Al activar el 1er `role=cliente` externo, un cliente vería datos de otro. Fix: `requireConsultorForClient` en todos. **Bloqueante antes de onboardear cliente externo.**
+
+### 🟡 D-186 — Precio Haiku contradictorio entre archivos
+- `usage.ts:188` $0.25/$1.25 vs `models.ts:5-6` comentario $1/$5. Una está mal → si el real es $1, el panel subreporta Haiku 4×. Verificar precio vigente de `claude-haiku-4-5` y unificar en `MODEL_PRICES` importado por ambos.
+
+### 🟡 D-187 — Resumen/Reporte IA aún cargan NIS/IBSO eliminado (prompts)
+- `dm-resumen/route.ts:176-199` y `dm-report/route.ts` siguen cargando `client_nis_assessment` e inyectando "brechas" de una metodología retirada (CLAUDE.md: "NIS/IBSO eliminado"). El checklist ya se limpió (D-183), pero los prompts no. Quitar la carga NIS de ambos, o reactivar la etapa si sigue viva.
+
+### 🟡 D-188 — Umbral de carga 5 vs 6 contradictorio
+- `TeamOccupancy.tsx:33` marca "sobrecargado" con `>=5` pero tooltip/barra dicen "de 6 máximo". Unificar constante `MAX_ACTIVE` y derivar todos los umbrales.
+
+### 🟡 D-189 — PDF escaneado sin OCR queda `parse_status="ok"` con basura
+- `queries.ts:75` marca `failed` solo si trim vacío, pero los marcadores `<!-- page:N -->` dan length>0 → un PDF sin texto real pasa a la IA como fuente. Umbral mínimo de texto alfanumérico útil (p.ej. <100 chars → `failed` "sin texto extraíble").
+
+### 🟡 D-191 — Crons fail-open si `CRON_SECRET` vacía
+- `cron/ingest-competitor-reports`, `cron/auto-update`, `cron/embed-chunks` usan `if(CRON_SECRET && authHeader!==...)` → si la env var queda vacía, el guard se salta. Unificar a `verifyCron()` (fail-closed, ya existe en `auth.ts`).
+
+### 🟡 D-192 — Job `ingest-one-company` fail-open (hardening)
+- `jobs/ingest-one-company/route.ts:42-44` procesa sin verificar firma si faltan QSTASH keys. No explotable en prod (keys presentes → código muerto), pero asimetría: `reparse-document` degrada a `requireAdmin`. Copiar ese patrón (401 si faltan keys).
+
+### 🟡 D-193 — SSRF: redirect seguido sin re-validar destino
+- `ingest-report` (`redirect:"follow"`) + `competitor.ts`, `extract-profile.ts`, `extract-test.ts`. URL pasa `isPublicHttpUrl` inicial pero un 302 puede apuntar a IP interna/metadata cloud. Con clientes reales sube el riesgo. `redirect:"manual"` + revalidar cada salto. Además `extract-test.ts:64-104` tiene guard SSRF propio más débil (sin IPv6 ULA) → usar `isPublicHttpUrl`.
+
+### 🟢 D-194 — Secrets de prod en `.env.local` dentro de OneDrive sincronizado
+- service_role, ANTHROPIC, RESEND, QSTASH, GOOGLE_AI en texto claro viajan a la nube MS. En .gitignore/no-trackeado (git OK), pero superficie ampliada. Considerar rotar service_role + evaluar mover el repo fuera de OneDrive o excluir `.env*` del sync.
+
+### 🟢 Menores forma (no bloquean)
+- Labels wizard DM-IA truncados ambiguos: 2× "Modelo de ne..." indistinguibles.
+- Panel monitoreo "Búsqueda semántica Inactiva" vs código Voyage activo — verificar (posible solo "sin actividad 30d").
+- L1 score consolidado con 3 fórmulas (max vs suma) · L2 Gemini loggea costo $0 · zip-bomb sin tope de ratio · truncateMarkdown corta a media tabla · 7 warnings W3 divs clickeables.
+
+### ⭐ Negocio (fuera de deuda técnica, pero es LA señal)
+- **Adopción ~0 en 30 días** (panel monitoreo: todo "Sin actividad"). La app está técnicamente sólida pero sin uso en el período. Antes de más features: entender por qué el equipo no la usa. Métrica HEART a instrumentar: # consultores que completan 1 estudio DM end-to-end/mes.
+
+---
+
 ### Bloque D-179–D-181 — Gaps vs STARTERS globales (sync-starters, 2026-06-17)
 
 ### 🟡 D-179 — starter: STARTER_BACKEND (tz canónico) — fechas «hoy/mes» cortan en UTC del servidor, no en TZ de México

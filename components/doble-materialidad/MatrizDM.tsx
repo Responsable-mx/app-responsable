@@ -3,10 +3,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
 import { extractEsrsCode } from "@/lib/dm/esg-classify";
+import { type Quadrant, scoreToAxis, classifyQuadrant } from "@/lib/dm/materiality-quadrant";
 
 // ── Tipos internos ────────────────────────────────────────────────────────────
-
-type Quadrant = "doble_material" | "solo_impacto" | "solo_financiero" | "en_seguimiento";
 
 type TemaPoint = {
   tema_esg: string;
@@ -64,8 +63,8 @@ const FILTER_OPTIONS: Array<{ value: "todos" | Quadrant; label: string }> = [
 ];
 
 // ── Helpers de coordenadas ────────────────────────────────────────────────────
-// Ejes 0-10 (pattern mockup-v7). Score 1-5 se deriva como (1→0, 2→2.5, 3→5, 4→7.5, 5→10)
-// o se sobrescribe con pos_x/pos_y manual del consultor.
+// scoreToAxis + classifyQuadrant viven en @/lib/dm/materiality-quadrant (fuente
+// única compartida con DoubleMaterialidadTab). mapX/mapY posicionan en el SVG.
 
 function mapX(axisValue: number): number {
   return LEFT + (axisValue / 10) * PLOT_W;
@@ -73,24 +72,6 @@ function mapX(axisValue: number): number {
 
 function mapY(axisValue: number): number {
   return TOP + PLOT_H - (axisValue / 10) * PLOT_H;
-}
-
-/** Score 1-5 → coord eje 0-10. Permite null score → midpoint 5. */
-function scoreToAxis(score: number | null | undefined): number {
-  if (score == null) return 5;
-  return ((score - 1) / 4) * 10;
-}
-
-// ── Clasificación de cuadrante ────────────────────────────────────────────────
-// Midpoint en 5 (ejes 0-10).
-
-function classifyQuadrant(x: number, y: number): Quadrant {
-  const xMat = x >= 5;
-  const yMat = y >= 5;
-  if (xMat && yMat)   return "doble_material";
-  if (!xMat && yMat)  return "solo_impacto";
-  if (xMat && !yMat)  return "solo_financiero";
-  return "en_seguimiento";
 }
 
 // ── Shapes SVG ────────────────────────────────────────────────────────────────

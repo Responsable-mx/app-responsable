@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import type { IroInventoryItem } from "@/lib/dm/iro-generation";
+import { classifyIroByScore } from "@/lib/dm/materiality-quadrant";
 // ContextoSection eager — etapa por default (primer panel visible)
 import { ContextoSection } from "@/components/doble-materialidad/ContextoSection";
 import { HorizontesConfig } from "@/components/doble-materialidad/HorizontesConfig";
@@ -430,20 +431,19 @@ export function DoubleMaterialidadTab({
     ? "pending"
     : "locked";
 
-  // Conteos por cuadrante — pasados a ResumenEjecutivoSection para KPI cards
+  // Conteos por cuadrante — pasados a ResumenEjecutivoSection para KPI cards.
+  // Usa la MISMA clasificación canónica que MatrizDM (lib/dm/materiality-quadrant)
+  // para que las tarjetas de resumen y la gráfica no se contradigan.
   const scoredIncluded = iros.filter(
     (i) => i.incluido && i.score_impacto != null && i.score_financiero != null
   );
+  const scoredQuadrants = scoredIncluded.map((i) =>
+    classifyIroByScore(i.score_impacto, i.score_financiero)
+  );
   const quadrantCounts = {
-    doble_material: scoredIncluded.filter(
-      (i) => (i.score_impacto ?? 0) >= 2 && (i.score_financiero ?? 0) >= 2
-    ).length,
-    solo_impacto: scoredIncluded.filter(
-      (i) => (i.score_impacto ?? 0) >= 2 && (i.score_financiero ?? 0) < 2
-    ).length,
-    solo_financiero: scoredIncluded.filter(
-      (i) => (i.score_impacto ?? 0) < 2 && (i.score_financiero ?? 0) >= 2
-    ).length,
+    doble_material: scoredQuadrants.filter((q) => q === "doble_material").length,
+    solo_impacto: scoredQuadrants.filter((q) => q === "solo_impacto").length,
+    solo_financiero: scoredQuadrants.filter((q) => q === "solo_financiero").length,
     brechas_criticas: 0,
   };
 
@@ -952,6 +952,7 @@ export function DoubleMaterialidadTab({
         <ReporteSection
           clientId={clientId}
           clientName={clientName}
+          benchmarkRequired={SHOW_BENCHMARK_STAGES}
           latestResult={latestResult}
           latestReport={latestReport}
           readiness={{

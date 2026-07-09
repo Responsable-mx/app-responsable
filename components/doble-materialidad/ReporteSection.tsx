@@ -97,6 +97,7 @@ export type ReporteReadiness = {
 export function ReporteSection({
   clientId,
   clientName,
+  benchmarkRequired,
   latestResult,
   latestReport,
   readiness,
@@ -106,6 +107,7 @@ export function ReporteSection({
 }: {
   clientId: string;
   clientName: string;
+  benchmarkRequired: boolean;
   latestResult: BenchmarkResultRef;
   latestReport: LatestReport;
   readiness: ReporteReadiness;
@@ -119,7 +121,12 @@ export function ReporteSection({
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
 
-  const canGenerate = latestResult?.status === "done";
+  // Con benchmark visible: requiere el benchmark completado. Con benchmark
+  // oculto (SHOW_BENCHMARK_STAGES=false): basta tener matriz (≥3 IROs con score)
+  // para que el reporte tenga materia. El checklist avisa criterios faltantes.
+  const canGenerate = benchmarkRequired
+    ? latestResult?.status === "done"
+    : readiness.hasMatriz;
 
   // Detectar batch estancado: actualiza cada 30s mientras el reporte está pendiente
   const [batchAgeMin, setBatchAgeMin] = useState(0);
@@ -143,12 +150,15 @@ export function ReporteSection({
       detail: readiness.questionnairePct !== null ? `${readiness.questionnairePct}%` : "sin datos",
       sectionId: "dm-sec-contexto",
     },
-    {
-      ok: readiness.benchmarkCompanies >= 3,
-      label: "Benchmark ejecutado con ≥3 empresas",
-      detail: `${readiness.benchmarkCompanies} ${readiness.benchmarkCompanies === 1 ? "empresa" : "empresas"}`,
-      sectionId: "dm-sec-benchmark",
-    },
+    // Benchmark solo cuenta como criterio cuando la etapa está visible.
+    ...(benchmarkRequired
+      ? [{
+          ok: readiness.benchmarkCompanies >= 3,
+          label: "Benchmark ejecutado con ≥3 empresas",
+          detail: `${readiness.benchmarkCompanies} ${readiness.benchmarkCompanies === 1 ? "empresa" : "empresas"}`,
+          sectionId: "dm-sec-benchmark",
+        }]
+      : []),
     {
       ok: readiness.irosScored >= 5,
       label: "IROs calificados (≥5 con score)",
@@ -160,12 +170,6 @@ export function ReporteSection({
       label: "Matriz de materialidad generada",
       detail: readiness.hasMatriz ? `${readiness.irosScored} IROs` : "sin matriz",
       sectionId: "dm-sec-matriz",
-    },
-    {
-      ok: readiness.nisCount > 0,
-      label: "Brechas NIS/IBSO documentadas",
-      detail: `${readiness.nisCount} ${readiness.nisCount === 1 ? "brecha" : "brechas"}`,
-      sectionId: "dm-sec-nis",
     },
     {
       ok: readiness.resumenReviewed,
@@ -185,13 +189,13 @@ export function ReporteSection({
   const allReady = okCount === totalCount;
 
   const handleGenerate = useCallback(async () => {
-    if (!latestResult) return;
     setGenerating(true);
     try {
       const res = await fetch(`/api/clients/${clientId}/dm-report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ result_id: latestResult.id }),
+        // Sin benchmark (etapa oculta), se genera sin result_id.
+        body: JSON.stringify(latestResult ? { result_id: latestResult.id } : {}),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error al generar reporte");
@@ -206,10 +210,11 @@ export function ReporteSection({
   }, [clientId, latestResult, push, onReportMutate, onStartReportPolling]);
 
   const handleDownloadPdf = useCallback(async () => {
-    if (!latestResult) return;
     setDownloading(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}/export-dm-pdf?result_id=${latestResult.id}`);
+      // Sin benchmark, el PDF se arma sin result_id (solo IROs + narrativa IA).
+      const qs = latestResult ? `?result_id=${latestResult.id}` : "";
+      const res = await fetch(`/api/clients/${clientId}/export-dm-pdf${qs}`);
       if (!res.ok) throw new Error("Error al exportar PDF");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -239,7 +244,9 @@ export function ReporteSection({
       {!canGenerate && (
         <div className="border-l-4 border-l-slate-300 pl-4 py-2">
           <p className="text-xs text-slate-500">
-            Completa el benchmark primero para poder generar el reporte.
+            {benchmarkRequired
+              ? "Completa el benchmark primero para poder generar el reporte."
+              : "Califica al menos 3 IROs (genera la matriz) para poder generar el reporte."}
           </p>
         </div>
       )}

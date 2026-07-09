@@ -25,22 +25,33 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   if (limited) return NextResponse.json({ error: limited.message }, { status: 429 });
 
   const resultId = req.nextUrl.searchParams.get("result_id");
-  if (!resultId) return NextResponse.json({ error: "result_id requerido" }, { status: 400 });
 
   const client = await getClient(id).catch(() => null);
   if (!client) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
   const admin = createAdminClient();
-  const { data: result, error } = await admin
-    .from("dm_benchmark_results")
-    .select("*")
-    .eq("id", resultId)
-    .eq("client_id", id)
-    .eq("status", "done")
-    .single();
 
-  if (error || !result) {
-    return NextResponse.json({ error: "Resultado de benchmark no encontrado" }, { status: 404 });
+  // Benchmark competitivo opcional: cuando la etapa está oculta
+  // (SHOW_BENCHMARK_STAGES=false) el reporte no tiene result_id y el PDF se
+  // arma solo con IROs + narrativa del reporte IA, sin sección de benchmark.
+  type BenchmarkResult = {
+    companies_snapshot: unknown;
+    comparison: unknown;
+    narrative: string | null;
+  };
+  let result: BenchmarkResult | null = null;
+  if (resultId) {
+    const { data, error } = await admin
+      .from("dm_benchmark_results")
+      .select("*")
+      .eq("id", resultId)
+      .eq("client_id", id)
+      .eq("status", "done")
+      .single();
+    if (error || !data) {
+      return NextResponse.json({ error: "Resultado de benchmark no encontrado" }, { status: 404 });
+    }
+    result = data as BenchmarkResult;
   }
 
   const { data: reportDoc } = await admin
@@ -52,7 +63,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     .limit(1)
     .single();
 
-  const companies = (result.companies_snapshot as Array<{ name: string; country: string | null; relation: string }>) ?? [];
+  const companies = (result?.companies_snapshot as Array<{ name: string; country: string | null; relation: string }>) ?? [];
 
   // Fetchar IROs + NIS frescos desde DB (más actualizado que el JSON embebido)
   const [irosRes, nisRes] = await Promise.all([
@@ -84,7 +95,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       executive_summary: reportDoc?.markdown_content
         ? extractSection(reportDoc.markdown_content, "Resumen Ejecutivo")
         : `Análisis de Doble Materialidad para ${client.name} vs ${companies.length} empresas de referencia. Genera el reporte con IA para análisis narrativo completo.`,
-      client_position: result.narrative ?? "Ejecuta el análisis de reporte IA para obtener el posicionamiento detallado.",
+      client_position: result?.narrative ?? "Ejecuta el análisis de reporte IA para obtener el posicionamiento detallado.",
       risks: [],
       strengths: ["Ver análisis detallado en el reporte IA"],
       improvement_areas: ["Genera el reporte con IA para obtener áreas de mejora específicas"],
@@ -118,7 +129,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     narrative,
     companies,
     fields: BENCHMARK_FIELDS,
-    comparison: (result.comparison as Record<string, Record<string, string>>) ?? {},
+    comparison: (result?.comparison as Record<string, Record<string, string>>) ?? {},
     generatedAt: new Date().toLocaleDateString("es-MX", {
       year: "numeric", month: "long", day: "numeric",
     }),

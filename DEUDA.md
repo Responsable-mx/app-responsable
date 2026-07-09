@@ -538,3 +538,9 @@ El sprint may-2026 implementó Cuestionario (D-01) y Materialidad (D-02) como fe
 ---
 
 *Última auditoría: may-2026 sesión 35 — D-04 eliminado (decisión de negocio, fuera de alcance técnico). Score global 9.9/10. Próxima revisión: ver tareas programadas en `MEMORY.md`.*
+
+## Drift del gate global (2026-07-09)
+
+| ID | Deuda | Fecha |
+|---|---|---|
+| D-107 | Gate global agregó **R7 type-floor** (ERROR texto <10px, audit leads 25-jun). El espejo local no lo tiene; al sincronizar fallarán **~155 instancias** `text-[<10px]` — barrerlas a 10px+ antes de actualizar el espejo. | jul-2026 |

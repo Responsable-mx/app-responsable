@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDevMode } from "@/lib/env";
+import { hoyEnMexico } from "@/lib/date";
 
 export type ActivityStatus = "pending" | "in_progress" | "completed" | "delayed";
 
@@ -58,14 +59,18 @@ function _hydrateStages(stages: typeof _devStages): ServiceStage[] {
   }));
 }
 
-// Status computado desde fechas — nunca se almacena.
-export function computeStatus(a: {
-  planned_start: string | null;
-  planned_end: string | null;
-  actual_start: string | null;
-  actual_end: string | null;
-}): ActivityStatus {
-  const today = new Date().toISOString().slice(0, 10);
+// Status computado desde fechas — nunca se almacena. `today` inyectable
+// (default = hoy en México) para tests deterministas y para reusar la misma
+// fecha en lotes; sin argumento usa la TZ de operación, no el UTC del servidor.
+export function computeStatus(
+  a: {
+    planned_start: string | null;
+    planned_end: string | null;
+    actual_start: string | null;
+    actual_end: string | null;
+  },
+  today: string = hoyEnMexico(),
+): ActivityStatus {
   if (a.actual_end) return "completed";
   // "Vencida" gana sobre "en curso": una actividad iniciada pero pasada de su
   // fecha límite debe contarse como retrasada (antes quedaba oculta como

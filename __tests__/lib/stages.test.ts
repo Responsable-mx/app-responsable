@@ -1,45 +1,46 @@
 import { describe, it, expect } from "vitest";
 import { computeStatus, StageInputSchema, ActivityInputSchema } from "../../lib/stages";
 
-// computeStatus es pura — sin efectos secundarios, testeable sin mock de DB.
+// computeStatus es pura — `today` inyectado fijo para tests deterministas
+// (sin depender de la hora/TZ de corrida).
 describe("computeStatus", () => {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const today = "2026-06-15";
+  const yesterday = "2026-06-14";
+  const tomorrow = "2026-06-16";
 
   it("completed si actual_end tiene valor", () => {
     expect(
-      computeStatus({ planned_start: today, planned_end: today, actual_start: today, actual_end: today })
+      computeStatus({ planned_start: today, planned_end: today, actual_start: today, actual_end: today }, today)
     ).toBe("completed");
   });
 
   it("in_progress si actual_start pero sin actual_end", () => {
     expect(
-      computeStatus({ planned_start: yesterday, planned_end: tomorrow, actual_start: today, actual_end: null })
+      computeStatus({ planned_start: yesterday, planned_end: tomorrow, actual_start: today, actual_end: null }, today)
     ).toBe("in_progress");
   });
 
   it("delayed si planned_end en pasado y sin actual_start", () => {
     expect(
-      computeStatus({ planned_start: yesterday, planned_end: yesterday, actual_start: null, actual_end: null })
+      computeStatus({ planned_start: yesterday, planned_end: yesterday, actual_start: null, actual_end: null }, today)
     ).toBe("delayed");
   });
 
   it("pending si sin fechas reales y planned_end en futuro", () => {
     expect(
-      computeStatus({ planned_start: today, planned_end: tomorrow, actual_start: null, actual_end: null })
+      computeStatus({ planned_start: today, planned_end: tomorrow, actual_start: null, actual_end: null }, today)
     ).toBe("pending");
   });
 
   it("pending si todas las fechas null", () => {
     expect(
-      computeStatus({ planned_start: null, planned_end: null, actual_start: null, actual_end: null })
+      computeStatus({ planned_start: null, planned_end: null, actual_start: null, actual_end: null }, today)
     ).toBe("pending");
   });
 
   it("completed tiene precedencia sobre delayed (actual_end presente, planned_end en pasado)", () => {
     expect(
-      computeStatus({ planned_start: yesterday, planned_end: yesterday, actual_start: yesterday, actual_end: yesterday })
+      computeStatus({ planned_start: yesterday, planned_end: yesterday, actual_start: yesterday, actual_end: yesterday }, today)
     ).toBe("completed");
   });
 
@@ -47,14 +48,21 @@ describe("computeStatus", () => {
     // Una actividad iniciada pero vencida debe contarse como retrasada: antes
     // quedaba oculta como in_progress, contradiciendo el correo de alertas.
     expect(
-      computeStatus({ planned_start: yesterday, planned_end: yesterday, actual_start: yesterday, actual_end: null })
+      computeStatus({ planned_start: yesterday, planned_end: yesterday, actual_start: yesterday, actual_end: null }, today)
     ).toBe("delayed");
   });
 
   it("in_progress si actual_start y planned_end NO ha pasado", () => {
     expect(
-      computeStatus({ planned_start: yesterday, planned_end: tomorrow, actual_start: yesterday, actual_end: null })
+      computeStatus({ planned_start: yesterday, planned_end: tomorrow, actual_start: yesterday, actual_end: null }, today)
     ).toBe("in_progress");
+  });
+
+  it("usa hoy-en-México por default cuando no se pasa `today`", () => {
+    // planned_end muy en el pasado → delayed sin importar la TZ de corrida.
+    expect(
+      computeStatus({ planned_start: "2020-01-01", planned_end: "2020-01-02", actual_start: null, actual_end: null })
+    ).toBe("delayed");
   });
 });
 

@@ -81,11 +81,9 @@ Método: captura en vivo (Chrome admin, solo lectura) + fondo code-read (2 revis
 
 ### Bloque D-179–D-181 — Gaps vs STARTERS globales (sync-starters, 2026-06-17)
 
-### 🟡 D-179 — starter: STARTER_BACKEND (tz canónico) — fechas «hoy/mes» cortan en UTC del servidor, no en TZ de México
-- `app/api/cron/delayed-activities/route.ts:25` (`new Date().toISOString().slice(0,10)` define «hoy» y compara `planned_end < today`), `lib/stages.ts:68`, `app/api/team/occupancy/route.ts:66`.
-- Un consultor en CDMX (UTC-6) ve actividades «vencidas» hasta 6h antes / un cron a las 0:00 UTC corre con la fecha del día equivocado.
-- Fix: helper único `hoyEnMéxico()` (IANA `America/Mexico_City`) y usarlo en esas rutas (`daily-qa/route.ts:93` ya usa la TZ correcta como referencia).
-- **Tipo:** Arquitectural · **Hito:** Al tocar reportes/alertas de fecha · **Complejidad:** Moderado.
+### ~~🟡 D-179 — fechas «hoy» cortan en UTC del servidor, no en TZ de México~~ ✅ RESUELTO (2026-07-10)
+- Helper único `lib/date.ts` `hoyEnMexico()` (IANA `America/Mexico_City`, formato `YYYY-MM-DD` vía `en-CA`). `computeStatus` (lib/stages.ts) ahora acepta `today` inyectable con default `hoyEnMexico()` → la tabla de Equipo (`occupancy` usa `computeStatus`) y el cron `delayed-activities` cuentan «vencidas» con fecha de México. Elimina el falso-positivo de 6h (18:00-24:00 CDMX). Tests de `computeStatus` ahora deterministas (today fijo).
+- Nota: `occupancy:66 oneYearAgoStr` (corte a 1 año) NO se cambió — impacto TZ nulo a esa escala.
 
 ### 🟡 D-180 — starter: STARTER_IA (budget) — sin tope de gasto IA fail-closed + costo subreportado
 - No existe `checkDailyBudget`/`ai_daily_cap`/wrapper único; un loop o abuso quema crédito Anthropic sin freno (el rate-limit es por-mensaje, no por-dinero).

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCron } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hoyEnMexico } from "@/lib/date";
 import { Resend } from "resend";
 
 export const maxDuration = 60;
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hoyEnMexico();
 
   // Query: actividades retrasadas con assignee + chain join hasta cliente para contexto.
   const { data: rows, error } = await admin

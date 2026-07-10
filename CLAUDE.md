@@ -557,3 +557,19 @@ Los health checks se dedupen automáticamente por key (Voyage Embeddings + Voyag
 - `dm-benchmark/route.ts` POST compare: verifica cache antes de Batch API. GET: escribe cache cuando batch→done. TTL 14d.
 - `dm-referentes/route.ts` generate_topics: verifica cache antes de Sonnet. Escribe tras DB store. TTL 30d.
 - Env vars necesarias: `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (misma cuenta que QStash).
+
+## Fuentes únicas canónicas — NO duplicar (audit jul-2026)
+
+Estas 4 lógicas nacieron duplicadas y divergieron, causando bugs de cara al cliente. Ahora hay una sola fuente por cada una; al tocar el tema, **importar de aquí, nunca reimplementar**:
+
+- **Clasificación de cuadrante de doble materialidad** → `lib/dm/materiality-quadrant.ts` (`classifyIroByScore`, `classifyQuadrant`, `scoreToAxis`, `resolveIroAxes`). Umbral canónico = midpoint 3 (escala 1-5) / eje≥5. Lo consumen `DoubleMaterialidadTab` (conteos KPI) y `MatrizDM` (gráfica). Antes divergían (`>=2` vs `>=3`) → mismo IRO salía "doble material" en el resumen y "en seguimiento" en la matriz.
+- **Precios de IA** → `lib/ai/pricing.ts` (`MODEL_PRICES`, `priceForModel`). Haiku 4.5 $1/$5, Opus 4.8 $5/$25, Sonnet $3/$15; voyage-3-lite $0.02 especial. Lo consumen `usage.ts` (total + byStage + byClient) y `ai-costs`. NUNCA hardcodear tablas de precio inline.
+- **Fecha "hoy" de operación** → `lib/date.ts` `hoyEnMexico()` (IANA `America/Mexico_City`, `YYYY-MM-DD`). Usarla en toda lógica de "hoy/vencido/mes"; NUNCA `new Date().toISOString().slice(0,10)` (eso es UTC del servidor → falso-positivo de 6h en la tarde CDMX). `computeStatus(a, today?)` la usa por default; el arg `today` inyectable permite tests deterministas y reuso en lotes.
+
+## Benchmark competitivo OPCIONAL en el reporte DM (audit jul-2026)
+
+Con `SHOW_BENCHMARK_STAGES=false` (estado actual) el pipeline DM genera el reporte final SIN benchmark. Patrón: `result_id` es opcional en `dm-report` y `export-dm-pdf` (placeholder si falta); `ReporteSection` recibe `benchmarkRequired` y usa `hasMatriz` como gate cuando el benchmark está oculto. Si se reactiva el benchmark (`SHOW_BENCHMARK_STAGES=true`), el flujo vuelve a exigirlo. NO volver a acoplar el reporte al benchmark de forma dura.
+
+## Auth de sub-recursos de cliente — regla dura (audit jul-2026, D-190)
+
+TODO handler bajo `clients/[id]/*` (y `materiality-topics`, `client-services/[id]`) debe usar `requireConsultorForClient(clientId)` para lectura Y mutación — NUNCA `requireUser` solo (no discrimina `role=cliente` y con service-role saltaría RLS → IDOR cross-tenant). Extraer el `id`/`clientId` de params ANTES del auth. Este es el gate que habilita onboardear clientes externos: si se agrega un endpoint nuevo bajo `clients/[id]`, aplica la misma regla.

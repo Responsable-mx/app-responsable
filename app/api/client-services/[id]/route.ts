@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireUser, requireAdmin } from "@/lib/auth";
+import { requireConsultorForClient, requireAdmin } from "@/lib/auth";
 import {
   updateClientService,
   updateClientServicePricing,
@@ -20,11 +20,12 @@ const PatchSchema = z.object({
 });
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
   const data = await getClientService(id);
   if (!data) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  // Verificar acceso al cliente dueño del servicio (bloquea rol cliente ajeno).
+  const user = await requireConsultorForClient(data.client_id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   return NextResponse.json({ data });
 }
 

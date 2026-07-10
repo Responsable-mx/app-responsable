@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 // Next.js 16 types require 2 args but 1-arg call is valid for fetch-tag invalidation
 import { revalidateTag as _revalidateTag } from "next/cache";
 const revalidateTag = _revalidateTag as (tag: string) => void;
-import { requireUser, requireAdmin } from "@/lib/auth";
+import { requireConsultorOrAdmin, requireAdmin } from "@/lib/auth";
 import { PROJECTS_OVERVIEW_TAG } from "@/app/api/projects/overview/route";
 import {
   ActivityInputSchema,
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 // Lectura no necesaria aquí — la lista completa va en GET /api/clients/:id/stages.
 // Mantengo GET noop para consistencia REST si después se necesita.
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
+  const user = await requireConsultorOrAdmin();
   if (!user) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   const { stageId } = await params;
   if (!validId(stageId))

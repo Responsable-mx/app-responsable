@@ -44,3 +44,31 @@ export function isPublicHttpUrl(u: string): { ok: boolean; reason?: string } {
   }
   return { ok: true };
 }
+
+/**
+ * fetch anti-SSRF: sigue redirects MANUALMENTE y revalida cada `Location` con
+ * isPublicHttpUrl. Sin esto, `redirect: "follow"` puede saltar de una URL pública
+ * a una IP interna / metadata cloud (169.254.169.254) tras un 302.
+ * Lanza si la URL inicial o cualquier salto es privado, o si hay demasiados saltos.
+ */
+export async function safeFetch(
+  url: string,
+  init: RequestInit = {},
+  opts: { maxRedirects?: number } = {},
+): Promise<Response> {
+  const maxRedirects = opts.maxRedirects ?? 5;
+  let current = url;
+  for (let i = 0; i <= maxRedirects; i++) {
+    const guard = isPublicHttpUrl(current);
+    if (!guard.ok) throw new Error(`URL bloqueada (SSRF): ${guard.reason}`);
+    const res = await fetch(current, { ...init, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) return res;
+      current = new URL(loc, current).toString(); // resuelve redirects relativos
+      continue;
+    }
+    return res;
+  }
+  throw new Error("Demasiados redirects (posible SSRF)");
+}

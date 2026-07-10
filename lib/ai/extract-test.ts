@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import { listCatalog } from "@/lib/catalogs";
 import { getTaskConfig } from "@/lib/ai/models";
+import { isPublicHttpUrl, safeFetch } from "@/lib/documents/ssrf";
 
 // ═══════════════════════════════════════════════════════════════
 // POC de extracción IA. Por ahora solo campo 'sector'.
@@ -62,45 +63,12 @@ function setCached(key: string, result: ExtractResult): void {
 }
 
 // ── Anti-SSRF: validación de URL ────────────────────────────
-const BLOCKED_HOSTNAMES = new Set([
-  "localhost",
-  "127.0.0.1",
-  "0.0.0.0",
-  "::1",
-  "metadata.google.internal",
-  "169.254.169.254", // AWS/GCP metadata
-]);
-
-function isPrivateIPv4(host: string): boolean {
-  const parts = host.split(".");
-  if (parts.length !== 4) return false;
-  const [a = 0, b = 0] = parts.map(Number);
-  if (a === 10) return true;
-  if (a === 127) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  return false;
-}
-
+// Usa el guard canónico isPublicHttpUrl (cubre IPv6 ULA, IPv4-mapped, etc.),
+// no una lista propia más débil.
 function validateUrl(raw: string): URL {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error("URL inválida");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Solo se permite http o https");
-  }
-  const host = url.hostname.toLowerCase();
-  if (BLOCKED_HOSTNAMES.has(host)) {
-    throw new Error("Hostname bloqueado por seguridad");
-  }
-  if (isPrivateIPv4(host)) {
-    throw new Error("IP privada bloqueada por seguridad");
-  }
-  return url;
+  const guard = isPublicHttpUrl(raw);
+  if (!guard.ok) throw new Error(guard.reason ?? "URL bloqueada por seguridad");
+  return new URL(raw);
 }
 
 // ── Fetch HTML + strip ──────────────────────────────────────
@@ -108,9 +76,8 @@ async function fetchPageText(url: URL): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url.toString(), {
+    const res = await safeFetch(url.toString(), {
       signal: ctrl.signal,
-      redirect: "follow",
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; AppResponSable/1.0; +https://app.responsable.net)",

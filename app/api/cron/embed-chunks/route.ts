@@ -20,9 +20,10 @@ const BATCH_LIMIT = 50;
 const INTER_BATCH_DELAY_MS = 200; // pausa entre batches Voyage para no saturar rate limit
 
 export async function GET(req: Request) {
-  // Vercel cron envía Authorization: Bearer <CRON_SECRET>
+  // Vercel cron envía Authorization: Bearer <CRON_SECRET>. Fail-closed: si
+  // CRON_SECRET queda vacío el endpoint NO se abre (antes el guard se saltaba).
   const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

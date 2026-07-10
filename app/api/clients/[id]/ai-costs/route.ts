@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { priceForModel } from "@/lib/ai/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,10 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireUser();
+  const { id } = await params;
+  const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const { id } = await params;
   const url = new URL(req.url);
   const days = Math.min(365, Math.max(1, parseInt(url.searchParams.get("days") ?? "90")));
   const since = new Date(Date.now() - days * 86400000).toISOString();
@@ -47,20 +48,13 @@ export async function GET(
   const byStage = new Map<string, Acc>();
 
   for (const r of rows ?? []) {
-    const m = ((r.model as string | null) ?? "").toLowerCase();
-    const isVoyage = m.includes("voyage");
-    const isHaiku  = m.includes("haiku");
-    const isOpus   = m.includes("opus");
-    const iIn  = isVoyage ? 0.10 : isHaiku ? 0.25  : isOpus ? 15   : 3;
-    const iOut = isVoyage ? 0    : isHaiku ? 1.25   : isOpus ? 75   : 15;
-    const iCr  = isVoyage ? 0    : isHaiku ? 0.03   : isOpus ? 1.5  : 0.3;
-    const iCw  = isVoyage ? 0    : isHaiku ? 0.03125: isOpus ? 18.75: 3.75;
-
+    // Precios canónicos (lib/ai/pricing) — una sola fuente para todos los paneles.
+    const p = priceForModel(r.model as string | null);
     const cost =
-      ((r.input_tokens            ?? 0) * iIn  +
-       (r.output_tokens           ?? 0) * iOut +
-       (r.cache_read_tokens       ?? 0) * iCr  +
-       (r.cache_creation_tokens   ?? 0) * iCw) / 1_000_000;
+      ((r.input_tokens            ?? 0) * p.input      +
+       (r.output_tokens           ?? 0) * p.output     +
+       (r.cache_read_tokens       ?? 0) * p.cacheRead  +
+       (r.cache_creation_tokens   ?? 0) * p.cacheWrite) / 1_000_000;
 
     const stage = r.workflow_stage as string;
     const acc = byStage.get(stage) ?? {

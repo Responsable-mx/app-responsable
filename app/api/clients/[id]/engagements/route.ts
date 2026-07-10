@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireUser, requireAdmin } from "@/lib/auth";
+import { requireConsultorForClient, requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logChange } from "@/lib/audit-log";
 
@@ -28,7 +28,7 @@ async function syncServicesArray(clientId: string) {
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { id } = await params;
-  const user = await requireUser();
+  const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const supabase = createAdminClient();
@@ -45,7 +45,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
-  const user = await requireUser();
+  const user = await requireConsultorForClient(id);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await req.json().catch(() => null);

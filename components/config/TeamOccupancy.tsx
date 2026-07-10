@@ -20,6 +20,9 @@ const seniorityFetcher = (url: string): Promise<{ value: string; label: string }
 
 type LoadLevel = { css: string; label: string; icon: string };
 
+// Máximo recomendado de actividades activas (in_progress + delayed) por consultor.
+const MAX_ACTIVE = 6;
+
 // Carga = actividades activas (in_progress + delayed). Más útil que conteo de proyectos.
 function loadLevel(activeCount: number, delayedCount: number): LoadLevel {
   if (delayedCount > 0)
@@ -28,7 +31,7 @@ function loadLevel(activeCount: number, delayedCount: number): LoadLevel {
     return { css: "bg-slate-100 text-slate-500", label: "Sin actividades activas", icon: "—" };
   if (activeCount <= 2)
     return { css: "bg-emerald-100 text-emerald-700", label: "Carga ligera", icon: "↓" };
-  if (activeCount <= 4)
+  if (activeCount <= MAX_ACTIVE)
     return { css: "bg-amber-100 text-amber-700", label: "Carga alta", icon: "↑" };
   return { css: "bg-rose-100 text-rose-700", label: "Sobrecargado", icon: "⚠" };
 }
@@ -189,11 +192,11 @@ export function TeamOccupancy({
                   <span className="text-[10px] text-slate-500">Carga ligera</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-amber-100 text-amber-700">↑ 3–4</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-amber-100 text-amber-700">↑ 3–{MAX_ACTIVE}</span>
                   <span className="text-[10px] text-slate-500">Carga alta</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700">⚠ 5+</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700">⚠ {MAX_ACTIVE + 1}+</span>
                   <span className="text-[10px] text-slate-500">Sobrecargado</span>
                 </div>
               </div>
@@ -308,7 +311,7 @@ export function TeamOccupancy({
                         ) : (
                           <div className="inline-flex flex-col items-center gap-0.5">
                             <span
-                              title={`${lvl.label} — ${m.active_count} de 6 máximo recomendado`}
+                              title={`${lvl.label} — ${m.active_count} de ${MAX_ACTIVE} máximo recomendado`}
                               className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-sm text-xs font-bold tabular-nums ${lvl.css}`}
                             >
                               <span aria-hidden>{lvl.icon}</span>
@@ -317,13 +320,13 @@ export function TeamOccupancy({
                             <div className="w-10 h-1 bg-slate-100 rounded-full overflow-hidden" aria-hidden>
                               <div
                                 className={`h-full rounded-full ${
-                                  m.delayed_count > 0 || m.active_count > 4
+                                  m.delayed_count > 0 || m.active_count > MAX_ACTIVE
                                     ? "bg-rose-400"
                                     : m.active_count <= 2
                                     ? "bg-emerald-400"
                                     : "bg-amber-400"
                                 }`}
-                                style={{ width: `${Math.min(100, Math.round((m.active_count / 6) * 100))}%` }}
+                                style={{ width: `${Math.min(100, Math.round((m.active_count / MAX_ACTIVE) * 100))}%` }}
                               />
                             </div>
                           </div>

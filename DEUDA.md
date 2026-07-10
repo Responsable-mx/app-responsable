@@ -38,33 +38,35 @@ Método: captura en vivo (Chrome admin, solo lectura) + fondo code-read (2 revis
 - `documents/route.ts` Path B confiaba en `storagePath` del body sin validar prefijo; download con service-role (salta RLS). Un consultor de A podía traerse el informe de B conociendo su UUID de path.
 - Fix: `if(!storagePath.startsWith(`${id}/`)) return 400` antes de usar el path (cubre rama ZIP e individual).
 
-#### Pendientes (priorizados)
+#### Resueltos en esta sesión (parte 2 — "subir a 10", 2026-07-09)
 
-### 🟠 D-190 — IDOR rol cliente latente (7 endpoints con `requireUser`) — GATE antes de 1er cliente externo
-- `ai-costs`, `services` (GET+POST), `clients/[id]` GET, `stages` GET, `engagements` GET/POST, `consultors` GET usan `requireUser` (no discrimina rol) + service-role. Hoy inerte (solo 3 cuentas +altamira internas, sin portal cliente). Al activar el 1er `role=cliente` externo, un cliente vería datos de otro. Fix: `requireConsultorForClient` en todos. **Bloqueante antes de onboardear cliente externo.**
+### ~~🟠 D-190 — IDOR rol cliente latente (8 endpoints con `requireUser`)~~ ✅ RESUELTO (2026-07-09)
+- `ai-costs`, `services` (GET+POST), `clients/[id]` GET, `stages` GET, `engagements` GET/POST, `consultors` GET, `client-services/[id]` GET, `materiality-topics/[topicId]` PATCH/DELETE → `requireConsultorForClient(clientId)`; `stages/[stageId]/activities` GET (noop 405) → `requireConsultorOrAdmin`. Ya NO hay superficie donde un `role=cliente` alcance datos de otro cliente. Gate para onboardear cliente externo: **cerrado**.
 
-### 🟡 D-186 — Precio Haiku contradictorio entre archivos
-- `usage.ts:188` $0.25/$1.25 vs `models.ts:5-6` comentario $1/$5. Una está mal → si el real es $1, el panel subreporta Haiku 4×. Verificar precio vigente de `claude-haiku-4-5` y unificar en `MODEL_PRICES` importado por ambos.
+### ~~🟡 D-186 — Precio Haiku/Opus contradictorio entre archivos~~ ✅ RESUELTO (2026-07-09)
+- Precio real confirmado (platform.claude.com): Haiku 4.5 $1/$5, Opus 4.8 $5/$25, Sonnet $3/$15. `usage.ts` cobraba Haiku $0.25/$1.25 (Haiku 3.5 viejo); `ai-costs` cobraba Opus $15/$75 (Opus 3 viejo). Fix: `lib/ai/pricing.ts` fuente única (`MODEL_PRICES`+`priceForModel`), consumida por ambos. voyage-3-lite conserva su precio especial.
 
-### 🟡 D-187 — Resumen/Reporte IA aún cargan NIS/IBSO eliminado (prompts)
-- `dm-resumen/route.ts:176-199` y `dm-report/route.ts` siguen cargando `client_nis_assessment` e inyectando "brechas" de una metodología retirada (CLAUDE.md: "NIS/IBSO eliminado"). El checklist ya se limpió (D-183), pero los prompts no. Quitar la carga NIS de ambos, o reactivar la etapa si sigue viva.
+### ~~🟡 D-187 — Resumen/Reporte IA cargaban NIS/IBSO eliminado (prompts)~~ ✅ RESUELTO (2026-07-09)
+- `dm-resumen` y `dm-report` ya no cargan `client_nis_assessment` ni inyectan "brechas NIS" al prompt. Eliminado el bloque `CAT_PATTERNS`/`iroRefsByCat`/`nisBrechas` y el parámetro `clientNis`. `{{nis_brechas}}` → "".
 
-### 🟡 D-188 — Umbral de carga 5 vs 6 contradictorio
-- `TeamOccupancy.tsx:33` marca "sobrecargado" con `>=5` pero tooltip/barra dicen "de 6 máximo". Unificar constante `MAX_ACTIVE` y derivar todos los umbrales.
+### ~~🟡 D-188 — Umbral de carga 5 vs 6 contradictorio~~ ✅ RESUELTO (2026-07-09)
+- `TeamOccupancy.tsx`: constante `MAX_ACTIVE=6`; todos los umbrales (sobrecargado, tooltip, barra, leyenda) derivan de ella. Coherente.
 
-### 🟡 D-189 — PDF escaneado sin OCR queda `parse_status="ok"` con basura
-- `queries.ts:75` marca `failed` solo si trim vacío, pero los marcadores `<!-- page:N -->` dan length>0 → un PDF sin texto real pasa a la IA como fuente. Umbral mínimo de texto alfanumérico útil (p.ej. <100 chars → `failed` "sin texto extraíble").
+### ~~🟡 D-189 — PDF escaneado sin OCR quedaba `parse_status="ok"` con basura~~ ✅ RESUELTO (2026-07-09)
+- `queries.ts`: helper `checkExtractedText` quita marcadores `<!-- page:N -->` y exige ≥100 chars alfanuméricos reales para PDFs; si no → `failed` "PDF sin texto extraíble (posible escaneo sin OCR)". Aplicado en los 2 sitios que deciden ok/failed.
 
-### 🟡 D-191 — Crons fail-open si `CRON_SECRET` vacía
-- `cron/ingest-competitor-reports`, `cron/auto-update`, `cron/embed-chunks` usan `if(CRON_SECRET && authHeader!==...)` → si la env var queda vacía, el guard se salta. Unificar a `verifyCron()` (fail-closed, ya existe en `auth.ts`).
+### ~~🟡 D-191 — Crons fail-open si `CRON_SECRET` vacía~~ ✅ RESUELTO (2026-07-09)
+- `embed-chunks`, `auto-update`, `ingest-competitor-reports` → `if(!CRON_SECRET || authHeader!==...)` (fail-closed).
 
-### 🟡 D-192 — Job `ingest-one-company` fail-open (hardening)
-- `jobs/ingest-one-company/route.ts:42-44` procesa sin verificar firma si faltan QSTASH keys. No explotable en prod (keys presentes → código muerto), pero asimetría: `reparse-document` degrada a `requireAdmin`. Copiar ese patrón (401 si faltan keys).
+### ~~🟡 D-192 — Job `ingest-one-company` fail-open~~ ✅ RESUELTO (2026-07-09)
+- Sin QSTASH signing keys y fuera de dev → 401 (antes procesaba sin verificar). Solo dev local procesa directo. Verificación de firma intacta cuando las keys están.
 
-### 🟡 D-193 — SSRF: redirect seguido sin re-validar destino
-- `ingest-report` (`redirect:"follow"`) + `competitor.ts`, `extract-profile.ts`, `extract-test.ts`. URL pasa `isPublicHttpUrl` inicial pero un 302 puede apuntar a IP interna/metadata cloud. Con clientes reales sube el riesgo. `redirect:"manual"` + revalidar cada salto. Además `extract-test.ts:64-104` tiene guard SSRF propio más débil (sin IPv6 ULA) → usar `isPublicHttpUrl`.
+### ~~🟡 D-193 — SSRF: redirect seguido sin re-validar destino~~ ✅ RESUELTO (2026-07-09)
+- `lib/documents/ssrf.ts` nuevo `safeFetch`: sigue redirects manual y revalida cada `Location` con `isPublicHttpUrl` (un 302 a IP interna ya NO pasa). Aplicado en `ingest-report`, `extract-profile`, `extract-test`, `competitor`. `extract-test` además reemplazó su guard propio más débil por `isPublicHttpUrl`.
 
-### 🟢 D-194 — Secrets de prod en `.env.local` dentro de OneDrive sincronizado
+#### Pendientes
+
+### 🟢 D-194 — Secrets de prod en `.env.local` dentro de OneDrive sincronizado (acción de NICOLÁS)
 - service_role, ANTHROPIC, RESEND, QSTASH, GOOGLE_AI en texto claro viajan a la nube MS. En .gitignore/no-trackeado (git OK), pero superficie ampliada. Considerar rotar service_role + evaluar mover el repo fuera de OneDrive o excluir `.env*` del sync.
 
 ### 🟢 Menores forma (no bloquean)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, requireAdmin } from "@/lib/auth";
+import { requireConsultorForClient, requireAdmin } from "@/lib/auth";
 import {
   getClient,
   updateClientRow,
@@ -11,9 +11,9 @@ import { logChange } from "@/lib/audit-log";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   try {
     const data = await getClient(id);
     if (!data)

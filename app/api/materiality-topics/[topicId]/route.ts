@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import {
   updateMaterialityTopic,
   deleteMaterialityTopic,
@@ -14,8 +14,6 @@ const VALID_COLORS: TopicColor[] = ["rose", "amber", "teal", "slate"];
 const VALID_SIZES: TopicSize[] = ["sm", "md", "lg"];
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { topicId } = await params;
 
   let body: Partial<MaterialityTopicInput> & { clientId?: string };
@@ -31,6 +29,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!clientId) {
     return NextResponse.json({ error: "clientId requerido" }, { status: 400 });
   }
+
+  // D-190: además de verificar topic∈cliente, verificar que el caller tenga
+  // acceso a ese cliente (bloquea rol cliente sobre clientes ajenos).
+  const user = await requireConsultorForClient(clientId);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   // Verificar que el topicId pertenezca al clientId declarado.
   const existing = await getMaterialityTopicVerified(topicId, clientId).catch(() => null);
@@ -72,8 +75,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { topicId } = await params;
 
   // D-12: clientId requerido vía query param para verificar ownership.
@@ -82,6 +83,10 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   if (!clientId) {
     return NextResponse.json({ error: "clientId requerido" }, { status: 400 });
   }
+
+  // D-190: verificar acceso del caller al cliente (bloquea rol cliente ajeno).
+  const user = await requireConsultorForClient(clientId);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   // Verificar que el topicId pertenezca al clientId declarado.
   const existing = await getMaterialityTopicVerified(topicId, clientId).catch(() => null);

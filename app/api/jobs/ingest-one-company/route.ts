@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { persistCompetitorReport } from "@/lib/documents/competitor";
+import { isDevMode } from "@/lib/env";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -21,26 +22,30 @@ export async function POST(req: Request) {
   const signingKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
   const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
 
-  if (signingKey && nextSigningKey) {
-    const receiver = new Receiver({ currentSigningKey: signingKey, nextSigningKey });
-    const body = await req.text();
-    const signature = req.headers.get("upstash-signature") ?? "";
-    const isValid = await receiver.verify({ body, signature }).catch(() => false);
-    if (!isValid) {
-      return NextResponse.json({ error: "Invalid QStash signature" }, { status: 401 });
+  // Fail-closed: sin llaves de firma QStash no hay forma de verificar el origen
+  // → rechazar. Antes el fallback procesaba SIN verificar (endpoint abierto si
+  // las env vars quedaban vacías). Solo dev local procesa directo.
+  if (!signingKey || !nextSigningKey) {
+    if (isDevMode()) {
+      const payload = (await req.json()) as JobPayload;
+      return processCompany(payload);
     }
-    // Parsear el body ya leído
-    let payload: JobPayload;
-    try {
-      payload = JSON.parse(body) as JobPayload;
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
-    }
-    return processCompany(payload);
+    return NextResponse.json({ error: "QStash signing keys no configuradas" }, { status: 401 });
   }
 
-  // Dev / fallback sin QStash keys: parsear body directamente
-  const payload = (await req.json()) as JobPayload;
+  const receiver = new Receiver({ currentSigningKey: signingKey, nextSigningKey });
+  const body = await req.text();
+  const signature = req.headers.get("upstash-signature") ?? "";
+  const isValid = await receiver.verify({ body, signature }).catch(() => false);
+  if (!isValid) {
+    return NextResponse.json({ error: "Invalid QStash signature" }, { status: 401 });
+  }
+  let payload: JobPayload;
+  try {
+    payload = JSON.parse(body) as JobPayload;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+  }
   return processCompany(payload);
 }
 

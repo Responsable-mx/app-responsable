@@ -1,7 +1,13 @@
 # AUDIT_LAST.md — App ResponSable
 
-**Fecha:** 2026-07-09 (audit-app UNIFICADO Fable — FORMA en vivo + FONDO code-read + PUENTES + SEGURIDAD adversarial con refutación)
-**Calificación global:** 6.5 / 10 (audit adversarial de flujos completos + seguridad; el 9.9 previo medía calidad de código incremental, no cruces/flujos/seguridad)
+**Fecha:** 2026-07-09 (audit-app UNIFICADO Fable + 2 tandas de fixes "subir a 10")
+**Calificación global:** 6.5 → **~9 / 10** tras cerrar toda la deuda accionable. El 10 pleno depende de 2 cosas fuera del código: (a) Nicolás rota la `service_role` y saca los secretos de OneDrive (D-194), y (b) la señal de negocio — adopción ~0 en 30 días — que no es un fix de código.
+
+## Progreso de fixes
+
+**Tanda 1 (commit `8a6d289`):** C1 matriz vs resumen, C2 reporte inalcanzable, H1 retrasadas ocultas, IDOR documentos (D-182–D-185).
+**Tanda 2 ("subir a 10", esta sesión):** D-186 pricing unificado (Haiku $1/$5, Opus $5/$25 — antes desincronizados), D-187 NIS fuera de prompts, D-188 umbral carga MAX_ACTIVE, D-189 PDF sin OCR → failed, **D-190 IDOR rol cliente cerrado en 8 endpoints (gate para cliente externo)**, D-191 crons fail-closed, D-192 job fail-closed, D-193 SSRF `safeFetch` revalida redirects. Detalle en DEUDA.md bloque D-182–D-194.
+**Pendiente:** D-194 (rotar secreto — Nicolás) + menores de forma (labels wizard, score 3 fórmulas, Gemini costo $0) + la adopción (negocio).
 
 ## Auditoría 2026-07-09 — hallazgos vivos (post-refutación)
 

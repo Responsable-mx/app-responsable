@@ -18,8 +18,9 @@ export const dynamic = "force-dynamic";
 const BATCH_SIZE = 3;
 
 export async function GET(req: Request) {
+  // Fail-closed: si CRON_SECRET queda vacío el endpoint NO se abre.
   const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

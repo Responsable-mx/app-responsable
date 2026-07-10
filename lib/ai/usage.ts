@@ -1,6 +1,7 @@
 import "server-only";
 import { isDevMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { priceForModel } from "@/lib/ai/pricing";
 
 export type UsageRow = {
   day: string;
@@ -180,14 +181,12 @@ export async function getUsageSummary(
     const isVoyage = m.includes("voyage");
     const family: UsageByModel["family"] =
       isVoyage ? "voyage" : isHaiku ? "haiku" : isOpus ? "opus" : isSonnet ? "sonnet" : "otro";
-    // Precios may-2026 por 1M tokens:
-    //   voyage-2 / voyage-3: $0.10 input, $0 output (no genera output)
-    //   voyage-3-lite: $0.02 input
-    // Voyage no tiene output ni cache_read distintos del input.
-    const voyageRate = m.includes("voyage-3-lite") ? 0.02 : 0.10;
-    const iIn  = isVoyage ? voyageRate : isHaiku ? 0.25 : isOpus ? 5  : 3;
-    const iOut = isVoyage ? 0 : isHaiku ? 1.25 : isOpus ? 25 : 15;
-    const iCache = isVoyage ? 0 : isHaiku ? 0.03 : isOpus ? 0.5 : 0.3;
+    // Precios canónicos (lib/ai/pricing) — una sola fuente para todos los paneles.
+    // voyage-3-lite es el único caso especial (más barato que voyage-3 estándar).
+    const p = priceForModel(m);
+    const iIn  = m.includes("voyage-3-lite") ? 0.02 : p.input;
+    const iOut = p.output;
+    const iCache = p.cacheRead;
     const rIn  = ((r.input_tokens  ?? 0) * iIn)    / 1_000_000;
     const rOut = ((r.output_tokens ?? 0) * iOut)   / 1_000_000;
     const rCache = ((r.cache_read_tokens ?? 0) * iCache) / 1_000_000;
@@ -241,12 +240,11 @@ export async function getUsageSummary(
     acc.calls += 1;
     if (r.error) acc.errors += 1;
     if (typeof r.latency_ms === "number") { acc.latency_sum += r.latency_ms; acc.latency_count += 1; }
-    // approximate cost per call using avg across all models for that call
+    // Costo por llamada con precios canónicos (misma fuente que el bloque principal).
     const m2 = ((r.model as string | null) ?? "").toLowerCase();
-    const iIn2  = m2.includes("voyage") ? 0.10 : m2.includes("haiku") ? 0.25 : m2.includes("opus") ? 5 : 3;
-    const iOut2 = m2.includes("voyage") ? 0 : m2.includes("haiku") ? 1.25 : m2.includes("opus") ? 25 : 15;
-    const iCr2  = m2.includes("voyage") ? 0 : m2.includes("haiku") ? 0.03 : m2.includes("opus") ? 0.5 : 0.3;
-    acc.cost_usd += ((r.input_tokens ?? 0) * iIn2 + (r.output_tokens ?? 0) * iOut2 + (r.cache_read_tokens ?? 0) * iCr2) / 1_000_000;
+    const p2 = priceForModel(m2);
+    const iIn2  = m2.includes("voyage-3-lite") ? 0.02 : p2.input;
+    acc.cost_usd += ((r.input_tokens ?? 0) * iIn2 + (r.output_tokens ?? 0) * p2.output + (r.cache_read_tokens ?? 0) * p2.cacheRead) / 1_000_000;
     byStageMap.set(stage, acc);
   }
   const byStage: UsageByStage[] = Array.from(byStageMap.entries())
@@ -369,10 +367,9 @@ export async function getUsageSummary(
   for (const r of calls) {
     if (!r.client_id) continue;
     const m2 = ((r.model as string | null) ?? "").toLowerCase();
-    const iIn2  = m2.includes("voyage") ? 0.10 : m2.includes("haiku") ? 0.25 : m2.includes("opus") ? 5  : 3;
-    const iOut2 = m2.includes("voyage") ? 0    : m2.includes("haiku") ? 1.25 : m2.includes("opus") ? 25 : 15;
-    const iCr2  = m2.includes("voyage") ? 0    : m2.includes("haiku") ? 0.03 : m2.includes("opus") ? 0.5: 0.3;
-    const cost = ((r.input_tokens ?? 0) * iIn2 + (r.output_tokens ?? 0) * iOut2 + (r.cache_read_tokens ?? 0) * iCr2) / 1_000_000;
+    const p2 = priceForModel(m2);
+    const iIn2 = m2.includes("voyage-3-lite") ? 0.02 : p2.input;
+    const cost = ((r.input_tokens ?? 0) * iIn2 + (r.output_tokens ?? 0) * p2.output + (r.cache_read_tokens ?? 0) * p2.cacheRead) / 1_000_000;
     const acc = byClientMap.get(r.client_id as string) ?? { cost_usd: 0, calls: 0 };
     acc.cost_usd += cost;
     acc.calls += 1;

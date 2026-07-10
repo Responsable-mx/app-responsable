@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireConsultorForClient } from "@/lib/auth";
 import {
   listClientServices,
   createClientService,
@@ -10,9 +10,9 @@ import type { ServiceKey } from "@/lib/services/service-schemas";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const data = await listClientServices(id);
   return NextResponse.json({ data }, {
     headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
@@ -20,9 +20,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id } = await params;
+  const user = await requireConsultorForClient(id);
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   let body: { service?: string; data?: Record<string, unknown> };
   try {
     body = await req.json();

@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { listCatalog } from "@/lib/catalogs";
-import { isPublicHttpUrl } from "@/lib/documents/ssrf";
+import { isPublicHttpUrl, safeFetch } from "@/lib/documents/ssrf";
 import { getTaskConfig } from "@/lib/ai/models";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -85,9 +85,8 @@ async function fetchPageData(url: URL): Promise<PageData> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url.toString(), {
+    const res = await safeFetch(url.toString(), {
       signal: ctrl.signal,
-      redirect: "follow",
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; AppResponSable/1.0; +https://app.responsable.net)",
         Accept: "text/html,application/xhtml+xml",

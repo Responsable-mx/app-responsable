@@ -82,14 +82,6 @@ type ClientIroRow = {
   confianza: string;
 };
 
-type ClientNisRow = {
-  ibso_label: string;
-  categoria: string;
-  estado: string;
-  calidad_dato: string;
-  accion: string | null;
-};
-
 type BenchmarkResultRow = {
   companies_snapshot: unknown;
   fields_snapshot: unknown;
@@ -102,7 +94,6 @@ async function buildReportPrompt(
   clientContext: string,
   benchmarkResult: BenchmarkResultRow | null,
   clientIros: ClientIroRow[],
-  clientNis: ClientNisRow[],
 ): Promise<string> {
   // ESRS catalog como referencia normativa
   const esrsIros = await listActiveIros().catch(() => []);
@@ -123,35 +114,6 @@ async function buildReportPrompt(
         .join("\n")}`
     : "";
 
-  // Brechas NIS/IBSO del cliente — solo indicadores con brecha real
-  // Excluye no_aplica y disponible+alta (dato listo, no es brecha)
-  const nisConBrecha = clientNis.filter(
-    (n) => n.estado !== "no_aplica" && !(n.estado === "disponible" && n.calidad_dato === "alta")
-  );
-
-  // Cross-reference NIS brecha → IROs afectados por categoría ESG
-  const CAT_PATTERNS: Record<string, RegExp> = {
-    ambiental:  /emisi|co2|ghg|carbon|energi|agua|residuo|biodiversi|climat|ambient|contamin/i,
-    social:     /labor|person|salud|segur|igualdad|comunidad|trabajador|derechos|emplead|cadena/i,
-    gobernanza: /gobern|etica|corrupci|riesg|transparenc|cumplimient|directiv|consejo|gesti/i,
-  };
-  const iroRefsByCat = Object.fromEntries(
-    Object.entries(CAT_PATTERNS).map(([cat, regex]) => [
-      cat,
-      clientIros.filter((iro) => regex.test(iro.tema_esg)).map((iro) => `IRO-${iro.n_iro}`),
-    ])
-  );
-
-  const nisBrechas = nisConBrecha.length
-    ? `\nMAPA DE BRECHAS NIS/IBSO:\n${nisConBrecha
-        .map((n) => {
-          const refs = iroRefsByCat[n.categoria]?.join(", ") ?? "";
-          const iroRef = refs ? ` — IROs afectados: ${refs}` : "";
-          return `${n.ibso_label} [${n.categoria}]: ${n.estado} (calidad: ${n.calidad_dato})${n.accion ? ` — acción: ${n.accion}` : ""}${iroRef}`;
-        })
-        .join("\n")}`
-    : "";
-
   const benchmarkData = benchmarkResult
     ? `Empresas comparadas: ${JSON.stringify(benchmarkResult.companies_snapshot, null, 2)}
 Campos analizados: ${JSON.stringify(benchmarkResult.fields_snapshot, null, 2)}
@@ -167,7 +129,7 @@ Síntesis del analista: ${benchmarkResult.narrative}`
     .replaceAll("{{client_context}}", clientContext)
     .replaceAll("{{esrs_context}}", esrsContext)
     .replaceAll("{{iro_inventory}}", iroInventory)
-    .replaceAll("{{nis_brechas}}", nisBrechas)
+    .replaceAll("{{nis_brechas}}", "")
     .replaceAll("{{benchmark_data}}", benchmarkData);
 }
 
@@ -330,19 +292,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: anthropicBreaker.userMessage }, { status: 503 });
   }
 
-  // Contexto IA: IROs validados + brechas NIS + marcos normativos Etapa 2 + decisiones validación Etapa 10
-  const [irosRes, nisRes, referentesRes, validacionRes] = await Promise.all([
+  // Contexto IA: IROs validados + marcos normativos Etapa 2 + decisiones validación Etapa 10
+  const [irosRes, referentesRes, validacionRes] = await Promise.all([
     admin
       .from("client_iro_inventory")
       .select("n_iro, tema_esg, descripcion, tipo, cadena, horizonte, score_impacto, score_financiero, confianza")
       .eq("client_id", id)
       .eq("incluido", true)
       .order("n_iro", { ascending: true }),
-    admin
-      .from("client_nis_assessment")
-      .select("ibso_label, categoria, estado, calidad_dato, accion")
-      .eq("client_id", id)
-      .order("sort_order", { ascending: true }),
     admin
       .from("dm_referentes")
       .select("enabled_frameworks")
@@ -356,7 +313,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   ]);
 
   const clientIros = (irosRes.data ?? []) as ClientIroRow[];
-  const clientNis  = (nisRes.data ?? []) as ClientNisRow[];
   const enabledFrameworks = (referentesRes.data?.enabled_frameworks as string[] | null) ?? [];
   const validacion = validacionRes.data;
 
@@ -384,7 +340,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     clientContext,
     benchmarkResult,
     clientIros,
-    clientNis,
   );
 
   const anthropic = createAnthropicClient();

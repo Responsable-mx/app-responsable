@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requireAdmin, requireConsultorForClient } from "@/lib/auth";
 import {
   listClientConsultors,
   assignConsultor,
@@ -10,11 +10,11 @@ import { logChange } from "@/lib/audit-log";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
+  const { id: clientId } = await params;
+  const user = await requireConsultorForClient(clientId);
   if (!user) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
-  const { id: clientId } = await params;
   try {
     const data = await listClientConsultors(clientId);
     return NextResponse.json({ data });

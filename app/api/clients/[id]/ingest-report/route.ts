@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireConsultorForClient } from "@/lib/auth";
 import { getClient } from "@/lib/clients";
 import { uploadAndParseDocument } from "@/lib/documents/queries";
-import { isPublicHttpUrl } from "@/lib/documents/ssrf";
+import { isPublicHttpUrl, safeFetch } from "@/lib/documents/ssrf";
 import { logChange } from "@/lib/audit-log";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -73,13 +73,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60_000);
-    response = await fetch(url, {
+    // safeFetch sigue redirects manualmente y revalida cada salto contra
+    // isPublicHttpUrl (un 302 a una IP interna ya NO pasa el guard).
+    response = await safeFetch(url, {
       method: "GET",
-      // "follow" es necesario para CDNs y repositorios (ej. BMV). La URL ya pasó
-      // isPublicHttpUrl() arriba, pero si el servidor redirige a una IP interna,
-      // el SSRF guard NO re-valida la URL destino. Riesgo aceptado para piloto;
-      // mitigación futura: resolver DNS del destino final y validar de nuevo.
-      redirect: "follow",
       signal: controller.signal,
       headers: {
         "User-Agent": "ResponSable-DocIngest/1.0",

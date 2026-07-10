@@ -1,6 +1,6 @@
 import "server-only";
 import { uploadAndParseDocument } from "@/lib/documents/queries";
-import { isPublicHttpUrl } from "@/lib/documents/ssrf";
+import { isPublicHttpUrl, safeFetch } from "@/lib/documents/ssrf";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // ── Persistencia reportes competidores (Wave 7 C) ──────────
@@ -94,9 +94,8 @@ export async function persistCompetitorReport(
   // 3. Fetch con timeout + size cap
   let response: Response;
   try {
-    response = await fetch(opts.sourceUrl, {
+    response = await safeFetch(opts.sourceUrl, {
       method: "GET",
-      redirect: "follow",
       headers: { "User-Agent": "ResponSable-Benchmark/1.0" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });

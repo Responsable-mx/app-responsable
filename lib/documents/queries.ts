@@ -7,6 +7,26 @@ import { createHash, randomUUID } from "node:crypto";
 
 const BUCKET = "client-documents";
 
+// Umbral mínimo de texto alfanumérico real tras quitar los marcadores de página
+// que parsePdf inyecta (`<!-- page: N -->`) incluso cuando no extrajo contenido
+// (ej. PDF escaneado sin OCR). Sin este chequeo, un PDF vacío queda parse_status="ok"
+// con solo marcadores, contaminando el contexto de la IA con ruido.
+const MIN_USEFUL_CHARS = 100;
+
+function checkExtractedText(markdown: string, fileType: FileType): { ok: true } | { ok: false; error: string } {
+  if (fileType !== "pdf") {
+    return markdown.trim().length === 0
+      ? { ok: false, error: "El parser no extrajo texto del archivo." }
+      : { ok: true };
+  }
+  const withoutPageMarkers = markdown.replace(/<!--\s*page:\s*\d+\s*-->/g, "");
+  const usefulChars = (withoutPageMarkers.match(/[a-zA-Z0-9À-ÿ]/g) ?? []).length;
+  if (usefulChars < MIN_USEFUL_CHARS) {
+    return { ok: false, error: "PDF sin texto extraíble (posible escaneo sin OCR)." };
+  }
+  return { ok: true };
+}
+
 export type ClientDocument = {
   id: string;
   client_id: string;
@@ -72,9 +92,10 @@ export async function uploadAndParseDocument(opts: UploadDocOpts): Promise<Clien
   try {
     const md = await parseToMarkdown(opts.buffer, fileType);
     markdown = truncateMarkdown(md);
-    if (markdown.trim().length === 0) {
+    const check = checkExtractedText(markdown, fileType);
+    if (!check.ok) {
       parseStatus = "failed";
-      parseError = "El parser no extrajo texto del archivo.";
+      parseError = check.error;
     }
   } catch (e) {
     parseStatus = "failed";
@@ -254,9 +275,10 @@ export async function processStoredDocument(opts: ProcessStoredDocOpts): Promise
   try {
     const md = await parseToMarkdown(buffer, fileType);
     markdown = truncateMarkdown(md);
-    if (markdown.trim().length === 0) {
+    const check = checkExtractedText(markdown, fileType);
+    if (!check.ok) {
       parseStatus = "failed";
-      parseError = "El parser no extrajo texto del archivo.";
+      parseError = check.error;
     }
   } catch (e) {
     parseStatus = "failed";

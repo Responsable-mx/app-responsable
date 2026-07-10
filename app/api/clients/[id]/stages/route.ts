@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireUser, requireAdmin } from "@/lib/auth";
+import { requireConsultorForClient, requireAdmin } from "@/lib/auth";
 import {
   listStagesByClient,
   createStage,
@@ -15,9 +15,9 @@ type Ctx = { params: Promise<{ id: string }> };
 // GET /api/clients/:id/stages
 // Devuelve todas las etapas (de todos los servicios del cliente) con sus actividades.
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   const { id: clientId } = await params;
+  const user = await requireConsultorForClient(clientId);
+  if (!user) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   try {
     const data = await listStagesByClient(clientId);
     return NextResponse.json({ data }, {

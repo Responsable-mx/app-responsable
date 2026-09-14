@@ -522,7 +522,7 @@ Repo vive bajo `C:\Users\…\OneDrive\…\app-responsable`. OneDrive puede conve
 1. **Antes de commit**: hook pre-commit ejecuta automáticamente pin + tsc. Si tsc falla, fix antes de continuar.
 2. **Antes de push manual** (opcional, validar build): `npm run predeploy`.
 3. **Push**: `git push` — Vercel detecta + buildea + deploya solo HEAD.
-4. **Commits no-funcionales** (docs/chores): agregar `[skip vercel]` al mensaje. No dispara build.
+4. **Commits no-funcionales** (docs/chores): NO hay token que evite el build — `[skip vercel]` está REFUTADO (medido 28-ago-2026 en ESTE repo: 4 de 4 commits con ese token se construyeron igual; ver `~/.claude/CLAUDE.md` § Git push). Acumularlos y subirlos junto con el siguiente cambio funcional.
 5. **Multiple commits**: acumular localmente, push único al terminar. Vercel buildea sólo HEAD (memoria global).
 6. **Migración SQL aditiva** (CREATE TABLE / ADD COLUMN / CREATE INDEX): aplicar a Supabase ANTES del push para evitar runtime errors entre los 2 pasos. Helper `node ~/.claude/scripts/apply-sql.mjs supabase/migrations/NNNN_xxx.sql --project=lyideepglavkmuuujoqz`. Destructiva pide OK textual + `--confirm-destructive`.
 7. **Verificación post-deploy**: `curl -sI https://app.responsable.net` debe devolver 200 o redirect a login.

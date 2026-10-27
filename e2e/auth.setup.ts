@@ -33,28 +33,34 @@ setup("obtener sesión de test", async ({ page }) => {
     return;
   }
 
-  // Generar magic link vía admin API (no envía email real — retorna URL directamente)
+  // Entra como un consultor real: código de acceso + /api/auth/login-code.
+  // Antes navegaba a un magic link, pero Supabase lo redirige a su Site URL
+  // (localhost:3000, sin redirect URLs permitidas) y el login nunca llegaba a la app.
+  // Aquí el código se inserta con service role en vez de mandarse por correo.
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: "magiclink",
-    email: testEmail,
-    options: {
-      // Redirige al app en vez de localhost (si Supabase está configurado con redirect URLs)
-      redirectTo: (process.env.E2E_BASE_URL ?? "http://localhost:3000") + "/clientes",
-    },
+  const email = testEmail.trim().toLowerCase();
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  await admin.from("access_codes").update({ used: true }).eq("email", email).eq("used", false);
+  const { error: insertError } = await admin.from("access_codes").insert({
+    email,
+    code,
+    used: false,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   });
-
-  if (error || !data?.properties?.action_link) {
-    throw new Error(`[auth.setup] No se pudo generar magic link: ${error?.message ?? "sin data"}`);
+  if (insertError) {
+    throw new Error(`[auth.setup] No se pudo crear el código: ${insertError.message}`);
   }
 
-  // Navegar al magic link — Supabase lo procesa, setea cookies de sesión
-  await page.goto(data.properties.action_link);
+  // page.request comparte cookies con el navegador: la sesión que fija la API queda en el contexto
+  const res = await page.request.post("/api/auth/login-code", { data: { email, code } });
+  if (!res.ok()) {
+    throw new Error(`[auth.setup] login-code respondió ${res.status()}: ${await res.text()}`);
+  }
 
-  // Esperar a que el app redirija post-auth a una página real
+  await page.goto("/clientes");
   await expect(page).toHaveURL(/\/(clientes|chat|configuracion)/, { timeout: 15_000 });
 
   // Guardar cookies + localStorage para reuso en tests

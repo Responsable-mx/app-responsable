@@ -497,7 +497,7 @@ export function ResumenEjecutivoSection({ clientId, quadrantCounts }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               <p className="text-[11px] text-slate-500">
-                Completa la calificación de IROs (Etapa 6) y usa <strong className="text-slate-600">"Generar resumen"</strong> para que Aurora redacte el análisis.
+                Completa la calificación de IROs (Etapa 6) y usa <strong className="text-slate-600">&quot;Generar resumen&quot;</strong> para que Aurora redacte el análisis.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">

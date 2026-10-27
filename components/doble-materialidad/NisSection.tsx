@@ -267,7 +267,7 @@ export function NisSection({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <p className="text-[11px] text-slate-500">
-              Haz clic en <strong className="text-slate-600">"Auto-completar desde cuestionario"</strong> para que la IA pre-llene el mapa con los indicadores más relevantes para el sector del cliente.
+              Haz clic en <strong className="text-slate-600">&quot;Auto-completar desde cuestionario&quot;</strong> para que la IA pre-llene el mapa con los indicadores más relevantes para el sector del cliente.
               {!hasBenchmark && <span className="text-amber-600 ml-1">Completa el benchmark primero.</span>}
             </p>
           </div>

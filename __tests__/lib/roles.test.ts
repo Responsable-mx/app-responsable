@@ -1,4 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// buildSystemBlocks carga sinónimos de Supabase desde may-2026; en tests no hay
+// Supabase, así que los cargadores devuelven vacío (el armado del bloque es real).
+vi.mock("@/lib/ai/synonyms", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ai/synonyms")>()),
+  loadGlobalSynonyms: async () => [],
+  loadClientVocabulary: async () => [],
+}));
+
 import { buildClientContext, buildSystemBlocks } from "@/lib/ai/roles";
 import { DEFAULT_PROMPTS, PROMPT_KEYS } from "@/lib/ai/prompts";
 import type { QuestionnaireBundle } from "@/lib/questionnaires/types";

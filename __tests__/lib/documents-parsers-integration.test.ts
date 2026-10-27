@@ -1,8 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { parseToMarkdown } from "@/lib/documents/parsers";
 
 // Tests de integración con archivos sintéticos generados en runtime.
 // Verifican que los parsers reales funcionan, no solo los mocks de TXT/MD.
+// La primera carga de mammoth/exceljs tarda 10-18 s en esta máquina (medido
+// 26-oct-2026); el tope de 5 s por default los daba por fallidos sin serlo.
+vi.setConfig({ testTimeout: 30_000 });
 
 describe("parseToMarkdown - DOCX integración", () => {
   it("extrae texto de DOCX válido generado en runtime", async () => {

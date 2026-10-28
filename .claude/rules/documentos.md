@@ -5,6 +5,8 @@ paths:
   - "app/api/clients/*/documents/**"
   - "app/api/cron/**"
   - "**/ai-fill/**"
+  - "components/clients/ReportIaButton.tsx"
+  - "components/questionnaire/ImportModal.tsx"
 ---
 
 # Documentos por cliente y retrieval semántico
